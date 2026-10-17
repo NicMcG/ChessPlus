@@ -16,13 +16,19 @@ Everything in the rules engine should be built so standard chess is just one con
 
 ## How Mac wants to work
 
-* Mac is learning to code as he goes. Explain what each new file and function does and why, in plain language. Don't dump large amounts of code without explanation.
+* Claude writes the code AND the tests, runs the tests itself, and commits and pushes to main after each working step (clear commit message, tests passing). Mac doesn't need to approve each file before it's written.
+* Mac is learning to code as he goes. After each step, explain what each new file and function does and why, in plain language. Don't dump large amounts of code without explanation.
 * Always state the full location of every file and folder you reference or create, as both the res:// path and the Windows path.
-* Work in small steps. After each working step, remind Mac to commit and push.
-* Anything done by clicking in the Godot editor (scenes, nodes, Inspector, .tres piece files, art) is Mac's to do. Give him numbered step-by-step instructions rather than hand-editing .tscn/.tres files, unless he asks.
-* Before adding any new piece type, mechanic, or content, ask Mac what it should be named. Also ask him about art (which images, what they're called) before implementing anything that uses art.
+* Work in small steps, each with its own passing tests and its own commit.
+* Claude may create and edit test scenes and other plumbing files itself. Game-facing editor work (the playable scenes and their layout, Inspector work on .tres piece files, art) stays Mac's: give him numbered step-by-step instructions rather than hand-editing those files, unless he asks.
+* Only stop to ask Mac about game design, art and content. Before adding any new piece type, mechanic, rule flag, or content, ask Mac what it should be named. Also ask him about art (which images, what they're called) before implementing anything that uses art.
 * Design decisions for Chess Plus (budget size, placement rules, promotion rules, piece costs) are Mac's calls. Raise them as questions; don't decide them silently.
 * Mac wants rigorous, honest feedback on his ideas, not reflexive praise.
+
+### Decisions made so far
+
+* Promotion options live in one game-wide rules list (standard chess: knight, bishop, rook, queen), so they can later become "pieces in your army".
+* The 50-move rule resets on captures and on moves by pieces with a new PieceDef flag (to be named by Mac), which the pawn will have.
 
 ## Architecture rules
 
@@ -65,8 +71,9 @@ Goal: a rules engine that produces every legal move in standard chess, driven en
 
 ## Running tests
 
-* Godot executable: C:\\Tools\\Godot\\Godot\_v4.7.2-stable\_win64\_console.exe. Use the \_console build so output prints to the terminal.
-* Run a test scene headless: `"<godot console exe>" --headless --path . res://tests/<scene>.tscn`. Test scripts must call `get\_tree().quit()` when finished, or the process won't exit.
+* Godot executable: C:\Tools\Godot\Godot\_v4.7.2-stable\_win64\_console.exe. Use the \_console build so output prints to the terminal.
+* All tests: `"<godot console exe>" --headless --path . res://tests/run_tests.tscn`. Only some files: add `-- <word>` (e.g. `-- movegen`) to run files whose names contain that word. The exit code is 1 if anything failed. In the editor, Mac can open `res://tests/run_tests.tscn` and press F6 (the Output panel's Log toggle must be on).
+* A test file is `res://tests/<name>_test.gd`, extends `TestSuite`, and has functions named `test_...` that call `check(...)` / `check_eq(...)`. The runner finds them automatically; no scene needed.
+* GDScript has no exceptions: a runtime error stops that test function early without marking it failed. Always scan test output for `SCRIPT ERROR` as well as the pass/fail summary.
 * If a newly added `class\_name` isn't recognized when running headless, refresh Godot's class cache with `"<godot console exe>" --headless --path . --import` (or open the project in the editor once).
-* Before editing any file, remind Mac to save everything in the Godot editor, so unsaved editor changes don't collide with your edits.
-
+* Godot reloads scripts changed on disk. If Mac has the editor open and it asks whether to reload a file, he should choose Reload.
