@@ -35,6 +35,11 @@ func make_move(move: Move) -> void:
 	board.set_piece(move.capture_square, null)
 	board.set_piece(move.to, move.piece)
 	move.piece.has_moved = true
+	if move.is_castling():
+		move.partner_had_moved = move.partner.has_moved
+		board.set_piece(move.partner_from, null)
+		board.set_piece(move.partner_to, move.partner)
+		move.partner.has_moved = true
 	# En passant is only possible on the very next move.
 	en_passant_squares = move.skipped_squares
 	en_passant_victim = move.to if not move.skipped_squares.is_empty() else Board.NO_SQUARE
@@ -49,6 +54,10 @@ func undo_move(move: Move) -> void:
 	move.piece.has_moved = move.piece_had_moved
 	en_passant_squares = move.prev_en_passant_squares
 	en_passant_victim = move.prev_en_passant_victim
+	if move.is_castling():
+		move.partner.has_moved = move.partner_had_moved
+		board.set_piece(move.partner_to, null)
+		board.set_piece(move.partner_from, move.partner)
 	board.set_piece(move.to, null)
 	board.set_piece(move.capture_square, move.captured)  # null if nothing was captured.
 	board.set_piece(move.from, move.piece)

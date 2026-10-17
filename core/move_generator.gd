@@ -39,6 +39,8 @@ static func pseudo_legal_moves(state: GameState) -> Array[Move]:
 				continue
 			for rule in piece.def.move_rules:
 				_add_rule_moves(state, from, piece, rule, moves)
+			if piece.def.can_castle and not piece.has_moved:
+				_add_castling_moves(board, from, piece, moves)
 	return moves
 
 ## True if any of `team`'s royal pieces is attacked.
@@ -110,6 +112,46 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 			if target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
 				moves.append(Move.new(from, to, piece, target))
 			break
+
+## Castling: the king moves two squares toward an unmoved partner on the same rank,
+## with only empty squares between them, and the partner lands on the square the
+## king crossed. Not allowed out of check or across an attacked square. (Landing
+## in check is ruled out by the normal legality filter.)
+static func _add_castling_moves(board: Board, king_pos: Vector2i, king: Piece, moves: Array[Move]) -> void:
+	var enemy := Piece.other_team(king.team)
+	var enemy_defs: Array[PieceDef] = []
+	var checked_for_check := false
+	for dir in [-1, 1]:
+		var partner_pos := _first_piece_along(board, king_pos, Vector2i(dir, 0))
+		if partner_pos == Board.NO_SQUARE or absi(partner_pos.x - king_pos.x) < 3:
+			continue
+		var partner := board.get_piece(partner_pos)
+		if partner.team != king.team or not partner.def.castle_partner or partner.has_moved:
+			continue
+		# Only look for attacks once castling is actually possible: it's slow-ish.
+		if not checked_for_check:
+			enemy_defs = _defs_on_board(board, enemy)
+			if _is_attacked_by(board, king_pos, enemy, enemy_defs):
+				return
+			checked_for_check = true
+		var crossed := king_pos + Vector2i(dir, 0)
+		if _is_attacked_by(board, crossed, enemy, enemy_defs):
+			continue
+		var move := Move.new(king_pos, king_pos + Vector2i(dir * 2, 0), king)
+		move.partner = partner
+		move.partner_from = partner_pos
+		move.partner_to = crossed
+		moves.append(move)
+
+## The first occupied square from `from` (not counting it) in direction `step`,
+## or NO_SQUARE if there's nothing before the edge of the board.
+static func _first_piece_along(board: Board, from: Vector2i, step: Vector2i) -> Vector2i:
+	var pos := from + step
+	while board.in_bounds(pos):
+		if not board.is_empty(pos):
+			return pos
+		pos += step
+	return Board.NO_SQUARE
 
 ## If moving to the empty square `to` would capture en passant, returns that
 ## capture, otherwise null. Both pieces need the en_passant flag.
