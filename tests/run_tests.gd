@@ -4,18 +4,25 @@ extends Node
 ## In the editor: open run_tests.tscn and press F6.
 ## Command line: see "Running tests" in CLAUDE.md. Words after "--" only run
 ## files whose names contain them, e.g. "-- movegen".
+## Functions named slow_test_... only run when "--slow" is given, e.g. "-- --slow".
 
 const TEST_DIR := "res://tests/"
 
 func _ready() -> void:
-	var filters := OS.get_cmdline_user_args()
+	var filters: PackedStringArray = []
+	var include_slow := false
+	for arg in OS.get_cmdline_user_args():
+		if arg == "--slow":
+			include_slow = true
+		else:
+			filters.append(arg)
 	var passed := 0
 	var failed := 0
 	for file in DirAccess.get_files_at(TEST_DIR):
 		if not file.ends_with("_test.gd") or not _matches(file, filters):
 			continue
 		var script: GDScript = load(TEST_DIR + file)
-		for test_name in _test_names(script):
+		for test_name in _test_names(script, include_slow):
 			# A fresh copy per test, so one test's leftovers can't affect another.
 			var suite: TestSuite = script.new()
 			var start := Time.get_ticks_msec()
@@ -41,11 +48,12 @@ func _matches(file: String, filters: PackedStringArray) -> bool:
 			return true
 	return false
 
-## The script's functions whose names start with "test_", in the order written.
-func _test_names(script: GDScript) -> PackedStringArray:
+## The script's test functions, in the order written.
+func _test_names(script: GDScript, include_slow: bool) -> PackedStringArray:
 	var names: PackedStringArray = []
 	for method in script.get_script_method_list():
 		var method_name: String = method.name
-		if method_name.begins_with("test_") and not names.has(method_name):
+		var is_test := method_name.begins_with("test_") or (include_slow and method_name.begins_with("slow_test_"))
+		if is_test and not names.has(method_name):
 			names.append(method_name)
 	return names
