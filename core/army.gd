@@ -7,6 +7,20 @@ extends Resource
 @export var army_name := ""
 @export var pieces: Array[ArmyPiece] = []
 
+## The file this army was saved in by ArmyLibrary ("" if never saved). Not saved
+## inside the file itself.
+var library_path := ""
+
+## An independent copy to edit, so changes can be thrown away. It shares the
+## PieceDefs (they're the same piece types) and remembers the same file.
+func copy() -> Army:
+	var result := Army.new()
+	result.army_name = army_name
+	result.library_path = library_path
+	for piece in pieces:
+		result.place(piece.def, piece.square)
+	return result
+
 ## Put a piece on a square, replacing anything already there.
 func place(def: PieceDef, square: Vector2i) -> void:
 	remove_at(square)
@@ -56,7 +70,7 @@ static func king_files(board_width: int) -> Array[int]:
 func problems(rules: GameRules, board_width: int) -> PackedStringArray:
 	var found: PackedStringArray = []
 	if cost() > rules.army_budget:
-		found.append("Costs %s points; the budget is %s." % [_points(cost()), _points(rules.army_budget)])
+		found.append("Costs %s points; the budget is %s." % [format_points(cost()), format_points(rules.army_budget)])
 
 	var kings := pieces.filter(func(p: ArmyPiece) -> bool: return p.def.is_king_type())
 	if kings.is_empty():
@@ -96,5 +110,5 @@ func is_valid(rules: GameRules, board_width: int) -> bool:
 	return problems(rules, board_width).is_empty()
 
 ## 39.0 -> "39", 1.5 -> "1.5".
-static func _points(value: float) -> String:
+static func format_points(value: float) -> String:
 	return str(int(value)) if is_equal_approx(value, roundf(value)) else str(value)

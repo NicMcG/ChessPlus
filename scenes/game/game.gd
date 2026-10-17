@@ -3,15 +3,24 @@ extends Control
 ## The game screen: connects the board view, the text around it and the buttons
 ## to a GameState. Two players share one device for now (pass and play).
 
+## Pressed "Menu". Only shown if something is listening (the main scene).
+signal menu_requested
+
 ## If set, games start from this FEN position instead of the standard one. Any
 ## piece in res://data/pieces/ can appear in it (e.g. "E"/"e" for elephants).
 @export var start_fen := ""
+
+## If both are set (by the main scene, before the screen opens), games are
+## played with these armies, and "New game" replays them.
+var white_army: Army
+var black_army: Army
 
 @onready var board_view: BoardView = %BoardView
 @onready var status_label: Label = %Status
 @onready var moves_label: Label = %Moves
 @onready var new_game_button: Button = %NewGame
 @onready var undo_button: Button = %Undo
+@onready var menu_button: Button = %Menu
 @onready var promotion_overlay: ColorRect = %PromotionOverlay
 @onready var promotion_choices: HBoxContainer = %PromotionChoices
 
@@ -22,11 +31,15 @@ func _ready() -> void:
 	board_view.choice_needed.connect(_ask_which_move)
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
+	menu_button.pressed.connect(func() -> void: menu_requested.emit())
+	menu_button.visible = not menu_requested.get_connections().is_empty()
 	promotion_overlay.gui_input.connect(_on_overlay_input)
 	new_game()
 
 func new_game() -> void:
-	if start_fen.is_empty():
+	if white_army and black_army:
+		state = ArmySetup.create_game(white_army, black_army, StandardSetup.create_rules())
+	elif start_fen.is_empty():
 		state = StandardSetup.create_game()
 	else:
 		state = Fen.parse(start_fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
