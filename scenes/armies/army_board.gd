@@ -13,6 +13,8 @@ const DARK_SQUARE := Color("#B58863")
 const HIGHLIGHT_TINT := Color(0.95, 0.85, 0.2, 0.45)
 
 var army: Army
+## Which colour the pieces are drawn in (armies work for either side).
+var team := Piece.Team.WHITE
 var columns := 8
 var rows := 2
 ## Squares to tint, e.g. where the selected piece is allowed to go.
@@ -48,7 +50,7 @@ func _draw() -> void:
 	if army == null:
 		return
 	for piece in army.pieces:
-		var texture := PieceArt.texture_for(piece.def, Piece.Team.WHITE)
+		var texture := PieceArt.texture_for(piece.def, team)
 		if texture:
 			draw_texture_rect(texture, _square_rect(piece.square), false)
 

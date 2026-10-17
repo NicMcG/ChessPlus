@@ -10,6 +10,18 @@ const DEFAULT_STYLE := "standard"
 
 static var _cache := {}  # Image path (without extension) -> Texture2D, or null if none.
 
+## Alternate pictures a piece may have (e.g. a paladin whose shield is broken).
+const VARIANTS: Array[String] = ["wounded"]
+
+## The piece's normal picture followed by any alternate ones it has.
+static func all_textures(def: PieceDef, team: Piece.Team, style := DEFAULT_STYLE) -> Array[Texture2D]:
+	var textures: Array[Texture2D] = []
+	for variant in [""] + VARIANTS:
+		var texture := texture_for(def, team, style, variant)
+		if texture:
+			textures.append(texture)
+	return textures
+
 ## The image for a piece, or null if there isn't one.
 static func texture_for(def: PieceDef, team: Piece.Team, style := DEFAULT_STYLE, variant := "") -> Texture2D:
 	var team_name := "white" if team == Piece.Team.WHITE else "black"

@@ -1,0 +1,75 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/common/piece_card.gd" id="1_card"]
+[ext_resource type="Script" path="res://scenes/common/guide_board.gd" id="2_board"]
+
+[node name="PieceCard" type="VBoxContainer"]
+theme_override_constants/separation = 12
+script = ExtResource("1_card")
+
+[node name="Header" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Pictures" type="HBoxContainer" parent="Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Titles" type="VBoxContainer" parent="Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="Name" type="Label" parent="Header/Titles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Piece"
+
+[node name="Details" type="Label" parent="Header/Titles"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.75, 0.75, 1)
+theme_override_font_sizes/font_size = 24
+text = "0 points"
+
+[node name="Body" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="GuideBoard" type="Control" parent="Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 220)
+layout_mode = 2
+script = ExtResource("2_board")
+
+[node name="Legend" type="VBoxContainer" parent="Body"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="Keywords" type="HFlowContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="Special" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SpecialTitle" type="Label" parent="Special"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Special"
+
+[node name="SpecialText" type="Label" parent="Special"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+autowrap_mode = 3
