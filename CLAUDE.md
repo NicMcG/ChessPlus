@@ -53,7 +53,7 @@ Everything in the rules engine should be built so standard chess is just one con
 
 ## What exists so far
 
-* `res://core/move\_rule.gd` — `MoveRule` (Resource): `directions: Array\[Vector2i]` as (files, ranks) from the owner's point of view, positive ranks = toward the opponent; `max\_steps` (1 = single step/leap, 0 = unlimited slide, stopping when blocked); `first\_move\_max\_steps` (if > 0, replaces max\_steps while the piece hasn't moved); `mode` (MOVE\_OR\_CAPTURE / MOVE\_ONLY / CAPTURE\_ONLY). A knight is (1,2)-type directions with max\_steps 1, so it can't be blocked.
+* `res://core/move\_rule.gd` — `MoveRule` (Resource): `directions: Array\[Vector2i]` as (files, ranks) from the owner's point of view, positive ranks = toward the opponent; `max\_steps` (1 = single step/leap, 0 = unlimited slide, stopping when blocked); `first\_move\_max\_steps` (if > 0, replaces max\_steps while the piece hasn't moved); `mode` (MOVE\_OR\_CAPTURE / MOVE\_ONLY / CAPTURE\_ONLY). `captures_by_hopping` (cannon-style: the first piece in the way is a screen; capture the first enemy beyond it; attack detection skips one screen too). A knight is (1,2)-type directions with max\_steps 1, so it can't be blocked.
 * `res://core/piece\_def.gd` — `PieceDef` (Resource): id, display\_name, symbol, value, move\_rules: Array\[MoveRule], plus `types` (flags: King, Royal, Pawn) and `keywords` (flags: Jump, Castle) with helpers is_king_type(), is_royal_type(), is_pawn_type(), has_jump(), has_castle(). The engine keys checkmate/castling off King type, en passant/promotion/50-move off Pawn type, castling partners off Castle.
 * `res://data/pieces/` — pawn, knight, bishop, rook, queen, king .tres files. The pawn has two rules: forward (0,1) max 1, first-move max 2, MOVE\_ONLY; diagonal (1,1)/(-1,1) max 1, CAPTURE\_ONLY. The king's value is 0 (not purchasable; every army will have exactly one).
 * `res://core/piece.gd` — `Piece` (RefCounted): def, team (`Piece.Team.WHITE/BLACK`), has\_moved, letter(), static other\_team().
@@ -86,6 +86,14 @@ Everything in the rules engine should be built so standard chess is just one con
 ## Current milestone: armies (Chess Plus phase 2)
 
 Steps 1–4 DONE: army data and rules, army builder screen, saving up to 10 armies, choosing armies before a pass-and-play match. Possible next: a computer opponent, more custom pieces, polish (animation, sounds).
+
+## Next pieces (in progress)
+
+Mac's designs; waiting on his answers for costs, art and the open questions:
+* Man (M): one step any direction, no tags. Suggested cost 3.
+* Cannon (C): moves like a rook; captures by hopping exactly one piece (xiangqi rule, assumed — confirm); Castle keyword. Engine support done (`captures_by_hopping`, tests in hopping_test.gd). Suggested cost 4–4.5.
+* Lance (L): slides straight forward only; can promote. Needs a separate promotion keyword (name? e.g. "Promote"), promotion choices, whether it resets the 50-move count. Suggested cost 2.5.
+* Paladin: one step orthogonally; "must be captured twice". "PD" can't work (FEN needs one character; single-letter decision) — suggested D. Needs exact rules: where the attacker ends up on the first hit, whether it uses the turn, whether the paladin heals, and a wounded look. Suggested cost 2–2.5.
 
 ## Previous milestone: playable board (pass and play)
 
