@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://dc107lf27c2f"]
+
+[ext_resource type="Script" uid="uid://cr54tluok4nsj" path="res://tests/test_movegen.gd" id="1_yo1oo"]
+
+[node name="TestMovegen" type="Node" unique_id=1141924365]
+script = ExtResource("1_yo1oo")
