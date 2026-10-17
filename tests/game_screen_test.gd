@@ -42,5 +42,5 @@ func test_new_game_resets() -> void:
 	_play(game, "e4")
 	game.new_game()
 	check_eq(game.state.history.size(), 0, "No moves")
-	check_eq(game.moves_label.text, "", "Empty move list")
+	check_eq(game.moves_label.text, game.TIP, "Tip instead of an empty move list")
 	game.free()

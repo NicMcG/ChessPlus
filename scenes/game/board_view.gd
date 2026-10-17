@@ -13,6 +13,8 @@ signal move_chosen(move: Move)
 ## The player's choice matched several moves between the same two squares (the
 ## promotion choices), so someone has to ask which one.
 signal choice_needed(moves: Array[Move])
+## The player held a finger (or the mouse) on a piece: show its info card.
+signal info_requested(piece: Piece)
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
@@ -25,6 +27,8 @@ const HOVER_TINT := Color(1, 1, 1, 0.3)
 const DRAG_THRESHOLD := 10.0
 ## A dragged piece is drawn this much bigger, so a finger doesn't hide it.
 const DRAG_SCALE := 1.3
+## Holding still on a piece this long (milliseconds) opens its info card.
+const LONG_PRESS_MS := 450
 
 ## Which folder in res://art/pieces/ the piece images come from.
 @export var piece_style := "standard"
@@ -41,6 +45,10 @@ var _dragging := false
 ## The press landed on the piece that was already selected. If it's released
 ## without dragging, that deselects it.
 var _pressed_selected := false
+## When the press started, and whether it can still turn into a long press (it
+## can't once it has made a move or wandered off the square).
+var _press_time := 0
+var _long_press_possible := false
 
 func _ready() -> void:
 	# Smooth edges when the piece images are shrunk to fit the squares.
@@ -66,19 +74,20 @@ func texture_for(def: PieceDef, team: Piece.Team) -> Texture2D:
 func square_center(square: Vector2i) -> Vector2:
 	return _square_rect(square).get_center()
 
-## Tap a square: select a piece, or move the selected piece there.
-## Public so tests and tools can tap too.
-func tap(square: Vector2i) -> void:
+## Tap a square: select a piece, or move the selected piece there. Returns true
+## if the tap chose a move. Public so tests and tools can tap too.
+func tap(square: Vector2i) -> bool:
 	if not _can_play():
-		return
+		return false
 	if _try_move_to(square):
-		return
+		return true
 	var piece := state.board.get_piece(square)
 	if piece and piece.team == state.side_to_move and square != _selected:
 		_select(square)
 	else:
 		_clear_selection()
 	queue_redraw()
+	return false
 
 ## The pointer went down at `pos` (a mouse press or a finger touching the screen).
 func pointer_down(pos: Vector2) -> void:
@@ -88,14 +97,19 @@ func pointer_down(pos: Vector2) -> void:
 	_pointer_pos = pos
 	var square := _square_at(pos)
 	_pressed_selected = square != Board.NO_SQUARE and square == _selected
+	_press_time = Time.get_ticks_msec()
+	_long_press_possible = state != null and not state.board.is_empty(square) if square != Board.NO_SQUARE else false
 	if not _pressed_selected and square != Board.NO_SQUARE:
-		tap(square)
+		if tap(square):
+			_long_press_possible = false
 
 ## The pointer moved to `pos`.
 func pointer_move(pos: Vector2) -> void:
 	if not _pressed:
 		return
 	_pointer_pos = pos
+	if _press_pos.distance_to(pos) > DRAG_THRESHOLD:
+		_long_press_possible = false
 	if not _dragging and _selected != Board.NO_SQUARE and _square_at(_press_pos) == _selected:
 		_dragging = _press_pos.distance_to(pos) > DRAG_THRESHOLD
 	if _dragging:
@@ -115,6 +129,25 @@ func pointer_up(pos: Vector2) -> void:
 	elif _pressed_selected:
 		_clear_selection()
 		queue_redraw()
+
+func _process(_delta: float) -> void:
+	check_long_press(Time.get_ticks_msec())
+
+## If the pointer has been held still on a piece long enough, ask for its info
+## card and cancel the press (so letting go doesn't also select or move).
+## `now_ms` is passed in so tests can pretend time has passed.
+func check_long_press(now_ms: int) -> void:
+	if not _pressed or _dragging or not _long_press_possible:
+		return
+	if now_ms - _press_time < LONG_PRESS_MS:
+		return
+	var piece := state.board.get_piece(_square_at(_press_pos))
+	_pressed = false
+	_long_press_possible = false
+	_clear_selection()
+	queue_redraw()
+	if piece:
+		info_requested.emit(piece)
 
 func _gui_input(event: InputEvent) -> void:
 	var button := event as InputEventMouseButton

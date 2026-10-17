@@ -10,6 +10,8 @@ signal saved(army: Army)
 
 const BOARD_WIDTH := 8
 const NAME_MAX_LENGTH := 20
+## Holding a tray button this long (milliseconds) opens the piece's info card.
+const LONG_PRESS_MS := 450
 
 @onready var name_edit: LineEdit = %NameEdit
 @onready var points_label: Label = %Points
@@ -26,6 +28,12 @@ var army: Army
 ## The piece type chosen in the tray (null if none).
 var selected: PieceDef
 var _tray_buttons := {}  # PieceDef -> Button
+## The tray button being held down, and since when.
+var _held_def: PieceDef
+var _held_since := 0
+## A long press opened the info card, so the release that follows mustn't also
+## select or deselect that piece type.
+var _skip_toggle_of: PieceDef
 
 ## Call before adding the screen to the tree. `existing` is null for a new army.
 func setup(p_library: ArmyLibrary, existing: Army = null) -> void:
@@ -49,6 +57,19 @@ func _ready() -> void:
 	back_button.pressed.connect(func() -> void: closed.emit())
 	_build_tray()
 	_refresh()
+
+func _process(_delta: float) -> void:
+	check_long_press(Time.get_ticks_msec())
+
+## If a tray button has been held long enough, open that piece's info card.
+## `now_ms` is passed in so tests can pretend time has passed.
+func check_long_press(now_ms: int) -> void:
+	if _held_def == null or now_ms - _held_since < LONG_PRESS_MS:
+		return
+	var def := _held_def
+	_held_def = null
+	_skip_toggle_of = def
+	PieceInfo.open(self, def, Piece.Team.WHITE, rules)
 
 ## Choose a piece type in the tray (null to choose nothing).
 func select(def: PieceDef) -> void:
@@ -107,7 +128,16 @@ func _build_tray() -> void:
 		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		button.custom_minimum_size = Vector2(160, 200)
 		button.add_theme_font_size_override("font_size", 24)
-		button.toggled.connect(func(on: bool) -> void: select(def if on else null))
+		button.toggled.connect(func(on: bool) -> void:
+			if _skip_toggle_of == def:
+				_skip_toggle_of = null
+				button.set_pressed_no_signal(selected == def)
+				return
+			select(def if on else null))
+		button.button_down.connect(func() -> void:
+			_held_def = def
+			_held_since = Time.get_ticks_msec())
+		button.button_up.connect(func() -> void: _held_def = null)
 		tray.add_child(button)
 		_tray_buttons[def] = button
 
