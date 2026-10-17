@@ -19,9 +19,13 @@ var fullmove_number: int = 1
 func _init(p_board: Board) -> void:
 	board = p_board
 
-## The moves available to whoever's turn it is.
+## The legal moves for whoever's turn it is.
 func moves() -> Array[Move]:
-	return MoveGenerator.pseudo_legal_moves(board, side_to_move)
+	return MoveGenerator.legal_moves(self)
+
+## True if the side to move has a royal piece under attack.
+func is_in_check() -> bool:
+	return MoveGenerator.is_in_check(board, side_to_move)
 
 func make_move(move: Move) -> void:
 	move.piece_had_moved = move.piece.has_moved
