@@ -59,6 +59,7 @@ static func is_attacked(board: Board, square: Vector2i, by_team: Piece.Team) -> 
 ## Works backwards from the square: for each kind of attacking piece, walk each of
 ## its capture directions in reverse. If the first piece met is that kind of piece,
 ## on the attacking team, and close enough for its step limit, it attacks the square.
+## For a hopping rule, the first piece met is the screen, so look one piece further.
 static func _is_attacked_by(board: Board, square: Vector2i, by_team: Piece.Team, defs: Array[PieceDef]) -> bool:
 	var board_size := maxi(board.width, board.height)
 	for def in defs:
@@ -71,12 +72,16 @@ static func _is_attacked_by(board: Board, square: Vector2i, by_team: Piece.Team,
 			for dir in rule.directions:
 				var step := _orient(dir, by_team)
 				var pos := square
+				var screen_found := false
 				for distance in range(1, reach + 1):
 					pos -= step
 					if not board.in_bounds(pos):
 						break
 					var piece := board.get_piece(pos)
 					if piece == null:
+						continue
+					if rule.captures_by_hopping and not screen_found:
+						screen_found = true
 						continue
 					if piece.def == def and piece.team == by_team and distance <= _step_limit(rule, piece, board):
 						return true
@@ -107,11 +112,29 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 					_append(state, move, moves)
 				passed.append(to)
 				continue
-			# Something is in the way: capture it if it's an enemy and the rule allows,
-			# then stop either way.
-			if target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
+			# Something is in the way. A hopping rule jumps it to look for a capture;
+			# otherwise capture it if it's an enemy and the rule allows. Stop either way.
+			if rule.captures_by_hopping:
+				if rule.mode != MoveRule.Mode.MOVE_ONLY:
+					_add_hop_capture(state, from, to, step, limit - i - 1, piece, moves)
+			elif target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
 				_append(state, Move.new(from, to, piece, target), moves)
 			break
+
+## Having reached a screen at `screen`, keep going (up to `steps_left` more squares)
+## and capture the first piece beyond it, if it's an enemy.
+static func _add_hop_capture(state: GameState, from: Vector2i, screen: Vector2i, step: Vector2i, steps_left: int, piece: Piece, moves: Array[Move]) -> void:
+	var to := screen
+	for i in range(steps_left):
+		to += step
+		if not state.board.in_bounds(to):
+			return
+		var target := state.board.get_piece(to)
+		if target == null:
+			continue
+		if target.team != piece.team:
+			_append(state, Move.new(from, to, piece, target), moves)
+		return
 
 ## Adds a move to the list. A promoting piece reaching the far rank must promote,
 ## so instead of the plain move this adds one move per promotion option.
