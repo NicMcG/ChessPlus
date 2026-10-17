@@ -23,12 +23,12 @@ func test_castling_moves_the_rook_and_undoes() -> void:
 	check_eq(state.board.get_piece(Vector2i(6, 0)).def.id, "king", "King on g1")
 	check_eq(state.board.get_piece(Vector2i(5, 0)).def.id, "rook", "Rook on f1")
 	check(state.board.is_empty(Vector2i(7, 0)), "h1 empty")
-	check_eq(Fen.write(state), "r3k2r/8/8/8/8/8/8/R4RK1 b kq - 0 1", "FEN after O-O")
+	check_eq(Fen.write(state), "r3k2r/8/8/8/8/8/8/R4RK1 b kq - 1 1", "FEN after O-O")
 	state.undo_move(castle)
 	check_eq(Fen.write(state), BOTH_SIDES, "FEN after undo")
 	castle = state.find_move("e1-c1")
 	state.make_move(castle)
-	check_eq(Fen.write(state), "r3k2r/8/8/8/8/8/8/2KR3R b kq - 0 1", "FEN after O-O-O")
+	check_eq(Fen.write(state), "r3k2r/8/8/8/8/8/8/2KR3R b kq - 1 1", "FEN after O-O-O")
 
 func test_not_out_of_check() -> void:
 	var texts := _texts(_parse("4k3/4r3/8/8/8/8/8/R3K2R w KQ - 0 1"))

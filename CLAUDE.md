@@ -20,7 +20,7 @@ Everything in the rules engine should be built so standard chess is just one con
 * Mac is learning to code as he goes. After each step, explain what each new file and function does and why, in plain language. Don't dump large amounts of code without explanation.
 * Always state the full location of every file and folder you reference or create, as both the res:// path and the Windows path.
 * Work in small steps, each with its own passing tests and its own commit.
-* Claude may create and edit test scenes and other plumbing files itself. Game-facing editor work (the playable scenes and their layout, Inspector work on .tres piece files, art) stays Mac's: give him numbered step-by-step instructions rather than hand-editing those files, unless he asks.
+* Claude does editor-type work itself whenever it can by editing files directly: scenes (.tscn), resources such as piece files (.tres), ticking flags, project settings. Only hand Mac a task when Claude literally can't do it (e.g. something that only works by clicking in the running editor, or creating art), and then give numbered step-by-step instructions.
 * Only stop to ask Mac about game design, art and content. Before adding any new piece type, mechanic, rule flag, or content, ask Mac what it should be named. Also ask him about art (which images, what they're called) before implementing anything that uses art.
 * Design decisions for Chess Plus (budget size, placement rules, promotion rules, piece costs) are Mac's calls. Raise them as questions; don't decide them silently.
 * Mac wants rigorous, honest feedback on his ideas, not reflexive praise.
@@ -28,12 +28,13 @@ Everything in the rules engine should be built so standard chess is just one con
 ### Decisions made so far
 
 * Promotion options live in one game-wide rules list (standard chess: knight, bishop, rook, queen), so they can later become "pieces in your army".
-* The 50-move rule resets on captures and on moves by pieces with a new PieceDef flag (to be named by Mac), which the pawn will have.
+* The 50-move rule resets on captures and on moves by pieces with the `resets_fifty_moves` PieceDef flag (the pawn has it).
+* Draws end the game automatically: 50-move rule, threefold repetition, and positions where checkmate is impossible (worked out from move data; custom pieces will need more thought later).
 
 ## Architecture rules
 
 * `res://core/` is the rules engine: plain GDScript classes extending RefCounted. No Nodes and no scene-tree dependencies. That lets the AI copy game states cheaply and lets a headless server referee online games later.
-* `res://data/pieces/` holds piece blueprints as PieceDef resources (.tres), created by Mac in the Inspector.
+* `res://data/pieces/` holds piece blueprints as PieceDef resources (.tres). Claude may create/edit them as text; Mac decides their names, rules and costs.
 * `res://scenes/` is the playable game (UI, board visuals, menus). Visuals and animation (planned later with Tweens) must never contain rules logic.
 * `res://tests/` holds test scenes and scripts players never see.
 * Before naming any class or enum, check that Godot doesn't already use the name. `Side`, `Color`, `Node`, `Object`, `Rect2` are taken. (We already hit this: the team enum is `Piece.Team`, not `Side`.)
@@ -42,13 +43,13 @@ Everything in the rules engine should be built so standard chess is just one con
 ## What exists so far
 
 * `res://core/move\_rule.gd` — `MoveRule` (Resource): `directions: Array\[Vector2i]` as (files, ranks) from the owner's point of view, positive ranks = toward the opponent; `max\_steps` (1 = single step/leap, 0 = unlimited slide, stopping when blocked); `first\_move\_max\_steps` (if > 0, replaces max\_steps while the piece hasn't moved); `mode` (MOVE\_OR\_CAPTURE / MOVE\_ONLY / CAPTURE\_ONLY). A knight is (1,2)-type directions with max\_steps 1, so it can't be blocked.
-* `res://core/piece\_def.gd` — `PieceDef` (Resource): id, display\_name, symbol, value, move\_rules: Array\[MoveRule], plus special-rule flags: is\_royal, promotes, en\_passant, can\_castle (king), castle\_partner (rook).
+* `res://core/piece\_def.gd` — `PieceDef` (Resource): id, display\_name, symbol, value, move\_rules: Array\[MoveRule], plus special-rule flags: is\_royal, promotes, en\_passant, can\_castle (king), castle\_partner (rook), resets\_fifty\_moves (pawn).
 * `res://data/pieces/` — pawn, knight, bishop, rook, queen, king .tres files. The pawn has two rules: forward (0,1) max 1, first-move max 2, MOVE\_ONLY; diagonal (1,1)/(-1,1) max 1, CAPTURE\_ONLY. The king's value is 0 (not purchasable; every army will have exactly one).
 * `res://core/piece.gd` — `Piece` (RefCounted): def, team (`Piece.Team.WHITE/BLACK`), has\_moved, letter(), static other\_team().
 * `res://core/board.gd` — `Board` (RefCounted): width/height (not hardcoded to 8), flat `\_squares` array indexed rank \* width + file, get\_piece (returns null off-board), set\_piece, is\_empty, in\_bounds, static square\_name / parse\_square, `NO_SQUARE`, to\_text.
 * `res://core/game_rules.gd` — `GameRules` (Resource): game-wide rules; so far `promotion_options: Array[PieceDef]`.
 * `res://core/move.gd` — `Move` (RefCounted): from, to, piece, captured, capture\_square (differs from `to` only for en passant), skipped\_squares (en passant targets created), promotion, castling partner/partner\_from/partner\_to, plus `prev_...` fields that make\_move fills in for undo. to\_text() gives test text like `e2-e4`, `e4xd5`, `e7-e8=Q` (not real notation).
-* `res://core/game_state.gd` — `GameState` (RefCounted): board, rules, side\_to\_move, en\_passant\_squares/victim, halfmove\_clock (not yet updated by moves), fullmove\_number; moves() (legal), is\_in\_check(), make\_move / undo\_move (undo in reverse order), find\_move(text) for tests.
+* `res://core/game_state.gd` — `GameState` (RefCounted): board, rules, side\_to\_move, en\_passant\_squares/victim, halfmove\_clock, fullmove\_number, history (moves played); moves() (legal), is\_in\_check(), outcome() / result\_text(), make\_move / undo\_move (undo in reverse order), find\_move(text) for tests.
 * `res://core/move_generator.gd` — `MoveGenerator` (static): legal\_moves (make, check royals, undo), pseudo\_legal\_moves, is\_in\_check, is\_attacked (walks each enemy piece type's capture rays backwards from the square). En passant, castling and promotion all keyed off PieceDef flags + GameRules.
 * `res://core/fen.gd` — `Fen.parse(text, defs, rules)` / `Fen.write(state)`. Board size comes from the FEN; has\_moved is inferred from castling rights and pawns' starting ranks.
 * `res://core/standard_setup.gd` — `StandardSetup`: piece\_defs(), create\_rules(), create\_board(), create\_game(), from\_fen(fen).
@@ -56,7 +57,7 @@ Everything in the rules engine should be built so standard chess is just one con
 
 ## Current milestone: the move generator
 
-Status: legal move generation, en passant, castling and promotion are done and perft-verified. Still to do: the 50-move rule (needs Mac to name the new PieceDef flag), threefold repetition, and checkmate/stalemate as game results.
+Status: DONE. Legal moves, en passant, castling, promotion, 50-move rule, threefold repetition, insufficient material and checkmate/stalemate (`GameState.outcome()` / `result_text()`), all tested and perft-verified. Next up: standard algebraic notation for the move list (needs Mac's decision on symbols running out).
 
 Goal: a rules engine that produces every legal move in standard chess, driven entirely by the MoveRule/PieceDef data.
 
