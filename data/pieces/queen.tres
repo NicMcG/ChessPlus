@@ -16,4 +16,5 @@ display_name = "Queen"
 symbol = "Q"
 value = 9
 move_rules = Array[ExtResource("1_fqwco")]([SubResource("Resource_bo4sf")])
+types = 2
 metadata/_custom_type_script = "uid://inn3y60fmap"

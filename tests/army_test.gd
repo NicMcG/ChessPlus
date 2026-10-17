@@ -49,11 +49,10 @@ func test_promotion_includes_opponents_pieces() -> void:
 	check(rules.promotion_options.size() == 4, "The shared rules weren't changed")
 
 func test_over_budget() -> void:
-	var army := _army([[KING, Vector2i(4, 0)],
-		[QUEEN, Vector2i(3, 0)], [QUEEN, Vector2i(3, 1)],
-		[ROOK, Vector2i(0, 0)], [ROOK, Vector2i(7, 0)],
-		[BISHOP, Vector2i(2, 0)], [BISHOP, Vector2i(5, 0)],
-		[KNIGHT, Vector2i(1, 0)], [KNIGHT, Vector2i(6, 0)]])
+	# The standard army (39) with two pawns swapped for two elephants: 40.
+	var army := StandardSetup.army()
+	army.place(ELEPHANT, Vector2i(0, 1))
+	army.place(ELEPHANT, Vector2i(7, 1))
 	check_eq(army.cost(), 40.0, "Cost")
 	check_eq(army.problems(rules, 8), PackedStringArray(["Costs 40 points; the budget is 39."]), "Problems")
 
@@ -67,6 +66,38 @@ func test_king_required_and_only_one() -> void:
 	check_eq(Army.new().problems(rules, 8), PackedStringArray(["Needs a king."]), "Empty army")
 	var two_kings := _army([[KING, Vector2i(4, 0)], [KING, Vector2i(3, 0)]])
 	check_eq(two_kings.problems(rules, 8), PackedStringArray(["Too many kings: 2 (the most is 1)."]), "Two kings")
+
+func test_king_must_start_in_the_middle_of_the_back_row() -> void:
+	for file in [3, 4]:
+		check(_army([[KING, Vector2i(file, 0)]]).is_valid(rules, 8), "King on file %d" % file)
+	for square in [Vector2i(0, 0), Vector2i(2, 0), Vector2i(5, 0), Vector2i(4, 1)]:
+		check_eq(_army([[KING, square]]).problems(rules, 8),
+				PackedStringArray(["The king must start in the middle of the back row."]), "King on %s" % square)
+
+func test_one_royal_piece_besides_the_king() -> void:
+	var army := _army([[KING, Vector2i(4, 0)], [QUEEN, Vector2i(3, 0)]])
+	check(army.is_valid(rules, 8), "One queen is fine")
+	army.place(QUEEN, Vector2i(3, 1))
+	check_eq(army.problems(rules, 8),
+			PackedStringArray(["Too many royal pieces: 2 besides the king (the most is 1)."]), "Two queens")
+	check(_just_a_king().is_valid(rules, 8), "No queen is fine too")
+
+func test_tags_on_the_standard_pieces() -> void:
+	check(KING.is_king_type() and KING.is_royal_type(), "King: king + royal")
+	check(QUEEN.is_royal_type() and not QUEEN.is_king_type(), "Queen: royal")
+	check(PAWN.is_pawn_type(), "Pawn: pawn type")
+	check(KNIGHT.has_jump() and ELEPHANT.has_jump(), "Knight and elephant: jump")
+	check(ROOK.has_castle(), "Rook: castle")
+	check(not BISHOP.has_jump() and BISHOP.types == 0, "Bishop: no tags")
+
+func test_pawns_can_promote_to_a_queen() -> void:
+	var game := ArmySetup.create_game(_army([[KING, Vector2i(4, 0)], [QUEEN, Vector2i(3, 0)]]), _just_a_king(), rules)
+	check_eq(game.rules.promotion_options, [QUEEN] as Array[PieceDef], "Queen is royal but not a king type")
+
+func test_back_row_pawn_can_still_double_step() -> void:
+	var game := ArmySetup.create_game(_army([[KING, Vector2i(4, 0)], [PAWN, Vector2i(0, 0)]]), _just_a_king(), rules)
+	var texts := game.moves().map(func(m: Move) -> String: return m.to_text())
+	check(texts.has("a1-a2") and texts.has("a1-a3"), "a1 pawn: one or two squares")
 
 func test_at_most_two_of_a_type() -> void:
 	var army := _army([[KING, Vector2i(4, 0)], [KNIGHT, Vector2i(1, 0)], [KNIGHT, Vector2i(6, 0)], [KNIGHT, Vector2i(3, 1)]])

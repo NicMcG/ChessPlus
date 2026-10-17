@@ -39,7 +39,7 @@ static func pseudo_legal_moves(state: GameState) -> Array[Move]:
 				continue
 			for rule in piece.def.move_rules:
 				_add_rule_moves(state, from, piece, rule, moves)
-			if piece.def.can_castle and not piece.has_moved:
+			if piece.def.is_king_type() and not piece.has_moved:
 				_add_castling_moves(board, state.rules, from, piece, moves)
 	return moves
 
@@ -102,7 +102,7 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 					_append(state, en_passant, moves)
 				elif rule.mode != MoveRule.Mode.CAPTURE_ONLY:
 					var move := Move.new(from, to, piece)
-					if piece.def.en_passant:
+					if piece.def.is_pawn_type():
 						move.skipped_squares = passed.duplicate()
 					_append(state, move, moves)
 				passed.append(to)
@@ -117,7 +117,7 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 ## so instead of the plain move this adds one move per promotion option.
 static func _append(state: GameState, move: Move, moves: Array[Move]) -> void:
 	var options := state.rules.promotion_options
-	if not move.piece.def.promotes or options.is_empty() or move.to.y != _far_rank(state.board, move.piece.team):
+	if not move.piece.def.is_pawn_type() or options.is_empty() or move.to.y != _far_rank(state.board, move.piece.team):
 		moves.append(move)
 		return
 	for option in options:
@@ -143,7 +143,7 @@ static func _add_castling_moves(board: Board, rules: GameRules, king_pos: Vector
 		if partner_pos == Board.NO_SQUARE or absi(partner_pos.x - king_pos.x) < 3:
 			continue
 		var partner := board.get_piece(partner_pos)
-		if partner.team != king.team or not partner.def.castle_partner or partner.has_moved:
+		if partner.team != king.team or not partner.def.has_castle() or partner.has_moved:
 			continue
 		if rules.castling_partner_in_corner and not _is_back_corner(board, partner_pos, king.team):
 			continue
@@ -178,14 +178,14 @@ static func _first_piece_along(board: Board, from: Vector2i, step: Vector2i) -> 
 	return Board.NO_SQUARE
 
 ## If moving to the empty square `to` would capture en passant, returns that
-## capture, otherwise null. Both pieces need the en_passant flag.
+## capture, otherwise null. Both pieces must be pawn types.
 static func _en_passant_capture(state: GameState, from: Vector2i, to: Vector2i, piece: Piece, rule: MoveRule) -> Move:
-	if rule.mode == MoveRule.Mode.MOVE_ONLY or not piece.def.en_passant:
+	if rule.mode == MoveRule.Mode.MOVE_ONLY or not piece.def.is_pawn_type():
 		return null
 	if not state.en_passant_squares.has(to):
 		return null
 	var victim := state.board.get_piece(state.en_passant_victim)
-	if victim == null or victim.team == piece.team or not victim.def.en_passant:
+	if victim == null or victim.team == piece.team or not victim.def.is_pawn_type():
 		return null
 	var move := Move.new(from, to, piece, victim)
 	move.capture_square = state.en_passant_victim
@@ -223,6 +223,6 @@ static func _royal_squares(board: Board, team: Piece.Team) -> Array[Vector2i]:
 	for rank in range(board.height):
 		for file in range(board.width):
 			var piece := board.get_piece(Vector2i(file, rank))
-			if piece and piece.team == team and piece.def.is_royal:
+			if piece and piece.team == team and piece.def.is_king_type():
 				squares.append(Vector2i(file, rank))
 	return squares

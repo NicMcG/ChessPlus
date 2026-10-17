@@ -15,4 +15,5 @@ display_name = "Knight"
 symbol = "N"
 value = 3
 move_rules = Array[ExtResource("1_igdar")]([SubResource("Resource_wpsba")])
+keywords = 1
 metadata/_custom_type_script = "uid://inn3y60fmap"
