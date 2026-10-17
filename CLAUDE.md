@@ -123,6 +123,14 @@ Goal: a rules engine that produces every legal move in standard chess, driven en
 * Piece letters come from PieceDef.symbol, so new pieces get notation automatically. In Chess Plus, symbols must stay unique across all pieces. Mac's decision: single letters for now; revisit only when they actually run out.
 * Only the piece whose symbol is "P" goes without a letter (`Notation.NO_LETTER_SYMBOL`), so a bare square always means exactly one piece type.
 
+## Playing on Mac's phone (iPhone)
+
+* iPhone, so the plan is a web build played in Safari (Share > Add to Home Screen for an app-like icon and full screen). A native iPhone app would need a Mac and an Apple developer account.
+* `export_presets.cfg` has a "Web" preset: single-threaded (no special server headers needed), progressive web app on (portrait, standalone), tests/ and tools/ left out. Output goes to `build/web/` (git-ignored, has a .gdignore).
+* Export: `"<godot console exe>" --headless --path . --export-release "Web" build/web/index.html` — needs Godot's export templates installed (Editor > Manage Export Templates), which Mac does in the editor.
+* Hosting: the GitHub repo is private, so GitHub Pages isn't free for it; suggested itch.io (free, draft/restricted link). Mac creates the account and uploads a zip of build/web. Always ask before putting anything online.
+* The main menu shows the required credit: "Chess pieces by Cburnett (CC BY-SA 3.0)".
+
 ## Running tests
 
 * Godot executable: C:\Tools\Godot\Godot\_v4.7.2-stable\_win64\_console.exe. Use the \_console build so output prints to the terminal.
