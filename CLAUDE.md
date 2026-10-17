@@ -94,7 +94,7 @@ Steps 1–4 DONE: army data and rules, army builder screen, saving up to 10 armi
 * Lance (L, 2.5): slides straight forward only; Promote keyword (same choices as pawns). Its moves do NOT reset the 50-move count (Mac's call).
 * Paladin (PD, 2): one step orthogonally; Shield keyword. First capture only breaks the shield: attacker stays put, turn used, counts as a capture for the 50-move rule; the shield never returns. Consequence (told to Mac): a shielded piece giving check can't be removed by "capturing" it — the king must move or block.
 * Symbols: one or two capital letters (Mac's decision). Notation writes them as-is (PDe4); FEN wraps two-letter symbols in brackets ((PD)/(pd)) and marks a broken shield with ' after the piece. A shield break is written like a capture (Rxd5).
-* Art for Man / Cannon / Lance / Paladin (with and without shield) still to do — Mac sent references for cannon (barrel on a wheel, round token) and lance (shogi-style pentagon tile with a spear), wants the man as a simple head and shoulders, the paladin as an armoured knight behind a big shield that disappears when wounded.
+* Art (drafts, Mac to choose/tune): man = head and shoulders; cannon = round token with a cannon (option B, from Mac's reference; A = standing cannon on a wheel); lance = shogi-style tile with a spear (option B, from Mac's reference; A = spear on a base); paladin = armoured knight behind a big shield, plus `<team>_paladin_wounded` without the shield, shown once the shield breaks (`PieceArt` variant "wounded"). Sources and options in `res://art/source/piece_options/` (`make_pieces.py` draws them).
 
 ## Previous milestone: playable board (pass and play)
 

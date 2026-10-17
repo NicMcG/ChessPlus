@@ -187,7 +187,11 @@ func _draw() -> void:
 		_draw_piece(board.get_piece(_selected), rect)
 
 func _draw_piece(piece: Piece, rect: Rect2) -> void:
-	var texture := texture_for(piece.def, piece.team)
+	var texture: Texture2D = null
+	if piece.def.has_shield() and piece.shield_broken:
+		texture = PieceArt.texture_for(piece.def, piece.team, piece_style, "wounded")
+	if texture == null:
+		texture = texture_for(piece.def, piece.team)
 	if texture:
 		draw_texture_rect(texture, rect, false)
 		return

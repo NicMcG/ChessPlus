@@ -70,10 +70,16 @@ func test_no_taps_after_game_over() -> void:
 
 func test_every_piece_has_a_picture() -> void:
 	var view := BoardView.new()
-	for def in StandardSetup.piece_defs():
+	for def in PieceCatalog.all_defs():
 		for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 			check(view.texture_for(def, team) != null, "%s %s" % [team, def.id])
 	view.free()
+
+func test_shield_pieces_have_a_wounded_picture() -> void:
+	for def in PieceCatalog.all_defs():
+		if def.has_shield():
+			for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+				check(PieceArt.texture_for(def, team, PieceArt.DEFAULT_STYLE, "wounded") != null, "%s %s wounded" % [team, def.id])
 
 # --- Dragging. The view is given a size so squares have screen positions. ------
 
