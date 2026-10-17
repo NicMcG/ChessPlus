@@ -29,6 +29,8 @@ Everything in the rules engine should be built so standard chess is just one con
 
 * Promotion options live in one game-wide rules list (standard chess: knight, bishop, rook, queen), so they can later become "pieces in your army".
 * The 50-move rule resets on captures and on moves by pieces with the `resets_fifty_moves` PieceDef flag (the pawn has it).
+* Mobile is a must: portrait layout (720x1280 viewport, scales to any screen; 450x800 window on PC), tap-to-move (a mouse click works the same). Board uses classic light/dark squares (#F0D9B5 / #B58863).
+* Piece art: Claude generates styles, Mac picks or tunes them. Three generated so far (classic, flat, token); Mac hasn't picked yet, `BoardView.piece_style` defaults to "classic".
 * Draws end the game automatically: 50-move rule, threefold repetition, and positions where checkmate is impossible (worked out from move data; custom pieces will need more thought later).
 
 ## Architecture rules
@@ -54,9 +56,17 @@ Everything in the rules engine should be built so standard chess is just one con
 * `res://core/fen.gd` — `Fen.parse(text, defs, rules)` / `Fen.write(state)`. Board size comes from the FEN; has\_moved is inferred from castling rights and pawns' starting ranks.
 * `res://core/notation.gd` — `Notation`: san(state, move), find_move(state, san) (check marks optional), move_list(state) ("1. e4 e5 2. Nf3", plus the result if the game is over).
 * `res://core/standard_setup.gd` — `StandardSetup`: piece\_defs(), create\_rules(), create\_board(), create\_game(), from\_fen(fen).
+* `res://tools/generate_piece_art.gd` — draws the piece SVGs into `res://art/pieces/<style>/<team>_<piece id>.svg` plus `res://art/pieces/preview.html`. Colours are constants at the top. Run: `"<godot console exe>" --headless --path . -s res://tools/generate_piece_art.gd`.
+* `res://tools/screenshot.gd` — opens the game screen, plays SAN moves / `tap:e2` / `fen:<fen with _ for spaces>`, saves a PNG. Needs a window (no --headless): `"<godot console exe>" --path . --resolution 720x1280 -s res://tools/screenshot.gd -- <out.png> e4 e5 tap:g1`. Use it to check UI changes visually.
+* `res://scenes/game/game.tscn` + `game.gd` — the main scene (pass-and-play): status line, board, move list, New game button, promotion picker overlay.
+* `res://scenes/game/board_view.gd` — `BoardView` (Control): draws board/pieces/highlights (last move, selection, check, move dots/rings), tap(square) selection logic, signals move_chosen / choice_needed. Images looked up by piece id; falls back to drawing the letter if a piece has no image.
 * `res://tests/` — `run_tests.tscn` runs every `*_test.gd` (see Running tests). Perft matches the start position (depth 4), Kiwipete (depth 3), and CPW positions 3 (depth 5), 4 (depth 4) and 5 (depth 3).
 
-## Current milestone: the move generator
+## Current milestone: playable board (pass and play)
+
+First version done: tap-to-move board, promotion picker, results, move list. Waiting on Mac's choice of piece style. Possible next pieces: flip board / face-to-face mode, drag-to-move, move animation (Tweens), undo button, menus.
+
+## Previous milestone: the move generator
 
 Status: DONE. Legal moves, en passant, castling, promotion, 50-move rule, threefold repetition, insufficient material and checkmate/stalemate (`GameState.outcome()` / `result_text()`), all tested and perft-verified. Standard algebraic notation (`Notation`) is done too.
 
