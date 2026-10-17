@@ -6,6 +6,7 @@ extends RefCounted
 ## happen in reverse order (last move made is the first one undone).
 
 var board: Board
+var rules: GameRules
 var side_to_move: Piece.Team = Piece.Team.WHITE
 ## Squares the last move's piece skipped over, where it can be captured en passant.
 var en_passant_squares: Array[Vector2i] = []
@@ -16,8 +17,9 @@ var halfmove_clock: int = 0
 ## Starts at 1 and goes up after each Black move, as in FEN and PGN.
 var fullmove_number: int = 1
 
-func _init(p_board: Board) -> void:
+func _init(p_board: Board, p_rules: GameRules) -> void:
 	board = p_board
+	rules = p_rules
 
 ## The legal moves for whoever's turn it is.
 func moves() -> Array[Move]:
@@ -33,7 +35,12 @@ func make_move(move: Move) -> void:
 	move.prev_en_passant_victim = en_passant_victim
 	board.set_piece(move.from, null)
 	board.set_piece(move.capture_square, null)
-	board.set_piece(move.to, move.piece)
+	if move.promotion:
+		var promoted := Piece.new(move.promotion, move.piece.team)
+		promoted.has_moved = true
+		board.set_piece(move.to, promoted)
+	else:
+		board.set_piece(move.to, move.piece)
 	move.piece.has_moved = true
 	if move.is_castling():
 		move.partner_had_moved = move.partner.has_moved
@@ -62,7 +69,8 @@ func undo_move(move: Move) -> void:
 	board.set_piece(move.capture_square, move.captured)  # null if nothing was captured.
 	board.set_piece(move.from, move.piece)
 
-## The available move whose to_text() matches, e.g. "e2-e4", or null. For tests.
+## The available move whose to_text() matches, e.g. "e2-e4" or "e7-e8=Q", or null.
+## For tests.
 func find_move(text: String) -> Move:
 	for move in moves():
 		if move.to_text() == text:

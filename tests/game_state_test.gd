@@ -1,13 +1,13 @@
 extends TestSuite
 
 func test_turn_alternates() -> void:
-	var state := GameState.new(StandardSetup.create_board())
+	var state := StandardSetup.create_game()
 	check_eq(state.side_to_move, Piece.Team.WHITE, "First turn")
 	state.make_move(state.find_move("e2-e4"))
 	check_eq(state.side_to_move, Piece.Team.BLACK, "After e4")
 
 func test_make_and_undo_restores_start() -> void:
-	var state := GameState.new(StandardSetup.create_board())
+	var state := StandardSetup.create_game()
 	var start_text := state.board.to_text()
 	var e4 := state.find_move("e2-e4")
 	state.make_move(e4)
@@ -24,7 +24,7 @@ func test_make_and_undo_restores_start() -> void:
 	check(not state.board.get_piece(Vector2i(4, 6)).has_moved, "Pawn back on e7 should be unmoved")
 
 func test_capture_and_undo() -> void:
-	var state := GameState.new(StandardSetup.create_board())
+	var state := StandardSetup.create_game()
 	state.make_move(state.find_move("e2-e4"))
 	state.make_move(state.find_move("d7-d5"))
 	var before := state.board.to_text()

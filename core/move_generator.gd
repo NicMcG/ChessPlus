@@ -99,19 +99,36 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 			if target == null:
 				var en_passant := _en_passant_capture(state, from, to, piece, rule)
 				if en_passant:
-					moves.append(en_passant)
+					_append(state, en_passant, moves)
 				elif rule.mode != MoveRule.Mode.CAPTURE_ONLY:
 					var move := Move.new(from, to, piece)
 					if piece.def.en_passant:
 						move.skipped_squares = passed.duplicate()
-					moves.append(move)
+					_append(state, move, moves)
 				passed.append(to)
 				continue
 			# Something is in the way: capture it if it's an enemy and the rule allows,
 			# then stop either way.
 			if target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
-				moves.append(Move.new(from, to, piece, target))
+				_append(state, Move.new(from, to, piece, target), moves)
 			break
+
+## Adds a move to the list. A promoting piece reaching the far rank must promote,
+## so instead of the plain move this adds one move per promotion option.
+static func _append(state: GameState, move: Move, moves: Array[Move]) -> void:
+	var options := state.rules.promotion_options
+	if not move.piece.def.promotes or options.is_empty() or move.to.y != _far_rank(state.board, move.piece.team):
+		moves.append(move)
+		return
+	for option in options:
+		var promotion := Move.new(move.from, move.to, move.piece, move.captured)
+		promotion.capture_square = move.capture_square
+		promotion.promotion = option
+		moves.append(promotion)
+
+## The rank farthest from the team's side of the board.
+static func _far_rank(board: Board, team: Piece.Team) -> int:
+	return board.height - 1 if team == Piece.Team.WHITE else 0
 
 ## Castling: the king moves two squares toward an unmoved partner on the same rank,
 ## with only empty squares between them, and the partner lands on the square the

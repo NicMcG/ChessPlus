@@ -1,7 +1,7 @@
 class_name StandardSetup
 extends RefCounted
 
-## Builds the normal chess starting position.
+## Everything needed for a game of standard chess.
 
 const PAWN = preload("res://data/pieces/pawn.tres")
 const KNIGHT = preload("res://data/pieces/knight.tres")
@@ -14,6 +14,21 @@ const KING = preload("res://data/pieces/king.tres")
 static func piece_defs() -> Array[PieceDef]:
 	return [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING]
 
+## Standard chess rules: pawns promote to a queen, rook, bishop or knight.
+static func create_rules() -> GameRules:
+	var rules := GameRules.new()
+	rules.promotion_options = [QUEEN, ROOK, BISHOP, KNIGHT]
+	return rules
+
+## A new game from the starting position.
+static func create_game() -> GameState:
+	return GameState.new(create_board(), create_rules())
+
+## A standard-chess game from a FEN position. Returns null if the FEN can't be read.
+static func from_fen(fen: String) -> GameState:
+	return Fen.parse(fen, piece_defs(), create_rules())
+
+## The normal starting position.
 static func create_board() -> Board:
 	var board := Board.new(8, 8)
 	var back_rank := [ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK]

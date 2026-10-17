@@ -12,7 +12,7 @@ const STANDARD_START := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 
 
 ## Builds a GameState from FEN text. `defs` are the piece types the letters may
 ## refer to (matched on PieceDef.symbol). Returns null if the text can't be read.
-static func parse(text: String, defs: Array[PieceDef]) -> GameState:
+static func parse(text: String, defs: Array[PieceDef], rules: GameRules) -> GameState:
 	var fields := text.strip_edges().split(" ", false)
 	if fields.is_empty():
 		push_error("FEN is empty")
@@ -20,7 +20,7 @@ static func parse(text: String, defs: Array[PieceDef]) -> GameState:
 	var board := _parse_pieces(fields[0], defs)
 	if board == null:
 		return null
-	var state := GameState.new(board)
+	var state := GameState.new(board, rules)
 	state.side_to_move = Piece.Team.BLACK if fields.size() > 1 and fields[1] == "b" else Piece.Team.WHITE
 	_set_moved_flags(board, fields[2] if fields.size() > 2 else "-")
 	if fields.size() > 3 and fields[3] != "-":
