@@ -30,7 +30,8 @@ Everything in the rules engine should be built so standard chess is just one con
 * Promotion options live in one game-wide rules list (standard chess: knight, bishop, rook, queen), so they can later become "pieces in your army".
 * The 50-move rule resets on captures and on moves by pieces with the `resets_fifty_moves` PieceDef flag (the pawn has it).
 * Mobile is a must: portrait layout (720x1280 viewport, scales to any screen; 450x800 window on PC), tap-to-move (a mouse click works the same). Board uses classic light/dark squares (#F0D9B5 / #B58863).
-* Piece art: Claude generates styles, Mac picks or tunes them. Three generated so far (classic, flat, token); Mac hasn't picked yet, `BoardView.piece_style` defaults to "classic".
+* Piece art: the "Cburnett" set from Wikimedia Commons (Mac supplied the sprite sheet). It is licensed (CC BY-SA 3.0 / GPL / BSD / GFDL), so a published game must credit it (e.g. "Chess pieces by Cburnett, CC BY-SA 3.0") — remind Mac before any release. Style folder: `res://art/pieces/standard/`. New piece types will need matching art (ask Mac).
+* Board orientation: White always at the bottom, nothing drawn upside down (no flipping).
 * Draws end the game automatically: 50-move rule, threefold repetition, and positions where checkmate is impossible (worked out from move data; custom pieces will need more thought later).
 
 ## Architecture rules
@@ -56,15 +57,15 @@ Everything in the rules engine should be built so standard chess is just one con
 * `res://core/fen.gd` — `Fen.parse(text, defs, rules)` / `Fen.write(state)`. Board size comes from the FEN; has\_moved is inferred from castling rights and pawns' starting ranks.
 * `res://core/notation.gd` — `Notation`: san(state, move), find_move(state, san) (check marks optional), move_list(state) ("1. e4 e5 2. Nf3", plus the result if the game is over).
 * `res://core/standard_setup.gd` — `StandardSetup`: piece\_defs(), create\_rules(), create\_board(), create\_game(), from\_fen(fen).
-* `res://tools/generate_piece_art.gd` — draws the piece SVGs into `res://art/pieces/<style>/<team>_<piece id>.svg` plus `res://art/pieces/preview.html`. Colours are constants at the top. Run: `"<godot console exe>" --headless --path . -s res://tools/generate_piece_art.gd`.
-* `res://tools/screenshot.gd` — opens the game screen, plays SAN moves / `tap:e2` / `fen:<fen with _ for spaces>`, saves a PNG. Needs a window (no --headless): `"<godot console exe>" --path . --resolution 720x1280 -s res://tools/screenshot.gd -- <out.png> e4 e5 tap:g1`. Use it to check UI changes visually.
-* `res://scenes/game/game.tscn` + `game.gd` — the main scene (pass-and-play): status line, board, move list, New game button, promotion picker overlay.
-* `res://scenes/game/board_view.gd` — `BoardView` (Control): draws board/pieces/highlights (last move, selection, check, move dots/rings), tap(square) selection logic, signals move_chosen / choice_needed. Images looked up by piece id; falls back to drawing the letter if a piece has no image.
+* `res://art/source/chess_pieces_sprite.webp` — the original piece sheet (folder has a .gdignore so it isn't imported). `res://tools/slice_piece_sprite.gd` cuts it into `res://art/pieces/standard/<team>_<piece id>.png` (mipmaps on in the .import files). Run: `"<godot console exe>" --headless --path . -s res://tools/slice_piece_sprite.gd`.
+* `res://tools/screenshot.gd` — opens the game screen, plays SAN moves / `tap:e2` / `hold:g1>f3` (drag held partway) / `fen:<fen with _ for spaces>`, saves a PNG. Needs a window (no --headless): `"<godot console exe>" --path . --resolution 720x1280 -s res://tools/screenshot.gd -- <out.png> e4 e5 tap:g1`. Use it to check UI changes visually.
+* `res://scenes/game/game.tscn` + `game.gd` — the main scene (pass-and-play): status line, board, move list, Undo and New game buttons, promotion picker overlay.
+* `res://scenes/game/board_view.gd` — `BoardView` (Control): draws board/pieces/highlights (last move, selection, check, move dots/rings), tap(square) and pointer_down/move/up (drag to move; tap-tap still works), signals move_chosen / choice_needed. Images looked up by piece id; falls back to drawing the letter if a piece has no image.
 * `res://tests/` — `run_tests.tscn` runs every `*_test.gd` (see Running tests). Perft matches the start position (depth 4), Kiwipete (depth 3), and CPW positions 3 (depth 5), 4 (depth 4) and 5 (depth 3).
 
 ## Current milestone: playable board (pass and play)
 
-First version done: tap-to-move board, promotion picker, results, move list. Waiting on Mac's choice of piece style. Possible next pieces: flip board / face-to-face mode, drag-to-move, move animation (Tweens), undo button, menus.
+Done: tap- and drag-to-move board, undo, promotion picker, results, move list, Cburnett pieces. Possible next pieces: move animation (Tweens), menus, sounds.
 
 ## Previous milestone: the move generator
 
@@ -94,6 +95,6 @@ Goal: a rules engine that produces every legal move in standard chess, driven en
 * Godot executable: C:\Tools\Godot\Godot\_v4.7.2-stable\_win64\_console.exe. Use the \_console build so output prints to the terminal.
 * All tests: `"<godot console exe>" --headless --path . res://tests/run_tests.tscn`. Only some files: add `-- <word>` (e.g. `-- movegen`) to run files whose names contain that word. Functions named `slow_test_...` (deep perft) only run with `-- --slow`; run them before committing move-generator changes. The exit code is 1 if anything failed. In the editor, Mac can open `res://tests/run_tests.tscn` and press F6 (the Output panel's Log toggle must be on).
 * A test file is `res://tests/<name>_test.gd`, extends `TestSuite`, and has functions named `test_...` that call `check(...)` / `check_eq(...)`. The runner finds them automatically; no scene needed.
-* GDScript has no exceptions: a runtime error stops that test function early without marking it failed. Always scan test output for `SCRIPT ERROR` as well as the pass/fail summary.
+* GDScript has no exceptions: a runtime error stops that test function early. The runner counts every logged error (a `Logger` registered with `OS.add_logger`) and fails the test it happened in, so errors can't hide behind a PASS. Tests may add scenes to the tree (`Engine.get_main_loop().root`); free them at the end.
 * If a newly added `class\_name` isn't recognized when running headless, refresh Godot's class cache with `"<godot console exe>" --headless --path . --import` (or open the project in the editor once).
 * Godot reloads scripts changed on disk. If Mac has the editor open and it asks whether to reload a file, he should choose Reload.

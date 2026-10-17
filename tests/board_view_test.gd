@@ -68,11 +68,68 @@ func test_no_taps_after_game_over() -> void:
 	check_eq(chosen.size(), 0, "Checkmated side can't move")
 	view.free()
 
-func test_every_piece_has_a_picture_in_each_style() -> void:
+func test_every_piece_has_a_picture() -> void:
 	var view := BoardView.new()
-	for style in ["classic", "flat", "token"]:
-		view.piece_style = style
-		for def in StandardSetup.piece_defs():
-			for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
-				check(view.texture_for(def, team) != null, "%s %s %s" % [style, team, def.id])
+	for def in StandardSetup.piece_defs():
+		for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+			check(view.texture_for(def, team) != null, "%s %s" % [team, def.id])
+	view.free()
+
+# --- Dragging. The view is given a size so squares have screen positions. ------
+
+func _sized_view(state: GameState) -> BoardView:
+	var view := _view_for(state)
+	view.size = Vector2(800, 800)
+	return view
+
+func _drag(view: BoardView, from: String, to: String) -> void:
+	var start := view.square_center(_square(from))
+	var end := view.square_center(_square(to))
+	view.pointer_down(start)
+	view.pointer_move(start.lerp(end, 0.5))
+	view.pointer_move(end)
+	view.pointer_up(end)
+
+func test_drag_makes_the_move() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	_drag(view, "g1", "f3")
+	check_eq(chosen.size(), 1, "Moves sent")
+	if chosen.size() == 1:
+		check_eq(chosen[0].to_text(), "g1-f3", "Move sent")
+	view.free()
+
+func test_drag_to_illegal_square_keeps_selection() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	_drag(view, "g1", "g3")
+	check_eq(chosen.size(), 0, "No move for an illegal drop")
+	# The knight is still selected, so tapping a legal square now moves it.
+	view.tap(_square("h3"))
+	check_eq(chosen.size(), 1, "Tap after a failed drag")
+	view.free()
+
+func test_drag_promotion_asks_for_a_choice() -> void:
+	var view := _sized_view(StandardSetup.from_fen("4k3/1P6/8/8/8/8/8/4K3 w - - 0 1"))
+	_drag(view, "b7", "b8")
+	check_eq(choices.size(), 1, "Asked which piece")
+	view.free()
+
+func test_press_and_release_on_selected_piece_deselects() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	var e2 := view.square_center(_square("e2"))
+	view.pointer_down(e2)
+	view.pointer_up(e2)
+	view.pointer_down(e2)
+	view.pointer_up(e2)
+	view.tap(_square("e4"))
+	check_eq(chosen.size(), 0, "Second click deselected, so e4 doesn't move anything")
+	view.free()
+
+func test_small_wobble_is_still_a_tap() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	var e2 := view.square_center(_square("e2"))
+	view.pointer_down(e2)
+	view.pointer_move(e2 + Vector2(3, 2))
+	view.pointer_up(e2 + Vector2(3, 2))
+	view.pointer_down(view.square_center(_square("e4")))
+	check_eq(chosen.size(), 1, "Tap, tap still moves")
 	view.free()

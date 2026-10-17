@@ -8,7 +8,29 @@ extends Node
 
 const TEST_DIR := "res://tests/"
 
+## Counts every error Godot logs, including script errors. GDScript has no
+## exceptions: a script error just stops the test function early. Counting errors
+## lets the runner fail that test instead of wrongly reporting a pass.
+class ErrorCounter extends Logger:
+	var count := 0
+	var _mutex := Mutex.new()  # Errors can be logged from other threads.
+
+	func _log_error(_function: String, _file: String, _line: int, _code: String,
+			_rationale: String, _editor_notify: bool, _error_type: int,
+			_script_backtraces: Array[ScriptBacktrace]) -> void:
+		_mutex.lock()
+		count += 1
+		_mutex.unlock()
+
+var _errors := ErrorCounter.new()
+
 func _ready() -> void:
+	OS.add_logger(_errors)
+	# Wait until the scene tree has finished starting up, so tests can add
+	# scenes to it.
+	_run_all.call_deferred()
+
+func _run_all() -> void:
 	var filters: PackedStringArray = []
 	var include_slow := false
 	for arg in OS.get_cmdline_user_args():
@@ -26,8 +48,12 @@ func _ready() -> void:
 			# A fresh copy per test, so one test's leftovers can't affect another.
 			var suite: TestSuite = script.new()
 			var start := Time.get_ticks_msec()
+			var errors_before := _errors.count
 			suite.call(test_name)
 			var ms := Time.get_ticks_msec() - start
+			var new_errors := _errors.count - errors_before
+			if new_errors > 0:
+				suite.failures.append("%d error(s) logged during the test (see above)" % new_errors)
 			var label := "%s.%s (%d ms)" % [file.get_basename(), test_name, ms]
 			if suite.failures.is_empty():
 				passed += 1
