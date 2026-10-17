@@ -40,7 +40,7 @@ static func pseudo_legal_moves(state: GameState) -> Array[Move]:
 			for rule in piece.def.move_rules:
 				_add_rule_moves(state, from, piece, rule, moves)
 			if piece.def.can_castle and not piece.has_moved:
-				_add_castling_moves(board, from, piece, moves)
+				_add_castling_moves(board, state.rules, from, piece, moves)
 	return moves
 
 ## True if any of `team`'s royal pieces is attacked.
@@ -134,7 +134,7 @@ static func _far_rank(board: Board, team: Piece.Team) -> int:
 ## with only empty squares between them, and the partner lands on the square the
 ## king crossed. Not allowed out of check or across an attacked square. (Landing
 ## in check is ruled out by the normal legality filter.)
-static func _add_castling_moves(board: Board, king_pos: Vector2i, king: Piece, moves: Array[Move]) -> void:
+static func _add_castling_moves(board: Board, rules: GameRules, king_pos: Vector2i, king: Piece, moves: Array[Move]) -> void:
 	var enemy := Piece.other_team(king.team)
 	var enemy_defs: Array[PieceDef] = []
 	var checked_for_check := false
@@ -144,6 +144,8 @@ static func _add_castling_moves(board: Board, king_pos: Vector2i, king: Piece, m
 			continue
 		var partner := board.get_piece(partner_pos)
 		if partner.team != king.team or not partner.def.castle_partner or partner.has_moved:
+			continue
+		if rules.castling_partner_in_corner and not _is_back_corner(board, partner_pos, king.team):
 			continue
 		# Only look for attacks once castling is actually possible: it's slow-ish.
 		if not checked_for_check:
@@ -159,6 +161,11 @@ static func _add_castling_moves(board: Board, king_pos: Vector2i, king: Piece, m
 		move.partner_from = partner_pos
 		move.partner_to = crossed
 		moves.append(move)
+
+## True if `square` is a corner of `team`'s back rank.
+static func _is_back_corner(board: Board, square: Vector2i, team: Piece.Team) -> bool:
+	var back_rank := 0 if team == Piece.Team.WHITE else board.height - 1
+	return square.y == back_rank and (square.x == 0 or square.x == board.width - 1)
 
 ## The first occupied square from `from` (not counting it) in direction `step`,
 ## or NO_SQUARE if there's nothing before the edge of the board.

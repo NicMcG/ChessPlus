@@ -34,6 +34,9 @@ Everything in the rules engine should be built so standard chess is just one con
 * Board orientation: White always at the bottom, nothing drawn upside down (no flipping).
 * First custom piece: the **Elephant** (`res://data/pieces/elephant.tres`, symbol E): jumps exactly 2 squares diagonally (can't be blocked, stays on one colour), captures the same way. Value 1.5 (`PieceDef.value` is a float). Art: option F in `res://art/source/elephant_options/` — option D (side view facing left, dome head, hanging trunk, curved ivory tusk, notched ear sticking out behind) with the head shrunk to 85% and the base removed: the neck flares to a wide flat bottom like the knight's. `make_option_f.py` there regenerates it (head scale and anchor are arguments). A–E kept as earlier attempts.
 * Custom piece art is drawn by Claude as SVG in the Cburnett style (45x45 canvas, 1.5 black outline, white or black fill, white detail lines on black pieces), saved in `res://art/source/pieces/<team>_<id>.svg`, rendered to PNG with `tools/render_piece_svg.gd`. Offer Mac a few options per piece.
+* Armies (Mac's rules, set in `GameRules`): budget 39 points; pieces start only on the owner's first two rows; exactly one king required; at most 2 of each piece type, except pawn types (`promotes` flag, no limit) and royal types (`is_royal`, max 1).
+* Castling only with a castle partner in a corner of its owner's back rank (`GameRules.castling_partner_in_corner`). King moves 2 squares toward it, as before.
+* Promotion in army games: to any piece type on the board at the start (either army), except royal and pawn types (Claude's interpretation, told to Mac). Most valuable listed first.
 * Draws end the game automatically: 50-move rule, threefold repetition, and positions where checkmate is impossible (worked out from move data; custom pieces will need more thought later).
 
 ## Architecture rules
@@ -61,6 +64,9 @@ Everything in the rules engine should be built so standard chess is just one con
 * `res://core/standard_setup.gd` — `StandardSetup`: piece\_defs(), create\_rules(), create\_board(), create\_game(), from\_fen(fen).
 * `res://art/source/chess_pieces_sprite.webp` — the original piece sheet (folder has a .gdignore so it isn't imported). `res://tools/slice_piece_sprite.gd` cuts it into `res://art/pieces/standard/<team>_<piece id>.png` (mipmaps on in the .import files). Run: `"<godot console exe>" --headless --path . -s res://tools/slice_piece_sprite.gd`.
 * `res://tools/render_piece_svg.gd` — renders every SVG in `res://art/source/pieces/` to a 320px PNG in `res://art/pieces/standard/` (then set `mipmaps/generate=true` in the new .import files). Run: `"<godot console exe>" --headless --path . -s res://tools/render_piece_svg.gd`.
+* `res://core/army.gd` — `Army` (Resource): army_name, pieces: Array[ArmyPiece]; place/remove_at/def_at, cost(), count_of(), static max_copies(def, rules), problems(rules, width) -> plain-English list of rule breaks (empty = legal), is_valid().
+* `res://core/army_piece.gd` — `ArmyPiece` (Resource): def + square as (file, row from the owner's edge). Files aren't mirrored for Black.
+* `res://core/army_setup.gd` — `ArmySetup.create_game(white, black, rules)`: builds a GameState from two armies (Black's rows flipped), with a duplicated GameRules whose promotion_options come from promotion_options_for(board). `StandardSetup.army()` is the standard set as an Army.
 * `res://core/piece_catalog.gd` — `PieceCatalog.all_defs()`: every PieceDef in `res://data/pieces/`. Use it (not `StandardSetup.piece_defs()`) when any piece type may appear.
 * `res://scenes/sandbox/elephant_sandbox.tscn` — the game screen starting from a custom FEN (`game.gd`'s `start_fen` export), with elephants on c3/f3/c6/f6. Open it and press F6 to try the elephant.
 * `res://tools/screenshot.gd` — opens the game screen, plays SAN moves / `tap:e2` / `hold:g1>f3` (drag held partway) / `fen:<fen with _ for spaces>`, saves a PNG. Needs a window (no --headless): `"<godot console exe>" --path . --resolution 720x1280 -s res://tools/screenshot.gd -- <out.png> e4 e5 tap:g1`. Use it to check UI changes visually.
@@ -68,9 +74,13 @@ Everything in the rules engine should be built so standard chess is just one con
 * `res://scenes/game/board_view.gd` — `BoardView` (Control): draws board/pieces/highlights (last move, selection, check, move dots/rings), tap(square) and pointer_down/move/up (drag to move; tap-tap still works), signals move_chosen / choice_needed. Images looked up by piece id; falls back to drawing the letter if a piece has no image.
 * `res://tests/` — `run_tests.tscn` runs every `*_test.gd` (see Running tests). Perft matches the start position (depth 4), Kiwipete (depth 3), and CPW positions 3 (depth 5), 4 (depth 4) and 5 (depth 3).
 
-## Current milestone: playable board (pass and play)
+## Current milestone: armies (Chess Plus phase 2)
 
-Done: tap- and drag-to-move board, undo, promotion picker, results, move list, Cburnett pieces. Possible next pieces: move animation (Tweens), menus, sounds.
+Steps: 1) army data + rules + game from two armies — DONE. 2) army builder screen (pick pieces, see points, place them). 3) save/load armies on the device. 4) play a game with two chosen armies.
+
+## Previous milestone: playable board (pass and play)
+
+Done: tap- and drag-to-move board, undo, promotion picker, results, move list, Cburnett pieces. Possible later: move animation (Tweens), menus, sounds.
 
 ## Previous milestone: the move generator
 
