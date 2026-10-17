@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/game/game.tscn" id="1_game"]
+
+[node name="ElephantSandbox" instance=ExtResource("1_game")]
+start_fen = "rnbqkbnr/pppppppp/2e2e2/8/8/2E2E2/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

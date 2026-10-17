@@ -16,7 +16,7 @@ func _initialize() -> void:
 	await process_frame
 	for arg in args.slice(1):
 		if arg.begins_with("fen:"):
-			game.state = StandardSetup.from_fen(arg.substr(4).replace("_", " "))
+			game.state = Fen.parse(arg.substr(4).replace("_", " "), PieceCatalog.all_defs(), StandardSetup.create_rules())
 			game.board_view.show_game(game.state)
 			game._update_text()
 		elif arg.begins_with("hold:"):

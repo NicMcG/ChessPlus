@@ -3,6 +3,10 @@ extends Control
 ## The game screen: connects the board view, the text around it and the buttons
 ## to a GameState. Two players share one device for now (pass and play).
 
+## If set, games start from this FEN position instead of the standard one. Any
+## piece in res://data/pieces/ can appear in it (e.g. "E"/"e" for elephants).
+@export var start_fen := ""
+
 @onready var board_view: BoardView = %BoardView
 @onready var status_label: Label = %Status
 @onready var moves_label: Label = %Moves
@@ -22,7 +26,10 @@ func _ready() -> void:
 	new_game()
 
 func new_game() -> void:
-	state = StandardSetup.create_game()
+	if start_fen.is_empty():
+		state = StandardSetup.create_game()
+	else:
+		state = Fen.parse(start_fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
 	promotion_overlay.hide()
 	board_view.show_game(state)
 	_update_text()
