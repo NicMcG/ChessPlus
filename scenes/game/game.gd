@@ -26,9 +26,14 @@ var black_army: Army
 
 var state: GameState
 
+## Shown where the move list goes, until the first move.
+const TIP := "Tip: hold any piece to see how it moves."
+
 func _ready() -> void:
 	board_view.move_chosen.connect(play)
 	board_view.choice_needed.connect(_ask_which_move)
+	board_view.info_requested.connect(func(piece: Piece) -> void:
+		PieceInfo.open(self, piece.def, piece.team, state.rules))
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
@@ -103,4 +108,6 @@ func _update_text() -> void:
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			status_label.text = "Draw: checkmate is impossible"
 	moves_label.text = Notation.move_list(state)
+	if state.history.is_empty():
+		moves_label.text = TIP
 	undo_button.disabled = state.history.is_empty()
