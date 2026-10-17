@@ -21,3 +21,5 @@ extends Resource
 @export var can_castle: bool = false
 ## Can be castled with (the rook).
 @export var castle_partner: bool = false
+## Moving this piece resets the 50-move count, as captures do (the pawn).
+@export var resets_fifty_moves: bool = false
