@@ -2,8 +2,9 @@ class_name Notation
 extends RefCounted
 
 ## Standard algebraic notation (SAN) for moves, e.g. e4, Nf3, exd5, Nbd2, O-O,
-## e8=Q, Qh4#. Piece letters come from PieceDef.symbol and are uppercase for both
-## teams. The piece whose symbol is "P" gets no letter, as pawns do in chess.
+## e8=Q, Qh4#. A capture that only breaks a Shield ends in *, e.g. Rxd5*.
+## Piece letters come from PieceDef.symbol and are uppercase for both teams.
+## The piece whose symbol is "P" gets no letter, as pawns do in chess.
 
 const NO_LETTER_SYMBOL := "P"
 
@@ -25,6 +26,10 @@ static func san(state: GameState, move: Move) -> String:
 		text += Board.square_name(move.to)
 		if move.promotion:
 			text += "=" + move.promotion.symbol.to_upper()
+		# A capture that only broke a Shield (the piece is still there): Rxd5*.
+		# Nothing moves, so it can never give check: there's never a + after it.
+		if move.breaks_shield():
+			text += "*"
 	return text + _check_suffix(state, move)
 
 ## The legal move whose SAN matches `text`, or null. Check marks (+, #) are optional.
