@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3 uid="uid://ish3qour6a4r"]
+
+[ext_resource type="Script" uid="uid://bonqgoxij6pmo" path="res://core/move_rule.gd" id="1_04804"]
+[ext_resource type="Script" uid="uid://inn3y60fmap" path="res://core/piece_def.gd" id="2_4ygnt"]
+
+[sub_resource type="Resource" id="Resource_74wec"]
+script = ExtResource("1_04804")
+directions = Array[Vector2i]([Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+metadata/_custom_type_script = "uid://bonqgoxij6pmo"
+
+[resource]
+script = ExtResource("2_4ygnt")
+id = "king"
+display_name = "King"
+symbol = "K"
+move_rules = Array[ExtResource("1_04804")]([SubResource("Resource_74wec")])
+is_royal = true
+can_castle = true
+metadata/_custom_type_script = "uid://inn3y60fmap"
