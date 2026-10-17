@@ -101,8 +101,9 @@ func test_two_letter_symbols_in_positions() -> void:
 func test_first_capture_only_breaks_the_shield() -> void:
 	# White rook on d1 "captures" the black paladin on d5.
 	var state := _parse("k7/8/8/3(pd)4/8/8/8/3R3K w - - 7 20")
-	var hit := Notation.find_move(state, "Rxd5")
-	check(hit != null and hit.breaks_shield(), "Rxd5 breaks the shield")
+	check(Notation.find_move(state, "Rxd5") == null, "Not a plain capture while the shield is up")
+	var hit := Notation.find_move(state, "Rxd5*")
+	check(hit != null and hit.breaks_shield(), "Rxd5* breaks the shield")
 	state.make_move(hit)
 	check_eq(state.board.get_piece(Board.parse_square("d1")).def, ROOK, "Rook stays on d1")
 	var paladin := state.board.get_piece(Board.parse_square("d5"))
@@ -127,13 +128,13 @@ func test_pawn_breaking_a_shield_on_the_last_rank_does_not_promote() -> void:
 	check_eq(hits.size(), 1, "One shield-break move, no promotion choices")
 	if hits.size() == 1:
 		check(hits[0].promotion == null, "No promotion")
-		check_eq(Notation.san(state, hits[0]), "exd8", "Written like a capture")
+		check_eq(Notation.san(state, hits[0]), "exd8*", "Written like a capture, with *")
 
 func test_king_breaking_a_shield_stays_safe() -> void:
 	# The king stays on e1 when it hits the paladin on d2, so the rook on d8 (which
 	# would attack d2 once the paladin was gone) doesn't make that illegal.
 	var state := _parse("k2r4/8/8/8/8/8/3(pd)4/4K3 w - - 0 1")
-	check(_sans(state).has("Kxd2"), "King can break the shield")
+	check(_sans(state).has("Kxd2*"), "King can break the shield")
 
 func test_breaking_a_checking_shield_does_not_end_the_check() -> void:
 	# The shielded paladin on e2 checks the king. Hitting it leaves it there, still
@@ -141,7 +142,7 @@ func test_breaking_a_checking_shield_does_not_end_the_check() -> void:
 	var state := _parse("k7/8/8/8/8/8/4(pd)3/4K3 w - - 0 1")
 	check(state.is_in_check(), "In check from the paladin")
 	var sans := _sans(state)
-	check(not sans.has("Kxe2"), "Can't just hit the shield")
+	check(not sans.has("Kxe2*"), "Can't just hit the shield")
 	check(sans.has("Kf1") and sans.has("Kd1"), "Must move away")
 
 func test_shield_state_counts_for_repetition() -> void:
