@@ -1,0 +1,53 @@
+class_name Board
+extends RefCounted
+
+## The grid of squares and what's on each one.
+## Squares are Vector2i(file, rank): (0, 0) is a1, (4, 3) is e4.
+
+const FILE_LETTERS := "abcdefghijklmnopqrstuvwxyz"
+
+var width: int
+var height: int
+var _squares: Array[Piece] = []
+
+func _init(p_width: int = 8, p_height: int = 8) -> void:
+	width = p_width
+	height = p_height
+	_squares.resize(width * height)
+
+func in_bounds(pos: Vector2i) -> bool:
+	return pos.x >= 0 and pos.x < width and pos.y >= 0 and pos.y < height
+
+func get_piece(pos: Vector2i) -> Piece:
+	if not in_bounds(pos):
+		return null
+	return _squares[_index(pos)]
+
+func set_piece(pos: Vector2i, piece: Piece) -> void:
+	assert(in_bounds(pos), "Tried to place a piece off the board")
+	_squares[_index(pos)] = piece
+
+func is_empty(pos: Vector2i) -> bool:
+	return get_piece(pos) == null
+
+## Turns Vector2i(4, 3) into "e4".
+static func square_name(pos: Vector2i) -> String:
+	return FILE_LETTERS[pos.x] + str(pos.y + 1)
+
+## The board as text, White at the bottom. Used for testing.
+func to_text() -> String:
+	var lines: PackedStringArray = []
+	for rank in range(height - 1, -1, -1):
+		var row := str(rank + 1).lpad(2) + " "
+		for file in range(width):
+			var piece := get_piece(Vector2i(file, rank))
+			row += (piece.letter() if piece else ".") + " "
+		lines.append(row)
+	var footer := "   "
+	for file in range(width):
+		footer += FILE_LETTERS[file] + " "
+	lines.append(footer)
+	return "\n".join(lines)
+
+func _index(pos: Vector2i) -> int:
+	return pos.y * width + pos.x
