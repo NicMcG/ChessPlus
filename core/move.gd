@@ -11,7 +11,7 @@ var captured: Piece
 ## Where the captured piece stands. The same as `to`, except for en passant.
 var capture_square: Vector2i
 ## Squares this move skips over that the opponent may capture onto en passant
-## next turn. Only set for multi-step moves by pieces with the en_passant flag.
+## next turn. Only set for multi-step moves by pawn-type pieces.
 var skipped_squares: Array[Vector2i] = []
 ## What the piece turns into, or null if this move doesn't promote.
 var promotion: PieceDef

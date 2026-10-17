@@ -14,3 +14,4 @@ display_name = "Elephant"
 symbol = "E"
 value = 1.5
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_jump")])
+keywords = 1

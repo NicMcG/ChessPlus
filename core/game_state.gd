@@ -15,7 +15,7 @@ var side_to_move: Piece.Team = Piece.Team.WHITE
 var en_passant_squares: Array[Vector2i] = []
 ## Where that piece now stands (the piece removed by an en passant capture).
 var en_passant_victim: Vector2i = Board.NO_SQUARE
-## Half-moves since the last capture or resets_fifty_moves move (100 = 50 moves each).
+## Half-moves since the last capture or pawn-type move (100 = 50 moves each).
 var halfmove_clock: int = 0
 ## Starts at 1 and goes up after each Black move, as in FEN and PGN.
 var fullmove_number: int = 1
@@ -62,7 +62,7 @@ func make_move(move: Move) -> void:
 	move.prev_en_passant_squares = en_passant_squares
 	move.prev_en_passant_victim = en_passant_victim
 	move.prev_halfmove_clock = halfmove_clock
-	if move.is_capture() or move.piece.def.resets_fifty_moves:
+	if move.is_capture() or move.piece.def.is_pawn_type():
 		halfmove_clock = 0
 	else:
 		halfmove_clock += 1
@@ -110,7 +110,7 @@ func undo_move(move: Move) -> void:
 ## How many times the current position has occurred, counting now. "Same position"
 ## means the same pieces on the same squares, same side to move, same castling
 ## rights and same en passant possibilities. Only positions since the last capture
-## or resets_fifty_moves move can match, so it steps back that far (undoing moves
+## or pawn-type move can match, so it steps back that far (undoing moves
 ## to look, then replaying them).
 func _repetition_count() -> int:
 	var key := _position_key()
@@ -149,9 +149,9 @@ func _checkmate_impossible() -> bool:
 	for rank in range(board.height):
 		for file in range(board.width):
 			var piece := board.get_piece(Vector2i(file, rank))
-			if piece == null or piece.def.is_royal:
+			if piece == null or piece.def.is_king_type():
 				continue
-			if piece.def.promotes:
+			if piece.def.is_pawn_type():
 				return false
 			others.append(piece)
 			square_colors[(file + rank) % 2] = true

@@ -17,6 +17,8 @@ extends Resource
 @export var army_budget := 39.0
 ## How many rows, counted from each player's own edge, armies may start on.
 @export var army_start_rows := 2
-## The most copies of one piece type an army may have. Pawn types (pieces with
-## the `promotes` flag) have no limit; royal types (`is_royal`) are limited to 1.
+## The most copies of one piece type an army may have. Pawn types have no limit
+## and an army has exactly one king type.
 @export var army_max_copies := 2
+## How many royal-type pieces an army may have besides its king.
+@export var army_max_extra_royals := 1

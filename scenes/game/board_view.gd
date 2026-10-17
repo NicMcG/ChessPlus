@@ -242,7 +242,7 @@ func _royal_squares(team: Piece.Team) -> Array[Vector2i]:
 	for rank in range(state.board.height):
 		for file in range(state.board.width):
 			var piece := state.board.get_piece(Vector2i(file, rank))
-			if piece and piece.team == team and piece.def.is_royal:
+			if piece and piece.team == team and piece.def.is_king_type():
 				squares.append(Vector2i(file, rank))
 	return squares
 

@@ -37,19 +37,39 @@ func count_of(def: PieceDef) -> int:
 
 ## The most of this piece type an army may have (-1 means no limit).
 static func max_copies(def: PieceDef, rules: GameRules) -> int:
-	if def.is_royal:
+	if def.is_king_type():
 		return 1
-	if def.promotes:
+	if def.is_pawn_type():
 		return -1
+	if def.is_royal_type():
+		return mini(rules.army_max_extra_royals, rules.army_max_copies)
 	return rules.army_max_copies
+
+## The back-row files the king may start on: the middle two (d and e on 8 files),
+## or the single middle file on an odd-width board.
+static func king_files(board_width: int) -> Array[int]:
+	if board_width % 2 == 1:
+		return [board_width / 2]
+	return [board_width / 2 - 1, board_width / 2]
 
 ## Everything wrong with the army, in plain words. Empty means it's legal.
 func problems(rules: GameRules, board_width: int) -> PackedStringArray:
 	var found: PackedStringArray = []
 	if cost() > rules.army_budget:
 		found.append("Costs %s points; the budget is %s." % [_points(cost()), _points(rules.army_budget)])
-	if not pieces.any(func(p: ArmyPiece) -> bool: return p.def.is_royal):
+
+	var kings := pieces.filter(func(p: ArmyPiece) -> bool: return p.def.is_king_type())
+	if kings.is_empty():
 		found.append("Needs a king.")
+	for king in kings:
+		if king.square.y != 0 or not king_files(board_width).has(king.square.x):
+			found.append("The king must start in the middle of the back row.")
+
+	var extra_royals := pieces.filter(func(p: ArmyPiece) -> bool:
+			return p.def.is_royal_type() and not p.def.is_king_type()).size()
+	if extra_royals > rules.army_max_extra_royals:
+		found.append("Too many royal pieces: %d besides the king (the most is %d)." % [extra_royals, rules.army_max_extra_royals])
+
 	var checked := {}
 	for piece in pieces:
 		if checked.has(piece.def):
@@ -57,8 +77,11 @@ func problems(rules: GameRules, board_width: int) -> PackedStringArray:
 		checked[piece.def] = true
 		var limit := max_copies(piece.def, rules)
 		var count := count_of(piece.def)
-		if limit >= 0 and count > limit:
+		# Extra royal pieces are already reported above, as a group.
+		var royal_only := piece.def.is_royal_type() and not piece.def.is_king_type()
+		if limit >= 0 and count > limit and not royal_only:
 			found.append("Too many %ss: %d (the most is %d)." % [piece.def.display_name.to_lower(), count, limit])
+
 	var used := {}
 	for piece in pieces:
 		var s := piece.square

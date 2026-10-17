@@ -15,15 +15,15 @@ static func create_game(white: Army, black: Army, base_rules: GameRules, width :
 	rules.promotion_options = promotion_options_for(board)
 	return GameState.new(board, rules)
 
-## What promoting pieces may become: each piece type on the board at the start,
-## from either army, except royal types (a second king would break the game) and
-## pawn types (promoting into one would be pointless).
+## What pawn-type pieces may promote to: each piece type on the board at the
+## start, from either army, except king types (a second king would break the
+## game) and pawn types (promoting into one would be pointless).
 static func promotion_options_for(board: Board) -> Array[PieceDef]:
 	var options: Array[PieceDef] = []
 	for rank in range(board.height):
 		for file in range(board.width):
 			var piece := board.get_piece(Vector2i(file, rank))
-			if piece and not piece.def.is_royal and not piece.def.promotes and not options.has(piece.def):
+			if piece and not piece.def.is_king_type() and not piece.def.is_pawn_type() and not options.has(piece.def):
 				options.append(piece.def)
 	# Most valuable first, so the promotion picker shows the likely choice first.
 	options.sort_custom(func(a: PieceDef, b: PieceDef) -> bool: return a.value > b.value)

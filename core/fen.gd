@@ -118,7 +118,7 @@ static func _set_moved_flags(board: Board, castling: String) -> void:
 			var piece := board.get_piece(pos)
 			if piece == null:
 				continue
-			if piece.def.can_castle or piece.def.castle_partner:
+			if piece.def.is_king_type() or piece.def.has_castle():
 				piece.has_moved = true
 			elif _has_first_move_rule(piece.def):
 				var home_rank := 1 if piece.team == Piece.Team.WHITE else board.height - 2
@@ -157,7 +157,7 @@ static func _find_castler(board: Board, team: Piece.Team) -> Vector2i:
 	for rank in range(board.height):
 		for file in range(board.width):
 			var piece := board.get_piece(Vector2i(file, rank))
-			if piece and piece.team == team and piece.def.can_castle:
+			if piece and piece.team == team and piece.def.is_king_type():
 				return Vector2i(file, rank)
 	return Board.NO_SQUARE
 
@@ -167,7 +167,7 @@ static func _outermost_partner(board: Board, team: Piece.Team, king_pos: Vector2
 	var file := board.width - 1 if dir > 0 else 0
 	while file != king_pos.x:
 		var piece := board.get_piece(Vector2i(file, king_pos.y))
-		if piece and piece.team == team and piece.def.castle_partner:
+		if piece and piece.team == team and piece.def.has_castle():
 			return Vector2i(file, king_pos.y)
 		file -= dir
 	return Board.NO_SQUARE
@@ -176,7 +176,7 @@ static func _has_unmoved_partner(board: Board, team: Piece.Team, king_pos: Vecto
 	var pos := king_pos + Vector2i(dir, 0)
 	while board.in_bounds(pos):
 		var piece := board.get_piece(pos)
-		if piece and piece.team == team and piece.def.castle_partner and not piece.has_moved:
+		if piece and piece.team == team and piece.def.has_castle() and not piece.has_moved:
 			return true
 		pos.x += dir
 	return false

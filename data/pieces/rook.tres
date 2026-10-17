@@ -16,5 +16,5 @@ display_name = "Rook"
 symbol = "R"
 value = 5
 move_rules = Array[ExtResource("1_h7r84")]([SubResource("Resource_fbp7n")])
-castle_partner = true
+keywords = 2
 metadata/_custom_type_script = "uid://inn3y60fmap"
