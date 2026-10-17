@@ -5,6 +5,8 @@ extends RefCounted
 ## Squares are Vector2i(file, rank): (0, 0) is a1, (4, 3) is e4.
 
 const FILE_LETTERS := "abcdefghijklmnopqrstuvwxyz"
+## Stands for "no square" wherever a square is optional.
+const NO_SQUARE := Vector2i(-1, -1)
 
 var width: int
 var height: int
@@ -33,6 +35,16 @@ func is_empty(pos: Vector2i) -> bool:
 ## Turns Vector2i(4, 3) into "e4".
 static func square_name(pos: Vector2i) -> String:
 	return FILE_LETTERS[pos.x] + str(pos.y + 1)
+
+## Turns "e4" into Vector2i(4, 3). Returns NO_SQUARE if the text isn't a square name.
+static func parse_square(text: String) -> Vector2i:
+	if text.length() < 2:
+		return NO_SQUARE
+	var file := FILE_LETTERS.find(text[0])
+	var rank_text := text.substr(1)
+	if file < 0 or not rank_text.is_valid_int():
+		return NO_SQUARE
+	return Vector2i(file, rank_text.to_int() - 1)
 
 ## The board as text, White at the bottom. Used for testing.
 func to_text() -> String:

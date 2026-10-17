@@ -10,6 +10,10 @@ const ROOK = preload("res://data/pieces/rook.tres")
 const QUEEN = preload("res://data/pieces/queen.tres")
 const KING = preload("res://data/pieces/king.tres")
 
+## Every piece type in standard chess, e.g. for the FEN loader.
+static func piece_defs() -> Array[PieceDef]:
+	return [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING]
+
 static func create_board() -> Board:
 	var board := Board.new(8, 8)
 	var back_rank := [ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK]
