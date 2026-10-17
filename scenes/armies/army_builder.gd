@@ -40,6 +40,7 @@ func _ready() -> void:
 	name_edit.text_changed.connect(func(text: String) -> void:
 		army.army_name = text
 		_refresh())
+	PhoneTextInput.attach(name_edit, "Army name")
 	army_board.columns = BOARD_WIDTH
 	army_board.rows = rules.army_start_rows
 	army_board.show_army(army)

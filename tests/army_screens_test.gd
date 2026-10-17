@@ -139,6 +139,14 @@ func test_builder_saves_and_edits_a_copy() -> void:
 	check_eq(library.armies()[0].pieces.size(), 4, "Elephant added in the file")
 	builder.free()
 
+func test_phone_text_input_does_nothing_outside_phone_browsers() -> void:
+	# Tests run on PC, so attaching must leave the LineEdit working normally.
+	check(not PhoneTextInput.in_phone_browser(), "Not a phone browser")
+	var edit := LineEdit.new()
+	PhoneTextInput.attach(edit, "Name")
+	check_eq(edit.gui_input.get_connections().size(), 0, "No tap handler added on PC")
+	edit.free()
+
 # --- Army list and match setup -------------------------------------------------
 
 func test_army_list_shows_saved_armies() -> void:
