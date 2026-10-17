@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3 uid="uid://dxm57dtgutjl3"]
+
+[ext_resource type="Script" uid="uid://bonqgoxij6pmo" path="res://core/move_rule.gd" id="1_hqs58"]
+[ext_resource type="Script" uid="uid://inn3y60fmap" path="res://core/piece_def.gd" id="2_3hljn"]
+
+[sub_resource type="Resource" id="Resource_183yx"]
+script = ExtResource("1_hqs58")
+directions = Array[Vector2i]([Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+max_steps = 0
+metadata/_custom_type_script = "uid://bonqgoxij6pmo"
+
+[resource]
+script = ExtResource("2_3hljn")
+id = "bishop"
+display_name = "Bishop"
+symbol = "B"
+value = 3
+move_rules = Array[ExtResource("1_hqs58")]([SubResource("Resource_183yx")])
+metadata/_custom_type_script = "uid://inn3y60fmap"

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3 uid="uid://5mhvm3uew1hh"]
+
+[ext_resource type="Script" uid="uid://bonqgoxij6pmo" path="res://core/move_rule.gd" id="1_buy6n"]
+[ext_resource type="Script" uid="uid://inn3y60fmap" path="res://core/piece_def.gd" id="2_o57et"]
+
+[sub_resource type="Resource" id="Resource_nhnax"]
+script = ExtResource("1_buy6n")
+directions = Array[Vector2i]([Vector2i(0, 1)])
+first_move_max_steps = 2
+mode = 1
+metadata/_custom_type_script = "uid://bonqgoxij6pmo"
+
+[sub_resource type="Resource" id="Resource_yt1lp"]
+script = ExtResource("1_buy6n")
+directions = Array[Vector2i]([Vector2i(1, 1), Vector2i(-1, 1)])
+mode = 2
+metadata/_custom_type_script = "uid://bonqgoxij6pmo"
+
+[resource]
+script = ExtResource("2_o57et")
+id = "pawn"
+display_name = "Pawn"
+symbol = "P"
+value = 1
+move_rules = Array[ExtResource("1_buy6n")]([SubResource("Resource_nhnax"), SubResource("Resource_yt1lp")])
+promotes = true
+en_passant = true
+metadata/_custom_type_script = "uid://inn3y60fmap"
