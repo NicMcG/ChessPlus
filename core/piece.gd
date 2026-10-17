@@ -8,10 +8,16 @@ enum Team { WHITE, BLACK }
 var def: PieceDef
 var team: Team
 var has_moved: bool = false
+## For pieces with the Shield keyword: true once the shield has been broken.
+var shield_broken: bool = false
 
 func _init(p_def: PieceDef, p_team: Team) -> void:
 	def = p_def
 	team = p_team
+
+## True if this piece has a Shield that hasn't been broken yet.
+func has_active_shield() -> bool:
+	return def.has_shield() and not shield_broken
 
 ## The other team: WHITE gives BLACK, BLACK gives WHITE.
 static func other_team(p_team: Team) -> Team:

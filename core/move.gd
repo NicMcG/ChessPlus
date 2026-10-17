@@ -13,6 +13,9 @@ var capture_square: Vector2i
 ## Squares this move skips over that the opponent may capture onto en passant
 ## next turn. Only set for multi-step moves by pawn-type pieces.
 var skipped_squares: Array[Vector2i] = []
+## For a move that breaks a Shield: the shielded piece. The attacker stays on
+## `from` and the shielded piece stays on `to`; only the shield is lost.
+var shield_target: Piece
 ## What the piece turns into, or null if this move doesn't promote.
 var promotion: PieceDef
 ## For castling: the partner piece (rook) that moves too, and where it goes.
@@ -37,8 +40,16 @@ func _init(p_from: Vector2i, p_to: Vector2i, p_piece: Piece, p_captured: Piece =
 	captured = p_captured
 	capture_square = p_to
 
+## True for captures and for shield breaks (both are written with "x").
 func is_capture() -> bool:
-	return captured != null
+	return captured != null or breaks_shield()
+
+func breaks_shield() -> bool:
+	return shield_target != null
+
+## Where the moving piece ends up: `to`, or `from` if it only broke a shield.
+func lands_on() -> Vector2i:
+	return from if breaks_shield() else to
 
 func is_castling() -> bool:
 	return partner != null

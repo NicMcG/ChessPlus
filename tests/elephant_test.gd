@@ -16,13 +16,16 @@ func _elephant_moves(state: GameState) -> Array:
 func test_catalog_has_the_elephant() -> void:
 	var ids := PieceCatalog.all_defs().map(func(d: PieceDef) -> String: return d.id)
 	check(ids.has("elephant"), "Elephant in the catalog")
-	check_eq(ids.size(), 7, "Seven piece types")
+	for id in ["pawn", "knight", "bishop", "rook", "queen", "king", "man", "cannon", "lance", "paladin"]:
+		check(ids.has(id), "Catalog has " + id)
 
-func test_symbols_are_unique() -> void:
+func test_symbols_are_unique_capitals() -> void:
 	var seen := {}
+	var capitals := RegEx.create_from_string("^[A-Z]{1,2}$")
 	for def in PieceCatalog.all_defs():
-		check(not seen.has(def.symbol.to_upper()), "Symbol used twice: " + def.symbol)
-		seen[def.symbol.to_upper()] = true
+		check(not seen.has(def.symbol), "Symbol used twice: " + def.symbol)
+		check(capitals.search(def.symbol) != null, "One or two capital letters: " + def.symbol)
+		seen[def.symbol] = true
 
 func test_moves_from_the_middle() -> void:
 	var state := _parse("4k3/8/8/8/3E4/8/8/4K3 w - - 0 1")

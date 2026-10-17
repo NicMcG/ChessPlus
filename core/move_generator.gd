@@ -17,7 +17,7 @@ static func legal_moves(state: GameState) -> Array[Move]:
 		state.make_move(move)
 		var safe := true
 		for square in royals:
-			var now_at := move.to if square == move.from else square
+			var now_at := move.lands_on() if square == move.from else square
 			if _is_attacked_by(board, now_at, enemy, enemy_defs):
 				safe = false
 				break
@@ -118,8 +118,16 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 				if rule.mode != MoveRule.Mode.MOVE_ONLY:
 					_add_hop_capture(state, from, to, step, limit - i - 1, piece, moves)
 			elif target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
-				_append(state, Move.new(from, to, piece, target), moves)
+				_append(state, _capture(from, to, piece, target), moves)
 			break
+
+## A capture of `target`, or just a shield break if it still has a Shield.
+static func _capture(from: Vector2i, to: Vector2i, piece: Piece, target: Piece) -> Move:
+	if target.has_active_shield():
+		var hit := Move.new(from, to, piece)
+		hit.shield_target = target
+		return hit
+	return Move.new(from, to, piece, target)
 
 ## Having reached a screen at `screen`, keep going (up to `steps_left` more squares)
 ## and capture the first piece beyond it, if it's an enemy.
@@ -133,14 +141,16 @@ static func _add_hop_capture(state: GameState, from: Vector2i, screen: Vector2i,
 		if target == null:
 			continue
 		if target.team != piece.team:
-			_append(state, Move.new(from, to, piece, target), moves)
+			_append(state, _capture(from, to, piece, target), moves)
 		return
 
 ## Adds a move to the list. A promoting piece reaching the far rank must promote,
 ## so instead of the plain move this adds one move per promotion option.
 static func _append(state: GameState, move: Move, moves: Array[Move]) -> void:
 	var options := state.rules.promotion_options
-	if not move.piece.def.is_pawn_type() or options.is_empty() or move.to.y != _far_rank(state.board, move.piece.team):
+	# A shield break doesn't move the piece, so it can't promote.
+	if not move.piece.def.can_promote() or move.breaks_shield() or options.is_empty() \
+			or move.to.y != _far_rank(state.board, move.piece.team):
 		moves.append(move)
 		return
 	for option in options:

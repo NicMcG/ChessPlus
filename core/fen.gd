@@ -51,7 +51,9 @@ static func write(state: GameState) -> String:
 			if empty > 0:
 				row += str(empty)
 				empty = 0
-			row += piece.letter()
+			row += piece.letter() if piece.def.symbol.length() == 1 else "(%s)" % piece.letter()
+			if piece.shield_broken:
+				row += "'"
 		if empty > 0:
 			row += str(empty)
 		rows.append(row)
@@ -74,24 +76,28 @@ static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 	for i in range(height):
 		var rank := height - 1 - i
 		var file := 0
-		var digits := ""  # Collected so wide boards can use numbers like "10".
-		for c in rows[i]:
-			if c.is_valid_int():
-				digits += c
+		var last: Piece = null
+		for token in _tokens(rows[i]):
+			if token.is_valid_int():
+				file += token.to_int()
 				continue
-			file += digits.to_int()
-			digits = ""
-			var def: PieceDef = by_symbol.get(c.to_upper())
+			if token == "'":
+				# The piece just before this mark has lost its shield.
+				if last:
+					last.shield_broken = true
+				continue
+			var letters := token.trim_prefix("(").trim_suffix(")")
+			var def: PieceDef = by_symbol.get(letters.to_upper())
 			if def == null:
-				push_error("FEN has an unknown piece letter: " + c)
+				push_error("FEN has an unknown piece: " + token)
 				return null
 			if file >= width:
 				push_error("FEN rank %d is too long" % (rank + 1))
 				return null
-			var team := Piece.Team.WHITE if c == c.to_upper() else Piece.Team.BLACK
-			board.set_piece(Vector2i(file, rank), Piece.new(def, team))
+			var team := Piece.Team.WHITE if letters == letters.to_upper() else Piece.Team.BLACK
+			last = Piece.new(def, team)
+			board.set_piece(Vector2i(file, rank), last)
 			file += 1
-		file += digits.to_int()
 		if file != width:
 			push_error("FEN rank %d has the wrong length" % (rank + 1))
 			return null
@@ -99,14 +105,38 @@ static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 
 static func _row_width(row: String) -> int:
 	var width := 0
-	var digits := ""
-	for c in row:
+	for token in _tokens(row):
+		if token.is_valid_int():
+			width += token.to_int()
+		elif token != "'":
+			width += 1
+	return width
+
+## Splits one rank of the placement field into pieces: a number of empty squares
+## ("3", or "10" on wide boards), a one-letter piece ("N"), a two-letter piece in
+## brackets ("(PD)"), or a "'" mark meaning the piece before it lost its shield.
+static func _tokens(row: String) -> PackedStringArray:
+	var tokens: PackedStringArray = []
+	var i := 0
+	while i < row.length():
+		var c := row[i]
 		if c.is_valid_int():
-			digits += c
-		else:
-			width += digits.to_int() + 1
-			digits = ""
-	return width + digits.to_int()
+			var digits := ""
+			while i < row.length() and row[i].is_valid_int():
+				digits += row[i]
+				i += 1
+			tokens.append(digits)
+			continue
+		if c == "(":
+			var close := row.find(")", i)
+			if close < 0:
+				close = row.length() - 1
+			tokens.append(row.substr(i, close - i + 1))
+			i = close + 1
+			continue
+		tokens.append(c)
+		i += 1
+	return tokens
 
 ## FEN doesn't store has_moved, so work it out:
 ## - castling pieces count as moved unless the castling rights say otherwise;
