@@ -7,6 +7,14 @@ extends RefCounted
 
 var board: Board
 var side_to_move: Piece.Team = Piece.Team.WHITE
+## Squares the last move's piece skipped over, where it can be captured en passant.
+var en_passant_squares: Array[Vector2i] = []
+## Where that piece now stands (the piece removed by an en passant capture).
+var en_passant_victim: Vector2i = Board.NO_SQUARE
+## Moves since the last capture or pawn-type move (for the 50-move rule).
+var halfmove_clock: int = 0
+## Starts at 1 and goes up after each Black move, as in FEN and PGN.
+var fullmove_number: int = 1
 
 func _init(p_board: Board) -> void:
 	board = p_board
@@ -20,10 +28,14 @@ func make_move(move: Move) -> void:
 	board.set_piece(move.from, null)
 	board.set_piece(move.to, move.piece)  # Replaces any captured piece.
 	move.piece.has_moved = true
+	if side_to_move == Piece.Team.BLACK:
+		fullmove_number += 1
 	side_to_move = Piece.other_team(side_to_move)
 
 func undo_move(move: Move) -> void:
 	side_to_move = Piece.other_team(side_to_move)
+	if side_to_move == Piece.Team.BLACK:
+		fullmove_number -= 1
 	move.piece.has_moved = move.piece_had_moved
 	board.set_piece(move.to, move.captured)  # null if nothing was captured.
 	board.set_piece(move.from, move.piece)

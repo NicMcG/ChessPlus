@@ -1,0 +1,188 @@
+class_name Fen
+extends RefCounted
+
+## Reads and writes FEN, the standard one-line text format for a chess position.
+## It has six fields separated by spaces:
+##   pieces (top rank first, "/" between ranks, digits = that many empty squares)
+##   side to move (w or b), castling rights (KQkq or -), en passant square (or -),
+##   halfmove clock, move number.
+## Uppercase letters are White, lowercase are Black.
+
+const STANDARD_START := "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
+## Builds a GameState from FEN text. `defs` are the piece types the letters may
+## refer to (matched on PieceDef.symbol). Returns null if the text can't be read.
+static func parse(text: String, defs: Array[PieceDef]) -> GameState:
+	var fields := text.strip_edges().split(" ", false)
+	if fields.is_empty():
+		push_error("FEN is empty")
+		return null
+	var board := _parse_pieces(fields[0], defs)
+	if board == null:
+		return null
+	var state := GameState.new(board)
+	state.side_to_move = Piece.Team.BLACK if fields.size() > 1 and fields[1] == "b" else Piece.Team.WHITE
+	_set_moved_flags(board, fields[2] if fields.size() > 2 else "-")
+	if fields.size() > 3 and fields[3] != "-":
+		var square := Board.parse_square(fields[3])
+		if not board.in_bounds(square):
+			push_error("FEN has a bad en passant square: " + fields[3])
+			return null
+		state.en_passant_squares = [square]
+		# The piece that just moved stands one step past the square it skipped.
+		var forward := 1 if state.side_to_move == Piece.Team.BLACK else -1
+		state.en_passant_victim = square + Vector2i(0, forward)
+	state.halfmove_clock = fields[4].to_int() if fields.size() > 4 else 0
+	state.fullmove_number = fields[5].to_int() if fields.size() > 5 else 1
+	return state
+
+## The FEN text for a game state.
+static func write(state: GameState) -> String:
+	var board := state.board
+	var rows: PackedStringArray = []
+	for rank in range(board.height - 1, -1, -1):
+		var row := ""
+		var empty := 0
+		for file in range(board.width):
+			var piece := board.get_piece(Vector2i(file, rank))
+			if piece == null:
+				empty += 1
+				continue
+			if empty > 0:
+				row += str(empty)
+				empty = 0
+			row += piece.letter()
+		if empty > 0:
+			row += str(empty)
+		rows.append(row)
+	var side := "w" if state.side_to_move == Piece.Team.WHITE else "b"
+	var en_passant := "-"
+	if not state.en_passant_squares.is_empty():
+		en_passant = Board.square_name(state.en_passant_squares[0])
+	return " ".join(["/".join(rows), side, _castling_text(board), en_passant,
+			str(state.halfmove_clock), str(state.fullmove_number)])
+
+## Reads the piece-placement field. The board's size comes from the text itself.
+static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
+	var by_symbol := {}
+	for def in defs:
+		by_symbol[def.symbol.to_upper()] = def
+	var rows := text.split("/")
+	var height := rows.size()
+	var width := _row_width(rows[0])
+	var board := Board.new(width, height)
+	for i in range(height):
+		var rank := height - 1 - i
+		var file := 0
+		var digits := ""  # Collected so wide boards can use numbers like "10".
+		for c in rows[i]:
+			if c.is_valid_int():
+				digits += c
+				continue
+			file += digits.to_int()
+			digits = ""
+			var def: PieceDef = by_symbol.get(c.to_upper())
+			if def == null:
+				push_error("FEN has an unknown piece letter: " + c)
+				return null
+			if file >= width:
+				push_error("FEN rank %d is too long" % (rank + 1))
+				return null
+			var team := Piece.Team.WHITE if c == c.to_upper() else Piece.Team.BLACK
+			board.set_piece(Vector2i(file, rank), Piece.new(def, team))
+			file += 1
+		file += digits.to_int()
+		if file != width:
+			push_error("FEN rank %d has the wrong length" % (rank + 1))
+			return null
+	return board
+
+static func _row_width(row: String) -> int:
+	var width := 0
+	var digits := ""
+	for c in row:
+		if c.is_valid_int():
+			digits += c
+		else:
+			width += digits.to_int() + 1
+			digits = ""
+	return width + digits.to_int()
+
+## FEN doesn't store has_moved, so work it out:
+## - castling pieces count as moved unless the castling rights say otherwise;
+## - pieces with a first-move rule (pawns) are unmoved only on their starting rank.
+static func _set_moved_flags(board: Board, castling: String) -> void:
+	for rank in range(board.height):
+		for file in range(board.width):
+			var pos := Vector2i(file, rank)
+			var piece := board.get_piece(pos)
+			if piece == null:
+				continue
+			if piece.def.can_castle or piece.def.castle_partner:
+				piece.has_moved = true
+			elif _has_first_move_rule(piece.def):
+				var home_rank := 1 if piece.team == Piece.Team.WHITE else board.height - 2
+				piece.has_moved = rank != home_rank
+	for c in castling:
+		if c.to_upper() != "K" and c.to_upper() != "Q":
+			continue
+		var team := Piece.Team.WHITE if c == c.to_upper() else Piece.Team.BLACK
+		var king_pos := _find_castler(board, team)
+		if king_pos == Board.NO_SQUARE:
+			continue
+		# K = the partner toward the h-file side, Q = toward the a-file side.
+		var dir := 1 if c.to_upper() == "K" else -1
+		var partner_pos := _outermost_partner(board, team, king_pos, dir)
+		if partner_pos == Board.NO_SQUARE:
+			continue
+		board.get_piece(king_pos).has_moved = false
+		board.get_piece(partner_pos).has_moved = false
+
+static func _castling_text(board: Board) -> String:
+	var text := ""
+	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		var king_pos := _find_castler(board, team)
+		if king_pos == Board.NO_SQUARE or board.get_piece(king_pos).has_moved:
+			continue
+		var rights := ""
+		if _has_unmoved_partner(board, team, king_pos, 1):
+			rights += "K"
+		if _has_unmoved_partner(board, team, king_pos, -1):
+			rights += "Q"
+		text += rights if team == Piece.Team.WHITE else rights.to_lower()
+	return text if text != "" else "-"
+
+## Where the team's castling piece (the king) is, or NO_SQUARE.
+static func _find_castler(board: Board, team: Piece.Team) -> Vector2i:
+	for rank in range(board.height):
+		for file in range(board.width):
+			var piece := board.get_piece(Vector2i(file, rank))
+			if piece and piece.team == team and piece.def.can_castle:
+				return Vector2i(file, rank)
+	return Board.NO_SQUARE
+
+## The castle partner farthest from the king in direction `dir` (+1 or -1 files)
+## on the king's rank, or NO_SQUARE.
+static func _outermost_partner(board: Board, team: Piece.Team, king_pos: Vector2i, dir: int) -> Vector2i:
+	var file := board.width - 1 if dir > 0 else 0
+	while file != king_pos.x:
+		var piece := board.get_piece(Vector2i(file, king_pos.y))
+		if piece and piece.team == team and piece.def.castle_partner:
+			return Vector2i(file, king_pos.y)
+		file -= dir
+	return Board.NO_SQUARE
+
+static func _has_unmoved_partner(board: Board, team: Piece.Team, king_pos: Vector2i, dir: int) -> bool:
+	var pos := king_pos + Vector2i(dir, 0)
+	while board.in_bounds(pos):
+		var piece := board.get_piece(pos)
+		if piece and piece.team == team and piece.def.castle_partner and not piece.has_moved:
+			return true
+		pos.x += dir
+	return false
+
+static func _has_first_move_rule(def: PieceDef) -> bool:
+	for rule in def.move_rules:
+		if rule.first_move_max_steps > 0:
+			return true
+	return false
