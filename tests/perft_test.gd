@@ -1,3 +1,4 @@
+class_name PerftTest
 extends TestSuite
 
 ## Perft ("performance test") counts every possible sequence of moves to a given
