@@ -52,12 +52,13 @@ Everything in the rules engine should be built so standard chess is just one con
 * `res://core/game_state.gd` — `GameState` (RefCounted): board, rules, side\_to\_move, en\_passant\_squares/victim, halfmove\_clock, fullmove\_number, history (moves played); moves() (legal), is\_in\_check(), outcome() / result\_text(), make\_move / undo\_move (undo in reverse order), find\_move(text) for tests.
 * `res://core/move_generator.gd` — `MoveGenerator` (static): legal\_moves (make, check royals, undo), pseudo\_legal\_moves, is\_in\_check, is\_attacked (walks each enemy piece type's capture rays backwards from the square). En passant, castling and promotion all keyed off PieceDef flags + GameRules.
 * `res://core/fen.gd` — `Fen.parse(text, defs, rules)` / `Fen.write(state)`. Board size comes from the FEN; has\_moved is inferred from castling rights and pawns' starting ranks.
+* `res://core/notation.gd` — `Notation`: san(state, move), find_move(state, san) (check marks optional), move_list(state) ("1. e4 e5 2. Nf3", plus the result if the game is over).
 * `res://core/standard_setup.gd` — `StandardSetup`: piece\_defs(), create\_rules(), create\_board(), create\_game(), from\_fen(fen).
 * `res://tests/` — `run_tests.tscn` runs every `*_test.gd` (see Running tests). Perft matches the start position (depth 4), Kiwipete (depth 3), and CPW positions 3 (depth 5), 4 (depth 4) and 5 (depth 3).
 
 ## Current milestone: the move generator
 
-Status: DONE. Legal moves, en passant, castling, promotion, 50-move rule, threefold repetition, insufficient material and checkmate/stalemate (`GameState.outcome()` / `result_text()`), all tested and perft-verified. Next up: standard algebraic notation for the move list (needs Mac's decision on symbols running out).
+Status: DONE. Legal moves, en passant, castling, promotion, 50-move rule, threefold repetition, insufficient material and checkmate/stalemate (`GameState.outcome()` / `result_text()`), all tested and perft-verified. Standard algebraic notation (`Notation`) is done too.
 
 Goal: a rules engine that produces every legal move in standard chess, driven entirely by the MoveRule/PieceDef data.
 
@@ -75,7 +76,8 @@ Goal: a rules engine that produces every legal move in standard chess, driven en
 
 * Positions (board text output, FEN): uppercase = White, lowercase = Black. This is the FEN standard, so `Piece.letter()` and `Board.to\_text()` use it, and the FEN loader must too.
 * Moves (move list, game history, PGN export) use standard algebraic notation: piece letters are uppercase for BOTH colors (Nf3 ... Nc6); pawns get no letter (e4); "x" for captures, with a pawn capture written using its starting file (exd5); disambiguate by file, then rank (Nbd2, N1d2); castling O-O / O-O-O with the letter O (the PGN standard); promotion e8=Q; "+" for check, "#" for checkmate; results 1-0, 0-1, 1/2-1/2.
-* Piece letters come from PieceDef.symbol, so new pieces get notation automatically. In Chess Plus, symbols must stay unique across all pieces. Single letters will eventually run out; how to handle that is Mac's design call, so ask him.
+* Piece letters come from PieceDef.symbol, so new pieces get notation automatically. In Chess Plus, symbols must stay unique across all pieces. Mac's decision: single letters for now; revisit only when they actually run out.
+* Only the piece whose symbol is "P" goes without a letter (`Notation.NO_LETTER_SYMBOL`), so a bare square always means exactly one piece type.
 
 ## Running tests
 
