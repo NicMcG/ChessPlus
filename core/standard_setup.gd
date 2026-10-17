@@ -28,6 +28,16 @@ static func create_game() -> GameState:
 static func from_fen(fen: String) -> GameState:
 	return Fen.parse(fen, piece_defs(), create_rules())
 
+## The standard set of pieces as an army (it costs exactly 39).
+static func army() -> Army:
+	var result := Army.new()
+	result.army_name = "Standard"
+	var back_rank := [ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK]
+	for file in range(8):
+		result.place(back_rank[file], Vector2i(file, 0))
+		result.place(PAWN, Vector2i(file, 1))
+	return result
+
 ## The normal starting position.
 static func create_board() -> Board:
 	var board := Board.new(8, 8)
