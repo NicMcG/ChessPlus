@@ -40,6 +40,12 @@ func test_start_position() -> void:
 func slow_test_start_position_depth_4() -> void:
 	_check_perft(Fen.STANDARD_START, [20, 400, 8902, 197281])
 
+func test_kiwipete() -> void:
+	_check_perft(KIWIPETE, [48, 2039])
+
+func slow_test_kiwipete_depth_3() -> void:
+	_check_perft(KIWIPETE, [48, 2039, 97862])
+
 func test_position_3() -> void:
 	_check_perft(POSITION_3, [14, 191, 2812])
 
