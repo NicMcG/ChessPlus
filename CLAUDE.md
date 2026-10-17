@@ -44,12 +44,19 @@ Everything in the rules engine should be built so standard chess is just one con
 * `res://core/move\_rule.gd` — `MoveRule` (Resource): `directions: Array\[Vector2i]` as (files, ranks) from the owner's point of view, positive ranks = toward the opponent; `max\_steps` (1 = single step/leap, 0 = unlimited slide, stopping when blocked); `first\_move\_max\_steps` (if > 0, replaces max\_steps while the piece hasn't moved); `mode` (MOVE\_OR\_CAPTURE / MOVE\_ONLY / CAPTURE\_ONLY). A knight is (1,2)-type directions with max\_steps 1, so it can't be blocked.
 * `res://core/piece\_def.gd` — `PieceDef` (Resource): id, display\_name, symbol, value, move\_rules: Array\[MoveRule], plus special-rule flags: is\_royal, promotes, en\_passant, can\_castle (king), castle\_partner (rook).
 * `res://data/pieces/` — pawn, knight, bishop, rook, queen, king .tres files. The pawn has two rules: forward (0,1) max 1, first-move max 2, MOVE\_ONLY; diagonal (1,1)/(-1,1) max 1, CAPTURE\_ONLY. The king's value is 0 (not purchasable; every army will have exactly one).
-* `res://core/piece.gd` — `Piece` (RefCounted): def, team (`Piece.Team.WHITE/BLACK`), has\_moved, letter().
-* `res://core/board.gd` — `Board` (RefCounted): width/height (not hardcoded to 8), flat `\_squares` array indexed rank \* width + file, get\_piece (returns null off-board), set\_piece, is\_empty, in\_bounds, static square\_name, to\_text.
-* `res://core/standard\_setup.gd` — `StandardSetup.create\_board()` builds the standard starting position.
-* `res://tests/test\_board.tscn` + `test\_board.gd` — prints the starting position; passes.
+* `res://core/piece.gd` — `Piece` (RefCounted): def, team (`Piece.Team.WHITE/BLACK`), has\_moved, letter(), static other\_team().
+* `res://core/board.gd` — `Board` (RefCounted): width/height (not hardcoded to 8), flat `\_squares` array indexed rank \* width + file, get\_piece (returns null off-board), set\_piece, is\_empty, in\_bounds, static square\_name / parse\_square, `NO_SQUARE`, to\_text.
+* `res://core/game_rules.gd` — `GameRules` (Resource): game-wide rules; so far `promotion_options: Array[PieceDef]`.
+* `res://core/move.gd` — `Move` (RefCounted): from, to, piece, captured, capture\_square (differs from `to` only for en passant), skipped\_squares (en passant targets created), promotion, castling partner/partner\_from/partner\_to, plus `prev_...` fields that make\_move fills in for undo. to\_text() gives test text like `e2-e4`, `e4xd5`, `e7-e8=Q` (not real notation).
+* `res://core/game_state.gd` — `GameState` (RefCounted): board, rules, side\_to\_move, en\_passant\_squares/victim, halfmove\_clock (not yet updated by moves), fullmove\_number; moves() (legal), is\_in\_check(), make\_move / undo\_move (undo in reverse order), find\_move(text) for tests.
+* `res://core/move_generator.gd` — `MoveGenerator` (static): legal\_moves (make, check royals, undo), pseudo\_legal\_moves, is\_in\_check, is\_attacked (walks each enemy piece type's capture rays backwards from the square). En passant, castling and promotion all keyed off PieceDef flags + GameRules.
+* `res://core/fen.gd` — `Fen.parse(text, defs, rules)` / `Fen.write(state)`. Board size comes from the FEN; has\_moved is inferred from castling rights and pawns' starting ranks.
+* `res://core/standard_setup.gd` — `StandardSetup`: piece\_defs(), create\_rules(), create\_board(), create\_game(), from\_fen(fen).
+* `res://tests/` — `run_tests.tscn` runs every `*_test.gd` (see Running tests). Perft matches the start position (depth 4), Kiwipete (depth 3), and CPW positions 3 (depth 5), 4 (depth 4) and 5 (depth 3).
 
 ## Current milestone: the move generator
+
+Status: legal move generation, en passant, castling and promotion are done and perft-verified. Still to do: the 50-move rule (needs Mac to name the new PieceDef flag), threefold repetition, and checkmate/stalemate as game results.
 
 Goal: a rules engine that produces every legal move in standard chess, driven entirely by the MoveRule/PieceDef data.
 
