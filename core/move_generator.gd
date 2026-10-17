@@ -38,7 +38,7 @@ static func pseudo_legal_moves(state: GameState) -> Array[Move]:
 			if piece == null or piece.team != state.side_to_move:
 				continue
 			for rule in piece.def.move_rules:
-				_add_rule_moves(board, from, piece, rule, moves)
+				_add_rule_moves(state, from, piece, rule, moves)
 	return moves
 
 ## True if any of `team`'s royal pieces is attacked.
@@ -82,25 +82,48 @@ static func _is_attacked_by(board: Board, square: Vector2i, by_team: Piece.Team,
 	return false
 
 ## Walks each direction of one rule, one step at a time, adding moves as it goes.
-static func _add_rule_moves(board: Board, from: Vector2i, piece: Piece, rule: MoveRule, moves: Array[Move]) -> void:
+static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule: MoveRule, moves: Array[Move]) -> void:
+	var board := state.board
 	var limit := _step_limit(rule, piece, board)
 	for dir in rule.directions:
 		var step := _orient(dir, piece.team)
 		var to := from
+		var passed: Array[Vector2i] = []  # Empty squares walked over so far.
 		for i in range(limit):
 			to += step
 			if not board.in_bounds(to):
 				break
 			var target := board.get_piece(to)
 			if target == null:
-				if rule.mode != MoveRule.Mode.CAPTURE_ONLY:
-					moves.append(Move.new(from, to, piece))
+				var en_passant := _en_passant_capture(state, from, to, piece, rule)
+				if en_passant:
+					moves.append(en_passant)
+				elif rule.mode != MoveRule.Mode.CAPTURE_ONLY:
+					var move := Move.new(from, to, piece)
+					if piece.def.en_passant:
+						move.skipped_squares = passed.duplicate()
+					moves.append(move)
+				passed.append(to)
 				continue
 			# Something is in the way: capture it if it's an enemy and the rule allows,
 			# then stop either way.
 			if target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
 				moves.append(Move.new(from, to, piece, target))
 			break
+
+## If moving to the empty square `to` would capture en passant, returns that
+## capture, otherwise null. Both pieces need the en_passant flag.
+static func _en_passant_capture(state: GameState, from: Vector2i, to: Vector2i, piece: Piece, rule: MoveRule) -> Move:
+	if rule.mode == MoveRule.Mode.MOVE_ONLY or not piece.def.en_passant:
+		return null
+	if not state.en_passant_squares.has(to):
+		return null
+	var victim := state.board.get_piece(state.en_passant_victim)
+	if victim == null or victim.team == piece.team or not victim.def.en_passant:
+		return null
+	var move := Move.new(from, to, piece, victim)
+	move.capture_square = state.en_passant_victim
+	return move
 
 ## How many steps this rule allows right now. 0 in the data means "unlimited",
 ## which on a finite board is never more than the board's longest side.

@@ -29,9 +29,15 @@ func is_in_check() -> bool:
 
 func make_move(move: Move) -> void:
 	move.piece_had_moved = move.piece.has_moved
+	move.prev_en_passant_squares = en_passant_squares
+	move.prev_en_passant_victim = en_passant_victim
 	board.set_piece(move.from, null)
-	board.set_piece(move.to, move.piece)  # Replaces any captured piece.
+	board.set_piece(move.capture_square, null)
+	board.set_piece(move.to, move.piece)
 	move.piece.has_moved = true
+	# En passant is only possible on the very next move.
+	en_passant_squares = move.skipped_squares
+	en_passant_victim = move.to if not move.skipped_squares.is_empty() else Board.NO_SQUARE
 	if side_to_move == Piece.Team.BLACK:
 		fullmove_number += 1
 	side_to_move = Piece.other_team(side_to_move)
@@ -41,7 +47,10 @@ func undo_move(move: Move) -> void:
 	if side_to_move == Piece.Team.BLACK:
 		fullmove_number -= 1
 	move.piece.has_moved = move.piece_had_moved
-	board.set_piece(move.to, move.captured)  # null if nothing was captured.
+	en_passant_squares = move.prev_en_passant_squares
+	en_passant_victim = move.prev_en_passant_victim
+	board.set_piece(move.to, null)
+	board.set_piece(move.capture_square, move.captured)  # null if nothing was captured.
 	board.set_piece(move.from, move.piece)
 
 ## The available move whose to_text() matches, e.g. "e2-e4", or null. For tests.
