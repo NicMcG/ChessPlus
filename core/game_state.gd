@@ -67,6 +67,13 @@ func make_move(move: Move) -> void:
 	else:
 		halfmove_clock += 1
 	history.append(move)
+	if move.breaks_shield():
+		# Nothing moves: the shielded piece just loses its shield.
+		move.shield_target.shield_broken = true
+		en_passant_squares = []
+		en_passant_victim = Board.NO_SQUARE
+		_next_turn()
+		return
 	board.set_piece(move.from, null)
 	board.set_piece(move.capture_square, null)
 	if move.promotion:
@@ -85,6 +92,9 @@ func make_move(move: Move) -> void:
 	# En passant is only possible on the very next move.
 	en_passant_squares = move.skipped_squares
 	en_passant_victim = move.to if not move.skipped_squares.is_empty() else Board.NO_SQUARE
+	_next_turn()
+
+func _next_turn() -> void:
 	if side_to_move == Piece.Team.BLACK:
 		fullmove_number += 1
 	side_to_move = Piece.other_team(side_to_move)
@@ -99,6 +109,9 @@ func undo_move(move: Move) -> void:
 	move.piece.has_moved = move.piece_had_moved
 	en_passant_squares = move.prev_en_passant_squares
 	en_passant_victim = move.prev_en_passant_victim
+	if move.breaks_shield():
+		move.shield_target.shield_broken = false
+		return
 	if move.is_castling():
 		move.partner.has_moved = move.partner_had_moved
 		board.set_piece(move.partner_to, null)
