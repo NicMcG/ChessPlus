@@ -1,47 +1,57 @@
 extends TestSuite
 
-## The movement patterns shown in the piece guide.
+## The movement picture on the piece card.
 
 const MOVE := PieceGuide.MOVE
 const CAPTURE := PieceGuide.CAPTURE
 const FIRST := PieceGuide.FIRST_MOVE
-const HOP := PieceGuide.HOP_CAPTURE
+const JUMP := PieceGuide.JUMP
 
-func _def(id: String) -> PieceDef:
-	return load("res://data/pieces/%s.tres" % id)
+func _guide(id: String) -> Dictionary:
+	return PieceGuide.guide(load("res://data/pieces/%s.tres" % id))
 
-func test_knight() -> void:
-	var marks := PieceGuide.pattern(_def("knight"))
-	check_eq(marks.size(), 8, "Eight squares")
-	check_eq(marks.get(Vector2i(1, 2)), MOVE | CAPTURE, "Moves or captures on (1, 2)")
+func test_knight_jumps() -> void:
+	var g := _guide("knight")
+	check_eq(g.squares.size(), 8, "Eight squares")
+	check_eq(g.squares.get(Vector2i(1, 2)), MOVE | CAPTURE | JUMP, "(1, 2) is a jump")
+	check_eq(g.slides.size(), 0, "No slides")
+	check_eq(g.radius, 2, "Fits a 5 x 5 picture")
 
 func test_pawn() -> void:
-	var marks := PieceGuide.pattern(_def("pawn"))
-	check_eq(marks.get(Vector2i(0, 1)), MOVE, "Forward one: move only")
-	check_eq(marks.get(Vector2i(0, 2)), MOVE | FIRST, "Forward two: first move only")
-	check_eq(marks.get(Vector2i(1, 1)), CAPTURE, "Diagonal: capture only")
-	check_eq(marks.size(), 4, "Four squares")
+	var g := _guide("pawn")
+	check_eq(g.squares.get(Vector2i(0, 1)), MOVE, "Forward one: move only")
+	check_eq(g.squares.get(Vector2i(0, 2)), MOVE | FIRST, "Forward two: first move only")
+	check_eq(g.squares.get(Vector2i(1, 1)), CAPTURE, "Diagonal: capture only")
+	check_eq(g.squares.size(), 4, "Four squares")
 
-func test_rook_slides_to_the_edge_of_the_guide() -> void:
-	var marks := PieceGuide.pattern(_def("rook"))
-	check_eq(marks.size(), 16, "Four squares in each of four directions")
-	check(marks.has(Vector2i(0, 4)) and not marks.has(Vector2i(0, 5)), "Stops at the edge of a 9x9 guide")
+func test_sliders_are_directions_not_squares() -> void:
+	var rook := _guide("rook")
+	check_eq(rook.squares.size(), 0, "No fixed squares")
+	check_eq(rook.slides.size(), 4, "Four directions")
+	check(rook.slides.all(func(s: Array) -> bool: return s[1] == MOVE | CAPTURE), "Moves and captures along them")
+	check_eq(_guide("queen").slides.size(), 8, "Queen: eight directions")
+	check_eq(_guide("lance").slides, [[Vector2i(0, 1), MOVE | CAPTURE]], "Lance: straight forward")
 
-func test_cannon_hops_to_capture() -> void:
-	var marks := PieceGuide.pattern(_def("cannon"))
-	check_eq(marks.get(Vector2i(0, 1)), MOVE, "Next to it: move only (nothing to jump)")
-	check_eq(marks.get(Vector2i(0, 3)), MOVE | HOP, "Further: move, or capture by jumping")
+func test_cannon_slides_without_capturing() -> void:
+	var g := _guide("cannon")
+	check_eq(g.slides.size(), 4, "Four directions")
+	check(g.slides.all(func(s: Array) -> bool: return s[1] == MOVE), "Its hopping capture isn't drawn")
 
-func test_lance_forward_only() -> void:
-	var marks := PieceGuide.pattern(_def("lance"))
-	check_eq(marks.keys().size(), 4, "Four squares, all forward")
-	check(marks.keys().all(func(o: Vector2i) -> bool: return o.x == 0 and o.y > 0), "Only straight ahead")
+func test_step_pieces() -> void:
+	check_eq(_guide("king").squares.size(), 8, "King: eight neighbours")
+	check_eq(_guide("man").squares.size(), 8, "Man: eight neighbours")
+	check_eq(_guide("paladin").squares.size(), 4, "Paladin: four neighbours")
+	check(_guide("man").squares.values().all(func(f: int) -> bool: return f == MOVE | CAPTURE), "Steps aren't jumps")
+	check(_guide("elephant").squares.values().all(func(f: int) -> bool: return f & JUMP != 0), "Elephant jumps")
 
-func test_elephant_and_man() -> void:
-	check_eq(PieceGuide.pattern(_def("elephant")).size(), 4, "Elephant: four jumps")
-	check_eq(PieceGuide.pattern(_def("man")).size(), 8, "Man: eight neighbours")
-	check_eq(PieceGuide.pattern(_def("paladin")).size(), 4, "Paladin: four neighbours")
+func test_long_jumps_widen_the_picture() -> void:
+	var rule := MoveRule.new()
+	rule.directions = [Vector2i(3, 1)]
+	var camel := PieceDef.new()
+	camel.move_rules = [rule]
+	check_eq(PieceGuide.guide(camel).radius, 3, "A (3, 1) jump needs a 7 x 7 picture")
 
-func test_every_piece_has_a_pattern() -> void:
+func test_every_piece_has_something_to_show() -> void:
 	for def in PieceCatalog.all_defs():
-		check(not PieceGuide.pattern(def).is_empty(), def.id + " has squares to show")
+		var g := PieceGuide.guide(def)
+		check(not g.squares.is_empty() or not g.slides.is_empty(), def.id)

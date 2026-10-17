@@ -2,22 +2,24 @@ extends Control
 
 ## The army builder: name an army, buy pieces with the points budget and place
 ## them on your two starting rows. Tap a piece type in the tray, then tap squares
-## to place it; tap a placed piece to remove it. Any rule problems are listed in
-## red, and the army can only be saved once it's legal.
+## to place it; tap a placed piece to remove it. The card under the tray shows
+## the last piece type you tapped. Any rule problems are listed in red, and the
+## army can only be saved once it's legal. The White/Black button only changes
+## how the pieces look; armies work for either side.
 
 signal closed
 signal saved(army: Army)
 
 const BOARD_WIDTH := 8
 const NAME_MAX_LENGTH := 20
-## Holding a tray button this long (milliseconds) opens the piece's info card.
-const LONG_PRESS_MS := 450
 
 @onready var name_edit: LineEdit = %NameEdit
 @onready var points_label: Label = %Points
 @onready var army_board: ArmyBoard = %ArmyBoard
 @onready var problems_label: Label = %Problems
 @onready var tray: GridContainer = %Tray
+@onready var card: PieceCard = %Card
+@onready var team_button: Button = %TeamToggle
 @onready var save_button: Button = %Save
 @onready var back_button: Button = %Back
 
@@ -27,13 +29,9 @@ var library: ArmyLibrary
 var army: Army
 ## The piece type chosen in the tray (null if none).
 var selected: PieceDef
+## Which colour the pieces are drawn in.
+var team := Piece.Team.WHITE
 var _tray_buttons := {}  # PieceDef -> Button
-## The tray button being held down, and since when.
-var _held_def: PieceDef
-var _held_since := 0
-## A long press opened the info card, so the release that follows mustn't also
-## select or deselect that piece type.
-var _skip_toggle_of: PieceDef
 
 ## Call before adding the screen to the tree. `existing` is null for a new army.
 func setup(p_library: ArmyLibrary, existing: Army = null) -> void:
@@ -53,29 +51,33 @@ func _ready() -> void:
 	army_board.rows = rules.army_start_rows
 	army_board.show_army(army)
 	army_board.square_tapped.connect(tap_square)
+	team_button.pressed.connect(toggle_team)
 	save_button.pressed.connect(save)
 	back_button.pressed.connect(func() -> void: closed.emit())
 	_build_tray()
+	# Start by showing the first piece in the tray (the king).
+	card.show_piece(_tray_buttons.keys()[0], team)
 	_refresh()
 
-func _process(_delta: float) -> void:
-	check_long_press(Time.get_ticks_msec())
-
-## If a tray button has been held long enough, open that piece's info card.
-## `now_ms` is passed in so tests can pretend time has passed.
-func check_long_press(now_ms: int) -> void:
-	if _held_def == null or now_ms - _held_since < LONG_PRESS_MS:
-		return
-	var def := _held_def
-	_held_def = null
-	_skip_toggle_of = def
-	PieceInfo.open(self, def, Piece.Team.WHITE, rules)
-
-## Choose a piece type in the tray (null to choose nothing).
+## Choose a piece type in the tray (null to choose nothing). The card switches
+## to it; choosing nothing leaves the card as it was.
 func select(def: PieceDef) -> void:
 	selected = def
 	for tray_def in _tray_buttons:
 		_tray_buttons[tray_def].set_pressed_no_signal(tray_def == def)
+	if def:
+		card.show_piece(def, team)
+	_refresh()
+
+## Switch the pictures between White and Black.
+func toggle_team() -> void:
+	team = Piece.Team.BLACK if team == Piece.Team.WHITE else Piece.Team.WHITE
+	team_button.text = "White" if team == Piece.Team.WHITE else "Black"
+	for def in _tray_buttons:
+		_tray_buttons[def].icon = PieceArt.texture_for(def, team)
+	army_board.team = team
+	if card.def:
+		card.show_piece(card.def, team)
 	_refresh()
 
 ## Tapping a square: an empty square gets the selected piece; a square holding
@@ -115,29 +117,20 @@ func _build_tray() -> void:
 	# The chosen piece type gets a gold border, so it's obvious what you're placing.
 	var chosen_style := StyleBoxFlat.new()
 	chosen_style.bg_color = Color(0.25, 0.25, 0.27)
-	chosen_style.set_border_width_all(5)
+	chosen_style.set_border_width_all(4)
 	chosen_style.border_color = Color(0.95, 0.75, 0.2)
 	for def in defs:
 		var button := Button.new()
 		button.toggle_mode = true
 		button.add_theme_stylebox_override("pressed", chosen_style)
 		button.add_theme_stylebox_override("hover_pressed", chosen_style)
-		button.icon = PieceArt.texture_for(def, Piece.Team.WHITE)
+		button.icon = PieceArt.texture_for(def, team)
 		button.expand_icon = true
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-		button.custom_minimum_size = Vector2(160, 200)
-		button.add_theme_font_size_override("font_size", 24)
-		button.toggled.connect(func(on: bool) -> void:
-			if _skip_toggle_of == def:
-				_skip_toggle_of = null
-				button.set_pressed_no_signal(selected == def)
-				return
-			select(def if on else null))
-		button.button_down.connect(func() -> void:
-			_held_def = def
-			_held_since = Time.get_ticks_msec())
-		button.button_up.connect(func() -> void: _held_def = null)
+		button.custom_minimum_size = Vector2(106, 118)
+		button.add_theme_font_size_override("font_size", 17)
+		button.toggled.connect(func(on: bool) -> void: select(def if on else null))
 		tray.add_child(button)
 		_tray_buttons[def] = button
 
@@ -145,19 +138,20 @@ func _refresh() -> void:
 	points_label.text = "Points: %s / %s" % [Army.format_points(army.cost()), Army.format_points(rules.army_budget)]
 	var found := problems()
 	problems_label.text = "\n".join(found)
+	problems_label.visible = not found.is_empty()
 	save_button.disabled = not found.is_empty()
 	for def in _tray_buttons:
-		_tray_buttons[def].text = "%s\n%s" % [def.display_name, _tray_detail(def)]
+		_tray_buttons[def].text = _tray_detail(def)
 	army_board.highlighted = _allowed_squares()
 	army_board.queue_redraw()
 
-## The cost and how many more can be added, e.g. "3 pts, 1 left".
+## The cost and how many more can be added, e.g. "3 pts · 1 left".
 func _tray_detail(def: PieceDef) -> String:
 	var points := "%s pt%s" % [Army.format_points(def.value), "" if is_equal_approx(def.value, 1.0) else "s"]
 	var limit := Army.max_copies(def, rules)
 	if limit < 0:
 		return points
-	return "%s, %d left" % [points, maxi(limit - army.count_of(def), 0)]
+	return "%s · %d left" % [points, maxi(limit - army.count_of(def), 0)]
 
 ## Where the selected piece type may go (only the king is restricted).
 func _allowed_squares() -> Array[Vector2i]:

@@ -33,7 +33,7 @@ func _ready() -> void:
 	board_view.move_chosen.connect(play)
 	board_view.choice_needed.connect(_ask_which_move)
 	board_view.info_requested.connect(func(piece: Piece) -> void:
-		PieceInfo.open(self, piece.def, piece.team, state.rules))
+		PieceInfo.open(self, piece.def, piece.team))
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
