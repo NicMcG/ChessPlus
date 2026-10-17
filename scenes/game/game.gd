@@ -7,6 +7,7 @@ extends Control
 @onready var status_label: Label = %Status
 @onready var moves_label: Label = %Moves
 @onready var new_game_button: Button = %NewGame
+@onready var undo_button: Button = %Undo
 @onready var promotion_overlay: ColorRect = %PromotionOverlay
 @onready var promotion_choices: HBoxContainer = %PromotionChoices
 
@@ -16,6 +17,7 @@ func _ready() -> void:
 	board_view.move_chosen.connect(play)
 	board_view.choice_needed.connect(_ask_which_move)
 	new_game_button.pressed.connect(new_game)
+	undo_button.pressed.connect(undo)
 	promotion_overlay.gui_input.connect(_on_overlay_input)
 	new_game()
 
@@ -28,6 +30,15 @@ func new_game() -> void:
 ## Make a move (it must be legal) and update everything on screen.
 func play(move: Move) -> void:
 	state.make_move(move)
+	board_view.refresh()
+	_update_text()
+
+## Take back the last move (also after the game has ended).
+func undo() -> void:
+	if state.history.is_empty():
+		return
+	state.undo_move(state.history.back())
+	promotion_overlay.hide()
 	board_view.refresh()
 	_update_text()
 
@@ -72,3 +83,4 @@ func _update_text() -> void:
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			status_label.text = "Draw: checkmate is impossible"
 	moves_label.text = Notation.move_list(state)
+	undo_button.disabled = state.history.is_empty()

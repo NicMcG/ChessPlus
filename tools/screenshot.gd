@@ -6,6 +6,7 @@ extends SceneTree
 ##   "<godot console exe>" --path . -s res://tools/screenshot.gd -- <out.png> [moves...] [tap:e2]
 ## Moves are in algebraic notation, e.g. e4 e5 Nf3. "tap:e2" taps square e2.
 ## "fen:<position>" starts from a FEN position, with "_" instead of spaces.
+## "hold:g1>f3" starts dragging the g1 piece and holds it most of the way to f3.
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -18,6 +19,12 @@ func _initialize() -> void:
 			game.state = StandardSetup.from_fen(arg.substr(4).replace("_", " "))
 			game.board_view.show_game(game.state)
 			game._update_text()
+		elif arg.begins_with("hold:"):
+			var ends := arg.substr(5).split(">")
+			var start: Vector2 = game.board_view.square_center(Board.parse_square(ends[0]))
+			var end: Vector2 = game.board_view.square_center(Board.parse_square(ends[1]))
+			game.board_view.pointer_down(start)
+			game.board_view.pointer_move(start.lerp(end, 0.8))
 		elif arg.begins_with("tap:"):
 			game.board_view.tap(Board.parse_square(arg.substr(4)))
 		else:

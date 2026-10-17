@@ -1,15 +1,17 @@
 class_name BoardView
 extends Control
 
-## Draws a game's board and pieces, and turns taps into moves.
+## Draws a game's board and pieces, and turns taps and drags into moves.
 ## It never decides what's legal: it asks the GameState for its legal moves and
-## only lets you pick from those. Phone taps arrive as mouse clicks, so one input
-## path works on both PC and mobile.
+## only lets you pick from those. Phone touches arrive as mouse events, so one
+## input path works on both PC and mobile.
+##
+## Two ways to move: tap a piece then tap a square, or drag the piece there.
 
 ## The player picked a move.
 signal move_chosen(move: Move)
-## The tap matched several moves between the same two squares (the promotion
-## choices), so someone has to ask which one.
+## The player's choice matched several moves between the same two squares (the
+## promotion choices), so someone has to ask which one.
 signal choice_needed(moves: Array[Move])
 
 const LIGHT_SQUARE := Color("#F0D9B5")
@@ -18,63 +20,145 @@ const SELECTED_TINT := Color(0.95, 0.85, 0.2, 0.55)
 const LAST_MOVE_TINT := Color(0.95, 0.85, 0.2, 0.3)
 const CHECK_TINT := Color(0.9, 0.15, 0.1, 0.6)
 const TARGET_MARK := Color(0.1, 0.1, 0.1, 0.25)
+const HOVER_TINT := Color(1, 1, 1, 0.3)
+## How far (in pixels) the pointer must move while held before it counts as a drag.
+const DRAG_THRESHOLD := 10.0
+## A dragged piece is drawn this much bigger, so a finger doesn't hide it.
+const DRAG_SCALE := 1.3
 
 ## Which folder in res://art/pieces/ the piece images come from.
-@export var piece_style := "classic"
+@export var piece_style := "standard"
 
 var state: GameState
 var _selected := Board.NO_SQUARE
 var _selected_moves: Array[Move] = []
 var _textures := {}  # Image path -> Texture2D (or null if there's no image).
 
+# Pointer (mouse or finger) state.
+var _pressed := false
+var _press_pos := Vector2.ZERO
+var _pointer_pos := Vector2.ZERO
+var _dragging := false
+## The press landed on the piece that was already selected. If it's released
+## without dragging, that deselects it.
+var _pressed_selected := false
+
+func _ready() -> void:
+	# Smooth edges when the piece images are shrunk to fit the squares.
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
 ## Start showing a game.
 func show_game(p_state: GameState) -> void:
 	state = p_state
 	refresh()
 
-## Redraw after the game has changed (a move was made).
+## Redraw after the game has changed (a move was made or undone).
 func refresh() -> void:
 	_clear_selection()
+	_dragging = false
+	_pressed = false
 	queue_redraw()
 
 ## The image for a piece, or null if there isn't one (it's then drawn as a letter).
 func texture_for(def: PieceDef, team: Piece.Team) -> Texture2D:
 	var team_name := "white" if team == Piece.Team.WHITE else "black"
-	var path := "res://art/pieces/%s/%s_%s.svg" % [piece_style, team_name, def.id]
-	if not _textures.has(path):
-		_textures[path] = load(path) if ResourceLoader.exists(path) else null
-	return _textures[path]
+	var base := "res://art/pieces/%s/%s_%s" % [piece_style, team_name, def.id]
+	if not _textures.has(base):
+		_textures[base] = null
+		for extension in [".png", ".svg"]:
+			if ResourceLoader.exists(base + extension):
+				_textures[base] = load(base + extension)
+				break
+	return _textures[base]
 
-## What happens when a square is tapped. Public so tests and tools can tap too.
+## The middle of a square on screen.
+func square_center(square: Vector2i) -> Vector2:
+	return _square_rect(square).get_center()
+
+## Tap a square: select a piece, or move the selected piece there.
+## Public so tests and tools can tap too.
 func tap(square: Vector2i) -> void:
-	if state == null or state.outcome() != GameState.Outcome.NONE:
+	if not _can_play():
 		return
-	if _selected != Board.NO_SQUARE:
-		var choices: Array[Move] = []
-		choices.assign(_selected_moves.filter(func(m: Move) -> bool: return m.to == square))
-		if not choices.is_empty():
-			_clear_selection()
-			queue_redraw()
-			if choices.size() == 1:
-				move_chosen.emit(choices[0])
-			else:
-				choice_needed.emit(choices)
-			return
+	if _try_move_to(square):
+		return
 	var piece := state.board.get_piece(square)
 	if piece and piece.team == state.side_to_move and square != _selected:
-		_selected = square
-		_selected_moves.assign(state.moves().filter(func(m: Move) -> bool: return m.from == square))
+		_select(square)
 	else:
 		_clear_selection()
 	queue_redraw()
 
+## The pointer went down at `pos` (a mouse press or a finger touching the screen).
+func pointer_down(pos: Vector2) -> void:
+	_pressed = true
+	_dragging = false
+	_press_pos = pos
+	_pointer_pos = pos
+	var square := _square_at(pos)
+	_pressed_selected = square != Board.NO_SQUARE and square == _selected
+	if not _pressed_selected and square != Board.NO_SQUARE:
+		tap(square)
+
+## The pointer moved to `pos`.
+func pointer_move(pos: Vector2) -> void:
+	if not _pressed:
+		return
+	_pointer_pos = pos
+	if not _dragging and _selected != Board.NO_SQUARE and _square_at(_press_pos) == _selected:
+		_dragging = _press_pos.distance_to(pos) > DRAG_THRESHOLD
+	if _dragging:
+		queue_redraw()
+
+## The pointer was released at `pos`.
+func pointer_up(pos: Vector2) -> void:
+	if not _pressed:
+		return
+	_pressed = false
+	if _dragging:
+		_dragging = false
+		# Dropped on a legal square: move. Anywhere else: the piece goes back
+		# and stays selected.
+		_try_move_to(_square_at(pos))
+		queue_redraw()
+	elif _pressed_selected:
+		_clear_selection()
+		queue_redraw()
+
 func _gui_input(event: InputEvent) -> void:
-	var click := event as InputEventMouseButton
-	if click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
-		var square := _square_at(click.position)
-		if square != Board.NO_SQUARE:
-			tap(square)
+	var button := event as InputEventMouseButton
+	if button and button.button_index == MOUSE_BUTTON_LEFT:
+		if button.pressed:
+			pointer_down(button.position)
+		else:
+			pointer_up(button.position)
 		accept_event()
+	var motion := event as InputEventMouseMotion
+	if motion:
+		pointer_move(motion.position)
+
+## If the selected piece can move to `square`, choose that move and return true.
+func _try_move_to(square: Vector2i) -> bool:
+	if _selected == Board.NO_SQUARE or square == Board.NO_SQUARE or not _can_play():
+		return false
+	var choices: Array[Move] = []
+	choices.assign(_selected_moves.filter(func(m: Move) -> bool: return m.to == square))
+	if choices.is_empty():
+		return false
+	_clear_selection()
+	queue_redraw()
+	if choices.size() == 1:
+		move_chosen.emit(choices[0])
+	else:
+		choice_needed.emit(choices)
+	return true
+
+func _can_play() -> bool:
+	return state != null and state.outcome() == GameState.Outcome.NONE
+
+func _select(square: Vector2i) -> void:
+	_selected = square
+	_selected_moves.assign(state.moves().filter(func(m: Move) -> bool: return m.from == square))
 
 func _draw() -> void:
 	if state == null:
@@ -93,13 +177,23 @@ func _draw() -> void:
 	if state.is_in_check():
 		for square in _royal_squares(state.side_to_move):
 			draw_rect(_square_rect(square), CHECK_TINT)
+	if _dragging:
+		var hover := _square_at(_pointer_pos)
+		if _selected_moves.any(func(m: Move) -> bool: return m.to == hover):
+			draw_rect(_square_rect(hover), HOVER_TINT)
 	for rank in range(board.height):
 		for file in range(board.width):
-			var piece := board.get_piece(Vector2i(file, rank))
-			if piece:
-				_draw_piece(piece, _square_rect(Vector2i(file, rank)))
+			var square := Vector2i(file, rank)
+			var piece := board.get_piece(square)
+			# While dragging, the piece follows the pointer instead of its square.
+			if piece and not (_dragging and square == _selected):
+				_draw_piece(piece, _square_rect(square))
 	for move in _selected_moves:
 		_draw_target(move)
+	if _dragging:
+		var size_px := _square_size() * DRAG_SCALE
+		var rect := Rect2(_pointer_pos - Vector2(size_px, size_px) / 2, Vector2(size_px, size_px))
+		_draw_piece(board.get_piece(_selected), rect)
 
 func _draw_piece(piece: Piece, rect: Rect2) -> void:
 	var texture := texture_for(piece.def, piece.team)
@@ -137,7 +231,7 @@ func _square_rect(square: Vector2i) -> Rect2:
 	return Rect2(_origin() + Vector2(square.x * s, row * s), Vector2(s, s))
 
 func _square_at(pos: Vector2) -> Vector2i:
-	if state == null:
+	if state == null or _square_size() <= 0:
 		return Board.NO_SQUARE
 	var cell := ((pos - _origin()) / _square_size()).floor()
 	var square := Vector2i(int(cell.x), state.board.height - 1 - int(cell.y))
