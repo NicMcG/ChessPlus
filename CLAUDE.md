@@ -128,7 +128,9 @@ Goal: a rules engine that produces every legal move in standard chess, driven en
 * iPhone, so the plan is a web build played in Safari (Share > Add to Home Screen for an app-like icon and full screen). A native iPhone app would need a Mac and an Apple developer account.
 * `export_presets.cfg` has a "Web" preset: single-threaded (no special server headers needed), progressive web app on (portrait, standalone), tests/ and tools/ left out. Output goes to `build/web/` (git-ignored, has a .gdignore).
 * Export: `"<godot console exe>" --headless --path . --export-release "Web" build/web/index.html` — needs Godot's export templates installed (Editor > Manage Export Templates), which Mac does in the editor.
-* Hosting: the GitHub repo is private, so GitHub Pages isn't free for it; suggested itch.io (free, draft/restricted link). Mac creates the account and uploads a zip of build/web. Always ask before putting anything online.
+* Hosting: Mac made the repo public; the game is on GitHub Pages at https://thedarkhorse99.github.io/ChessPlus/ (served from the `gh-pages` branch, which only holds the latest build). Mac opens it in Safari and uses Add to Home Screen.
+* To update the live game: `bash tools/deploy_web.sh` (exports, then force-pushes the build to gh-pages). Publishing is outward-facing: ask Mac before each deploy unless he's said to deploy automatically.
+* Remote Control is on for Mac's session, so he can steer from the Claude iPhone app; this computer must stay on.
 * The main menu shows the required credit: "Chess pieces by Cburnett (CC BY-SA 3.0)".
 
 ## Running tests
