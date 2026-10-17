@@ -1,0 +1,185 @@
+extends TestSuite
+
+## Saving armies, and the army screens (builder, list, match setup, main flow).
+## Everything is saved in a test folder, never the player's real armies.
+
+const TEST_DIR := "user://test_armies/"
+const KING = preload("res://data/pieces/king.tres")
+const QUEEN = preload("res://data/pieces/queen.tres")
+const KNIGHT = preload("res://data/pieces/knight.tres")
+const PAWN = preload("res://data/pieces/pawn.tres")
+const ELEPHANT = preload("res://data/pieces/elephant.tres")
+
+func _fresh_library() -> ArmyLibrary:
+	if DirAccess.dir_exists_absolute(TEST_DIR):
+		for file in DirAccess.get_files_at(TEST_DIR):
+			DirAccess.remove_absolute(TEST_DIR + file)
+	return ArmyLibrary.new(TEST_DIR)
+
+func _small_army(army_name: String) -> Army:
+	var army := Army.new()
+	army.army_name = army_name
+	army.place(KING, Vector2i(4, 0))
+	army.place(KNIGHT, Vector2i(1, 0))
+	army.place(PAWN, Vector2i(0, 1))
+	return army
+
+func _open(scene: Node) -> Node:
+	(Engine.get_main_loop() as SceneTree).root.add_child(scene)
+	return scene
+
+# --- ArmyLibrary ---------------------------------------------------------------
+
+func test_save_and_load() -> void:
+	var library := _fresh_library()
+	check_eq(library.save(_small_army("Knights")), OK, "Saved")
+	var armies := library.armies()
+	check_eq(armies.size(), 1, "One army")
+	if armies.size() == 1:
+		check_eq(armies[0].army_name, "Knights", "Name")
+		check_eq(armies[0].cost(), 4.0, "Cost")
+		# Loaded pieces must be the very same piece types, or counting breaks.
+		check_eq(armies[0].def_at(Vector2i(1, 0)), KNIGHT, "Same knight piece type")
+		check_eq(armies[0].count_of(KNIGHT), 1, "Counting works after loading")
+
+func test_saving_again_overwrites() -> void:
+	var library := _fresh_library()
+	var army := _small_army("First")
+	library.save(army)
+	army.army_name = "Renamed"
+	library.save(army)
+	var armies := library.armies()
+	check_eq(armies.size(), 1, "Still one army")
+	if armies.size() == 1:
+		check_eq(armies[0].army_name, "Renamed", "Name updated")
+
+func test_delete() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("A"))
+	library.save(_small_army("B"))
+	library.delete(library.armies()[0])
+	var names := library.armies().map(func(a: Army) -> String: return a.army_name)
+	check_eq(names, ["B"], "A deleted")
+
+func test_at_most_ten() -> void:
+	var library := _fresh_library()
+	for i in ArmyLibrary.MAX_ARMIES:
+		library.save(_small_army("Army %d" % i))
+	check(library.is_full(), "Full at 10")
+	check_eq(library.save(_small_army("Eleventh")), ERR_CANT_CREATE, "No room for an 11th")
+	check_eq(library.count(), 10, "Still 10")
+	var first := library.armies()[0]
+	first.army_name = "Edited"
+	check_eq(library.save(first), OK, "Editing a saved army is still fine when full")
+
+# --- Army builder ----------------------------------------------------------------
+
+func _builder(library: ArmyLibrary, existing: Army = null) -> Node:
+	var builder: Node = load("res://scenes/armies/army_builder.tscn").instantiate()
+	builder.setup(library, existing)
+	return _open(builder)
+
+func test_builder_starts_empty_and_places_pieces() -> void:
+	var builder := _builder(_fresh_library())
+	check_eq(builder.army.pieces.size(), 0, "Empty board")
+	check(builder.save_button.disabled, "Can't save an empty army")
+	builder.select(KING)
+	builder.tap_square(Vector2i(4, 0))
+	builder.select(QUEEN)
+	builder.tap_square(Vector2i(3, 0))
+	check_eq(builder.army.cost(), 9.0, "King + queen")
+	check_eq(builder.points_label.text, "Points: 9 / 39", "Points shown")
+	check(builder.problems_label.text.contains("name"), "Still needs a name")
+	builder.name_edit.text = "Queenly"
+	builder.name_edit.text_changed.emit("Queenly")
+	check(not builder.save_button.disabled, "Ready to save")
+	builder.free()
+
+func test_builder_tap_removes_and_swaps() -> void:
+	var builder := _builder(_fresh_library())
+	builder.select(KNIGHT)
+	builder.tap_square(Vector2i(1, 0))
+	builder.tap_square(Vector2i(1, 0))
+	check_eq(builder.army.def_at(Vector2i(1, 0)), null, "Tapping the same type removes it")
+	builder.tap_square(Vector2i(1, 0))
+	builder.select(ELEPHANT)
+	builder.tap_square(Vector2i(1, 0))
+	check_eq(builder.army.def_at(Vector2i(1, 0)), ELEPHANT, "Another type swaps it")
+	builder.select(null)
+	builder.tap_square(Vector2i(1, 0))
+	check_eq(builder.army.pieces.size(), 0, "With nothing selected, tapping removes")
+	builder.free()
+
+func test_builder_shows_rule_problems() -> void:
+	var builder := _builder(_fresh_library())
+	builder.select(KING)
+	builder.tap_square(Vector2i(0, 0))
+	check(builder.problems_label.text.contains("middle of the back row"), "King in the corner")
+	check_eq(builder._allowed_squares(), [Vector2i(3, 0), Vector2i(4, 0)] as Array[Vector2i], "King squares highlighted")
+	builder.select(KNIGHT)
+	for file in [1, 2, 6]:
+		builder.tap_square(Vector2i(file, 0))
+	check(builder.problems_label.text.contains("Too many knights"), "Three knights")
+	check(builder._tray_buttons[KNIGHT].text.contains("0 left"), "Tray shows none left")
+	builder.free()
+
+func test_builder_saves_and_edits_a_copy() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("Original"))
+	var saved_army := library.armies()[0]
+	var builder := _builder(library, saved_army)
+	builder.select(ELEPHANT)
+	builder.tap_square(Vector2i(2, 0))
+	check_eq(saved_army.pieces.size(), 3, "The original isn't changed while editing")
+	var emitted := []
+	builder.saved.connect(func(a: Army) -> void: emitted.append(a))
+	builder.save()
+	check_eq(emitted.size(), 1, "Saved signal")
+	check_eq(library.count(), 1, "Overwrote, didn't add")
+	check_eq(library.armies()[0].pieces.size(), 4, "Elephant added in the file")
+	builder.free()
+
+# --- Army list and match setup -------------------------------------------------
+
+func test_army_list_shows_saved_armies() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("Alpha"))
+	library.save(_small_army("Beta"))
+	var army_list: Node = load("res://scenes/armies/army_list.tscn").instantiate()
+	army_list.library = library
+	_open(army_list)
+	check_eq(army_list.list.get_child_count(), 2, "Two rows")
+	check_eq(army_list.count_label.text, "2 of 10 saved", "Count")
+	check(not army_list.new_button.disabled, "Room for more")
+	army_list.free()
+
+func test_match_setup_offers_standard_and_saved() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("Mine"))
+	var setup: Node = load("res://scenes/menu/match_setup.tscn").instantiate()
+	setup.library = library
+	_open(setup)
+	check_eq(setup.white_pick.item_count, 2, "Standard + Mine")
+	var started := []
+	setup.start_requested.connect(func(w: Army, b: Army) -> void: started.append([w, b]))
+	setup.black_pick.select(1)
+	setup.start()
+	check_eq(started.size(), 1, "Start pressed")
+	if started.size() == 1:
+		check_eq(started[0][0].army_name, "Standard", "White: standard")
+		check_eq(started[0][1].army_name, "Mine", "Black: mine")
+	setup.free()
+
+# --- The whole flow --------------------------------------------------------------
+
+func test_main_starts_a_game_with_two_armies() -> void:
+	var main: Node = load("res://scenes/main/main.tscn").instantiate()
+	main.library = _fresh_library()
+	_open(main)
+	main.start_game(StandardSetup.army(), _small_army("Small"))
+	var game: Node = main.screen
+	check_eq(game.state.board.get_piece(Board.parse_square("b8")).def, KNIGHT, "Black's knight on b8")
+	check_eq(game.state.board.get_piece(Board.parse_square("a7")).def, PAWN, "Black's pawn on a7")
+	check(game.state.board.is_empty(Board.parse_square("d8")), "Black has no queen")
+	check(game.menu_button.visible, "Menu button shown")
+	main.free()

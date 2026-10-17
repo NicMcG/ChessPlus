@@ -73,13 +73,19 @@ Everything in the rules engine should be built so standard chess is just one con
 * `res://core/piece_catalog.gd` — `PieceCatalog.all_defs()`: every PieceDef in `res://data/pieces/`. Use it (not `StandardSetup.piece_defs()`) when any piece type may appear.
 * `res://scenes/sandbox/elephant_sandbox.tscn` — the game screen starting from a custom FEN (`game.gd`'s `start_fen` export), with elephants on c3/f3/c6/f6. Open it and press F6 to try the elephant.
 * `res://tools/screenshot.gd` — opens the game screen, plays SAN moves / `tap:e2` / `hold:g1>f3` (drag held partway) / `fen:<fen with _ for spaces>`, saves a PNG. Needs a window (no --headless): `"<godot console exe>" --path . --resolution 720x1280 -s res://tools/screenshot.gd -- <out.png> e4 e5 tap:g1`. Use it to check UI changes visually.
-* `res://scenes/game/game.tscn` + `game.gd` — the main scene (pass-and-play): status line, board, move list, Undo and New game buttons, promotion picker overlay.
+* `res://scenes/main/main.tscn` + `main.gd` — the app's main scene: shows one screen at a time (main menu, My armies, army builder, Choose armies, game) and owns the ArmyLibrary.
+* `res://scenes/menu/` — `main_menu` (Play / My armies) and `match_setup` (each side picks Standard or a saved legal army, then Start).
+* `res://scenes/armies/` — `army_list` (saved armies with cost, tap to edit, Delete with confirmation, New army disabled at 10), `army_builder` (name box, points counter, `ArmyBoard` showing the two starting rows with allowed king squares highlighted, tray of every PieceCatalog type with cost and "N left"; tap type then squares to place, tap a placed piece to remove/swap; problems in red; Save only when legal; edits a copy), `army_board.gd` (`ArmyBoard`).
+* `res://core/army_library.gd` — `ArmyLibrary`: saves armies as .tres in `user://armies/` (max 10), armies() loads fresh copies sorted by name, save() overwrites an army's own file or makes a new one, delete(). Tests use their own folder (`user://test_armies/`).
+* `res://scenes/common/piece_art.gd` — `PieceArt.texture_for(def, team)`: shared piece-image lookup.
+* `res://scenes/theme.tres` — project theme (default font size 30), set in Project Settings > GUI > Theme.
+* `res://scenes/game/game.tscn` + `game.gd` — the game screen (pass-and-play): status line, board, move list, Undo / Menu / New game buttons, promotion picker overlay. Plays two armies if `white_army`/`black_army` are set (New game replays them), else `start_fen`, else standard. Menu only shows when the main scene listens for `menu_requested`.
 * `res://scenes/game/board_view.gd` — `BoardView` (Control): draws board/pieces/highlights (last move, selection, check, move dots/rings), tap(square) and pointer_down/move/up (drag to move; tap-tap still works), signals move_chosen / choice_needed. Images looked up by piece id; falls back to drawing the letter if a piece has no image.
 * `res://tests/` — `run_tests.tscn` runs every `*_test.gd` (see Running tests). Perft matches the start position (depth 4), Kiwipete (depth 3), and CPW positions 3 (depth 5), 4 (depth 4) and 5 (depth 3).
 
 ## Current milestone: armies (Chess Plus phase 2)
 
-Steps: 1) army data + rules + game from two armies — DONE. 2) army builder screen (pick pieces, see points, place them). 3) save/load armies on the device. 4) play a game with two chosen armies.
+Steps 1–4 DONE: army data and rules, army builder screen, saving up to 10 armies, choosing armies before a pass-and-play match. Possible next: a computer opponent, more custom pieces, polish (animation, sounds).
 
 ## Previous milestone: playable board (pass and play)
 

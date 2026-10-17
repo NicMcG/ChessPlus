@@ -32,7 +32,6 @@ const DRAG_SCALE := 1.3
 var state: GameState
 var _selected := Board.NO_SQUARE
 var _selected_moves: Array[Move] = []
-var _textures := {}  # Image path -> Texture2D (or null if there's no image).
 
 # Pointer (mouse or finger) state.
 var _pressed := false
@@ -61,15 +60,7 @@ func refresh() -> void:
 
 ## The image for a piece, or null if there isn't one (it's then drawn as a letter).
 func texture_for(def: PieceDef, team: Piece.Team) -> Texture2D:
-	var team_name := "white" if team == Piece.Team.WHITE else "black"
-	var base := "res://art/pieces/%s/%s_%s" % [piece_style, team_name, def.id]
-	if not _textures.has(base):
-		_textures[base] = null
-		for extension in [".png", ".svg"]:
-			if ResourceLoader.exists(base + extension):
-				_textures[base] = load(base + extension)
-				break
-	return _textures[base]
+	return PieceArt.texture_for(def, team, piece_style)
 
 ## The middle of a square on screen.
 func square_center(square: Vector2i) -> Vector2:
