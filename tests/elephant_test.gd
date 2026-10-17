@@ -69,6 +69,10 @@ func test_fen_round_trip() -> void:
 func test_lone_elephant_cannot_checkmate() -> void:
 	check_eq(_parse("4k3/8/8/8/3E4/8/8/4K3 w - - 0 1").outcome(), GameState.Outcome.INSUFFICIENT_MATERIAL, "King and elephant vs king")
 
+func test_value() -> void:
+	var elephant: PieceDef = load("res://data/pieces/elephant.tres")
+	check_eq(elephant.value, 1.5, "Elephant value")
+
 func test_has_a_picture() -> void:
 	var view := BoardView.new()
 	var elephant: PieceDef = load("res://data/pieces/elephant.tres")

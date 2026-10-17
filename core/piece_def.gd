@@ -7,7 +7,7 @@ extends Resource
 @export var display_name: String = ""
 ## Short letter for text output and notation, e.g. "N" for knight.
 @export var symbol: String = ""
-@export var value: int = 0
+@export var value: float = 0.0
 @export var move_rules: Array[MoveRule] = []
 
 @export_group("Special Rules")
