@@ -1,7 +1,7 @@
 extends TestSuite
 
 func _parse(text: String) -> GameState:
-	return Fen.parse(text, StandardSetup.piece_defs())
+	return StandardSetup.from_fen(text)
 
 func _texts(moves: Array[Move]) -> Array:
 	var texts := moves.map(func(m: Move) -> String: return m.to_text())

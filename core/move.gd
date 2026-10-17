@@ -13,6 +13,8 @@ var capture_square: Vector2i
 ## Squares this move skips over that the opponent may capture onto en passant
 ## next turn. Only set for multi-step moves by pieces with the en_passant flag.
 var skipped_squares: Array[Vector2i] = []
+## What the piece turns into, or null if this move doesn't promote.
+var promotion: PieceDef
 ## For castling: the partner piece (rook) that moves too, and where it goes.
 var partner: Piece
 var partner_from: Vector2i
@@ -37,7 +39,10 @@ func is_capture() -> bool:
 func is_castling() -> bool:
 	return partner != null
 
-## Simple text like "e2-e4" or "e4xd5". Used for testing, not real notation.
+## Simple text like "e2-e4", "e4xd5" or "e7-e8=Q". Used for testing, not real notation.
 func to_text() -> String:
 	var joiner := "x" if is_capture() else "-"
-	return Board.square_name(from) + joiner + Board.square_name(to)
+	var text := Board.square_name(from) + joiner + Board.square_name(to)
+	if promotion:
+		text += "=" + promotion.symbol.to_upper()
+	return text

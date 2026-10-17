@@ -3,7 +3,7 @@ extends TestSuite
 const BOTH_SIDES := "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"
 
 func _parse(text: String) -> GameState:
-	return Fen.parse(text, StandardSetup.piece_defs())
+	return StandardSetup.from_fen(text)
 
 func _texts(state: GameState) -> Array:
 	return state.moves().map(func(m: Move) -> String: return m.to_text())
