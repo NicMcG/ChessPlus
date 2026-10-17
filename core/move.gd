@@ -9,6 +9,9 @@ var piece: Piece
 ## The piece being taken, or null if the move doesn't capture.
 var captured: Piece
 
+# Filled in by GameState.make_move so undo_move can put things back exactly.
+var piece_had_moved: bool
+
 func _init(p_from: Vector2i, p_to: Vector2i, p_piece: Piece, p_captured: Piece = null) -> void:
 	from = p_from
 	to = p_to
