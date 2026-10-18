@@ -117,14 +117,12 @@ func _ordinary(move: Move, state: GameState, dragged: bool) -> void:
 	var from := Vector2(move.from)
 	var landed := Vector2(move.lands_on())
 	var arrived := _travel(move.piece, from, landed, dragged, is_leap(move))
-	if not dragged and not is_leap(move) and from != landed:
-		_cue(0.0, GameSounds.Sound.MOVE)  # The wooden scrape plays as it slides.
 	if move.captured:
 		_knock_off(move.captured, Vector2(move.capture_square), landed - from, arrived)
 		_impact(move.piece, landed, landed - from, arrived)
 		_cue(arrived, GameSounds.Sound.CAPTURE)
-	elif is_leap(move) and not dragged:
-		_cue(arrived, GameSounds.Sound.LAND)
+	elif not dragged and from != landed:
+		_cue(arrived, GameSounds.Sound.LAND if is_leap(move) else GameSounds.Sound.MOVE)
 	if move.promotion:
 		var promoted := state.board.get_piece(move.lands_on())
 		var swap := arrived + 0.15

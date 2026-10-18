@@ -48,7 +48,7 @@ func test_capture_knocks_the_piece_off() -> void:
 	var victim := state.board.get_piece(Vector2i(3, 4))
 	var animation := _animate(state, "exd5")
 	check(animation.has_segment(victim, "knock"), "Knocked off")
-	check_eq(_sounds(animation), [Sound.MOVE, Sound.CAPTURE], "Scrape, then the capture")
+	check_eq(_sounds(animation), [Sound.CAPTURE], "The capture's crash")
 	var attacker := state.board.get_piece(Vector2i(3, 4))
 	check(animation.has_segment(attacker, "impact"), "The attacker feels the hit")
 	check(animation.has_extra("impact"), "Sparks where they meet")

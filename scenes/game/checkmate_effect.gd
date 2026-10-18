@@ -3,8 +3,8 @@ extends Control
 
 ## Checkmate (Mac's design): the beaten king rises off the board towards the
 ## player, growing until it fills the middle of the screen, then crumbles away
-## into fine dust from left to right while "CHECKMATE" in giant letters fades
-## in from left to right where it stood. It stays until the player taps
+## into fine dust from left to right; "CHECKMATE" in giant letters, as wide as
+## the king, appears letter by letter once the crumbling has passed each one. It stays until the player taps
 ## anywhere; then the game screen shows the usual result screen.
 ##
 ## The picture is cut into a grid of tiny pieces; each starts drifting at its
@@ -90,7 +90,7 @@ func dismiss() -> void:
 
 ## The big square in the middle of the screen where the king ends up.
 func _middle() -> Rect2:
-	var big := minf(size.x, size.y) * 0.55
+	var big := minf(size.x, size.y) * 0.85
 	return Rect2(size / 2 - Vector2(big, big) / 2, Vector2(big, big))
 
 ## Where the king is drawn while whole: from its square to the middle.
@@ -113,7 +113,7 @@ func _draw() -> void:
 		draw_texture_rect(texture, Rect2(rect.position + rect.size * 0.04 * lifted, rect.size), false, Color(0, 0, 0, 0.35 * lifted))
 		draw_texture_rect(texture, rect, false)
 		return
-	_draw_word(crumble_time / (SWEEP + 0.3))
+	_draw_word(rect, crumble_time)
 	var source_cell := texture.get_size() / GRID
 	var cell := rect.size / GRID
 	for speck: Array in _specks:
@@ -141,19 +141,21 @@ func _draw() -> void:
 		var alpha := clampf((crumble_time - SWEEP - DRIFT) / 0.8, 0.0, 1.0) * 0.8
 		draw_string(font, Vector2(0, size.y * 0.75), hint, HORIZONTAL_ALIGNMENT_CENTER, size.x, hint_size, Color(1, 1, 1, alpha))
 
-## "CHECKMATE" across the middle, each letter fading in as the sweep passes
-## (`progress` 0..1 = how far across it has got).
-func _draw_word(progress: float) -> void:
+## "CHECKMATE" across the king's square, each letter fading in just after the
+## crumbling (sweeping left to right over the square) has passed it.
+func _draw_word(rect: Rect2, crumble_time: float) -> void:
 	var font := get_theme_default_font()
-	var font_size := int(size.x * 0.9 / maxf(font.get_string_size(WORD, HORIZONTAL_ALIGNMENT_LEFT, -1, 100).x, 1.0) * 100)
+	var font_size := int(rect.size.x * 0.98 / maxf(font.get_string_size(WORD, HORIZONTAL_ALIGNMENT_LEFT, -1, 100).x, 1.0) * 100)
 	var width := font.get_string_size(WORD, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	var x := (size.x - width) / 2
-	var baseline := size.y / 2 + font_size * 0.35
+	var x := rect.get_center().x - width / 2
+	var baseline := rect.get_center().y + font_size * 0.35
 	var outline := maxi(2, font_size / 14)
+	# Where the crumbling has got to, plus a little extra so the dust has cleared.
+	var front := rect.position.x + rect.size.x * (crumble_time - 0.35) / SWEEP
 	for i in WORD.length():
 		var letter := WORD[i]
 		var letter_width := font.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-		var alpha := clampf(progress * (WORD.length() + 2) - i, 0.0, 1.0)
+		var alpha := clampf((front - (x + letter_width)) / (rect.size.x * 0.12), 0.0, 1.0)
 		if alpha > 0:
 			draw_string_outline(font, Vector2(x, baseline), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline, Color(WORD_OUTLINE, alpha))
 			draw_string(font, Vector2(x, baseline), letter, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(WORD_COLOR, alpha))
