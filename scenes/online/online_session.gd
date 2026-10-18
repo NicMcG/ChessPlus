@@ -16,7 +16,10 @@ extends Node
 ##   status            "waiting" (for a second player), "playing", "finished",
 ##                     or "cancelled"
 ##   result            once finished: "board" (checkmate or a draw on the board),
-##                     or "white_resigned", "black_timeout", ...
+##                     "draw_agreed", or "white_resigned", "black_timeout", ...
+##   draw_offer        "white"/"black" while that side offers a draw, else ""
+##   chat              messages so far: [{"from": "white"/"black", "text": ...}]
+##   rematch           once someone offers a rematch: the new game's code
 
 ## Something about the game changed on the server: the opponent joined, moved,
 ## resigned, or ran out of time. `row` is the new state of the game.
@@ -162,8 +165,54 @@ func send_moves(moves: Array, finished: bool) -> Dictionary:
 	if finished:
 		changes["status"] = FINISHED
 		changes["result"] = "board"
+	# Moving instead of answering turns down the opponent's draw offer.
+	if draw_offer() == team_key(Piece.other_team(my_team)):
+		changes["draw_offer"] = ""
 	var result := await _change(changes, {"move_count": move_count(), "status": PLAYING})
 	return result
+
+## Offer the opponent a draw (one offer at a time).
+func offer_draw() -> Dictionary:
+	return await _change({"draw_offer": team_key(my_team)}, {"status": PLAYING, "draw_offer": ""})
+
+## Answer the opponent's draw offer.
+func answer_draw(accept: bool) -> Dictionary:
+	var theirs := team_key(Piece.other_team(my_team))
+	if accept:
+		return await _change({"status": FINISHED, "result": "draw_agreed", "draw_offer": ""},
+				{"status": PLAYING, "draw_offer": theirs})
+	return await _change({"draw_offer": ""}, {"draw_offer": theirs})
+
+## Who is offering a draw right now: "white", "black" or "".
+func draw_offer() -> String:
+	return str(row.get("draw_offer", ""))
+
+## Send a chat message (up to 200 characters).
+func post_chat(text: String) -> Dictionary:
+	var message := text.strip_edges().left(200)
+	if message == "":
+		return OnlineBackend.failed("empty message")
+	var result := OnlineBackend.failed("not sent")
+	for attempt in 3:
+		result = await backend.call_function("post_chat", {"game_code": code, "sender": team_key(my_team), "message": message})
+		if result.ok:
+			break
+	if result.ok and not result.rows.is_empty():
+		_set_row(result.rows[0])
+	return result
+
+## The chat so far: [{"from": "white"/"black", "text": ...}, ...].
+func chat() -> Array:
+	return row.get("chat", [])
+
+## The rematch game's code once someone has offered one, else "".
+func rematch_code() -> String:
+	return str(row.get("rematch", ""))
+
+## Point this game at its rematch (`new_code`). Fails (rows empty) if the other
+## player got there first: then join theirs instead (see rematch_code()).
+func claim_rematch(new_code: String) -> Dictionary:
+	return await _change({"rematch": new_code}, {"rematch": ""})
 
 func resign() -> Dictionary:
 	return await _change({"status": FINISHED, "result": team_key(my_team) + "_resigned"}, {"status": PLAYING})
@@ -285,10 +334,10 @@ func _set_row(new_row: Dictionary) -> void:
 	row = new_row
 
 func _differs(new_row: Dictionary) -> bool:
-	for column in ["status", "result", "move_count", "white_id", "black_id"]:
+	for column in ["status", "result", "move_count", "white_id", "black_id", "draw_offer", "rematch"]:
 		if str(new_row.get(column, "")) != str(row.get(column, "")):
 			return true
-	return false
+	return (new_row.get("chat", []) as Array).size() != chat().size()
 
 static func _filled(game: Dictionary, column: String) -> bool:
 	var value: Variant = game.get(column)
