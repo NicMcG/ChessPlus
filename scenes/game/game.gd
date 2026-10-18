@@ -82,6 +82,7 @@ var sounds: GameSounds
 @onready var ability_button: Button = %Ability
 @onready var new_game_button: Button = %NewGame
 @onready var undo_button: Button = %Undo
+@onready var redo_button: Button = %Redo
 @onready var menu_button: Button = %Menu
 @onready var promotion_overlay: ColorRect = %PromotionOverlay
 @onready var promotion_choices: HBoxContainer = %PromotionChoices
@@ -135,8 +136,9 @@ func _ready() -> void:
 	board_view.choice_needed.connect(_ask_which_move)
 	board_view.info_requested.connect(func(piece: Piece) -> void:
 		PieceInfo.open(self, piece.def, piece.team))
-	new_game_button.pressed.connect(new_game)
+	new_game_button.pressed.connect(ask_new_game)
 	undo_button.pressed.connect(undo)
+	redo_button.pressed.connect(redo)
 	play_from_here_button.pressed.connect(play_from_here)
 	ability_button.pressed.connect(use_ability)
 	board_view.selection_changed.connect(_on_selection_changed)
@@ -158,6 +160,26 @@ func _ready() -> void:
 func new_game() -> void:
 	state = _create_start_state()
 	_show_new_state()
+
+## The New game button: once moves have been played, check first (Mac's request).
+func ask_new_game() -> void:
+	if state.history.is_empty():
+		new_game()
+		return
+	if new_game_confirm == null:
+		new_game_confirm = ConfirmationDialog.new()
+		new_game_confirm.title = "New game"
+		new_game_confirm.dialog_text = "Are you sure you want to start a new game?\nThis game will be lost."
+		new_game_confirm.ok_button_text = "New game"
+		new_game_confirm.confirmed.connect(new_game)
+		# Big enough to tap easily.
+		for button: Button in [new_game_confirm.get_ok_button(), new_game_confirm.get_cancel_button()]:
+			button.custom_minimum_size = Vector2(200, 72)
+		add_child(new_game_confirm)
+	new_game_confirm.popup_centered()
+
+## The "are you sure?" box for New game (made the first time it's needed).
+var new_game_confirm: ConfirmationDialog
 
 ## The game's starting position: from the armies, start_fen, or standard chess.
 func _create_start_state() -> GameState:
@@ -251,6 +273,9 @@ func is_bot_game() -> bool:
 ## player's moves are sent to the server (`from_server` = it came from there).
 func play(move: Move, from_server := false) -> void:
 	state.make_move(move)
+	# A new move means the taken-back moves can't be redone any more.
+	if not _redoing:
+		redo_moves.clear()
 	# While looking back, the board keeps showing the old position.
 	if viewing < 0:
 		# The board's animation plays each sound at the right moment.
@@ -276,10 +301,40 @@ func undo() -> void:
 		undone.append(state.history.back())
 		state.undo_move(undone[1])
 	promotion_overlay.hide()
+	# Remember them for Redo: the move to play next goes last.
+	for move in undone:
+		redo_moves.append(move)
 	board_view.show_undo(undone)
 	_update_text()
 	_save_progress()
 	_start_bot_turn_if_needed()
+
+## Moves taken back with Undo that Redo can play again: the next one is last.
+var redo_moves: Array[Move] = []
+## True while Redo is playing moves (so they don't clear redo_moves, and the
+## bot doesn't start thinking between the two).
+var _redoing := false
+
+## Play again the move that Undo took back (against the bot: your move and the
+## bot's reply, as Undo took back both).
+func redo() -> void:
+	if not _can_redo():
+		return
+	back_to_game()
+	_redoing = true
+	var replay := func() -> void:
+		var move: Move = state.find_move(redo_moves.pop_back().to_text())
+		if move:
+			play(move)
+	replay.call()
+	if is_bot_game() and state.side_to_move == bot_team and not redo_moves.is_empty() and state.outcome() == GameState.Outcome.NONE:
+		replay.call()
+	_redoing = false
+	_update_text()
+	_start_bot_turn_if_needed()
+
+func _can_redo() -> bool:
+	return not redo_moves.is_empty() and not bot_thinking and online == null
 
 ## The bot plays its move now. Normally called by _start_bot_turn_if_needed
 ## (after a short wait); tests call it directly.
@@ -314,6 +369,7 @@ func _show_new_state() -> void:
 	bot_thinking = false
 	viewing = -1
 	_view_state = null
+	redo_moves.clear()
 	board_view.show_game(state)
 	_update_text()
 	_save_progress()
@@ -333,6 +389,8 @@ func _save_progress() -> void:
 
 ## If it's the bot's turn: block the board, say it's thinking, then let it move.
 func _start_bot_turn_if_needed() -> void:
+	if _redoing:
+		return
 	if not is_bot_game() or state.side_to_move != bot_team or state.outcome() != GameState.Outcome.NONE:
 		_update_input()
 		return
@@ -524,6 +582,7 @@ func _update_text() -> void:
 	if viewing < 0:
 		_scroll_moves_to_end.call_deferred()
 	undo_button.disabled = not _can_undo()
+	redo_button.disabled = not _can_redo()
 	play_from_here_button.visible = is_bot_game() and viewing >= 0
 	play_from_here_button.disabled = bot_thinking
 	if online:
@@ -839,8 +898,9 @@ func _start_online() -> void:
 	if state == null:
 		state = _create_start_state()
 	undo_button.hide()
+	redo_button.hide()
 	new_game_button.text = "Resign"
-	new_game_button.pressed.disconnect(new_game)
+	new_game_button.pressed.disconnect(ask_new_game)
 	new_game_button.pressed.connect(resign)
 	clock_label.visible = online.timed()
 	_build_online_extras()
