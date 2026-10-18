@@ -52,7 +52,11 @@ var wide := false
 var state: GameState
 
 ## Shown where the move list goes, until the first move.
-const TIP := "Tip: hold any piece to see how it moves."
+var TIP := tip_text(DisplayServer.is_touchscreen_available())
+
+## Phones: hold a piece. PC: right-click it.
+static func tip_text(touchscreen: bool) -> String:
+	return "Tip: %s any piece to see how it moves." % ("hold" if touchscreen else "right-click")
 
 func _ready() -> void:
 	sounds = GameSounds.new()

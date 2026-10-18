@@ -173,7 +173,9 @@ func tap(square: Vector2i) -> bool:
 	return false
 
 ## The pointer went down at `pos` (a mouse press or a finger touching the screen).
-func pointer_down(pos: Vector2) -> void:
+## Holding still opens the piece's card only for a finger (`touch`): with a
+## mouse, right-clicking does that instead.
+func pointer_down(pos: Vector2, touch := true) -> void:
 	_pressed = true
 	_dragging = false
 	_skip_next_slide = false
@@ -182,7 +184,7 @@ func pointer_down(pos: Vector2) -> void:
 	var square := _square_at(pos)
 	_pressed_selected = square != Board.NO_SQUARE and square == _selected
 	_press_time = Time.get_ticks_msec()
-	_long_press_possible = state != null and not state.board.is_empty(square) if square != Board.NO_SQUARE else false
+	_long_press_possible = touch and state != null and not state.board.is_empty(square) if square != Board.NO_SQUARE else false
 	if not _pressed_selected and square != Board.NO_SQUARE:
 		if tap(square):
 			_long_press_possible = false
@@ -238,6 +240,17 @@ func advance_animation(delta: float) -> void:
 func is_shaking(square: Vector2i) -> bool:
 	return _shake_square == square
 
+## Right-clicking a piece (on PC) asks for its info card.
+func right_click(pos: Vector2) -> void:
+	if state == null or _dragging:
+		return
+	var square := _square_at(pos)
+	var piece := state.board.get_piece(square) if square != Board.NO_SQUARE else null
+	if piece:
+		_clear_selection()
+		queue_redraw()
+		info_requested.emit(piece)
+
 ## If the pointer has been held still on a piece long enough, ask for its info
 ## card and cancel the press (so letting go doesn't also select or move).
 ## `now_ms` is passed in so tests can pretend time has passed.
@@ -256,9 +269,14 @@ func check_long_press(now_ms: int) -> void:
 
 func _gui_input(event: InputEvent) -> void:
 	var button := event as InputEventMouseButton
+	if button and button.button_index == MOUSE_BUTTON_RIGHT and button.pressed:
+		right_click(button.position)
+		accept_event()
 	if button and button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
-			pointer_down(button.position)
+			# A finger's touch arrives as a pretend ("emulated") mouse click.
+			var touch := button.device == InputEvent.DEVICE_ID_EMULATION or DisplayServer.is_touchscreen_available()
+			pointer_down(button.position, touch)
 		else:
 			pointer_up(button.position)
 		accept_event()
