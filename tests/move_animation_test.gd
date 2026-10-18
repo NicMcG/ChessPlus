@@ -48,7 +48,12 @@ func test_capture_knocks_the_piece_off() -> void:
 	var victim := state.board.get_piece(Vector2i(3, 4))
 	var animation := _animate(state, "exd5")
 	check(animation.has_segment(victim, "knock"), "Knocked off")
-	check_eq(_sounds(animation), [Sound.CAPTURE], "Capture sound")
+	check_eq(_sounds(animation), [Sound.MOVE, Sound.CAPTURE], "Scrape, then the capture")
+	var attacker := state.board.get_piece(Vector2i(3, 4))
+	check(animation.has_segment(attacker, "impact"), "The attacker feels the hit")
+	check(animation.has_extra("impact"), "Sparks where they meet")
+	animation.time = MoveAnimation.SLIDE + 0.02
+	check(animation.pose(victim).flash > 0.5, "The captured piece flashes")
 	animation.time = animation.length
 	check(not animation.pose(victim).visible, "Gone at the end")
 

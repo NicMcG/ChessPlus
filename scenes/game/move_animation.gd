@@ -37,7 +37,7 @@ var length := 0.0
 var speed := 1.0
 
 ## How long the basic pieces of motion take, in seconds at normal speed.
-const SLIDE := 0.18
+const SLIDE := 0.22
 const HOP := 0.32
 const SLAM := 0.3
 const KNOCK := 0.38
@@ -117,11 +117,14 @@ func _ordinary(move: Move, state: GameState, dragged: bool) -> void:
 	var from := Vector2(move.from)
 	var landed := Vector2(move.lands_on())
 	var arrived := _travel(move.piece, from, landed, dragged, is_leap(move))
+	if not dragged and not is_leap(move) and from != landed:
+		_cue(0.0, GameSounds.Sound.MOVE)  # The wooden scrape plays as it slides.
 	if move.captured:
 		_knock_off(move.captured, Vector2(move.capture_square), landed - from, arrived)
+		_impact(move.piece, landed, landed - from, arrived)
 		_cue(arrived, GameSounds.Sound.CAPTURE)
-	elif not dragged:
-		_cue(arrived, GameSounds.Sound.LAND if is_leap(move) else GameSounds.Sound.MOVE)
+	elif is_leap(move) and not dragged:
+		_cue(arrived, GameSounds.Sound.LAND)
 	if move.promotion:
 		var promoted := state.board.get_piece(move.lands_on())
 		var swap := arrived + 0.15
@@ -214,8 +217,15 @@ func _travel(piece: Piece, from: Vector2, to: Vector2, dragged: bool, leap: bool
 	_add(piece, {"kind": "slide", "from": from, "to": to, "start": 0.0, "end": SLIDE})
 	return SLIDE
 
+## The capturing piece feels the hit: it squashes and bounces back a little,
+## and a burst of sparks flies out where the pieces meet.
+func _impact(piece: Piece, at: Vector2, direction: Vector2, when: float) -> void:
+	var dir := direction.normalized() if direction != Vector2.ZERO else Vector2(0, 1)
+	_add(piece, {"kind": "impact", "at": at, "dir": dir, "start": when, "end": when + 0.28})
+	extras.append({"kind": "impact", "at": at + dir * 0.3, "start": when, "end": when + 0.3})
+
 ## The captured piece stays put until `at` seconds, then is knocked away in the
-## direction of the hit, spinning and fading.
+## direction of the hit, spinning and fading, flashing white then red as it's hit.
 func _knock_off(piece: Piece, square: Vector2, direction: Vector2, at: float) -> void:
 	var dir := direction.normalized() if direction != Vector2.ZERO else Vector2(0, 1)
 	if at > 0:
@@ -320,7 +330,7 @@ func pose(piece: Piece) -> Variant:
 ## A segment's pose `t` of the way (0..1) through it.
 static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 	var pose := {"visible": true, "pos": segment.get("at", Vector2.ZERO), "lift": 0.0,
-			"scale": Vector2.ONE, "angle": 0.0, "alpha": 1.0, "sunk": 0.0}
+			"scale": Vector2.ONE, "angle": 0.0, "alpha": 1.0, "sunk": 0.0, "flash": 0.0}
 	match segment.kind:
 		"slide":
 			pose.pos = (segment.from as Vector2).lerp(segment.to, ease_out(t))
@@ -342,6 +352,7 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			pose.angle = segment.spin * 2.6 * t
 			pose.alpha = 1.0 - t * t
 			pose.scale = Vector2.ONE * (1.0 - 0.25 * t)
+			pose.flash = clampf(1.0 - t * 2.5, 0.0, 1.0)
 			if t >= 1.0:
 				pose.visible = false
 		"fade_out":
@@ -354,6 +365,11 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			pose.scale = Vector2.ONE * (1.0 + 0.3 * (1.0 - ease_out(t)))
 		"shake":
 			pose.pos = (segment.at as Vector2) + Vector2(shake_offset(t), 0)
+		"impact":
+			# Squashed by the hit, then springs back, pushed back a touch.
+			var wobble := exp(-6.0 * t) * cos(15.0 * t)
+			pose.scale = Vector2(1.0 + 0.12 * wobble, 1.0 - 0.16 * wobble)
+			pose.pos = (segment.at as Vector2) - (segment.dir as Vector2) * 0.12 * sin(PI * t) * (1.0 - t)
 		"recoil":
 			pose.pos = (segment.at as Vector2) - (segment.dir as Vector2) * 0.18 * sin(PI * t)
 		"bump":

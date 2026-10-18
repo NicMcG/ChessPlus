@@ -78,6 +78,8 @@ func _run_all() -> void:
 	# Empty the shared caches, so what's left at exit is a real leak worth a warning.
 	PieceArt.clear_cache()
 	PracticeBot.clear_cache()
+	GameSounds.clear_cache()
+	BoardView.clear_cache()
 	MemoryBackend.clear()
 	get_tree().quit(1 if failed > 0 else 0)
 
