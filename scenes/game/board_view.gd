@@ -23,6 +23,8 @@ const LAST_MOVE_TINT := Color(0.95, 0.85, 0.2, 0.3)
 const CHECK_TINT := Color(0.9, 0.15, 0.1, 0.6)
 const TARGET_MARK := Color(0.1, 0.1, 0.1, 0.25)
 const HOVER_TINT := Color(1, 1, 1, 0.3)
+## The see-through arrows players draw with the right mouse button.
+const ARROW_COLOR := Color(0.1, 0.55, 0.15, 0.6)
 ## How far (in pixels) the pointer must move while held before it counts as a drag.
 const DRAG_THRESHOLD := 10.0
 ## A dragged piece is drawn this much bigger, so a finger doesn't hide it.
@@ -71,6 +73,13 @@ var _shake_elapsed := 0.0
 ## The player just dropped a dragged piece, so its move needs no slide.
 var _skip_next_slide := false
 
+# Arrows (PC): drag with the right mouse button from one square to another.
+## Each arrow is [from square, to square].
+var arrows: Array = []
+## Where the right button went down (NO_SQUARE when it isn't held).
+var _arrow_start := Board.NO_SQUARE
+var _arrow_pointer := Vector2.ZERO
+
 func _ready() -> void:
 	# Smooth edges when the piece images are shrunk to fit the squares.
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -88,6 +97,9 @@ func refresh() -> void:
 	_slides.clear()
 	_fades.clear()
 	_shake_square = Board.NO_SQUARE
+	# A new move (or a different position) clears the arrows.
+	arrows.clear()
+	_arrow_start = Board.NO_SQUARE
 	queue_redraw()
 
 ## Redraw after `move` was made, sliding the piece there (and the castling
@@ -240,16 +252,42 @@ func advance_animation(delta: float) -> void:
 func is_shaking(square: Vector2i) -> bool:
 	return _shake_square == square
 
-## Right-clicking a piece (on PC) asks for its info card.
-func right_click(pos: Vector2) -> void:
+## The right mouse button went down (PC): maybe the start of an arrow.
+func right_down(pos: Vector2) -> void:
 	if state == null or _dragging:
 		return
-	var square := _square_at(pos)
-	var piece := state.board.get_piece(square) if square != Board.NO_SQUARE else null
-	if piece:
-		_clear_selection()
-		queue_redraw()
-		info_requested.emit(piece)
+	_arrow_start = _square_at(pos)
+	_arrow_pointer = pos
+
+## The right mouse button came up. Dragged to another square: add an arrow
+## there (or remove it, if that arrow is already drawn). Released where it went
+## down: a plain right-click, which clears the arrows and, on a piece, asks for
+## its info card.
+func right_up(pos: Vector2) -> void:
+	if state == null or _arrow_start == Board.NO_SQUARE:
+		_arrow_start = Board.NO_SQUARE
+		return
+	var start := _arrow_start
+	var end := _square_at(pos)
+	_arrow_start = Board.NO_SQUARE
+	if end != Board.NO_SQUARE and end != start:
+		var arrow := [start, end]
+		if arrows.has(arrow):
+			arrows.erase(arrow)
+		else:
+			arrows.append(arrow)
+	else:
+		arrows.clear()
+		var piece := state.board.get_piece(start)
+		if piece and end == start:
+			_clear_selection()
+			info_requested.emit(piece)
+	queue_redraw()
+
+## A plain right-click at `pos`.
+func right_click(pos: Vector2) -> void:
+	right_down(pos)
+	right_up(pos)
 
 ## If the pointer has been held still on a piece long enough, ask for its info
 ## card and cancel the press (so letting go doesn't also select or move).
@@ -269,8 +307,11 @@ func check_long_press(now_ms: int) -> void:
 
 func _gui_input(event: InputEvent) -> void:
 	var button := event as InputEventMouseButton
-	if button and button.button_index == MOUSE_BUTTON_RIGHT and button.pressed:
-		right_click(button.position)
+	if button and button.button_index == MOUSE_BUTTON_RIGHT:
+		if button.pressed:
+			right_down(button.position)
+		else:
+			right_up(button.position)
 		accept_event()
 	if button and button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
@@ -283,6 +324,9 @@ func _gui_input(event: InputEvent) -> void:
 	var motion := event as InputEventMouseMotion
 	if motion:
 		pointer_move(motion.position)
+		if _arrow_start != Board.NO_SQUARE:
+			_arrow_pointer = motion.position
+			queue_redraw()
 
 ## If the selected piece can move to `square`, choose that move and return true.
 func _try_move_to(square: Vector2i) -> bool:
@@ -351,10 +395,34 @@ func _draw() -> void:
 		_draw_piece(piece, Rect2(from_rect.position.lerp(to_rect.position, progress), to_rect.size))
 	for move in _selected_moves:
 		_draw_target(move)
+	for arrow: Array in arrows:
+		_draw_arrow(square_center(arrow[0]), square_center(arrow[1]))
+	# The arrow being drawn right now follows the pointer to the square under it.
+	if _arrow_start != Board.NO_SQUARE:
+		var hover := _square_at(_arrow_pointer)
+		if hover != Board.NO_SQUARE and hover != _arrow_start:
+			_draw_arrow(square_center(_arrow_start), square_center(hover))
 	if _dragging:
 		var size_px := _square_size() * DRAG_SCALE
 		var rect := Rect2(_pointer_pos - Vector2(size_px, size_px) / 2, Vector2(size_px, size_px))
 		_draw_piece(board.get_piece(_selected), rect)
+
+## A see-through arrow from the middle of one square to the middle of another,
+## drawn as one shape (so the overlapping parts don't look darker).
+func _draw_arrow(from: Vector2, to: Vector2) -> void:
+	var s := _square_size()
+	var direction := (to - from).normalized()
+	var side := Vector2(-direction.y, direction.x)
+	var start := from + direction * s * 0.25
+	var head_length := s * 0.4
+	var neck := to - direction * head_length
+	var shaft := s * 0.09  # Half the shaft's width.
+	var head := s * 0.25  # Half the head's width.
+	var points := PackedVector2Array([
+		start + side * shaft, neck + side * shaft, neck + side * head, to,
+		neck - side * head, neck - side * shaft, start - side * shaft,
+	])
+	draw_colored_polygon(points, ARROW_COLOR)
 
 ## Starts fast and slows down as it arrives.
 static func _ease(t: float) -> float:
