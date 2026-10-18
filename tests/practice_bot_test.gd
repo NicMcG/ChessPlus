@@ -68,3 +68,31 @@ func test_handles_custom_pieces() -> void:
 	# A cannon can only take the rook by hopping over the pawn.
 	var state := _parse("k3r3/8/8/8/4p3/8/8/K3C3 w - - 0 1")
 	check_eq(_bot(PracticeBot.Level.MEDIUM).choose_move(state).to_text(), "e1xe8", "Cannon hops to win the rook")
+
+# --- How it scores positions -------------------------------------------------------
+
+func test_pieces_score_more_where_they_reach_more() -> void:
+	var knight: PieceDef = load("res://data/pieces/knight.tres")
+	var board := Board.new(8, 8)
+	check_eq(PracticeBot.reach(knight, Vector2i(0, 0), Piece.Team.WHITE, board), 2, "Knight in the corner")
+	check_eq(PracticeBot.reach(knight, Vector2i(3, 3), Piece.Team.WHITE, board), 8, "Knight in the centre")
+	var centre := _parse("4k3/8/8/8/3N4/8/8/4K3 w - - 0 1")
+	var corner := _parse("4k3/8/8/8/8/8/8/N3K3 w - - 0 1")
+	check(PracticeBot.evaluate(centre) > PracticeBot.evaluate(corner), "Central knight is better")
+
+func test_king_safety_while_pieces_remain() -> void:
+	# Same pieces; in one the king sits behind its pawns in the corner, in the
+	# other it has walked out into the middle.
+	var safe := _parse("r2qk2r/8/8/8/8/8/5PPP/3Q1RK1 w - - 0 1")
+	var exposed := _parse("r2qk2r/8/8/8/8/4K3/5PPP/3Q1R2 w - - 0 1")
+	check(PracticeBot.evaluate(safe) > PracticeBot.evaluate(exposed), "Sheltered king is better")
+
+func test_being_in_check_counts_against_you() -> void:
+	var checked := _parse("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1")
+	var not_checked := _parse("4k3/8/8/8/8/8/3r4/4K3 w - - 0 1")
+	check(PracticeBot.evaluate(checked) < PracticeBot.evaluate(not_checked), "Check is a little worse")
+
+func test_wins_material_with_a_fork() -> void:
+	# Nc7+ forks the king and the rook on a8.
+	var state := _parse("r3k3/8/8/1N6/8/8/8/4K3 w - - 0 1")
+	check_eq(_bot(PracticeBot.Level.HARD).choose_move(state).to_text(), "b5-c7", "Hard finds the knight fork")

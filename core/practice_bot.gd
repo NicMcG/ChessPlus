@@ -93,34 +93,112 @@ func choose_move(state: GameState) -> Move:
 			break
 	return best
 
-## How good the position is for the side to move (positive = good).
+## How good the position is for the side to move (positive = good), in
+## hundredths of a point. Made of:
+##   material: each piece's point value (an unbroken shield adds half again)
+##   control: pieces score more where they reach more squares, and once they've
+##     left the back row; pawn-like pieces score more as they advance, most of
+##     all in the centre files
+##   king safety: while the opponent still has plenty of pieces, the king likes
+##     its back row, a corner, and its own pieces in front of it
+##   check: being in check counts a little against you
 static func evaluate(state: GameState) -> int:
 	var board := state.board
-	var center := Vector2((board.width - 1) / 2.0, (board.height - 1) / 2.0)
-	var score := 0
+	var center_x := (board.width - 1) / 2.0
+	var mover := state.side_to_move
+	# First pass: how much non-pawn material each side has (for king safety), and
+	# what's needed to tell whether the side to move is in check.
+	var pieces_value := {Piece.Team.WHITE: 0.0, Piece.Team.BLACK: 0.0}
+	var enemy_defs: Array[PieceDef] = []
+	var own_royals: Array[Vector2i] = []
 	for rank in range(board.height):
 		for file in range(board.width):
 			var piece := board.get_piece(Vector2i(file, rank))
 			if piece == null:
 				continue
+			if not piece.def.is_pawn_type():
+				pieces_value[piece.team] += piece.def.value
+			if piece.team != mover and not enemy_defs.has(piece.def):
+				enemy_defs.append(piece.def)
+			elif piece.team == mover and piece.def.is_king_type():
+				own_royals.append(Vector2i(file, rank))
+	var score := 0
+	for rank in range(board.height):
+		for file in range(board.width):
+			var square := Vector2i(file, rank)
+			var piece := board.get_piece(square)
+			if piece == null:
+				continue
 			var value := int(piece.def.value * 100)
 			if piece.has_active_shield():
 				value += int(piece.def.value * 50)
+			var forward := 1 if piece.team == Piece.Team.WHITE else -1
 			var row := rank if piece.team == Piece.Team.WHITE else board.height - 1 - rank
-			if piece.def.can_promote():
-				# Pawn-like pieces: worth more the further they get, especially in
-				# the centre files (where they fight for the middle of the board).
-				var central := absf(file - center.x) < 1.0
+			if piece.def.is_king_type():
+				if pieces_value[Piece.other_team(piece.team)] >= KING_SAFETY_MATERIAL:
+					value += _king_safety(board, piece, square, row, forward)
+			elif piece.def.can_promote():
+				var central := absf(file - center_x) < 1.0
 				value += row * (10 if central else 4)
-			elif not piece.def.is_king_type():
-				# Other pieces: better in the middle of the board, and once they've
-				# left the back row ("developed").
-				var distance := absf(file - center.x) + absf(rank - center.y)
-				value += int((7.0 - distance) * 3)
+			else:
+				value += reach(piece.def, square, piece.team, board) * 2
 				if row > 0:
 					value += 12
-			score += value if piece.team == state.side_to_move else -value
+			score += value if piece.team == mover else -value
+	for royal in own_royals:
+		if MoveGenerator.is_attacked_by_defs(board, royal, Piece.other_team(mover), enemy_defs):
+			score -= CHECK_PENALTY
+			break
 	return score
+
+## The opponent's pieces (not counting pawns) must be worth at least this many
+## points for king safety to matter; with less, the king should join in.
+const KING_SAFETY_MATERIAL := 10.0
+const CHECK_PENALTY := 35
+
+static func _king_safety(board: Board, king: Piece, square: Vector2i, row: int, forward: int) -> int:
+	var bonus := 20 if row == 0 else -25 * row
+	if square.x <= 2 or square.x >= board.width - 3:
+		bonus += 15
+	for dx in [-1, 0, 1]:
+		var guard := board.get_piece(square + Vector2i(dx, forward))
+		if guard and guard.team == king.team:
+			bonus += 10
+	return bonus
+
+## How many squares a piece would reach from `square` on an empty board: a
+## simple measure of how much it controls from there. Worked out once per piece
+## type and side (and board size), then looked up.
+static var _reach_cache := {}  # PieceDef -> [White's counts, Black's counts]
+
+static func reach(def: PieceDef, square: Vector2i, team: Piece.Team, board: Board) -> int:
+	var tables: Array = _reach_cache.get(def, [])
+	if tables.is_empty() or tables[0].size() != board.width * board.height:
+		tables = [_reach_table(def, Piece.Team.WHITE, board), _reach_table(def, Piece.Team.BLACK, board)]
+		_reach_cache[def] = tables
+	return tables[0 if team == Piece.Team.WHITE else 1][square.y * board.width + square.x]
+
+static func _reach_table(def: PieceDef, team: Piece.Team, board: Board) -> PackedInt32Array:
+	var counts := PackedInt32Array()
+	counts.resize(board.width * board.height)
+	for rank in range(board.height):
+		for file in range(board.width):
+			counts[rank * board.width + file] = _count_reach(def, Vector2i(file, rank), team, board)
+	return counts
+
+static func _count_reach(def: PieceDef, from: Vector2i, team: Piece.Team, board: Board) -> int:
+	var reached := {}
+	for rule in def.move_rules:
+		var steps := rule.max_steps if rule.max_steps > 0 else maxi(board.width, board.height)
+		for dir in rule.directions:
+			var step := Vector2i(dir.x, dir.y if team == Piece.Team.WHITE else -dir.y)
+			var pos := from
+			for i in range(steps):
+				pos += step
+				if not board.in_bounds(pos):
+					break
+				reached[pos] = true
+	return reached.size()
 
 ## The best score the side to move can get, looking `depth` moves ahead.
 ## For speed it starts from the possible moves (ignoring check) and skips any
