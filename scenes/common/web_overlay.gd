@@ -51,7 +51,7 @@ const JS := """
 			o.dock(id, true);
 			clearTimeout(o.undockTimer);
 			// A tap that didn't end up typing (e.g. a scroll): put it back.
-			o.undockTimer = setTimeout(function () { if (o.pre === id) o.pre = null; if (o.focused !== id) o.replaceAll(); }, 800);
+			o.undockTimer = setTimeout(function () { if (o.pre === id) o.pre = null; if (o.focused !== id) { o.undock(el); o.replaceAll(); } }, 800);
 		}, { passive: true });
 		el.addEventListener('focus', function () {
 			o.focused = id; o.pre = null;
@@ -65,7 +65,7 @@ const JS := """
 		el.addEventListener('blur', function () {
 			if (o.focused === id) { o.focused = null; clearInterval(o.dockTimer); }
 			if (o.handler) o.handler(id, 'blur', el.value);
-			Object.assign(el.style, { position: 'absolute', background: 'transparent', border: 'none', borderRadius: '0', boxShadow: 'none', zIndex: 10 });
+			o.undock(el);
 			window.scrollTo(0, 0);
 			o.replaceAll();
 		});
@@ -112,6 +112,10 @@ const JS := """
 			left: (left + 10) + 'px', width: (width - 20) + 'px', top: top + 'px', height: height + 'px',
 			fontSize: '18px', background: '#1d1d1f', border: '1px solid #8a8a8a', borderRadius: '12px',
 			boxShadow: '0 2px 12px rgba(0,0,0,0.6)' });
+	};
+	// Back to an invisible box over the game's own (placed by o.place).
+	o.undock = function (el) {
+		Object.assign(el.style, { position: 'absolute', background: 'transparent', border: 'none', borderRadius: '0', boxShadow: 'none', zIndex: 10 });
 	};
 	o.setValue = function (id, v) { const el = o.els[id]; if (el && el.value !== v) el.value = v; };
 	o.setAttr = function (id, name, v) { const el = o.els[id]; if (el) el[name] = v; };
