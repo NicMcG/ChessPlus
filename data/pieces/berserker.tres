@@ -24,4 +24,3 @@ display_name = "Berserker"
 symbol = "BR"
 value = 2.5
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2"), SubResource("Resource_rule3")])
-special_rule = "It reaches the outer squares two rows ahead through the diagonal square in front of them, so a piece there blocks the way."

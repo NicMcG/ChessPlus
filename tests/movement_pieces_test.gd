@@ -24,8 +24,8 @@ func test_costs_symbols_and_tags() -> void:
 	for id in expected:
 		check_eq([_def(id).symbol, _def(id).value], expected[id], id)
 	check(_def("wizard").is_royal_type() and _def("wizard").has_jump(), "Wizard: Royal, Jump")
-	check(_def("rogue").has_jump(), "Rogue: Jump")
-	check(_def("chariot").has_promote(), "Chariot: Promote")
+	check(not _def("rogue").has_jump(), "Rogue: no Jump keyword (Mac's call)")
+	check(_def("chariot").has_castle() and not _def("chariot").has_promote(), "Chariot: Castle, not Promote")
 	check(not _def("berserker").can_promote(), "Berserker doesn't promote")
 
 # --- Wizard ----------------------------------------------------------------------------
@@ -61,12 +61,14 @@ func test_rogue_captures_after_a_hop_and_gives_check() -> void:
 
 # --- Chariot ---------------------------------------------------------------------------
 
-func test_chariot_moves_up_to_four_and_promotes() -> void:
+func test_chariot_moves_up_to_four_and_castles() -> void:
 	var targets := _targets(_parse("4k3/8/8/8/8/8/8/(CH)6K w - - 0 1"), "a1")
 	check(targets.has("a5") and not targets.has("a6"), "Up to four squares")
 	check(targets.has("e1") and not targets.has("f1"), "Sideways too")
 	var state := _parse("4k3/(CH)7/8/8/8/8/8/K7 w - - 0 1")
-	check(state.find_move("a7-a8=Q") != null, "Promotes on the far rank")
+	check(state.find_move("a7-a8") != null and state.find_move("a7-a8=Q") == null, "Doesn't promote")
+	state = _parse("4k3/8/8/8/8/8/8/(CH)3K3 w Q - 0 1")
+	check(state.find_move("e1-c1") != null, "The king can castle with it")
 
 # --- Cavalry ---------------------------------------------------------------------------
 
@@ -134,5 +136,5 @@ func test_cards_show_the_new_moves() -> void:
 	check_eq(cavalry.squares.size(), 12, "Cavalry: twelve squares")
 	check(cavalry.squares[Vector2i(2, 1)] & PieceGuide.JUMP == 0, "Its L moves aren't jumps")
 	var rogue := PieceGuide.guide(_def("rogue"))
-	check(rogue.squares[Vector2i(0, 2)] & PieceGuide.JUMP, "Rogue: hop squares are jumps")
+	check(rogue.squares[Vector2i(0, 2)] & PieceGuide.JUMP == 0, "Rogue: hop squares are plain marks")
 	check_eq(PieceGuide.guide(_def("berserker")).squares.size(), 6, "Berserker: six squares")

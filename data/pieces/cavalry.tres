@@ -25,4 +25,3 @@ display_name = "Cavalry"
 symbol = "CV"
 value = 3
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2"), SubResource("Resource_rule3")])
-special_rule = "Its L-shaped moves go 2 squares sideways, then 1 forward or back. Unlike a knight it can't jump: a piece on the way blocks them."

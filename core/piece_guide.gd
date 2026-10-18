@@ -46,7 +46,9 @@ static func guide(def: PieceDef) -> Dictionary:
 			continue
 		var reach := maxi(rule.max_steps, rule.first_move_max_steps)
 		for dir in rule.directions:
-			var leap := (rule.max_steps == 1 and maxi(absi(dir.x), absi(dir.y)) > 1) or rule.leap_steps > 0
+			# A hop that needs one of its own pieces to jump (the Rogue) isn't shown as a
+			# jump: its special rule explains it.
+			var leap := (rule.max_steps == 1 and maxi(absi(dir.x), absi(dir.y)) > 1) 					or (rule.leap_steps > 0 and rule.leap_over == MoveRule.LeapOver.ANYTHING)
 			for i in range(1 + rule.leap_steps, reach + 1):
 				var square_flags := flags
 				if i > rule.max_steps:

@@ -15,4 +15,4 @@ display_name = "Chariot"
 symbol = "CH"
 value = 4
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1")])
-keywords = 4
+keywords = 2
