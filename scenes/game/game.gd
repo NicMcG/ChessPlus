@@ -130,8 +130,6 @@ func _ready() -> void:
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
 	play_from_here_button.pressed.connect(play_from_here)
-	for color in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		ability_button.add_theme_color_override(color, Color.WHITE)
 	ability_button.pressed.connect(use_ability)
 	board_view.selection_changed.connect(_on_selection_changed)
 	move_list.move_tapped.connect(view_move)
@@ -383,32 +381,46 @@ func _ask_which_move(moves: Array[Move]) -> void:
 		promotion_choices.add_child(button)
 	promotion_overlay.show()
 
-## A piece was selected (or the selection cleared): offer its special ability,
-## if it has one it can use now.
-func _on_selection_changed(_square: Vector2i) -> void:
-	var moves := board_view.selected_ability_moves()
-	ability_button.visible = not moves.is_empty()
-	if not moves.is_empty():
-		var def: PieceDef = moves[0].piece.def
-		ability_button.text = def.ability_name
-		_style_ability_button(def.ability_gradient())
+## A piece was selected (or the selection cleared): a piece with a special
+## ability shows its button (Mac's design): in its colours when it can be used
+## now, darkened when it can't be used in this position, grey once used up.
+func _on_selection_changed(square: Vector2i) -> void:
+	var piece: Piece = state.board.get_piece(square) if square != Board.NO_SQUARE else null
+	ability_button.visible = piece != null and piece.def.ability != PieceDef.Ability.NONE
+	_update_text()
+	if not ability_button.visible:
+		return
+	ability_button.text = piece.def.ability_name.to_upper()
+	if piece.ability_used:
+		_style_ability_button(PackedColorArray([Color("#555555"), Color("#555555")]), Color("#a0a0a0"), false)
+	elif board_view.selected_ability_moves().is_empty():
+		var dark := GradientStyleBox.new(piece.def.ability_gradient()).shaded(-0.55).colors
+		_style_ability_button(dark, Color("#9a9a9a"), false)
 	else:
-		_update_text()
+		_style_ability_button(piece.def.ability_gradient(), Color.WHITE, true)
 
-## The ability button gets the piece's gradient: lighter under the mouse,
-## darker while pressed.
-func _style_ability_button(colors: PackedColorArray) -> void:
+## The ability button gets the piece's gradient (lighter under the mouse,
+## darker while pressed when it can be used).
+func _style_ability_button(colors: PackedColorArray, text_color: Color, usable: bool) -> void:
 	var style := GradientStyleBox.new(colors, 12, 16, 8)
 	ability_button.add_theme_stylebox_override("normal", style)
 	ability_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	ability_button.add_theme_stylebox_override("hover", style.shaded(0.15))
-	ability_button.add_theme_stylebox_override("pressed", style.shaded(-0.2))
+	ability_button.add_theme_stylebox_override("hover", style.shaded(0.15) if usable else style)
+	ability_button.add_theme_stylebox_override("pressed", style.shaded(-0.2) if usable else style)
+	for color in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		ability_button.add_theme_color_override(color, text_color)
 
 ## The ability button: Crack Shot asks which piece to shoot (on the board);
 ## Raise Dead asks which lost piece to bring back (a picker, like promotion).
+## If it can't be used, a short message says why.
 func use_ability() -> void:
 	var moves := board_view.selected_ability_moves()
 	if moves.is_empty():
+		var piece: Piece = state.board.get_piece(board_view.selected_square()) if board_view.selected_square() != Board.NO_SQUARE else null
+		if piece and piece.ability_used:
+			show_notice("%s has already been used." % piece.def.ability_name)
+		else:
+			show_notice("This ability can't be used right now.")
 		return
 	var piece := moves[0].piece
 	if piece.def.ability == PieceDef.Ability.RAISE_DEAD:
@@ -416,6 +428,42 @@ func use_ability() -> void:
 	else:
 		board_view.aim_ability()
 		status_label.text = "%s: choose a target" % piece.def.ability_name
+
+## The last message shown by show_notice (for tests).
+var last_notice := ""
+
+## A short message that pops up just above the ability button, then fades away.
+func show_notice(text: String) -> void:
+	last_notice = text
+	var notice := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.11, 0.95)
+	style.border_color = Color("#8a8a8a")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(14)
+	notice.add_theme_stylebox_override("panel", style)
+	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 24)
+	notice.add_child(label)
+	notice.top_level = true
+	notice.modulate.a = 0.0
+	add_child(notice)
+	# Placed a frame later, once the button (maybe just shown) has its place.
+	await get_tree().process_frame
+	if not is_instance_valid(notice):
+		return
+	notice.reset_size()
+	notice.modulate.a = 1.0
+	var anchor := ability_button.get_global_rect()
+	notice.global_position = Vector2(anchor.get_center().x - notice.size.x / 2, anchor.position.y - notice.size.y - 10)
+	notice.global_position.x = clampf(notice.global_position.x, 8, maxf(8, size.x - notice.size.x - 8))
+	var tween := notice.create_tween()
+	tween.tween_interval(1.6)
+	tween.tween_property(notice, "modulate:a", 0.0, 0.4)
+	tween.tween_callback(notice.queue_free)
 
 ## Tapping outside the choices cancels.
 func _on_overlay_input(event: InputEvent) -> void:

@@ -42,19 +42,27 @@ const JS := """
 		// While typing, the box sits just above the keyboard (iOS slides the page
 		// around when the keyboard opens, so the box's own spot can end up anywhere).
 		// iPhones scroll the whole page up when a box low on the screen is tapped,
-		// so the keyboard won't cover it. Moving the box to the top of the screen
-		// the moment the finger lands (before the keyboard opens) leaves Safari
-		// nothing to scroll for; once it has focus it docks above the keyboard.
-		el.addEventListener('touchstart', function () {
-			if (o.focused === id) return;
-			o.pre = id;
-			o.dock(id, true);
-			clearTimeout(o.undockTimer);
-			// A tap that didn't end up typing (e.g. a scroll): put it back.
-			o.undockTimer = setTimeout(function () { if (o.pre === id) o.pre = null; if (o.focused !== id) { o.undock(el); o.replaceAll(); } }, 800);
+		// so the keyboard won't cover it. Instead, the tap is handled here: Safari's
+		// own focusing is cancelled, the box is moved to the top of the screen and
+		// focused from there without scrolling (focusing inside the tap still opens
+		// the keyboard). Once it has focus it docks above the keyboard.
+		// (Moving it as the finger lands doesn't work: the finger is then no longer
+		// on the box when it lifts, so Safari never focuses it.)
+		el.addEventListener('touchstart', function (e) {
+			const t = e.touches[0]; o.touchAt = t ? [t.clientX, t.clientY] : null;
 		}, { passive: true });
+		el.addEventListener('touchend', function (e) {
+			if (o.focused === id) return;
+			const t = e.changedTouches[0];
+			// A drag that started on the box isn't a tap.
+			if (o.touchAt && t && Math.abs(t.clientX - o.touchAt[0]) + Math.abs(t.clientY - o.touchAt[1]) > 12) return;
+			e.preventDefault();
+			o.dock(id, true);
+			try { el.focus({ preventScroll: true }); } catch (err) { el.focus(); }
+			if (o.focused !== id) { o.undock(el); o.replaceAll(); }
+		});
 		el.addEventListener('focus', function () {
-			o.focused = id; o.pre = null;
+			o.focused = id;
 			if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
 			if (o.handler) o.handler(id, 'focus', el.value);
 			o.dock();
@@ -86,7 +94,6 @@ const JS := """
 		const el = o.els[id]; if (!el) return;
 		o.spots[id] = [x, y, w, h, fontPx, show, minFont];
 		if (id === o.focused) { o.dock(); return; }
-		if (id === o.pre) return;
 		if (!show) { el.style.display = 'none'; return; }
 		const p = o.toPage(x, y); const s = p[2];
 		Object.assign(el.style, { display: 'block', left: p[0] + 'px', top: p[1] + 'px',
@@ -97,7 +104,7 @@ const JS := """
 	// Positioned on the screen (fixed) from the visible area alone: when the
 	// keyboard opens, iOS both scrolls the page and moves the visible area, and
 	// counting both put the bar under the keyboard.
-	// With atTop, the bar goes at the top of the screen instead (see touchstart).
+	// With atTop, the bar goes at the top of the screen instead (see touchend).
 	o.dock = function (whichId, atTop) {
 		const id = (typeof whichId === 'string') ? whichId : o.focused; const el = o.els[id]; if (!el) return;
 		// If Safari scrolled the page anyway, put it back so the game stays put.
@@ -107,7 +114,10 @@ const JS := """
 		const width = vv ? vv.width : window.innerWidth;
 		const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
 		const height = 52;
-		const top = atTop ? (vv ? vv.offsetTop : 0) + 10 : bottom - height - 10;
+		// Until the keyboard is open (the visible area shrinks), stay at the top:
+		// a focused box low on the screen is what makes Safari scroll the page.
+		const keyboardOpen = vv && vv.height < window.innerHeight * 0.85;
+		const top = (atTop || !keyboardOpen) ? (vv ? vv.offsetTop : 0) + 10 : bottom - height - 10;
 		Object.assign(el.style, { display: 'block', position: 'fixed', zIndex: 20,
 			left: (left + 10) + 'px', width: (width - 20) + 'px', top: top + 'px', height: height + 'px',
 			fontSize: '18px', background: '#1d1d1f', border: '1px solid #8a8a8a', borderRadius: '12px',
