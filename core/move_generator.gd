@@ -56,6 +56,11 @@ static func is_in_check(board: Board, team: Piece.Team) -> bool:
 static func is_attacked(board: Board, square: Vector2i, by_team: Piece.Team) -> bool:
 	return _is_attacked_by(board, square, by_team, _defs_on_board(board, by_team))
 
+## The same, for callers that already know which piece types `by_team` has on
+## the board (`defs`), which saves scanning the board again.
+static func is_attacked_by_defs(board: Board, square: Vector2i, by_team: Piece.Team, defs: Array[PieceDef]) -> bool:
+	return _is_attacked_by(board, square, by_team, defs)
+
 ## Works backwards from the square: for each kind of attacking piece, walk each of
 ## its capture directions in reverse. If the first piece met is that kind of piece,
 ## on the attacking team, and close enough for its step limit, it attacks the square.
