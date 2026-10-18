@@ -30,6 +30,8 @@ const EXPLANATIONS := {
 	"Shield": "The first capture only breaks its shield, and the attacker stays where it was. The second capture takes it. The shield never comes back.",
 }
 
+const ITALIC_FONT := preload("res://art/fonts/OpenSans-Italic.ttf")
+
 var def: PieceDef
 var team := Piece.Team.WHITE
 ## How big the card is drawn: 1 = normal (the pop-up in games); the army builder
@@ -210,17 +212,14 @@ func _detail_label(text: String) -> Label:
 	label.add_theme_color_override("font_color", Color(0.78, 0.78, 0.78))
 	return label
 
-## A real italic font from the computer (slanting the normal font made the
-## letters jiggle instead). Browsers don't let the game use the computer's fonts,
-## so the web version stays upright until an italic font file is bundled.
+## Open Sans Italic (res://art/fonts/, the italic partner of Godot's built-in
+## font), at the same semi-bold weight as the normal text. Bundled, so it looks
+## the same on PC, phones and in browsers. (Slanting the normal font made the
+## letters jiggle instead.)
 func _italic_font() -> Font:
-	if OS.has_feature("web"):
-		return get_theme_default_font()
-	var italic := SystemFont.new()
-	italic.font_names = PackedStringArray(["Open Sans", "Segoe UI", "Helvetica Neue", "Arial"])
-	italic.font_italic = true
-	italic.font_weight = 600
-	italic.fallbacks = [get_theme_default_font()]
+	var italic := FontVariation.new()
+	italic.base_font = ITALIC_FONT
+	italic.variation_opentype = {"wght": 600}
 	return italic
 
 func _fill_legend() -> void:
