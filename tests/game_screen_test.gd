@@ -263,3 +263,14 @@ func test_raise_dead_picker() -> void:
 	(game.promotion_choices.get_child(0) as Button).pressed.emit()
 	check_eq(game.state.board.get_piece(Board.parse_square("d2")).def.id, "queen", "Queen raised")
 	game.free()
+
+func test_playing_black_against_the_bot_flips_the_board() -> void:
+	var as_black := _open_bot_game(Piece.Team.WHITE)
+	check(as_black.board_view.flipped, "You play Black: Black at the bottom")
+	as_black.free()
+	var as_white := _open_bot_game(Piece.Team.BLACK)
+	check(not as_white.board_view.flipped, "You play White: White at the bottom")
+	as_white.free()
+	var two_players := _open()
+	check(not two_players.board_view.flipped, "Two players on one device: White at the bottom")
+	two_players.free()

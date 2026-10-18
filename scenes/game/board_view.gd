@@ -43,6 +43,12 @@ const SHAKE_TIME := 0.3
 @export var piece_style := "standard"
 ## How long (seconds) a move takes to slide across the board. 0 = no animation.
 @export var move_time := 0.18
+## Black's side at the bottom (the board turned round; pieces still upright).
+## Set when this player is Black, online or against the bot.
+var flipped := false:
+	set(value):
+		flipped = value
+		queue_redraw()
 
 var state: GameState
 ## False while the practice bot is thinking, so the player can't move.
@@ -518,17 +524,20 @@ func _origin() -> Vector2:
 	var board_size := Vector2(state.board.width, state.board.height) * _square_size()
 	return (size - board_size) / 2
 
-## Where a square is drawn. White's side is at the bottom.
+## Where a square is drawn: White's side at the bottom, or Black's if flipped.
 func _square_rect(square: Vector2i) -> Rect2:
 	var s := _square_size()
-	var row := state.board.height - 1 - square.y
-	return Rect2(_origin() + Vector2(square.x * s, row * s), Vector2(s, s))
+	var column := state.board.width - 1 - square.x if flipped else square.x
+	var row := square.y if flipped else state.board.height - 1 - square.y
+	return Rect2(_origin() + Vector2(column * s, row * s), Vector2(s, s))
 
 func _square_at(pos: Vector2) -> Vector2i:
 	if state == null or _square_size() <= 0:
 		return Board.NO_SQUARE
 	var cell := ((pos - _origin()) / _square_size()).floor()
 	var square := Vector2i(int(cell.x), state.board.height - 1 - int(cell.y))
+	if flipped:
+		square = Vector2i(state.board.width - 1 - int(cell.x), int(cell.y))
 	return square if state.board.in_bounds(square) else Board.NO_SQUARE
 
 func _royal_squares(team: Piece.Team) -> Array[Vector2i]:

@@ -276,3 +276,12 @@ func test_menu_offers_the_online_game_again() -> void:
 func get_tree_frames(count: int) -> void:
 	for i in count:
 		await (Engine.get_main_loop() as SceneTree).process_frame
+
+func test_your_army_is_at_the_bottom() -> void:
+	var pair: Array = await _started_game()
+	var host_screen := _game_screen(pair[0])
+	var guest_screen := _game_screen(pair[1])
+	check(not host_screen.board_view.flipped, "White (host): White at the bottom")
+	check(guest_screen.board_view.flipped, "Black (guest): Black at the bottom")
+	host_screen.free()
+	guest_screen.free()
