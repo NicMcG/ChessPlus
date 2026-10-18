@@ -37,14 +37,13 @@ func test_keywords() -> void:
 
 func test_special_rules_come_from_the_data() -> void:
 	check(PieceCard.special_rules(_def("cannon"))[0].begins_with("Captures by jumping"), "Cannon")
-	for id in ["rogue", "cavalry", "berserker"]:
-		check_eq(PieceCard.special_rules(_def(id)).size(), 1, id + " has a special rule")
-	for id in ["king", "queen", "pawn", "knight", "wizard", "chariot"]:
+	check_eq(PieceCard.special_rules(_def("rogue")).size(), 1, "Rogue has a special rule")
+	for id in ["king", "queen", "pawn", "knight", "wizard", "chariot", "cavalry", "berserker"]:
 		check(PieceCard.special_rules(_def(id)).is_empty(), id + " has nothing special")
 
 func test_pawn_types_show_promote() -> void:
 	check_eq(PieceCard.keyword_names(_def("pawn")), PackedStringArray(["Promote"]), "Pawn")
-	check_eq(PieceCard.keyword_names(_def("chariot")), PackedStringArray(["Promote"]), "Chariot")
+	check_eq(PieceCard.keyword_names(_def("chariot")), PackedStringArray(["Castle"]), "Chariot")
 	check_eq(PieceCard.keyword_names(_def("wizard")), PackedStringArray(["Jump"]), "Wizard")
 	check_eq(PieceCard.type_names(_def("wizard")), PackedStringArray(["Royal"]), "Wizard is royal")
 

@@ -21,5 +21,4 @@ display_name = "Rogue"
 symbol = "RO"
 value = 3.5
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
-keywords = 1
-special_rule = "Its jumps go over one of your own pieces next to it, landing on the square just beyond (capturing an enemy there). It can't jump over enemy pieces or empty squares."
+special_rule = "Can jump over one of your own pieces next to it, landing on the square just behind that piece in the same direction (capturing an enemy there)."
