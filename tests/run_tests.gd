@@ -53,7 +53,8 @@ func _run_all() -> void:
 			var suite: TestSuite = script.new()
 			var start := Time.get_ticks_msec()
 			var errors_before := _errors.count
-			suite.call(test_name)
+			# Tests may wait (await); others just return straight away.
+			await suite.call(test_name)
 			var ms := Time.get_ticks_msec() - start
 			var new_errors := _errors.count - errors_before
 			if new_errors > 0:
