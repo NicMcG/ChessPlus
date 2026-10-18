@@ -18,6 +18,7 @@ func _ready() -> void:
 	SystemFonts.install()
 	fit_window_to_screen()
 	show_main_menu()
+	_watch_for_updates()
 	if OS.has_feature("web") and "selftest=1" in str(JavaScriptBridge.eval("location.search")):
 		_online_self_test()
 
@@ -97,6 +98,24 @@ func show_main_menu() -> void:
 	menu.continue_online_pressed.connect(continue_online_game)
 	menu.armies_pressed.connect(show_army_list)
 	_show(menu)
+	_update_if_ready()
+
+## The web version keeps a copy of the game on the phone (so it starts fast and
+## works offline) and only notices a new version in the background. Without
+## this, the home-screen app and Safari could each keep running an old copy.
+## Ask the browser to look for a new version now; when one has downloaded, it
+## is switched to (the page reloads) the next time the main menu is showing,
+## so nobody is thrown out of a game.
+func _watch_for_updates() -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.pwa_update_available.connect(_update_if_ready)
+	JavaScriptBridge.eval("navigator.serviceWorker && navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); })")
+	_update_if_ready()
+
+func _update_if_ready() -> void:
+	if OS.has_feature("web") and screen != null and screen.scene_file_path == MAIN_MENU.resource_path and JavaScriptBridge.pwa_needs_update():
+		JavaScriptBridge.pwa_update()
 
 func show_army_list() -> void:
 	var army_list := ARMY_LIST.instantiate()
