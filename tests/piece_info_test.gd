@@ -74,7 +74,7 @@ func test_types_italic_keywords_capitals_and_explanations() -> void:
 	var king_label: Label = details.get_child(2)
 	check_eq(king_label.text, "King,", "First type")
 	var type_font := king_label.get_theme_font("font")
-	check(type_font is SystemFont and type_font.font_italic, "Types use a real italic font")
+	check(type_font is FontVariation and type_font.base_font == PieceCard.ITALIC_FONT, "Types use the italic font")
 	card.show_tooltip(king_label, "King")
 	check(card.tooltip.visible, "Explanation shown")
 	check(card.tooltip.get_child(0).text.begins_with("Your most important piece"), "King explained")
