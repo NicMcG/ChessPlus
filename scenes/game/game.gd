@@ -6,6 +6,8 @@ extends Control
 
 ## Pressed "Menu". Only shown if something is listening (the main scene).
 signal menu_requested
+## Online: both players are in the rematch; the main scene opens it.
+signal rematch_ready(session: OnlineSession)
 
 ## If set, games start from this FEN position instead of the standard one. Any
 ## piece in res://data/pieces/ can appear in it (e.g. "E"/"e" for elephants).
@@ -46,6 +48,22 @@ var _resign_tapped_ms := -1
 ## True while this player's move is on its way to the server.
 var _sending := false
 var _claiming_timeout := false
+## The result screen shown when a game ends.
+var game_over_panel: GameOverPanel
+## Saved armies, for choosing one for a rematch.
+var library: ArmyLibrary
+## Online extras: chat, draw offers, rematches.
+var chat_panel: ChatPanel
+var chat_button: Button
+var draw_button: Button
+## "Your opponent offers a draw" with Accept / Decline.
+var offer_bar: HBoxContainer
+## Was the game over at the last update (so the result shows once)?
+var _was_over := false
+## Chat messages already read.
+var _chat_seen := 0
+## The rematch this player set up (its code), if any.
+var _my_rematch_code := ""
 var sounds: GameSounds
 
 @onready var board_view: BoardView = %BoardView
@@ -92,6 +110,12 @@ func _ready() -> void:
 	clock_label.hide()
 	_layout.add_child(clock_label)
 	_layout.move_child(clock_label, status_label.get_index() + 1)
+	_build_offer_bar()
+	game_over_panel = GameOverPanel.new()
+	game_over_panel.chosen.connect(_on_game_over_action)
+	add_child(game_over_panel)
+	if library == null:
+		library = ArmyLibrary.new()
 	_bot_timer = Timer.new()
 	_bot_timer.one_shot = true
 	add_child(_bot_timer)
@@ -205,9 +229,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_area], _wide_box)
 		_wide_box.move_child(_board_area, 0)
-		ScreenShape.move_to([status_label, clock_label, _moves_scroll, ability_button, play_from_here_button, _buttons], _side)
+		ScreenShape.move_to([status_label, clock_label, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _board_area, _moves_scroll, ability_button, play_from_here_button, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _board_area, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -430,6 +454,254 @@ func _update_text() -> void:
 	undo_button.disabled = not _can_undo()
 	play_from_here_button.visible = is_bot_game() and viewing >= 0
 	play_from_here_button.disabled = bot_thinking
+	if online:
+		_update_online_controls()
+	_update_game_over()
+
+# --- The result screen ----------------------------------------------------------
+
+func is_over() -> bool:
+	if state.outcome() != GameState.Outcome.NONE:
+		return true
+	return online != null and online.status() in [OnlineSession.FINISHED, OnlineSession.CANCELLED]
+
+## Show the result once, when the game ends; hide it if the game is back on
+## (e.g. the last move was undone).
+func _update_game_over() -> void:
+	var over := is_over()
+	if over and not _was_over and viewing < 0:
+		show_game_over()
+	elif not over:
+		game_over_panel.hide()
+	_was_over = over
+
+func show_game_over() -> void:
+	var texts := result_texts()
+	var buttons := []
+	if online:
+		buttons.append(["rematch", "Rematch"])
+	elif is_bot_game():
+		buttons.append(["again", "Play again"])
+	else:
+		buttons.append(["again", "New game"])
+	buttons.append(["board", "View board"])
+	if menu_button.visible:
+		buttons.append(["menu", "Menu"])
+	game_over_panel.show_result(texts[0], texts[1], buttons)
+	if online and _opponent_wants_rematch():
+		_show_rematch_offer()
+
+## The headline and the line under it, e.g. ["Checkmate!", "You win!"].
+func result_texts() -> Array:
+	var me := _my_team()
+	if online:
+		var code := online.result_code()
+		if online.status() == OnlineSession.CANCELLED:
+			return ["Game cancelled", ""]
+		if code == "draw_agreed":
+			return ["Draw", "Agreed by both players"]
+		if code.ends_with("_resigned") or code.ends_with("_timeout"):
+			var loser := Piece.Team.WHITE if code.begins_with("white") else Piece.Team.BLACK
+			var you_lost := loser == me
+			if code.ends_with("_resigned"):
+				return ["You resigned" if you_lost else "Your opponent resigned", "You lose" if you_lost else "You win!"]
+			return ["Out of time", "You ran out of time" if you_lost else "Your opponent ran out of time - you win!"]
+	match state.outcome():
+		GameState.Outcome.CHECKMATE:
+			# The side to move has been checkmated.
+			var winner := Piece.other_team(state.side_to_move)
+			if me == -1:
+				return ["Checkmate!", "%s wins" % ("White" if winner == Piece.Team.WHITE else "Black")]
+			if winner == me:
+				return ["Checkmate!", "You win!"]
+			return ["Checkmate!", "The bot wins" if is_bot_game() else "You lose"]
+		GameState.Outcome.STALEMATE:
+			return ["Draw", "Stalemate: no legal moves, but not in check"]
+		GameState.Outcome.FIFTY_MOVES:
+			return ["Draw", "50 moves each without a capture or pawn move"]
+		GameState.Outcome.REPETITION:
+			return ["Draw", "The same position three times"]
+		GameState.Outcome.INSUFFICIENT_MATERIAL:
+			return ["Draw", "Checkmate is impossible"]
+	return ["Game over", ""]
+
+## This player's side: online or against the bot. -1 for two players on one device.
+func _my_team() -> int:
+	if online:
+		return online.my_team
+	if is_bot_game():
+		return Piece.other_team(bot_team)
+	return -1
+
+func _on_game_over_action(action: String) -> void:
+	match action:
+		"again":
+			new_game()
+		"board":
+			game_over_panel.hide()
+		"menu":
+			menu_requested.emit()
+		"rematch":
+			start_rematch()
+
+# --- Online extras: draw offers, chat, rematch ------------------------------------
+
+func _build_offer_bar() -> void:
+	offer_bar = HBoxContainer.new()
+	offer_bar.add_theme_constant_override("separation", 10)
+	offer_bar.hide()
+	var label := Label.new()
+	label.name = "Text"
+	label.text = "Your opponent offers a draw"
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	offer_bar.add_child(label)
+	for entry in [["Accept", true], ["Decline", false]]:
+		var button := Button.new()
+		button.name = entry[0]
+		button.text = entry[0]
+		button.custom_minimum_size = Vector2(150, 70)
+		var accept: bool = entry[1]
+		button.pressed.connect(func() -> void: answer_draw(accept))
+		offer_bar.add_child(button)
+	_layout.add_child(offer_bar)
+	_layout.move_child(offer_bar, _buttons.get_index())
+
+## The extra buttons and chat window, for online games.
+func _build_online_extras() -> void:
+	chat_button = Button.new()
+	chat_button.text = "Chat"
+	chat_button.custom_minimum_size = Vector2(0, 80)
+	chat_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chat_button.pressed.connect(open_chat)
+	_buttons.add_child(chat_button)
+	_buttons.move_child(chat_button, new_game_button.get_index())
+	draw_button = Button.new()
+	draw_button.text = "Draw"
+	draw_button.custom_minimum_size = Vector2(0, 80)
+	draw_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	draw_button.pressed.connect(offer_draw)
+	_buttons.add_child(draw_button)
+	_buttons.move_child(draw_button, new_game_button.get_index())
+	chat_panel = ChatPanel.new()
+	chat_panel.send_requested.connect(send_chat)
+	add_child(chat_panel)
+
+func _update_online_controls() -> void:
+	var playing := online.status() == OnlineSession.PLAYING
+	var theirs := OnlineSession.team_key(Piece.other_team(online.my_team))
+	draw_button.visible = playing
+	draw_button.disabled = online.draw_offer() != "" or _sending
+	draw_button.text = "Draw offered" if online.draw_offer() == OnlineSession.team_key(online.my_team) else "Draw"
+	offer_bar.visible = playing and online.draw_offer() == theirs
+	new_game_button.text = "Results" if is_over() else "Resign"
+	var unread := online.chat().size() - _chat_seen
+	chat_button.text = "Chat (%d)" % unread if unread > 0 else "Chat"
+	if chat_panel.visible:
+		_refresh_chat()
+
+func offer_draw() -> void:
+	if online == null or online.status() != OnlineSession.PLAYING or online.draw_offer() != "":
+		return
+	draw_button.disabled = true
+	await online.offer_draw()
+	_after_online_change()
+
+func answer_draw(accept: bool) -> void:
+	await online.answer_draw(accept)
+	_after_online_change()
+
+func open_chat() -> void:
+	_refresh_chat()
+	chat_panel.show()
+	_update_online_controls()
+
+func send_chat(text: String) -> void:
+	await online.post_chat(text)
+	_refresh_chat()
+	_update_online_controls()
+
+func _refresh_chat() -> void:
+	_chat_seen = online.chat().size()
+	chat_panel.show_messages(online.chat(), OnlineSession.team_key(online.my_team))
+
+func _opponent_wants_rematch() -> bool:
+	return online.rematch_code() != "" and online.rematch_code() != _my_rematch_code
+
+func _show_rematch_offer() -> void:
+	if not game_over_panel.visible:
+		show_game_over()
+		return
+	game_over_panel.set_note("Your opponent wants a rematch!")
+	var button := game_over_panel.button("rematch")
+	if button:
+		button.text = "Accept rematch"
+
+## Rematch: choose an army, then either accept the opponent's rematch or set
+## one up (colours swapped, same time limit) and wait for them.
+func start_rematch() -> void:
+	var picker := ArmyPicker.new(library, "Your army for the rematch")
+	picker.chosen.connect(_rematch_with)
+	add_child(picker)
+
+func _rematch_with(army: Army) -> void:
+	var button := game_over_panel.button("rematch")
+	if button:
+		button.disabled = true
+	if _opponent_wants_rematch():
+		await _join_rematch(online.rematch_code(), army)
+		return
+	game_over_panel.set_note("Setting up the rematch...")
+	var next := _new_session()
+	var side := OnlineSession.SIDE_BLACK if online.my_team == Piece.Team.WHITE else OnlineSession.SIDE_WHITE
+	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)))
+	if not created.ok:
+		_rematch_failed(next, "Couldn't set up a rematch: " + created.error)
+		return
+	var claimed := await online.claim_rematch(next.code)
+	if claimed.ok and not claimed.rows.is_empty():
+		_my_rematch_code = next.code
+		game_over_panel.set_note("Waiting for your opponent to accept the rematch...")
+		next.changed.connect(func(_row: Dictionary) -> void:
+			if next.status() == OnlineSession.PLAYING:
+				_go_to_rematch(next))
+		next.start_polling()
+		return
+	# The opponent set one up at the same moment: join theirs instead.
+	await next.cancel()
+	next.queue_free()
+	await online.poll()
+	if online.rematch_code() != "":
+		await _join_rematch(online.rematch_code(), army)
+	else:
+		_rematch_failed(null, "Couldn't set up a rematch.")
+
+func _join_rematch(rematch_code: String, army: Army) -> void:
+	game_over_panel.set_note("Joining the rematch...")
+	var next := _new_session()
+	var joined := await next.join_game(rematch_code, army)
+	if not joined.ok:
+		_rematch_failed(next, joined.error)
+		return
+	_go_to_rematch(next)
+
+func _new_session() -> OnlineSession:
+	var next := OnlineSession.new(online.backend.duplicate(), online.player_id)
+	next.poll_seconds = online.poll_seconds
+	add_child(next)
+	return next
+
+func _rematch_failed(next: OnlineSession, message: String) -> void:
+	if next:
+		next.queue_free()
+	game_over_panel.set_note(message)
+	var button := game_over_panel.button("rematch")
+	if button:
+		button.disabled = false
+
+func _go_to_rematch(next: OnlineSession) -> void:
+	next.stop_polling()
+	rematch_ready.emit(next)
 
 # --- Online games ---------------------------------------------------------------
 
@@ -448,6 +720,7 @@ func _start_online() -> void:
 	new_game_button.pressed.disconnect(new_game)
 	new_game_button.pressed.connect(resign)
 	clock_label.visible = online.timed()
+	_build_online_extras()
 	online.changed.connect(_on_online_changed)
 	online.start_polling()
 	UserSettings.set_online_game(online.code if online.status() == OnlineSession.PLAYING else "")
@@ -490,15 +763,23 @@ func _on_online_changed(_row: Dictionary) -> void:
 	_after_online_change()
 
 func _after_online_change() -> void:
+	# Keep checking the server after the game ends too, for rematch offers.
 	if online.status() != OnlineSession.PLAYING:
-		online.stop_polling()
 		UserSettings.set_online_game("")
 	_update_text()
 	_update_input()
+	if is_over() and _opponent_wants_rematch():
+		_show_rematch_offer()
 
 ## Resign this online game (the first tap asks for a second one).
 func resign() -> void:
-	if online == null or online.status() != OnlineSession.PLAYING:
+	if online == null:
+		return
+	# After the game, this button shows the result screen again.
+	if is_over():
+		show_game_over()
+		return
+	if online.status() != OnlineSession.PLAYING:
 		return
 	var now := Time.get_ticks_msec()
 	if _resign_tapped_ms < 0 or now - _resign_tapped_ms > 3000:
