@@ -17,6 +17,17 @@ var screen: Node
 func _ready() -> void:
 	fit_window_to_screen()
 	show_main_menu()
+	if OS.has_feature("web") and "selftest=1" in str(JavaScriptBridge.eval("location.search")):
+		_online_self_test()
+
+## Opened with ?selftest=1 (web only): check the online server can be reached
+## from this browser, and print the answer to the browser's console.
+func _online_self_test() -> void:
+	var backend := SupabaseBackend.new()
+	add_child(backend)
+	var result := await backend.fetch("SELFTEST")
+	print("ONLINE SELF-TEST: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
+	backend.queue_free()
 
 ## On a computer (not a phone), draw the game at the screen's own pixel size
 ## instead of shrinking the phone-sized layout to fit: text and pictures come
