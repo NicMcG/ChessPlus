@@ -440,6 +440,8 @@ func _draw() -> void:
 		var from_rect := _square_rect(_slides[piece][0])
 		var to_rect := _square_rect(_slides[piece][1])
 		_draw_piece(piece, Rect2(from_rect.position.lerp(to_rect.position, progress), to_rect.size))
+	# On top of the pieces, so a piece on an edge square doesn't hide its label.
+	_draw_coordinates()
 	for move in _selected_moves:
 		_draw_target(move)
 	for arrow: Array in arrows:
@@ -470,6 +472,43 @@ func _draw_arrow(from: Vector2, to: Vector2) -> void:
 		neck - side * head, neck - side * shaft, start - side * shaft,
 	])
 	draw_colored_polygon(points, ARROW_COLOR)
+
+## The squares along the bottom and left edges as they're shown, with the text
+## each gets: [square, "a"] for the file letters along the bottom row, [square,
+## "1"] for the rank numbers up the left column. They follow the flip.
+func edge_labels() -> Array:
+	var board := state.board
+	var bottom_rank := board.height - 1 if flipped else 0
+	var left_file := board.width - 1 if flipped else 0
+	var labels := []
+	for file in range(board.width):
+		labels.append([Vector2i(file, bottom_rank), Board.FILE_LETTERS[file]])
+	for rank in range(board.height):
+		labels.append([Vector2i(left_file, rank), str(rank + 1)])
+	return labels
+
+## Draw the file letters (bottom-right of the bottom row's squares) and rank
+## numbers (top-left of the left column's), each in the other square colour,
+## over the pieces.
+func _draw_coordinates() -> void:
+	var s := _square_size()
+	var font_size := int(s * 0.24)
+	if font_size < 6:
+		return
+	var font := ThemeDB.fallback_font
+	for label: Array in edge_labels():
+		var square: Vector2i = label[0]
+		var text: String = label[1]
+		var rect := _square_rect(square)
+		var light := (square.x + square.y) % 2 == 1
+		var color := DARK_SQUARE if light else LIGHT_SQUARE
+		if text.is_valid_int():
+			var top_left := rect.position + Vector2(s * 0.06, s * 0.06 + font_size * 0.8)
+			draw_string(font, top_left, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+		else:
+			var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			var bottom_right := rect.end - Vector2(width + s * 0.06, s * 0.07)
+			draw_string(font, bottom_right, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 ## Starts fast and slows down as it arrives.
 static func _ease(t: float) -> float:

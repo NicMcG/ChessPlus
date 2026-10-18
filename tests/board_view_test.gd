@@ -257,3 +257,15 @@ func test_taps_and_drags_follow_the_flip() -> void:
 	if chosen.size() == 1:
 		check_eq(chosen[0].to_text(), "e7-e5", "The right squares")
 	view.free()
+
+func test_coordinates_follow_the_flip() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	var letters := view.edge_labels().filter(func(l: Array) -> bool: return not (l[1] as String).is_valid_int())
+	check_eq(letters.map(func(l: Array) -> String: return l[1]), ["a", "b", "c", "d", "e", "f", "g", "h"], "Files a to h")
+	check(letters.all(func(l: Array) -> bool: return l[0].y == 0), "Along White's back rank")
+	view.flipped = true
+	letters = view.edge_labels().filter(func(l: Array) -> bool: return not (l[1] as String).is_valid_int())
+	check(letters.all(func(l: Array) -> bool: return l[0].y == 7), "Flipped: along Black's back rank")
+	var numbers := view.edge_labels().filter(func(l: Array) -> bool: return (l[1] as String).is_valid_int())
+	check(numbers.all(func(l: Array) -> bool: return l[0].x == 7), "Flipped: numbers down the h-file side")
+	view.free()
