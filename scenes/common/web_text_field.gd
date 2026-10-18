@@ -22,8 +22,7 @@ func _ready() -> void:
 		WebOverlay.set_attribute(_id, "maxLength", edit.max_length)
 	_text = edit.text
 	WebOverlay.set_value(_id, _text)
-	for color in ["font_color", "font_placeholder_color", "caret_color", "font_selected_color"]:
-		edit.add_theme_color_override(color, Color(0, 0, 0, 0))
+	_show_own_text(false)
 	edit.focus_mode = Control.FOCUS_NONE
 
 func _process(_delta: float) -> void:
@@ -44,8 +43,21 @@ func _exit_tree() -> void:
 		WebOverlay.remove(_id)
 		_id = ""
 
+## The LineEdit's own text is hidden (the web box on top shows it), except while
+## the player is typing: then the web box is docked above the keyboard and the
+## game's box shows the text too, in case the docked box is out of sight.
+func _show_own_text(show: bool) -> void:
+	for color in ["font_color", "font_placeholder_color", "caret_color", "font_selected_color"]:
+		if show:
+			edit.remove_theme_color_override(color)
+		else:
+			edit.add_theme_color_override(color, Color(0, 0, 0, 0))
+
 func _on_page_event(kind: String, value: String) -> void:
 	if not is_instance_valid(edit):
+		return
+	if kind == "focus" or kind == "blur":
+		_show_own_text(kind == "focus")
 		return
 	if edit.max_length > 0:
 		value = value.left(edit.max_length)
