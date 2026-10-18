@@ -10,9 +10,13 @@ var piece: Piece
 var captured: Piece
 ## Where the captured piece stands. The same as `to`, except for en passant.
 var capture_square: Vector2i
+## An empty list that moves share until they need a list of their own (making a
+## new empty list for every move is surprisingly slow). Never add to it.
+const NO_SQUARES: Array[Vector2i] = []
+
 ## Squares this move skips over that the opponent may capture onto en passant
 ## next turn. Only set for multi-step moves by pawn-type pieces.
-var skipped_squares: Array[Vector2i] = []
+var skipped_squares: Array[Vector2i] = NO_SQUARES
 ## For a move that breaks a Shield: the shielded piece. The attacker stays on
 ## `from` and the shielded piece stays on `to`; only the shield is lost.
 var shield_target: Piece
@@ -30,7 +34,7 @@ var prev_halfmove_clock: int
 ## replayed, so later moves that refer to it still find the same piece.
 var promoted_piece: Piece
 var partner_had_moved: bool
-var prev_en_passant_squares: Array[Vector2i]
+var prev_en_passant_squares: Array[Vector2i] = NO_SQUARES
 var prev_en_passant_victim: Vector2i
 
 func _init(p_from: Vector2i, p_to: Vector2i, p_piece: Piece, p_captured: Piece = null) -> void:

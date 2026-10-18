@@ -10,7 +10,7 @@ static func legal_moves(state: GameState) -> Array[Move]:
 	var board := state.board
 	var team := state.side_to_move
 	var enemy := Piece.other_team(team)
-	var enemy_defs := _defs_on_board(board, enemy)
+	var table := state.attack_table(enemy)
 	var royals := _royal_squares(board, team)
 	var legal: Array[Move] = []
 	for move in pseudo_legal_moves(state):
@@ -18,7 +18,7 @@ static func legal_moves(state: GameState) -> Array[Move]:
 		var safe := true
 		for square in royals:
 			var now_at := move.lands_on() if square == move.from else square
-			if _is_attacked_by(board, now_at, enemy, enemy_defs):
+			if attacked_with(board, now_at, enemy, table):
 				safe = false
 				break
 		state.undo_move(move)
@@ -27,21 +27,30 @@ static func legal_moves(state: GameState) -> Array[Move]:
 	return legal
 
 ## Every move the side to move's pieces can make by their movement rules,
-## without checking whether it leaves their royal piece attacked.
-static func pseudo_legal_moves(state: GameState) -> Array[Move]:
+## without checking whether it leaves their royal piece attacked. With
+## `captures_only`, just the captures (and shield breaks): the practice bot uses
+## that to look at captures without paying for every quiet move too.
+static func pseudo_legal_moves(state: GameState, captures_only := false) -> Array[Move]:
 	var board := state.board
 	var moves: Array[Move] = []
-	for rank in range(board.height):
-		for file in range(board.width):
-			var from := Vector2i(file, rank)
-			var piece := board.get_piece(from)
-			if piece == null or piece.team != state.side_to_move:
-				continue
-			for rule in piece.def.move_rules:
-				_add_rule_moves(state, from, piece, rule, moves)
-			if piece.def.is_king_type() and not piece.has_moved:
-				_add_castling_moves(board, state.rules, from, piece, moves)
+	var pieces := board.pieces_of(state.side_to_move)
+	for from: Vector2i in pieces:
+		var piece: Piece = pieces[from]
+		for rule in piece.def.move_rules:
+			_add_rule_moves(state, from, piece, rule, moves, captures_only)
+		if not captures_only and piece.def.is_king_type() and not piece.has_moved:
+			_add_castling_moves(board, state.rules, from, piece, moves)
 	return moves
+
+## True if any of `team`'s royal pieces is attacked, using the game's saved
+## attack table (faster than is_in_check, which works it out from the board).
+static func in_check(state: GameState, team: Piece.Team) -> bool:
+	var enemy := Piece.other_team(team)
+	var table := state.attack_table(enemy)
+	for square in _royal_squares(state.board, team):
+		if attacked_with(state.board, square, enemy, table):
+			return true
+	return false
 
 ## True if any of `team`'s royal pieces is attacked.
 static func is_in_check(board: Board, team: Piece.Team) -> bool:
@@ -56,66 +65,97 @@ static func is_in_check(board: Board, team: Piece.Team) -> bool:
 static func is_attacked(board: Board, square: Vector2i, by_team: Piece.Team) -> bool:
 	return _is_attacked_by(board, square, by_team, _defs_on_board(board, by_team))
 
-## The same, for callers that already know which piece types `by_team` has on
-## the board (`defs`), which saves scanning the board again.
-static func is_attacked_by_defs(board: Board, square: Vector2i, by_team: Piece.Team, defs: Array[PieceDef]) -> bool:
-	return _is_attacked_by(board, square, by_team, defs)
-
-## Works backwards from the square: for each kind of attacking piece, walk each of
-## its capture directions in reverse. If the first piece met is that kind of piece,
-## on the attacking team, and close enough for its step limit, it attacks the square.
-## For a hopping rule, the first piece met is the screen, so look one piece further.
 static func _is_attacked_by(board: Board, square: Vector2i, by_team: Piece.Team, defs: Array[PieceDef]) -> bool:
-	var board_size := maxi(board.width, board.height)
+	return attacked_with(board, square, by_team, attack_table(by_team, defs))
+
+## The lines `by_team`'s piece types (`defs`) can capture along, grouped by
+## direction so each line only has to be walked once. Each entry is
+## [step, farthest reach, [[piece type, rule], ...], any hopping rule?].
+## Build it once and reuse it (GameState.attack_table does).
+static func attack_table(by_team: Piece.Team, defs: Array[PieceDef]) -> Array:
+	var by_step := {}
 	for def in defs:
 		for rule in def.move_rules:
 			if rule.mode == MoveRule.Mode.MOVE_ONLY:
 				continue
-			# The farthest this rule could ever reach, moved or not.
-			var reach := board_size if rule.max_steps == 0 else rule.max_steps
-			reach = maxi(reach, rule.first_move_max_steps)
+			var reach := UNLIMITED if rule.max_steps == 0 else maxi(rule.max_steps, rule.first_move_max_steps)
 			for dir in rule.directions:
 				var step := _orient(dir, by_team)
-				var pos := square
-				var screen_found := false
-				for distance in range(1, reach + 1):
-					pos -= step
-					if not board.in_bounds(pos):
-						break
-					var piece := board.get_piece(pos)
-					if piece == null:
-						continue
-					if rule.captures_by_hopping and not screen_found:
-						screen_found = true
-						continue
-					if piece.def == def and piece.team == by_team and distance <= _step_limit(rule, piece, board):
+				if not by_step.has(step):
+					by_step[step] = [step, 0, [], false]
+				var entry: Array = by_step[step]
+				entry[1] = maxi(entry[1], reach)
+				entry[2].append([def, rule])
+				if rule.captures_by_hopping:
+					entry[3] = true
+	return by_step.values()
+
+## Further than any board is wide: "slides until blocked".
+const UNLIMITED := 1000
+
+## True if a piece of `by_team` could capture on `square`. Works backwards from
+## the square: walk each line in `table` (from attack_table) and look at the
+## first piece met. If it's an attacking piece type for that line, on the right
+## team and close enough for its step limit, the square is attacked. For a
+## hopping rule the first piece met is the screen, so look one piece further.
+static func attacked_with(board: Board, square: Vector2i, by_team: Piece.Team, table: Array) -> bool:
+	for entry: Array in table:
+		var step: Vector2i = entry[0]
+		var reach: int = entry[1]
+		var attackers: Array = entry[2]
+		var has_hop: bool = entry[3]
+		var pos := square
+		var screens := 0
+		for distance in range(1, reach + 1):
+			pos -= step
+			if not board.in_bounds(pos):
+				break
+			var piece := board.get_piece(pos)
+			if piece == null:
+				continue
+			if piece.team == by_team:
+				for attacker: Array in attackers:
+					var rule: MoveRule = attacker[1]
+					if piece.def == attacker[0] and rule.captures_by_hopping == (screens == 1) \
+							and distance <= _step_limit(rule, piece, board):
 						return true
-					break
+			screens += 1
+			if screens > 1 or not has_hop:
+				break
 	return false
 
 ## Walks each direction of one rule, one step at a time, adding moves as it goes.
-static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule: MoveRule, moves: Array[Move]) -> void:
+static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule: MoveRule, moves: Array[Move], captures_only := false) -> void:
 	var board := state.board
 	var limit := _step_limit(rule, piece, board)
+	# Worked out once per rule rather than on every square.
+	var pawn_like := piece.def.is_pawn_type()
+	var can_en_passant := pawn_like and rule.mode != MoveRule.Mode.MOVE_ONLY and not state.en_passant_squares.is_empty()
+	var quiet_moves := rule.mode != MoveRule.Mode.CAPTURE_ONLY and not captures_only
 	for dir in rule.directions:
 		var step := _orient(dir, piece.team)
 		var to := from
-		var passed: Array[Vector2i] = []  # Empty squares walked over so far.
+		# Empty squares walked over so far (only pawn-like pieces need them, for
+		# en passant).
+		var passed: Array[Vector2i] = Move.NO_SQUARES
+		if pawn_like:
+			passed = []
 		for i in range(limit):
 			to += step
 			if not board.in_bounds(to):
 				break
 			var target := board.get_piece(to)
 			if target == null:
-				var en_passant := _en_passant_capture(state, from, to, piece, rule)
+				var en_passant: Move = _en_passant_capture(state, from, to, piece, rule) if can_en_passant else null
 				if en_passant:
 					_append(state, en_passant, moves)
-				elif rule.mode != MoveRule.Mode.CAPTURE_ONLY:
+				elif quiet_moves:
 					var move := Move.new(from, to, piece)
-					if piece.def.is_pawn_type():
+					if not passed.is_empty():
 						move.skipped_squares = passed.duplicate()
 					_append(state, move, moves)
-				passed.append(to)
+				if pawn_like:
+					passed.append(to)
 				continue
 			# Something is in the way. A hopping rule jumps it to look for a capture;
 			# otherwise capture it if it's an enemy and the rule allows. Stop either way.
@@ -249,18 +289,15 @@ static func _orient(dir: Vector2i, team: Piece.Team) -> Vector2i:
 ## Each kind of piece the team has on the board, listed once.
 static func _defs_on_board(board: Board, team: Piece.Team) -> Array[PieceDef]:
 	var defs: Array[PieceDef] = []
-	for rank in range(board.height):
-		for file in range(board.width):
-			var piece := board.get_piece(Vector2i(file, rank))
-			if piece and piece.team == team and not defs.has(piece.def):
-				defs.append(piece.def)
+	for piece: Piece in board.pieces_of(team).values():
+		if not defs.has(piece.def):
+			defs.append(piece.def)
 	return defs
 
 static func _royal_squares(board: Board, team: Piece.Team) -> Array[Vector2i]:
 	var squares: Array[Vector2i] = []
-	for rank in range(board.height):
-		for file in range(board.width):
-			var piece := board.get_piece(Vector2i(file, rank))
-			if piece and piece.team == team and piece.def.is_king_type():
-				squares.append(Vector2i(file, rank))
+	var pieces := board.pieces_of(team)
+	for square: Vector2i in pieces:
+		if pieces[square].def.is_king_type():
+			squares.append(square)
 	return squares
