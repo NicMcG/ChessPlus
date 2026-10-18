@@ -161,7 +161,9 @@ func start_online_game(session: OnlineSession) -> void:
 		session.get_parent().remove_child(session)
 	var game := GAME.instantiate()
 	game.online = session
+	game.library = library
 	game.menu_requested.connect(show_main_menu)
+	game.rematch_ready.connect(start_online_game)
 	_show(game)
 
 ## Pick up the online game this device was playing.
