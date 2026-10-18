@@ -198,3 +198,29 @@ func test_illegal_tap_shakes_the_piece() -> void:
 	view.advance_animation(1.0)
 	check(not view.is_shaking(_square("e2")), "Then stops")
 	view.free()
+
+# --- Arrows (right mouse button) ---------------------------------------------------
+
+func _right_drag(view: BoardView, from: String, to: String) -> void:
+	view.right_down(view.square_center(_square(from)))
+	view.right_up(view.square_center(_square(to)))
+
+func test_right_drag_draws_arrows() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	_right_drag(view, "e2", "e4")
+	_right_drag(view, "g1", "f3")
+	check_eq(view.arrows.size(), 2, "Two arrows")
+	_right_drag(view, "e2", "e4")
+	check_eq(view.arrows.size(), 1, "Drawing the same arrow again removes it")
+	view.right_click(view.square_center(_square("d5")))
+	check_eq(view.arrows.size(), 0, "A right-click clears them")
+	view.free()
+
+func test_a_move_clears_the_arrows() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	_right_drag(view, "e2", "e4")
+	var move := view.state.find_move("e2-e4")
+	view.state.make_move(move)
+	view.show_move(move)
+	check_eq(view.arrows.size(), 0, "Cleared by the move")
+	view.free()
