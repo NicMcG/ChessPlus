@@ -26,7 +26,12 @@ func _online_self_test() -> void:
 	var backend := SupabaseBackend.new()
 	add_child(backend)
 	var result := await backend.fetch("SELFTEST")
-	print("ONLINE SELF-TEST: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
+	print("ONLINE SELF-TEST read: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
+	var code := "T%04d" % (Time.get_ticks_usec() % 10000)
+	result = await backend.insert({"code": code, "status": "cancelled", "result": "", "moves": [], "move_count": 0})
+	print("ONLINE SELF-TEST create: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
+	result = await backend.update(code, {"result": "selftest"}, {"status": "cancelled"})
+	print("ONLINE SELF-TEST update: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
 	backend.queue_free()
 
 ## On a computer (not a phone), draw the game at the screen's own pixel size
