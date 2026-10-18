@@ -45,7 +45,18 @@ func fit_window_to_screen() -> void:
 	# 1.5 on a laptop set to 150%), rather than stretching a 720x1280 layout.
 	window.content_scale_size = Vector2i.ZERO
 	_fit_content_scale()
-	window.size_changed.connect(_fit_content_scale)
+	_fitting_scale = true
+
+## True once the window should keep being fitted (see _process).
+var _fitting_scale := false
+var _fitted_size := Vector2i.ZERO
+
+## Refit whenever the window changes size. Checked every frame rather than
+## trusting a resize signal: a browser's canvas can start at zero size and grow
+## without one.
+func _process(_delta: float) -> void:
+	if _fitting_scale and get_window().size != _fitted_size:
+		_fit_content_scale()
 
 ## The smallest space (in game units) the screens need. A smaller window (a
 ## small browser window, say) is drawn scaled down just enough to fit.
@@ -53,6 +64,9 @@ const MIN_GAME_SIZE := Vector2(720, 900)
 
 func _fit_content_scale() -> void:
 	var window := get_window()
+	_fitted_size = window.size
+	if window.size.x <= 0 or window.size.y <= 0:
+		return
 	var size := Vector2(window.size)
 	var scale := DisplayServer.screen_get_scale(window.current_screen)
 	scale = minf(scale, minf(size.x / MIN_GAME_SIZE.x, size.y / MIN_GAME_SIZE.y))
