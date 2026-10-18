@@ -210,11 +210,17 @@ func _detail_label(text: String) -> Label:
 	label.add_theme_color_override("font_color", Color(0.78, 0.78, 0.78))
 	return label
 
-## The normal font, slanted to look italic.
-func _italic_font() -> FontVariation:
-	var italic := FontVariation.new()
-	italic.base_font = get_theme_default_font()
-	italic.variation_transform = Transform2D(Vector2(1, 0), Vector2(0.22, 1), Vector2.ZERO)
+## A real italic font from the computer (slanting the normal font made the
+## letters jiggle instead). Browsers don't let the game use the computer's fonts,
+## so the web version stays upright until an italic font file is bundled.
+func _italic_font() -> Font:
+	if OS.has_feature("web"):
+		return get_theme_default_font()
+	var italic := SystemFont.new()
+	italic.font_names = PackedStringArray(["Open Sans", "Segoe UI", "Helvetica Neue", "Arial"])
+	italic.font_italic = true
+	italic.font_weight = 600
+	italic.fallbacks = [get_theme_default_font()]
 	return italic
 
 func _fill_legend() -> void:
