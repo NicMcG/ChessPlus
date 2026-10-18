@@ -1,7 +1,8 @@
 extends Control
 
 ## The game screen: connects the board view, the text around it and the buttons
-## to a GameState. Two players share one device for now (pass and play).
+## to a GameState. Either two players share the device (pass and play), or one
+## player plays the practice bot.
 
 ## Pressed "Menu". Only shown if something is listening (the main scene).
 signal menu_requested
@@ -14,6 +15,19 @@ signal menu_requested
 ## played with these armies, and "New game" replays them.
 var white_army: Army
 var black_army: Army
+
+## The bot's side (Piece.Team), or -1 when two people are playing. Set by the
+## main scene, with the bot's level, before the screen opens.
+var bot_team := -1
+var bot_level := PracticeBot.Level.MEDIUM
+## Frames to wait before the bot thinks, so the screen can show the player's move
+## and "Bot is thinking..." first (thinking freezes the screen briefly). Tests use 0.
+var bot_delay_frames := 2
+var bot: PracticeBot
+## True from the moment it's the bot's turn until it has moved.
+var bot_thinking := false
+## Counts bot turns, so a turn that was overtaken (New game, Menu) is dropped.
+var _bot_turn_id := 0
 
 @onready var board_view: BoardView = %BoardView
 @onready var status_label: Label = %Status
@@ -39,6 +53,8 @@ func _ready() -> void:
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
 	promotion_overlay.gui_input.connect(_on_overlay_input)
+	if is_bot_game():
+		bot = PracticeBot.new(bot_level)
 	new_game()
 
 func new_game() -> void:
@@ -49,23 +65,69 @@ func new_game() -> void:
 	else:
 		state = Fen.parse(start_fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
 	promotion_overlay.hide()
+	bot_thinking = false
 	board_view.show_game(state)
 	_update_text()
+	_start_bot_turn_if_needed()
+
+func is_bot_game() -> bool:
+	return bot_team >= 0
 
 ## Make a move (it must be legal) and update everything on screen.
 func play(move: Move) -> void:
 	state.make_move(move)
 	board_view.refresh()
 	_update_text()
+	_start_bot_turn_if_needed()
 
-## Take back the last move (also after the game has ended).
+## Take back the last move (also after the game has ended). Against the bot it
+## takes back the bot's reply too, so it's your turn again.
 func undo() -> void:
-	if state.history.is_empty():
+	if not _can_undo():
 		return
 	state.undo_move(state.history.back())
+	if is_bot_game() and state.side_to_move == bot_team and not state.history.is_empty():
+		state.undo_move(state.history.back())
 	promotion_overlay.hide()
 	board_view.refresh()
 	_update_text()
+	_start_bot_turn_if_needed()
+
+## The bot plays its move now. Normally called by _start_bot_turn_if_needed
+## (after a short wait); tests call it directly.
+func make_bot_move() -> void:
+	var move := bot.choose_move(state)
+	bot_thinking = false
+	board_view.input_enabled = true
+	if move:
+		play(move)
+	else:
+		_update_text()
+
+## If it's the bot's turn: block the board, say it's thinking, then let it move.
+func _start_bot_turn_if_needed() -> void:
+	if not is_bot_game() or state.side_to_move != bot_team or state.outcome() != GameState.Outcome.NONE:
+		board_view.input_enabled = true
+		return
+	board_view.input_enabled = false
+	bot_thinking = true
+	_update_text()
+	_bot_turn_id += 1
+	var turn_id := _bot_turn_id
+	for i in bot_delay_frames:
+		await get_tree().process_frame
+	# Dropped if a new game (or another turn) started while we waited.
+	if turn_id == _bot_turn_id and bot_thinking:
+		make_bot_move()
+
+## Undo is possible if there's a move to take back that you made (against the
+## bot) or any move at all (two players), and the bot isn't thinking.
+func _can_undo() -> bool:
+	if bot_thinking:
+		return false
+	if is_bot_game():
+		return state.history.any(func(m: Move) -> bool: return m.piece.team != bot_team)
+	return not state.history.is_empty()
 
 ## Several moves go between the same two squares: the promotion choices.
 ## Show a button with each new piece's picture.
@@ -94,11 +156,18 @@ func _on_overlay_input(event: InputEvent) -> void:
 func _update_text() -> void:
 	var mover := "White" if state.side_to_move == Piece.Team.WHITE else "Black"
 	var other := "Black" if state.side_to_move == Piece.Team.WHITE else "White"
+	if is_bot_game():
+		var bots_turn := state.side_to_move == bot_team
+		mover = "Bot" if bots_turn else "You"
+		other = "You" if bots_turn else "The bot"
 	match state.outcome():
 		GameState.Outcome.NONE:
-			status_label.text = mover + " to move" + (" - check!" if state.is_in_check() else "")
+			if is_bot_game():
+				status_label.text = "Bot is thinking..." if bot_thinking else "Your move" + (" - check!" if state.is_in_check() else "")
+			else:
+				status_label.text = mover + " to move" + (" - check!" if state.is_in_check() else "")
 		GameState.Outcome.CHECKMATE:
-			status_label.text = "Checkmate! %s wins" % other
+			status_label.text = "Checkmate! %s %s" % [other, "win" if other == "You" else "wins"]
 		GameState.Outcome.STALEMATE:
 			status_label.text = "Draw by stalemate"
 		GameState.Outcome.FIFTY_MOVES:
@@ -110,4 +179,4 @@ func _update_text() -> void:
 	moves_label.text = Notation.move_list(state)
 	if state.history.is_empty():
 		moves_label.text = TIP
-	undo_button.disabled = state.history.is_empty()
+	undo_button.disabled = not _can_undo()

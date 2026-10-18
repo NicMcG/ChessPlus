@@ -167,10 +167,10 @@ func test_match_setup_offers_standard_and_saved() -> void:
 	var setup: Node = load("res://scenes/menu/match_setup.tscn").instantiate()
 	setup.library = library
 	_open(setup)
-	check_eq(setup.white_pick.item_count, 2, "Standard + Mine")
+	check_eq(setup.first_pick.item_count, 2, "Standard + Mine")
 	var started := []
-	setup.start_requested.connect(func(w: Army, b: Army) -> void: started.append([w, b]))
-	setup.black_pick.select(1)
+	setup.start_requested.connect(func(w: Army, b: Army, _bot: int, _level: int) -> void: started.append([w, b]))
+	setup.second_pick.select(1)
 	setup.start()
 	check_eq(started.size(), 1, "Start pressed")
 	if started.size() == 1:
