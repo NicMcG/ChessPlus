@@ -177,3 +177,23 @@ func test_builder_colour_switch() -> void:
 	builder.toggle_team()
 	check_eq(builder.team_button.text, "White", "And back")
 	builder.free()
+
+func test_mouse_hold_does_not_open_a_card() -> void:
+	var view := _view(StandardSetup.create_game())
+	view.pointer_down(view.square_center(Board.parse_square("g1")), false)
+	view.check_long_press(Time.get_ticks_msec() + BoardView.LONG_PRESS_MS + 10)
+	check_eq(infos.size(), 0, "Holding the mouse button opens nothing")
+	view.free()
+
+func test_right_click_opens_the_card() -> void:
+	var view := _view(StandardSetup.create_game())
+	view.tap(Board.parse_square("g1"))
+	view.right_click(view.square_center(Board.parse_square("d8")))
+	check(infos.size() == 1 and infos[0].def.id == "queen", "Queen's card")
+	view.right_click(view.square_center(Board.parse_square("e4")))
+	check_eq(infos.size(), 1, "Empty square: nothing")
+	view.free()
+
+func test_tip_matches_the_device() -> void:
+	check(load("res://scenes/game/game.gd").tip_text(true).contains("hold"), "Phones: hold")
+	check(load("res://scenes/game/game.gd").tip_text(false).contains("right-click"), "PC: right-click")
