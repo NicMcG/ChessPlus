@@ -49,7 +49,7 @@ func fit_window_to_screen() -> void:
 
 ## The smallest space (in game units) the screens need. A smaller window (a
 ## small browser window, say) is drawn scaled down just enough to fit.
-const MIN_GAME_SIZE := Vector2(720, 760)
+const MIN_GAME_SIZE := Vector2(720, 900)
 
 func _fit_content_scale() -> void:
 	var window := get_window()
