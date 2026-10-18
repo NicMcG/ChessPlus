@@ -35,7 +35,8 @@ black_archer = (line(BOW, 6.5, "#000") + line("M 9.5,14.5 C 22,3 41,22 30.5,35",
 # Shortened so the tip stays clear of the top of the square (Mac).
 LANCE = "M 40,41 L 14.5,7.5"
 LANCE_TIP = "M 16,5.5 L 11.5,4 L 12.5,9 Z"
-PENNANT = "M 19,12 L 6.5,12.5 L 11,16 L 6.5,19.5 L 22.5,17.5 Z"
+# Sticks out well behind the horse so it can be seen (Mac).
+PENNANT = "M 16.5,9.5 L 1.5,8.5 L 6,12 L 1.5,15.5 L 19.5,15 Z"
 NECK = "M 22,10 C 32.5,11 38.5,18 38,39 L 15,39 C 15,30 25,32.5 23,18"
 HEAD_PATH = ("M 24,18 C 24.38,20.91 18.45,25.37 16,27 C 13,29 13.18,31.34 11,31 C 9.958,30.06 12.41,27.96 11,28 "
              "C 10,28 11.19,29.23 10,30 C 9,30 5.997,31 6,26 C 6,24 12,14 12,14 C 12,14 13.89,12.1 14,10.5 "
@@ -57,7 +58,7 @@ white_cavalry = (line(LANCE, 4.5, "#000") + line(LANCE, 2, "#fff")
 black_cavalry = (line(LANCE, 4.5, "#000") + line("M 37.5,37.7 L 16.5,10", 0.9, "#fff")
                  + '<path d="%s" fill="#000"/>' % LANCE_TIP
                  + '<path d="%s" fill="#000"/>' % PENNANT
-                 + line("M 18,14.5 L 11.5,14.7", 0.9, "#fff")
+                 + line("M 15.5,12 L 5,11.8", 0.9, "#fff")
                  + mirror(black_horse))
 
 for name, body in {"white_archer": white_archer, "black_archer": black_archer,
