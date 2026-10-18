@@ -271,6 +271,10 @@ func _continue_saved_game(saved: SavedGame) -> void:
 
 ## Show `state` from scratch (after a new game or continuing a saved one).
 func _show_new_state() -> void:
+	# Your own army at the bottom: online, or against the bot. (Two players
+	# sharing a device keep White at the bottom.)
+	var black_player := online.my_team == Piece.Team.BLACK if online else bot_team == Piece.Team.WHITE
+	board_view.flipped = black_player
 	promotion_overlay.hide()
 	bot_thinking = false
 	viewing = -1

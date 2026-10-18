@@ -232,3 +232,28 @@ func test_a_move_clears_the_arrows() -> void:
 	view.show_move(move)
 	check_eq(view.arrows.size(), 0, "Cleared by the move")
 	view.free()
+
+# --- Flipped board (Black at the bottom) -------------------------------------------
+
+func test_flipped_board_puts_black_at_the_bottom() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	var a1 := view.square_center(_square("a1"))
+	var h8 := view.square_center(_square("h8"))
+	check(a1.y > h8.y and a1.x < h8.x, "Normally a1 is bottom-left")
+	view.flipped = true
+	a1 = view.square_center(_square("a1"))
+	h8 = view.square_center(_square("h8"))
+	check(a1.y < h8.y and a1.x > h8.x, "Flipped: a1 is top-right, h8 bottom-left")
+	view.free()
+
+func test_taps_and_drags_follow_the_flip() -> void:
+	var game := StandardSetup.create_game()
+	game.make_move(game.find_move("e2-e4"))
+	var view := _sized_view(game)
+	view.flipped = true
+	# Drag Black's e-pawn as it appears on the flipped board.
+	_drag(view, "e7", "e5")
+	check_eq(chosen.size(), 1, "Moved")
+	if chosen.size() == 1:
+		check_eq(chosen[0].to_text(), "e7-e5", "The right squares")
+	view.free()
