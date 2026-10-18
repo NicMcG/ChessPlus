@@ -41,8 +41,21 @@ const JS := """
 		el.addEventListener('input', function () { if (o.handler) o.handler(id, 'input', el.value); });
 		// While typing, the box sits just above the keyboard (iOS slides the page
 		// around when the keyboard opens, so the box's own spot can end up anywhere).
+		// iPhones scroll the whole page up when a box low on the screen is tapped,
+		// so the keyboard won't cover it. Moving the box to the top of the screen
+		// the moment the finger lands (before the keyboard opens) leaves Safari
+		// nothing to scroll for; once it has focus it docks above the keyboard.
+		el.addEventListener('touchstart', function () {
+			if (o.focused === id) return;
+			o.pre = id;
+			o.dock(id, true);
+			clearTimeout(o.undockTimer);
+			// A tap that didn't end up typing (e.g. a scroll): put it back.
+			o.undockTimer = setTimeout(function () { if (o.pre === id) o.pre = null; if (o.focused !== id) o.replaceAll(); }, 800);
+		}, { passive: true });
 		el.addEventListener('focus', function () {
-			o.focused = id;
+			o.focused = id; o.pre = null;
+			if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
 			if (o.handler) o.handler(id, 'focus', el.value);
 			o.dock();
 			// Keep it above the keyboard while it slides in (and if it changes size).
@@ -73,6 +86,7 @@ const JS := """
 		const el = o.els[id]; if (!el) return;
 		o.spots[id] = [x, y, w, h, fontPx, show, minFont];
 		if (id === o.focused) { o.dock(); return; }
+		if (id === o.pre) return;
 		if (!show) { el.style.display = 'none'; return; }
 		const p = o.toPage(x, y); const s = p[2];
 		Object.assign(el.style, { display: 'block', left: p[0] + 'px', top: p[1] + 'px',
@@ -83,15 +97,19 @@ const JS := """
 	// Positioned on the screen (fixed) from the visible area alone: when the
 	// keyboard opens, iOS both scrolls the page and moves the visible area, and
 	// counting both put the bar under the keyboard.
-	o.dock = function () {
-		const id = o.focused; const el = o.els[id]; if (!el) return;
+	// With atTop, the bar goes at the top of the screen instead (see touchstart).
+	o.dock = function (whichId, atTop) {
+		const id = (typeof whichId === 'string') ? whichId : o.focused; const el = o.els[id]; if (!el) return;
+		// If Safari scrolled the page anyway, put it back so the game stays put.
+		if (o.focused === id && (window.scrollY || window.scrollX)) window.scrollTo(0, 0);
 		const vv = window.visualViewport;
 		const left = vv ? vv.offsetLeft : 0;
 		const width = vv ? vv.width : window.innerWidth;
 		const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
 		const height = 52;
+		const top = atTop ? (vv ? vv.offsetTop : 0) + 10 : bottom - height - 10;
 		Object.assign(el.style, { display: 'block', position: 'fixed', zIndex: 20,
-			left: (left + 10) + 'px', width: (width - 20) + 'px', top: (bottom - height - 10) + 'px', height: height + 'px',
+			left: (left + 10) + 'px', width: (width - 20) + 'px', top: top + 'px', height: height + 'px',
 			fontSize: '18px', background: '#1d1d1f', border: '1px solid #8a8a8a', borderRadius: '12px',
 			boxShadow: '0 2px 12px rgba(0,0,0,0.6)' });
 	};
@@ -116,6 +134,10 @@ const JS := """
 	o.replaceAll = function () {
 		Object.keys(o.spots).forEach(function (id) { o.place.apply(null, [id].concat(o.spots[id])); });
 	};
+	// The game fills the screen: the page itself never needs to scroll.
+	document.documentElement.style.overflow = 'hidden';
+	document.body.style.overflow = 'hidden';
+	document.documentElement.style.overscrollBehavior = 'none';
 	window.addEventListener('resize', o.replaceAll);
 	window.addEventListener('scroll', o.replaceAll);
 	if (window.visualViewport) {

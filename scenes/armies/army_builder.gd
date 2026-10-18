@@ -18,7 +18,7 @@ var _scroll_at_press := 0
 
 ## How big the piece card is drawn (see PieceCard.zoom) on wide and tall screens.
 const CARD_ZOOM_WIDE := 1.5
-const CARD_ZOOM_TALL := 0.85
+const CARD_ZOOM_TALL := 1.25
 ## The range of widths for the piece-type buttons in the tray.
 const TRAY_BUTTON_MIN := 100.0
 const TRAY_BUTTON_MAX := 170.0
@@ -212,6 +212,8 @@ func _fit_tray() -> void:
 	for button: Button in _tray_buttons.values():
 		button.custom_minimum_size = Vector2(width, roundf(width * 1.1))
 		button.add_theme_font_size_override("font_size", roundi(width * 0.14))
+		var cost: Label = button.get_node("Cost")
+		cost.add_theme_font_size_override("font_size", roundi(width * 0.18))
 
 func _build_tray() -> void:
 	var defs := PieceCatalog.all_defs()
@@ -244,6 +246,7 @@ func _build_tray() -> void:
 				button.set_pressed_no_signal(not on)
 				return
 			select(def if on else null))
+		_add_cost_label(button, def)
 		tray.add_child(button)
 		_tray_buttons[def] = button
 
@@ -256,18 +259,31 @@ func _refresh() -> void:
 	for def in _tray_buttons:
 		var button: Button = _tray_buttons[def]
 		# No picture yet: show the piece's name too.
-		button.text = (def.display_name + "
-" if button.icon == null else "") + _tray_detail(def)
+		button.text = def.display_name if button.icon == null else ""
+		# None left to add: faded out.
+		var limit := Army.max_copies(def, rules)
+		button.modulate.a = 0.4 if limit >= 0 and army.count_of(def) >= limit else 1.0
 	army_board.highlighted = _allowed_squares()
 	army_board.queue_redraw()
 
-## The cost and how many more can be added, e.g. "3 pts · 1 left".
-func _tray_detail(def: PieceDef) -> String:
-	var points := "%s pt%s" % [Army.format_points(def.value), "" if is_equal_approx(def.value, 1.0) else "s"]
-	var limit := Army.max_copies(def, rules)
-	if limit < 0:
-		return points
-	return "%s · %d left" % [points, maxi(limit - army.count_of(def), 0)]
+## The cost in the button's bottom-right corner, e.g. "3".
+func _add_cost_label(button: Button, def: PieceDef) -> void:
+	var cost := Label.new()
+	cost.name = "Cost"
+	cost.text = Army.format_points(def.value)
+	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cost.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
+	cost.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	cost.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	cost.add_theme_color_override("font_color", Color.WHITE)
+	# On a small dark badge, so it reads on top of the picture.
+	var badge := StyleBoxFlat.new()
+	badge.bg_color = Color(0.08, 0.08, 0.09, 0.85)
+	badge.set_corner_radius_all(6)
+	badge.content_margin_left = 6
+	badge.content_margin_right = 6
+	cost.add_theme_stylebox_override("normal", badge)
+	button.add_child(cost)
 
 ## Where the selected piece type may go (only the king is restricted).
 func _allowed_squares() -> Array[Vector2i]:

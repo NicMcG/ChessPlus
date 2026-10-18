@@ -17,4 +17,5 @@ value = 4
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1")])
 ability = 1
 ability_name = "Crack Shot"
+ability_colors = PackedColorArray(0.106, 0.369, 0.125, 1, 0.486, 0.839, 0.498, 1)
 ability_text = "Once per game: capture a piece it could capture normally, without moving from its square. Uses your turn. (A shielded piece only loses its shield.)"
