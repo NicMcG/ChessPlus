@@ -131,5 +131,5 @@ func test_picture_check_and_mate() -> void:
 
 func test_picture_shield_break_promotion_and_castling() -> void:
 	check_eq(_picture_text(_from("4k3/8/8/3(pd)4/8/8/8/3RK3 w - - 0 1"), "Rxd5*"), "rook <shield_break> d5", "Shield break")
-	check_eq(_picture_text(StandardSetup.from_fen("8/P5k1/8/8/8/8/8/4K3 w - - 0 1"), "a8=Q"), "pawn a8 = queen", "Promotion")
+	check_eq(_picture_text(StandardSetup.from_fen("8/P5k1/8/8/8/8/8/4K3 w - - 0 1"), "a8=Q"), "pawn a8 <promote> queen", "Promotion")
 	check_eq(_picture_text(StandardSetup.from_fen("4k3/8/8/8/8/8/8/4K2R w K - 0 1"), "O-O"), "king O-O", "Castling")
