@@ -109,13 +109,36 @@ func show_main_menu() -> void:
 func _watch_for_updates() -> void:
 	if not OS.has_feature("web"):
 		return
-	JavaScriptBridge.pwa_update_available.connect(_update_if_ready)
-	JavaScriptBridge.eval("navigator.serviceWorker && navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); })")
-	_update_if_ready()
+	# The page asks the browser for a new version now, then keeps a flag saying
+	# whether one has finished downloading (Godot's own signal can miss one that
+	# started downloading before the game had loaded).
+	JavaScriptBridge.eval(UPDATE_JS, true)
+	var timer := Timer.new()
+	timer.wait_time = 2.0
+	timer.timeout.connect(_update_if_ready)
+	add_child(timer)
+	timer.start()
+
+const UPDATE_JS := """
+(function () {
+	if (!('serviceWorker' in navigator) || window.cpUpdate) return;
+	window.cpUpdate = { ready: false };
+	navigator.serviceWorker.getRegistration().then(function (r) {
+		if (!r) return;
+		r.update().catch(function () {});
+		setInterval(function () { window.cpUpdate.ready = !!(r.waiting && r.active); }, 1000);
+	});
+	window.cpUpdate.apply = function () {
+		navigator.serviceWorker.getRegistration().then(function (r) { if (r && r.waiting) r.waiting.postMessage('update'); });
+	};
+})();
+"""
 
 func _update_if_ready() -> void:
-	if OS.has_feature("web") and screen != null and screen.scene_file_path == MAIN_MENU.resource_path and JavaScriptBridge.pwa_needs_update():
-		JavaScriptBridge.pwa_update()
+	if not OS.has_feature("web") or screen == null or screen.scene_file_path != MAIN_MENU.resource_path:
+		return
+	if JavaScriptBridge.eval("!!(window.cpUpdate && window.cpUpdate.ready)", true):
+		JavaScriptBridge.eval("window.cpUpdate.ready = false; window.cpUpdate.apply();", true)
 
 func show_army_list() -> void:
 	var army_list := ARMY_LIST.instantiate()
