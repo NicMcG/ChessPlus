@@ -54,3 +54,32 @@ func test_card_zoom_scales_the_mini_board() -> void:
 	card.set_zoom(2.0)
 	check_eq(card.get_node("%GuideBoard").custom_minimum_size, Vector2(440, 440), "Mini board twice the size")
 	card.free()
+
+func test_builder_card_is_one_size_for_every_piece() -> void:
+	var builder := _open("res://scenes/armies/army_builder.tscn")
+	builder.size = Vector2(720, 1280)
+	# Let the card be measured for every piece.
+	for i in 80:
+		await (Engine.get_main_loop() as SceneTree).process_frame
+	check(builder._card_height > 0, "Measured")
+	var heights := {}
+	for def: PieceDef in builder._tray_buttons.keys():
+		builder.select(def)
+		await (Engine.get_main_loop() as SceneTree).process_frame
+		heights[builder._card_scroll.custom_minimum_size.y] = true
+	check_eq(heights.size(), 1, "The same height whichever piece is shown")
+	builder.free()
+
+func test_a_scroll_on_a_tray_button_does_not_pick_it() -> void:
+	var builder := _open("res://scenes/armies/army_builder.tscn")
+	var queen: PieceDef = load("res://data/pieces/queen.tres")
+	var button: Button = builder._tray_buttons[queen]
+	check_eq(button.mouse_filter, Control.MOUSE_FILTER_PASS, "Drags pass through to the tray")
+	# Pretend the finger went down, then the tray scrolled before it lifted.
+	builder._scroll_at_press = builder._tray_scroll.scroll_vertical - 60
+	button.button_pressed = true
+	check(not button.button_pressed, "Not picked")
+	builder._scroll_at_press = builder._tray_scroll.scroll_vertical
+	button.button_pressed = true
+	check(button.button_pressed, "A plain tap still picks it")
+	builder.free()

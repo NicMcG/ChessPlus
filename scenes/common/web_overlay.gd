@@ -14,7 +14,7 @@ extends RefCounted
 const JS := """
 (function () {
 	if (window.cpOverlay) return;
-	const o = window.cpOverlay = { els: {}, spots: {}, handler: null, next: 1 };
+	const o = window.cpOverlay = { els: {}, spots: {}, handler: null, next: 1, focused: null };
 	o.canvas = function () { return document.getElementById('canvas') || document.querySelector('canvas'); };
 	// Game pixels -> page coordinates (the canvas may be scaled for the screen).
 	// Measured from the top of the page, not the screen, and the elements are
@@ -39,6 +39,15 @@ const JS := """
 		Object.assign(el.style, { background: 'transparent', border: 'none', outline: 'none', color: '#e6e6e6', padding: '0 10px' });
 		const id = o.base(el);
 		el.addEventListener('input', function () { if (o.handler) o.handler(id, 'input', el.value); });
+		// While typing, the box sits just above the keyboard (iOS slides the page
+		// around when the keyboard opens, so the box's own spot can end up anywhere).
+		el.addEventListener('focus', function () { o.focused = id; o.dock(); setTimeout(o.dock, 300); });
+		el.addEventListener('blur', function () {
+			if (o.focused === id) { o.focused = null; }
+			Object.assign(el.style, { background: 'transparent', border: 'none', borderRadius: '0', boxShadow: 'none', zIndex: 10 });
+			window.scrollTo(0, 0);
+			o.replaceAll();
+		});
 		el.addEventListener('keydown', function (e) {
 			if (e.key === 'Enter') { e.preventDefault(); if (o.handler) o.handler(id, 'submit', el.value); el.blur(); }
 		});
@@ -55,10 +64,25 @@ const JS := """
 	o.place = function (id, x, y, w, h, fontPx, show, minFont) {
 		const el = o.els[id]; if (!el) return;
 		o.spots[id] = [x, y, w, h, fontPx, show, minFont];
+		if (id === o.focused) { o.dock(); return; }
 		if (!show) { el.style.display = 'none'; return; }
 		const p = o.toPage(x, y); const s = p[2];
 		Object.assign(el.style, { display: 'block', left: p[0] + 'px', top: p[1] + 'px',
 			width: (w * s) + 'px', height: (h * s) + 'px', fontSize: Math.max(minFont, fontPx * s) + 'px' });
+	};
+	// The box being typed in, as a bar just above the keyboard (the bottom of the
+	// part of the page that's still visible).
+	o.dock = function () {
+		const id = o.focused; const el = o.els[id]; if (!el) return;
+		const vv = window.visualViewport;
+		const left = (vv ? vv.offsetLeft : 0) + window.scrollX;
+		const width = vv ? vv.width : window.innerWidth;
+		const bottom = (vv ? vv.offsetTop + vv.height : window.innerHeight) + window.scrollY;
+		const height = 52;
+		Object.assign(el.style, { display: 'block', position: 'absolute', zIndex: 20,
+			left: (left + 10) + 'px', width: (width - 20) + 'px', top: (bottom - height - 10) + 'px', height: height + 'px',
+			fontSize: '18px', background: '#1d1d1f', border: '1px solid #8a8a8a', borderRadius: '12px',
+			boxShadow: '0 2px 12px rgba(0,0,0,0.6)' });
 	};
 	o.setValue = function (id, v) { const el = o.els[id]; if (el && el.value !== v) el.value = v; };
 	o.setAttr = function (id, name, v) { const el = o.els[id]; if (el) el[name] = v; };

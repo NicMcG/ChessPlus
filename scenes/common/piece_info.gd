@@ -11,6 +11,18 @@ const SCENE_PATH := "res://scenes/common/piece_info.tscn"
 var def: PieceDef
 var team := Piece.Team.WHITE
 
+## The card's width inside the pop-up, and the height that fits every piece
+## (worked out by prepare(); 0 until then).
+const CARD_WIDTH := 612.0
+static var card_height := 0.0
+
+## Measure the tallest card ahead of time (the game screen calls this), so every
+## pop-up is the same size.
+static func prepare(host: Node) -> void:
+	if card_height > 0:
+		return
+	card_height = await PieceCard.tallest_height(host, PieceCatalog.all_defs(), CARD_WIDTH)
+
 ## Show the card for `p_def` on top of `parent` (usually the current screen).
 static func open(parent: Node, p_def: PieceDef, p_team := Piece.Team.WHITE) -> PieceInfo:
 	var info: PieceInfo = load(SCENE_PATH).instantiate()
@@ -20,6 +32,7 @@ static func open(parent: Node, p_def: PieceDef, p_team := Piece.Team.WHITE) -> P
 	return info
 
 func _ready() -> void:
+	%Card.custom_minimum_size = Vector2(CARD_WIDTH, card_height)
 	%Card.show_piece(def, team)
 	%Close.pressed.connect(close)
 	%Dim.gui_input.connect(func(event: InputEvent) -> void:

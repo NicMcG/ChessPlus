@@ -13,6 +13,9 @@ signal saved(army: Army)
 const BOARD_WIDTH := 8
 const NAME_MAX_LENGTH := 20
 
+## Where the tray was scrolled to when a button was pressed.
+var _scroll_at_press := 0
+
 ## How big the piece card is drawn (see PieceCard.zoom) on wide and tall screens.
 const CARD_ZOOM_WIDE := 1.5
 const CARD_ZOOM_TALL := 1.25
@@ -162,14 +165,36 @@ func _fit_army_board() -> void:
 	army_board.custom_minimum_size.y = clampf(square * army_board.rows, 150, 400)
 
 ## Tall screens: the card gets all the height it needs (no scrolling) and the
-## tray above it scrolls instead. Wide screens: the card has its own column.
+## tray above it scrolls instead. The height is the tallest any piece's card
+## gets, so the card stays one size whichever piece is shown. Wide screens: the
+## card has its own column.
 func _fit_card() -> void:
 	if wide:
 		_card_scroll.custom_minimum_size.y = 0
 		_card_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	else:
-		_card_scroll.custom_minimum_size.y = card.get_combined_minimum_size().y
+		_card_scroll.custom_minimum_size.y = maxf(_card_height, card.get_combined_minimum_size().y)
 		_card_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_measure_card.call_deferred()
+
+## The tallest card for the current width and zoom (0 until measured).
+var _card_height := 0.0
+var _measured_for := ""
+
+func _measure_card() -> void:
+	var width := card.size.x
+	if width <= 0:
+		return
+	var key := "%d|%.2f" % [roundi(width), card.zoom]
+	if key == _measured_for:
+		return
+	_measured_for = key
+	var tallest := await PieceCard.tallest_height(self, _tray_buttons.keys(), width, card.zoom)
+	if key != _measured_for or not is_inside_tree():
+		return
+	_card_height = tallest
+	if not wide:
+		_card_scroll.custom_minimum_size.y = maxf(_card_height, card.get_combined_minimum_size().y)
 
 ## The piece-type buttons share the column's width equally (within limits), so
 ## they're as big as the space allows. Measured from the whole screen, not the
@@ -210,7 +235,15 @@ func _build_tray() -> void:
 		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		button.custom_minimum_size = Vector2(TRAY_BUTTON_MIN, roundf(TRAY_BUTTON_MIN * 1.1))
 		button.add_theme_font_size_override("font_size", 17)
-		button.toggled.connect(func(on: bool) -> void: select(def if on else null))
+		# Drags that start on a button scroll the tray (the button passes them on);
+		# a press that turned into a scroll doesn't select the piece.
+		button.mouse_filter = Control.MOUSE_FILTER_PASS
+		button.button_down.connect(func() -> void: _scroll_at_press = _tray_scroll.scroll_vertical)
+		button.toggled.connect(func(on: bool) -> void:
+			if absi(_tray_scroll.scroll_vertical - _scroll_at_press) > 4:
+				button.set_pressed_no_signal(not on)
+				return
+			select(def if on else null))
 		tray.add_child(button)
 		_tray_buttons[def] = button
 
