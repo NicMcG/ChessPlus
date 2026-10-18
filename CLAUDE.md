@@ -144,7 +144,7 @@ Goal: a rules engine that produces every legal move in standard chess, driven en
 * Chess notation can't record Chess Plus effects, so the move list uses pictures: `Notation.picture(state, move)` returns parts ({"piece", "team"} / {"icon"} / {"text"}) and `MoveList` draws them (piece pictures on small light tiles so black pieces show on the dark background; letters if a piece has no art yet).
 * Move: [piece] e4. Capture: [piece] [crossed swords] d5 (a pawn capture keeps its file: [pawn] e [swords] d5; other pieces add a file/rank only when needed, as in SAN). Shield break: [piece] [cracked shield] d5. Promotion: [pawn] a8 [arrow icon] [new piece]. Castling: [king] O-O. Check: warning-triangle icon at the end; checkmate: skull and crossbones.
 * Special ability: [piece] [lightning bolt] [target piece, or the piece brought back].
-* Icons: SVGs in `res://art/source/icons/` (capture, check, checkmate, shield_break (a shield split apart), ability, promote (arrow)), rendered to `res://art/icons/` at 128 px by `tools/render_piece_svg.gd` (mipmaps on). Drawn by Claude in the Cburnett style; Mac may want them tuned.
+* Icon colours (Mac): lightning bolt red, warning triangle yellow, skull white, swords and cracked shield light grey (#C9C9C9). Icons: SVGs in `res://art/source/icons/` (capture, check, checkmate, shield_break (a shield split apart), ability, promote (arrow)), rendered to `res://art/icons/` at 128 px by `tools/render_piece_svg.gd` (mipmaps on). Drawn by Claude in the Cburnett style; Mac may want them tuned.
 * The status line while looking back says "Viewing White's move 2" (no letters). Text SAN (below) is still used for tests, saved text and `find_move`.
 
 ## Notation (two different systems, don't mix them up)
