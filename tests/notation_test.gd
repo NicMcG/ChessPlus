@@ -93,3 +93,43 @@ func test_every_move_has_its_own_san() -> void:
 			var text := Notation.san(state, move)
 			check(not seen.has(text), "Two moves share the SAN %s in %s" % [text, fen])
 			seen[text] = true
+
+# --- Picture notation ----------------------------------------------------------------
+
+## A picture as short text for comparing: piece ids, icon names in <>, and text.
+func _picture_text(state: GameState, san_text: String) -> String:
+	var move := Notation.find_move(state, san_text)
+	if move == null:
+		return "no move " + san_text
+	var words: PackedStringArray = []
+	for part: Dictionary in Notation.picture(state, move):
+		if part.has("piece"):
+			words.append(part.piece.id)
+		elif part.has("icon"):
+			words.append("<%s>" % part.icon)
+		else:
+			words.append(part.text)
+	return " ".join(words)
+
+func _from(fen: String) -> GameState:
+	return Fen.parse(fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
+
+func test_picture_quiet_moves_and_captures() -> void:
+	var state := StandardSetup.create_game()
+	check_eq(_picture_text(state, "e4"), "pawn e4", "Pawn move")
+	check_eq(_picture_text(state, "Nf3"), "knight f3", "Knight move")
+	state = StandardSetup.from_fen("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1")
+	check_eq(_picture_text(state, "exd5"), "pawn e <capture> d5", "Pawn capture names its file")
+
+func test_picture_check_and_mate() -> void:
+	var state := StandardSetup.create_game()
+	for san in ["f3", "e5", "g4"]:
+		state.make_move(Notation.find_move(state, san))
+	check_eq(_picture_text(state, "Qh4#"), "queen h4 <checkmate>", "Skull and crossbones for mate")
+	state = StandardSetup.from_fen("4k3/8/8/8/8/8/8/R3K3 w - - 0 1")
+	check_eq(_picture_text(state, "Ra8+"), "rook a8 <check>", "Triangle for check")
+
+func test_picture_shield_break_promotion_and_castling() -> void:
+	check_eq(_picture_text(_from("4k3/8/8/3(pd)4/8/8/8/3RK3 w - - 0 1"), "Rxd5*"), "rook <shield_break> d5", "Shield break")
+	check_eq(_picture_text(StandardSetup.from_fen("8/P5k1/8/8/8/8/8/4K3 w - - 0 1"), "a8=Q"), "pawn a8 = queen", "Promotion")
+	check_eq(_picture_text(StandardSetup.from_fen("4k3/8/8/8/8/8/8/4K2R w K - 0 1"), "O-O"), "king O-O", "Castling")
