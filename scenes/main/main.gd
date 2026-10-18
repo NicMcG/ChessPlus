@@ -18,6 +18,7 @@ func _ready() -> void:
 
 func show_main_menu() -> void:
 	var menu := MAIN_MENU.instantiate()
+	menu.continue_pressed.connect(continue_game)
 	menu.play_pressed.connect(show_match_setup)
 	menu.armies_pressed.connect(show_army_list)
 	_show(menu)
@@ -51,6 +52,21 @@ func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeB
 	game.black_army = black
 	game.bot_team = bot_team
 	game.bot_level = bot_level
+	game.menu_requested.connect(show_main_menu)
+	_show(game)
+
+## Pick up the saved game, if there is one.
+func continue_game() -> void:
+	var saved := SavedGame.load_saved()
+	if saved == null:
+		show_main_menu()
+		return
+	var game := GAME.instantiate()
+	game.white_army = saved.white_army
+	game.black_army = saved.black_army
+	game.bot_team = saved.bot_team
+	game.bot_level = saved.bot_level
+	game.resume = saved
 	game.menu_requested.connect(show_main_menu)
 	_show(game)
 
