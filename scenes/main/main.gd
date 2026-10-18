@@ -17,22 +17,33 @@ func _ready() -> void:
 	fit_window_to_screen()
 	show_main_menu()
 
-## On a PC, open the window as big as the screen comfortably allows (it's drawn
-## for a tall phone screen, so a small window shrinks everything and blurs the
-## text). Not in phone or web builds, nor when the window was opened at some
-## other size on purpose (the screenshot tools ask for one).
+## On a computer (not a phone), draw the game at the screen's own pixel size
+## instead of shrinking the phone-sized layout to fit: text and pictures come
+## out sharp. The PC app's window also opens as big as the screen comfortably
+## allows. Skipped when the window was opened at some other size on purpose (the
+## screenshot tools ask for one to see the phone layout).
 func fit_window_to_screen() -> void:
 	var window := get_window()
 	var normal_size := Vector2i(ProjectSettings.get_setting("display/window/size/window_width_override"),
 			ProjectSettings.get_setting("display/window/size/window_height_override"))
-	if not OS.has_feature("pc") or DisplayServer.get_name() == "headless" 			or window.size != normal_size or window.mode != Window.MODE_WINDOWED:
+	var pc_app := OS.has_feature("pc") and DisplayServer.get_name() != "headless"
+	var pc_browser := OS.has_feature("web") and not OS.has_feature("web_android") \
+			and not OS.has_feature("web_ios") and not DisplayServer.is_touchscreen_available()
+	if not (pc_app or pc_browser) or (pc_app and window.size != normal_size):
 		return
-	var area := DisplayServer.screen_get_usable_rect(window.current_screen)
-	# 90% of the screen's height (leaving room for the title bar), 16:10 shaped.
-	var height := int(area.size.y * 0.9)
-	var width := mini(int(height * 1.6), int(area.size.x * 0.95))
-	window.size = Vector2i(width, height)
-	window.position = area.position + (area.size - window.size) / 2
+	if pc_app and window.mode == Window.MODE_WINDOWED:
+		var area := DisplayServer.screen_get_usable_rect(window.current_screen)
+		# 90% of the screen's height (leaving room for the title bar), 16:10 shaped.
+		var height := int(area.size.y * 0.9)
+		var width := mini(int(height * 1.6), int(area.size.x * 0.95))
+		window.size = Vector2i(width, height)
+		window.position = area.position + (area.size - window.size) / 2
+		# Smaller than this, the screens don't fit.
+		window.min_size = Vector2i(900, 640)
+	# One game pixel per screen pixel (times the screen's own scale setting, e.g.
+	# 1.5 on a laptop set to 150%), rather than stretching a 720x1280 layout.
+	window.content_scale_size = Vector2i.ZERO
+	window.content_scale_factor = DisplayServer.screen_get_scale(window.current_screen)
 
 func show_main_menu() -> void:
 	var menu := MAIN_MENU.instantiate()

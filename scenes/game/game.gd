@@ -40,7 +40,7 @@ var sounds: GameSounds
 
 @onready var board_view: BoardView = %BoardView
 @onready var status_label: Label = %Status
-@onready var moves_label: RichTextLabel = %Moves
+@onready var move_list: MoveList = %Moves
 @onready var play_from_here_button: Button = %PlayFromHere
 @onready var new_game_button: Button = %NewGame
 @onready var undo_button: Button = %Undo
@@ -49,7 +49,7 @@ var sounds: GameSounds
 @onready var promotion_choices: HBoxContainer = %PromotionChoices
 @onready var _layout: VBoxContainer = $Margin/Layout
 @onready var _board_area: Control = $Margin/Layout/BoardArea
-@onready var _moves_scroll: Control = $Margin/Layout/MovesScroll
+@onready var _moves_scroll: ScrollContainer = $Margin/Layout/MovesScroll
 @onready var _buttons: Control = $Margin/Layout/Buttons
 ## On wide screens: the board on the left, `_side` (status, moves, buttons) on the right.
 var _wide_box: HBoxContainer
@@ -61,8 +61,6 @@ var wide := false
 var viewing := -1
 ## The position being looked at (a separate copy of the game).
 var _view_state: GameState
-## Highlights the move being looked at in the move list.
-const VIEWED_MOVE_COLOR := "#B5886399"
 
 var state: GameState
 
@@ -89,12 +87,7 @@ func _ready() -> void:
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
 	play_from_here_button.pressed.connect(play_from_here)
-	moves_label.meta_clicked.connect(func(meta: Variant) -> void: view_move(int(str(meta))))
-	# Bold move numbers: the normal font, thickened.
-	var bold := FontVariation.new()
-	bold.base_font = moves_label.get_theme_font("normal_font")
-	bold.variation_embolden = 0.9
-	moves_label.add_theme_font_override("bold_font", bold)
+	move_list.move_tapped.connect(view_move)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
 	promotion_overlay.gui_input.connect(_on_overlay_input)
@@ -356,29 +349,18 @@ func _update_text() -> void:
 			status_label.text = "Draw: checkmate is impossible"
 	if viewing >= 0:
 		status_label.text = "Viewing %s" % _move_name(viewing - 1)
-	moves_label.text = _move_list_text()
+	var result := state.result_text()
+	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result, viewing, TIP)
+	# Keep the latest move in sight (not while looking back at an older one).
+	if viewing < 0:
+		_scroll_moves_to_end.call_deferred()
 	undo_button.disabled = not _can_undo()
 	play_from_here_button.visible = is_bot_game() and viewing >= 0
 	play_from_here_button.disabled = bot_thinking
 
-## The move list with bold move numbers. Each move is a link: tapping it shows
-## the position after it (handled by view_move).
-func _move_list_text() -> String:
-	if state.history.is_empty():
-		return TIP
-	var parts: PackedStringArray = []
-	var entries := Notation.numbered_moves(state)
-	for i in entries.size():
-		if entries[i][0] != "":
-			parts.append("[b]%s[/b]" % entries[i][0])
-		var link := "[url=%d]%s[/url]" % [i + 1, entries[i][1]]
-		if i + 1 == viewing:
-			link = "[bgcolor=%s]%s[/bgcolor]" % [VIEWED_MOVE_COLOR, link]
-		parts.append(link)
-	var result := state.result_text()
-	if result != "*":
-		parts.append("[b]%s[/b]" % result)
-	return " ".join(parts)
+func _scroll_moves_to_end() -> void:
+	if is_inside_tree():
+		_moves_scroll.scroll_vertical = int(_moves_scroll.get_v_scroll_bar().max_value)
 
 ## A move written with its number, like "12. Nf3" or "12... Nf6".
 func _move_name(index: int) -> String:

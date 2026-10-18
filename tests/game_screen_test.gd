@@ -21,7 +21,7 @@ func test_undo_takes_back_one_move() -> void:
 	check(not game.undo_button.disabled, "Undo is on after moves")
 	game.undo()
 	check_eq(game.state.history.size(), 1, "One move left")
-	check_eq(game.moves_label.get_parsed_text(), "1. e4", "Move list after undo")
+	check_eq(game.move_list.lines(), PackedStringArray(["1. e4"]), "Move list after undo")
 	check_eq(game.status_label.text, "Black to move", "Status after undo")
 	game.undo()
 	check_eq(Fen.write(game.state), Fen.STANDARD_START, "Back to the start")
@@ -42,7 +42,8 @@ func test_new_game_resets() -> void:
 	_play(game, "e4")
 	game.new_game()
 	check_eq(game.state.history.size(), 0, "No moves")
-	check_eq(game.moves_label.text, game.TIP, "Tip instead of an empty move list")
+	check(game.move_list._tip.visible and game.move_list._tip.text == game.TIP, "Tip instead of an empty move list")
+	check(game.move_list.buttons.is_empty(), "No moves listed")
 	game.free()
 
 # --- Against the practice bot ------------------------------------------------------
@@ -135,11 +136,23 @@ func test_bot_takes_its_time() -> void:
 
 # --- Looking back through the moves ------------------------------------------------
 
-func test_move_numbers_are_bold_links() -> void:
+func test_one_turn_per_line() -> void:
 	var game := _open()
+	for san in ["e4", "e5", "Nf3"]:
+		_play(game, san)
+	check_eq(game.move_list.lines(), PackedStringArray(["1. e4 e5", "2. Nf3"]), "One line per turn")
+	check_eq(game.move_list.buttons.size(), 3, "A button per move")
+	game.move_list.buttons[0].pressed.emit()
+	check_eq(game.viewing, 1, "Tapping a move looks back at it")
+	game.free()
+
+func test_black_moving_first_leaves_whites_cell_empty() -> void:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.start_fen = "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1"
+	(Engine.get_main_loop() as SceneTree).root.add_child(game)
+	_play(game, "Kd7")
 	_play(game, "e4")
-	_play(game, "e5")
-	check_eq(game.moves_label.text, "[b]1.[/b] [url=1]e4[/url] [url=2]e5[/url]", "Bold number, moves are links")
+	check_eq(game.move_list.lines(), PackedStringArray(["1... Kd7", "2. e4"]), "Black first")
 	game.free()
 
 func test_looking_back_leaves_the_game_alone() -> void:
@@ -153,7 +166,8 @@ func test_looking_back_leaves_the_game_alone() -> void:
 	check_eq(Fen.write(game.state), now, "The game itself is unchanged")
 	check(not game.board_view.input_enabled, "No moving while looking back")
 	check(game.status_label.text == "Viewing 1. e4", "Status says so")
-	check(game.moves_label.text.contains("[bgcolor="), "Viewed move highlighted")
+	var viewed_box: StyleBoxFlat = game.move_list.buttons[0].get_theme_stylebox("normal")
+	check_eq(viewed_box.bg_color, MoveList.VIEWED_BG, "Viewed move highlighted")
 	check(not game.play_from_here_button.visible, "Play from here is only for bot games")
 	game.view_move(3)
 	check_eq(game.viewing, -1, "Tapping the last move returns to the game")

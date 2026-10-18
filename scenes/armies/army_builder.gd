@@ -14,7 +14,7 @@ const BOARD_WIDTH := 8
 const NAME_MAX_LENGTH := 20
 
 ## How big the piece card is drawn (see PieceCard.zoom) on wide and tall screens.
-const CARD_ZOOM_WIDE := 2.0
+const CARD_ZOOM_WIDE := 1.5
 const CARD_ZOOM_TALL := 1.25
 ## The range of widths for the piece-type buttons in the tray.
 const TRAY_BUTTON_MIN := 100.0
