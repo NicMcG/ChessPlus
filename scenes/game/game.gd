@@ -30,6 +30,7 @@ var bot_thinking := false
 var _bot_turn_id := 0
 ## A saved game to continue instead of starting a new one (set by the main scene).
 var resume: SavedGame
+var sounds: GameSounds
 
 @onready var board_view: BoardView = %BoardView
 @onready var status_label: Label = %Status
@@ -46,6 +47,8 @@ var state: GameState
 const TIP := "Tip: hold any piece to see how it moves."
 
 func _ready() -> void:
+	sounds = GameSounds.new()
+	add_child(sounds)
 	board_view.move_chosen.connect(play)
 	board_view.choice_needed.connect(_ask_which_move)
 	board_view.info_requested.connect(func(piece: Piece) -> void:
@@ -77,7 +80,8 @@ func is_bot_game() -> bool:
 ## Make a move (it must be legal) and update everything on screen.
 func play(move: Move) -> void:
 	state.make_move(move)
-	board_view.refresh()
+	board_view.show_move(move)
+	sounds.play_for_move(state, move)
 	_update_text()
 	_save_progress()
 	_start_bot_turn_if_needed()
@@ -87,11 +91,14 @@ func play(move: Move) -> void:
 func undo() -> void:
 	if not _can_undo():
 		return
-	state.undo_move(state.history.back())
+	var undone: Array[Move] = [state.history.back()]
+	state.undo_move(undone[0])
 	if is_bot_game() and state.side_to_move == bot_team and not state.history.is_empty():
-		state.undo_move(state.history.back())
+		undone.append(state.history.back())
+		state.undo_move(undone[1])
 	promotion_overlay.hide()
-	board_view.refresh()
+	board_view.show_undo(undone)
+	sounds.play(GameSounds.Sound.MOVE)
 	_update_text()
 	_save_progress()
 	_start_bot_turn_if_needed()
@@ -148,6 +155,9 @@ func _start_bot_turn_if_needed() -> void:
 	_bot_turn_id += 1
 	var turn_id := _bot_turn_id
 	for i in bot_delay_frames:
+		await get_tree().process_frame
+	# Let the player's move finish sliding first: thinking freezes the screen.
+	while bot_delay_frames > 0 and board_view.is_animating() and turn_id == _bot_turn_id:
 		await get_tree().process_frame
 	# Dropped if a new game (or another turn) started while we waited.
 	if turn_id == _bot_turn_id and bot_thinking:
