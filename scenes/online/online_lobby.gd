@@ -22,7 +22,7 @@ signal game_ready(session: OnlineSession)
 var library: ArmyLibrary
 ## Where games are stored. Null = the real server (tests use a MemoryBackend).
 var backend: OnlineBackend
-## This device's ID; "" = UserSettings.player_id() (tests set their own).
+## The player ID to use; "" = a fresh one (tests set their own).
 var player_id := ""
 ## The game being created or joined.
 var session: OnlineSession

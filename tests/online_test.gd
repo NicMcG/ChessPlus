@@ -343,3 +343,37 @@ func test_rematch_claim() -> void:
 	await guest.poll()
 	check_eq(guest.rematch_code(), "NEW01", "Both see the same rematch")
 	_free(pair)
+
+func test_two_copies_on_one_phone_can_play_each_other() -> void:
+	MemoryBackend.clear()
+	# No IDs given: each session makes its own, as two copies of the app would.
+	var first := OnlineSession.new(MemoryBackend.new())
+	var second := OnlineSession.new(MemoryBackend.new())
+	first.poll_seconds = 0
+	second.poll_seconds = 0
+	_root().add_child(first)
+	_root().add_child(second)
+	check(first.player_id != second.player_id, "Different IDs")
+	await first.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 0)
+	var joined := await second.join_game(first.code, StandardSetup.army())
+	check(joined.ok, "Joined: " + joined.error)
+	first.free()
+	second.free()
+
+func test_continue_uses_the_id_saved_with_the_game() -> void:
+	var pair: Array = await _started_game()
+	var guest_screen := _game_screen(pair[1])
+	check_eq(UserSettings.online_game(), guest_screen.online.code, "Game remembered")
+	check_eq(UserSettings.online_player_id(), "guest", "With the guest's ID")
+	var code: String = guest_screen.online.code
+	guest_screen.free()
+	(pair[0] as Node).free()
+	var main: Node = load("res://scenes/main/main.tscn").instantiate()
+	_root().add_child(main)
+	await main.continue_online_game(MemoryBackend.new())
+	check(main.screen.get("online") != null, "Back in the game")
+	if main.screen.get("online") != null:
+		check_eq(main.screen.online.code, code, "The same game")
+		check_eq(main.screen.online.my_team, Piece.Team.BLACK, "On the same side")
+	main.free()
+	UserSettings.set_online_game("")

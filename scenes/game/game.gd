@@ -724,7 +724,10 @@ func _start_online() -> void:
 	_build_online_extras()
 	online.changed.connect(_on_online_changed)
 	online.start_polling()
-	UserSettings.set_online_game(online.code if online.status() == OnlineSession.PLAYING else "")
+	if online.status() == OnlineSession.PLAYING:
+		UserSettings.set_online_game(online.code, online.player_id)
+	else:
+		UserSettings.set_online_game("")
 	_show_new_state()
 
 func _my_online_turn() -> bool:

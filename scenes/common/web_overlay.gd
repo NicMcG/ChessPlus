@@ -14,15 +14,18 @@ extends RefCounted
 const JS := """
 (function () {
 	if (window.cpOverlay) return;
-	const o = window.cpOverlay = { els: {}, handler: null, next: 1 };
+	const o = window.cpOverlay = { els: {}, spots: {}, handler: null, next: 1 };
 	o.canvas = function () { return document.getElementById('canvas') || document.querySelector('canvas'); };
 	// Game pixels -> page coordinates (the canvas may be scaled for the screen).
+	// Measured from the top of the page, not the screen, and the elements are
+	// attached to the page (position: absolute): when the phone's keyboard opens
+	// and Safari slides the page up, they slide with the game.
 	o.toPage = function (x, y) {
 		const c = o.canvas(); const r = c.getBoundingClientRect(); const s = r.width / c.width;
-		return [r.left + x * s, r.top + y * s, s];
+		return [r.left + window.scrollX + x * s, r.top + window.scrollY + y * s, s];
 	};
 	o.base = function (el) {
-		Object.assign(el.style, { position: 'fixed', zIndex: 10, display: 'none', margin: '0', boxSizing: 'border-box',
+		Object.assign(el.style, { position: 'absolute', zIndex: 10, display: 'none', margin: '0', boxSizing: 'border-box',
 			fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' });
 		document.body.appendChild(el);
 		const id = 'e' + (o.next++);
@@ -51,6 +54,7 @@ const JS := """
 	// Show the element over the game rectangle (x, y, w, h), or hide it.
 	o.place = function (id, x, y, w, h, fontPx, show, minFont) {
 		const el = o.els[id]; if (!el) return;
+		o.spots[id] = [x, y, w, h, fontPx, show, minFont];
 		if (!show) { el.style.display = 'none'; return; }
 		const p = o.toPage(x, y); const s = p[2];
 		Object.assign(el.style, { display: 'block', left: p[0] + 'px', top: p[1] + 'px',
@@ -71,7 +75,18 @@ const JS := """
 		});
 		el.scrollTop = el.scrollHeight;
 	};
-	o.remove = function (id) { const el = o.els[id]; if (el) { el.remove(); delete o.els[id]; } };
+	o.remove = function (id) { const el = o.els[id]; if (el) { el.remove(); delete o.els[id]; delete o.spots[id]; } };
+	// If the page or screen changes (keyboard opening, rotating), put everything
+	// back over its spot.
+	o.replaceAll = function () {
+		Object.keys(o.spots).forEach(function (id) { o.place.apply(null, [id].concat(o.spots[id])); });
+	};
+	window.addEventListener('resize', o.replaceAll);
+	window.addEventListener('scroll', o.replaceAll);
+	if (window.visualViewport) {
+		window.visualViewport.addEventListener('resize', o.replaceAll);
+		window.visualViewport.addEventListener('scroll', o.replaceAll);
+	}
 })();
 """
 
