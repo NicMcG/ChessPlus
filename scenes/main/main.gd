@@ -44,10 +44,13 @@ func show_match_setup() -> void:
 	setup.start_requested.connect(start_game)
 	_show(setup)
 
-func start_game(white: Army, black: Army) -> void:
+## `bot_team` is the practice bot's side (Piece.Team), or -1 for two players.
+func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeBot.Level.MEDIUM) -> void:
 	var game := GAME.instantiate()
 	game.white_army = white
 	game.black_army = black
+	game.bot_team = bot_team
+	game.bot_level = bot_level
 	game.menu_requested.connect(show_main_menu)
 	_show(game)
 

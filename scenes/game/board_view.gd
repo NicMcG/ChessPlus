@@ -34,6 +34,8 @@ const LONG_PRESS_MS := 450
 @export var piece_style := "standard"
 
 var state: GameState
+## False while the practice bot is thinking, so the player can't move.
+var input_enabled := true
 var _selected := Board.NO_SQUARE
 var _selected_moves: Array[Move] = []
 
@@ -178,7 +180,7 @@ func _try_move_to(square: Vector2i) -> bool:
 	return true
 
 func _can_play() -> bool:
-	return state != null and state.outcome() == GameState.Outcome.NONE
+	return input_enabled and state != null and state.outcome() == GameState.Outcome.NONE
 
 func _select(square: Vector2i) -> void:
 	_selected = square

@@ -35,7 +35,7 @@ theme_override_constants/margin_bottom = 24
 
 [node name="Layout" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 14
 
 [node name="TopBar" type="HBoxContainer" parent="Margin/Layout"]
 layout_mode = 2
@@ -51,23 +51,57 @@ text = "Back"
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 40
-text = "Choose armies"
+text = "New match"
 horizontal_alignment = 1
 
-[node name="WhiteLabel" type="Label" parent="Margin/Layout"]
+[node name="OpponentLabel" type="Label" parent="Margin/Layout"]
 layout_mode = 2
-text = "White plays with"
+text = "Opponent"
 
-[node name="WhiteArmy" type="OptionButton" parent="Margin/Layout"]
+[node name="Opponent" type="OptionButton" parent="Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 
-[node name="BlackLabel" type="Label" parent="Margin/Layout"]
+[node name="BotOptions" type="VBoxContainer" parent="Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="DifficultyLabel" type="Label" parent="Margin/Layout/BotOptions"]
+layout_mode = 2
+text = "Difficulty"
+
+[node name="Difficulty" type="OptionButton" parent="Margin/Layout/BotOptions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="SideLabel" type="Label" parent="Margin/Layout/BotOptions"]
+layout_mode = 2
+text = "You play"
+
+[node name="Side" type="OptionButton" parent="Margin/Layout/BotOptions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="FirstLabel" type="Label" parent="Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "White plays with"
+
+[node name="FirstArmy" type="OptionButton" parent="Margin/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="SecondLabel" type="Label" parent="Margin/Layout"]
+unique_name_in_owner = true
 layout_mode = 2
 text = "Black plays with"
 
-[node name="BlackArmy" type="OptionButton" parent="Margin/Layout"]
+[node name="SecondArmy" type="OptionButton" parent="Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
