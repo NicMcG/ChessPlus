@@ -24,6 +24,12 @@ var bot_level := PracticeBot.Level.MEDIUM
 ## and "Bot is thinking..." first (thinking freezes the screen briefly). Tests use 0.
 var bot_delay_frames := 2
 var bot: PracticeBot
+## The bot always takes at least this long (seconds) over a move, so its replies
+## don't land instantly. Not in tests (bot_delay_frames = 0).
+var bot_min_seconds := 2.0
+## Counts down the rest of that time. A child of this screen, so if the screen
+## closes while it runs, the bot's turn is simply dropped.
+var _bot_timer: Timer
 ## True from the moment it's the bot's turn until it has moved.
 var bot_thinking := false
 ## Counts bot turns, so a turn that was overtaken (New game, Menu) is dropped.
@@ -61,6 +67,9 @@ static func tip_text(touchscreen: bool) -> String:
 func _ready() -> void:
 	sounds = GameSounds.new()
 	add_child(sounds)
+	_bot_timer = Timer.new()
+	_bot_timer.one_shot = true
+	add_child(_bot_timer)
 	_build_wide_layout()
 	resized.connect(fit_layout)
 	fit_layout()
@@ -148,7 +157,9 @@ func undo() -> void:
 ## The bot plays its move now. Normally called by _start_bot_turn_if_needed
 ## (after a short wait); tests call it directly.
 func make_bot_move() -> void:
-	var move := bot.choose_move(state)
+	_play_bot_move(bot.choose_move(state))
+
+func _play_bot_move(move: Move) -> void:
 	bot_thinking = false
 	board_view.input_enabled = true
 	if move:
@@ -202,8 +213,17 @@ func _start_bot_turn_if_needed() -> void:
 	while bot_delay_frames > 0 and board_view.is_animating() and turn_id == _bot_turn_id:
 		await get_tree().process_frame
 	# Dropped if a new game (or another turn) started while we waited.
+	if turn_id != _bot_turn_id or not bot_thinking:
+		return
+	var started := Time.get_ticks_msec()
+	var move := bot.choose_move(state)
+	# Fast answers wait until the bot has "thought" for bot_min_seconds.
+	var wait := bot_min_seconds - (Time.get_ticks_msec() - started) / 1000.0
+	if bot_delay_frames > 0 and wait > 0:
+		_bot_timer.start(wait)
+		await _bot_timer.timeout
 	if turn_id == _bot_turn_id and bot_thinking:
-		make_bot_move()
+		_play_bot_move(move)
 
 ## Undo is possible if there's a move to take back that you made (against the
 ## bot) or any move at all (two players), and the bot isn't thinking.

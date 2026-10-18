@@ -119,3 +119,16 @@ func test_match_setup_with_the_bot() -> void:
 		sides[started[0][0]] = true
 	check_eq(sides.size(), 2, "Random gives both sides")
 	setup.free()
+
+func test_bot_takes_its_time() -> void:
+	var game := _open_bot_game(Piece.Team.BLACK)
+	game.bot_delay_frames = 1
+	game.bot_min_seconds = 0.4
+	var started := Time.get_ticks_msec()
+	_play(game, "e4")
+	check_eq(game.state.history.size(), 1, "Not answered straight away")
+	while game.state.history.size() < 2 and Time.get_ticks_msec() - started < 5000:
+		await (Engine.get_main_loop() as SceneTree).process_frame
+	check_eq(game.state.history.size(), 2, "Answered in the end")
+	check(Time.get_ticks_msec() - started >= 400, "After at least the minimum time")
+	game.free()
