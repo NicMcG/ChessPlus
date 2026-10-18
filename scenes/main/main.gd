@@ -44,7 +44,19 @@ func fit_window_to_screen() -> void:
 	# One game pixel per screen pixel (times the screen's own scale setting, e.g.
 	# 1.5 on a laptop set to 150%), rather than stretching a 720x1280 layout.
 	window.content_scale_size = Vector2i.ZERO
-	window.content_scale_factor = DisplayServer.screen_get_scale(window.current_screen)
+	_fit_content_scale()
+	window.size_changed.connect(_fit_content_scale)
+
+## The smallest space (in game units) the screens need. A smaller window (a
+## small browser window, say) is drawn scaled down just enough to fit.
+const MIN_GAME_SIZE := Vector2(720, 760)
+
+func _fit_content_scale() -> void:
+	var window := get_window()
+	var size := Vector2(window.size)
+	var scale := DisplayServer.screen_get_scale(window.current_screen)
+	scale = minf(scale, minf(size.x / MIN_GAME_SIZE.x, size.y / MIN_GAME_SIZE.y))
+	window.content_scale_factor = maxf(scale, 0.25)
 
 func show_main_menu() -> void:
 	var menu := MAIN_MENU.instantiate()
