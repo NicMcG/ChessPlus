@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3]
+
+[ext_resource type="Script" path="res://core/move_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]
+
+[sub_resource type="Resource" id="Resource_rule1"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+
+[sub_resource type="Resource" id="Resource_rule2"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+max_steps = 2
+leap_steps = 1
+leap_over = 1
+
+[resource]
+script = ExtResource("2_def")
+id = "rogue"
+display_name = "Rogue"
+symbol = "RO"
+value = 3.5
+move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
+keywords = 1
+special_rule = "Its jumps go over one of your own pieces next to it, landing on the square just beyond (capturing an enemy there). It can't jump over enemy pieces or empty squares."

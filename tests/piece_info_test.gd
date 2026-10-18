@@ -35,11 +35,18 @@ func test_keywords() -> void:
 		for keyword in PieceCard.keyword_names(def):
 			check(PieceCard.KEYWORD_COLORS.has(keyword), keyword + " has a colour")
 
-func test_special_section_only_for_the_cannon_so_far() -> void:
+func test_special_rules_come_from_the_data() -> void:
 	check(PieceCard.special_rules(_def("cannon"))[0].begins_with("Captures by jumping"), "Cannon")
-	for def in PieceCatalog.all_defs():
-		if def.id != "cannon":
-			check(PieceCard.special_rules(def).is_empty(), def.id + " has nothing special")
+	for id in ["rogue", "cavalry", "berserker"]:
+		check_eq(PieceCard.special_rules(_def(id)).size(), 1, id + " has a special rule")
+	for id in ["king", "queen", "pawn", "knight", "wizard", "chariot"]:
+		check(PieceCard.special_rules(_def(id)).is_empty(), id + " has nothing special")
+
+func test_pawn_types_show_promote() -> void:
+	check_eq(PieceCard.keyword_names(_def("pawn")), PackedStringArray(["Promote"]), "Pawn")
+	check_eq(PieceCard.keyword_names(_def("chariot")), PackedStringArray(["Promote"]), "Chariot")
+	check_eq(PieceCard.keyword_names(_def("wizard")), PackedStringArray(["Jump"]), "Wizard")
+	check_eq(PieceCard.type_names(_def("wizard")), PackedStringArray(["Royal"]), "Wizard is royal")
 
 func test_alternate_pictures() -> void:
 	check_eq(PieceArt.all_textures(_def("paladin"), Piece.Team.WHITE).size(), 2, "Paladin with and without shield")

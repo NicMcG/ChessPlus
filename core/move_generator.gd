@@ -68,15 +68,22 @@ static func is_attacked(board: Board, square: Vector2i, by_team: Piece.Team) -> 
 static func _is_attacked_by(board: Board, square: Vector2i, by_team: Piece.Team, defs: Array[PieceDef]) -> bool:
 	return attacked_with(board, square, by_team, attack_table(by_team, defs))
 
-## The lines `by_team`'s piece types (`defs`) can capture along, grouped by
-## direction so each line only has to be walked once. Each entry is
-## [step, farthest reach, [[piece type, rule], ...], any hopping rule?].
+## How `by_team`'s piece types (`defs`) can capture, as [lines, unusual]:
+##   lines: the straight lines they capture along, grouped by direction so each
+##     line only has to be walked once. Each entry is
+##     [step, farthest reach, [[piece type, rule], ...], any hopping rule?].
+##   unusual: [piece type, rule] pairs for leaping and bent-path rules, which are
+##     checked from each such piece instead (see MoveRule.is_unusual).
 ## Build it once and reuse it (GameState.attack_table does).
 static func attack_table(by_team: Piece.Team, defs: Array[PieceDef]) -> Array:
 	var by_step := {}
+	var unusual := []
 	for def in defs:
 		for rule in def.move_rules:
 			if rule.mode == MoveRule.Mode.MOVE_ONLY:
+				continue
+			if rule.is_unusual():
+				unusual.append([def, rule])
 				continue
 			var reach := UNLIMITED if rule.max_steps == 0 else maxi(rule.max_steps, rule.first_move_max_steps)
 			for dir in rule.directions:
@@ -88,7 +95,7 @@ static func attack_table(by_team: Piece.Team, defs: Array[PieceDef]) -> Array:
 				entry[2].append([def, rule])
 				if rule.captures_by_hopping:
 					entry[3] = true
-	return by_step.values()
+	return [by_step.values(), unusual]
 
 ## Further than any board is wide: "slides until blocked".
 const UNLIMITED := 1000
@@ -99,7 +106,7 @@ const UNLIMITED := 1000
 ## team and close enough for its step limit, the square is attacked. For a
 ## hopping rule the first piece met is the screen, so look one piece further.
 static func attacked_with(board: Board, square: Vector2i, by_team: Piece.Team, table: Array) -> bool:
-	for entry: Array in table:
+	for entry: Array in table[0]:
 		var step: Vector2i = entry[0]
 		var reach: int = entry[1]
 		var attackers: Array = entry[2]
@@ -122,11 +129,62 @@ static func attacked_with(board: Board, square: Vector2i, by_team: Piece.Team, t
 			screens += 1
 			if screens > 1 or not has_hop:
 				break
+	# Leaping and bent-path pieces: check each one directly.
+	var unusual: Array = table[1]
+	if unusual.is_empty():
+		return false
+	var pieces := board.pieces_of(by_team)
+	for pair: Array in unusual:
+		for from: Vector2i in pieces:
+			var piece: Piece = pieces[from]
+			if piece.def == pair[0] and _rule_reaches(board, from, piece, pair[1], square):
+				return true
 	return false
+
+## True if `piece` (on `from`) could capture on `square` with `rule`, a leaping
+## or bent-path rule, as things stand on the board.
+static func _rule_reaches(board: Board, from: Vector2i, piece: Piece, rule: MoveRule, square: Vector2i) -> bool:
+	if not rule.path.is_empty():
+		for steps: Array in rule.path_variants():
+			if from + _orient(MoveRule.path_offset(steps), piece.team) == square 					and _path_end(board, from, steps, piece.team) == square:
+				return true
+		return false
+	var delta := square - from
+	var limit := _step_limit(rule, piece, board)
+	for dir in rule.directions:
+		var step := _orient(dir, piece.team)
+		# How many steps along this line `square` is (0 if it isn't on it).
+		var count := delta.x / step.x if step.x != 0 else delta.y / step.y
+		if count <= rule.leap_steps or count > limit or step * count != delta:
+			continue
+		for i in range(1, count):
+			var between := board.get_piece(from + step * i)
+			if i <= rule.leap_steps:
+				if rule.leap_over == MoveRule.LeapOver.OWN_PIECE and (between == null or between.team != piece.team):
+					return false
+			elif between != null:
+				return false
+		return true
+	return false
+
+## Follow a bent path from `from`. Returns where it ends, or NO_SQUARE if it
+## leaves the board or a square on the way (before the last) isn't empty.
+static func _path_end(board: Board, from: Vector2i, steps: Array, team: Piece.Team) -> Vector2i:
+	var pos := from
+	for i in steps.size():
+		pos += _orient(steps[i], team)
+		if not board.in_bounds(pos):
+			return Board.NO_SQUARE
+		if i < steps.size() - 1 and not board.is_empty(pos):
+			return Board.NO_SQUARE
+	return pos
 
 ## Walks each direction of one rule, one step at a time, adding moves as it goes.
 static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule: MoveRule, moves: Array[Move], captures_only := false) -> void:
 	var board := state.board
+	if not rule.path.is_empty():
+		_add_path_moves(state, from, piece, rule, moves, captures_only)
+		return
 	var limit := _step_limit(rule, piece, board)
 	# Worked out once per rule rather than on every square.
 	var pawn_like := piece.def.is_pawn_type()
@@ -144,6 +202,14 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 			to += step
 			if not board.in_bounds(to):
 				break
+			# Leapt squares: can't stop there, and they don't block (but the Rogue
+			# can only leap one of its own pieces).
+			if i < rule.leap_steps:
+				if rule.leap_over == MoveRule.LeapOver.OWN_PIECE:
+					var over := board.get_piece(to)
+					if over == null or over.team != piece.team:
+						break
+				continue
 			var target := board.get_piece(to)
 			if target == null:
 				var en_passant: Move = _en_passant_capture(state, from, to, piece, rule) if can_en_passant else null
@@ -165,6 +231,20 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 			elif target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
 				_append(state, _capture(from, to, piece, target), moves)
 			break
+
+## A bent-path rule's moves: each version of the path whose squares on the way
+## are empty ends in a move (empty square) or a capture (enemy piece).
+static func _add_path_moves(state: GameState, from: Vector2i, piece: Piece, rule: MoveRule, moves: Array[Move], captures_only: bool) -> void:
+	for steps: Array in rule.path_variants():
+		var to := _path_end(state.board, from, steps, piece.team)
+		if to == Board.NO_SQUARE:
+			continue
+		var target := state.board.get_piece(to)
+		if target == null:
+			if rule.mode != MoveRule.Mode.CAPTURE_ONLY and not captures_only:
+				_append(state, Move.new(from, to, piece), moves)
+		elif target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
+			_append(state, _capture(from, to, piece, target), moves)
 
 ## A capture of `target`, or just a shield break if it still has a Shield.
 static func _capture(from: Vector2i, to: Vector2i, piece: Piece, target: Piece) -> Move:

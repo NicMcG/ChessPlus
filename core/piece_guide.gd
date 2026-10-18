@@ -15,7 +15,8 @@ const MIN_RADIUS := 2
 
 ## Everything the picture needs:
 ##   "squares": offset -> flags, for squares it reaches in a fixed number of steps
-##   "slides":  [direction, flags] pairs, for directions it moves any distance along
+##   "slides":  [direction, flags, first step] for directions it moves any distance
+##              along (first step is 1, or more if it leaps the first squares)
 ##   "radius":  squares to show each side of the piece (at least MIN_RADIUS, more if
 ##              a jump wouldn't fit)
 ## Offsets are (x = right, y = forward, toward the opponent), shown from White's side.
@@ -31,14 +32,22 @@ static func guide(def: PieceDef) -> Dictionary:
 			flags |= CAPTURE
 		if flags == 0:
 			continue
+		# A bent path: a mark where it lands (the squares on the way can block it).
+		if not rule.path.is_empty():
+			for steps: Array in rule.path_variants():
+				_add(squares, MoveRule.path_offset(steps), flags)
+			continue
 		if rule.max_steps == 0:
 			for dir in rule.directions:
-				slides.append([dir, flags])
+				# A leaping slide: a jump mark on its first square, then the arrow.
+				if rule.leap_steps > 0:
+					_add(squares, dir * (rule.leap_steps + 1), flags | JUMP)
+				slides.append([dir, flags, rule.leap_steps + 2 if rule.leap_steps > 0 else 1])
 			continue
 		var reach := maxi(rule.max_steps, rule.first_move_max_steps)
 		for dir in rule.directions:
-			var leap := rule.max_steps == 1 and maxi(absi(dir.x), absi(dir.y)) > 1
-			for i in range(1, reach + 1):
+			var leap := (rule.max_steps == 1 and maxi(absi(dir.x), absi(dir.y)) > 1) or rule.leap_steps > 0
+			for i in range(1 + rule.leap_steps, reach + 1):
 				var square_flags := flags
 				if i > rule.max_steps:
 					square_flags |= FIRST_MOVE
@@ -48,6 +57,9 @@ static func guide(def: PieceDef) -> Dictionary:
 	var radius := MIN_RADIUS
 	for offset in squares:
 		radius = maxi(radius, maxi(absi(offset.x), absi(offset.y)))
+	# A slide that starts after a jump needs room for its arrow past the jump mark.
+	for slide in slides:
+		radius = maxi(radius, slide[2])
 	return {"squares": squares, "slides": slides, "radius": radius}
 
 ## Combine flags from several rules. A square reachable on every move doesn't

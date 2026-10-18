@@ -30,6 +30,14 @@ enum Keyword { JUMP = 1, CASTLE = 2, PROMOTE = 4, SHIELD = 8 }
 ##   attacker stays where it is and uses its turn); the shield never comes back.
 @export_flags("Jump", "Castle", "Promote", "Shield") var keywords := 0
 
+## Shown on the piece card under "Special Rule": anything about how it plays that
+## its types, keywords and move picture can't show. Empty for most pieces.
+@export_multiline var special_rule := ""
+## Shown under "Special Ability": a once-per-game action that uses a turn. The
+## name (e.g. "Crack Shot") and what it does. Empty for most pieces.
+@export var ability_name := ""
+@export_multiline var ability_text := ""
+
 func is_king_type() -> bool:
 	return types & Type.KING != 0
 

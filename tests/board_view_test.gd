@@ -68,11 +68,19 @@ func test_no_taps_after_game_over() -> void:
 	check_eq(chosen.size(), 0, "Checkmated side can't move")
 	view.free()
 
+## Pieces whose art hasn't been drawn yet (they show their letters meanwhile).
+## Take each one off this list when its pictures are added.
+const ART_TO_COME := ["wizard", "rogue", "chariot", "cavalry", "berserker"]
+
 func test_every_piece_has_a_picture() -> void:
 	var view := BoardView.new()
 	for def in PieceCatalog.all_defs():
 		for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
-			check(view.texture_for(def, team) != null, "%s %s" % [team, def.id])
+			var has_picture := view.texture_for(def, team) != null
+			if def.id in ART_TO_COME:
+				check(not has_picture, "%s %s has art now: take it off ART_TO_COME" % [team, def.id])
+			else:
+				check(has_picture, "%s %s" % [team, def.id])
 	view.free()
 
 func test_shield_pieces_have_a_wounded_picture() -> void:

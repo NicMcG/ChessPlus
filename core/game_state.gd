@@ -198,7 +198,7 @@ func _checkmate_impossible() -> bool:
 ## like a knight. Such a piece can't guard the squares around itself.
 static func _is_distant_leaper(def: PieceDef) -> bool:
 	for rule in def.move_rules:
-		if rule.max_steps != 1 or rule.first_move_max_steps > 1:
+		if rule.is_unusual() or rule.max_steps != 1 or rule.first_move_max_steps > 1:
 			return false
 		for dir in rule.directions:
 			if absi(dir.x) + absi(dir.y) < 3:
@@ -208,6 +208,12 @@ static func _is_distant_leaper(def: PieceDef) -> bool:
 ## True if every move keeps the piece on the same square color, like a bishop.
 static func _stays_on_one_color(def: PieceDef) -> bool:
 	for rule in def.move_rules:
+		if not rule.path.is_empty():
+			for steps: Array in rule.path_variants():
+				var offset := MoveRule.path_offset(steps)
+				if (offset.x + offset.y) % 2 != 0:
+					return false
+			continue
 		for dir in rule.directions:
 			if (dir.x + dir.y) % 2 != 0:
 				return false

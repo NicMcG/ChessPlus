@@ -129,11 +129,23 @@ func _draw() -> void:
 		var dir: Vector2i = slide[0]
 		var screen_dir := Vector2(dir.x, dir.y * forward)
 		var steps := float(radius) / maxi(absi(dir.x), absi(dir.y))
-		var start := center + screen_dir.normalized() * s * 0.5
+		# From the edge of the square before its first step (the piece's own square,
+		# or the jump mark for a leaping slide).
+		var first_step: int = slide[2]
+		var start := center + screen_dir * s * (first_step - 1) + screen_dir.normalized() * s * 0.5
 		draw_slide(self, start, center + screen_dir * s * steps, slide[1] & PieceGuide.CAPTURE != 0, s)
 	for offset in guide.squares:
 		var cell := Vector2(radius + offset.x, radius + offset.y * forward)
 		draw_square_marker(self, Rect2(origin + cell * s, Vector2(s, s)), guide.squares[offset])
 	var texture := PieceArt.texture_for(def, team)
+	var piece_rect := Rect2(origin + Vector2(radius, radius) * s, Vector2(s, s))
 	if texture:
-		draw_texture_rect(texture, Rect2(origin + Vector2(radius, radius) * s, Vector2(s, s)), false)
+		draw_texture_rect(texture, piece_rect, false)
+	else:
+		# No picture yet: its letter(s), in the team's colour with an outline.
+		var font := get_theme_default_font()
+		var font_size := int(s * (0.55 if def.symbol.length() == 1 else 0.4))
+		var baseline := Vector2(piece_rect.position.x, piece_rect.position.y + s * 0.5 + font_size * 0.35)
+		var fill := Color.WHITE if team == Piece.Team.WHITE else Color.BLACK
+		draw_string_outline(font, baseline, def.symbol, HORIZONTAL_ALIGNMENT_CENTER, s, font_size, maxi(2, int(s * 0.06)), Color.BLACK if team == Piece.Team.WHITE else Color.WHITE)
+		draw_string(font, baseline, def.symbol, HORIZONTAL_ALIGNMENT_CENTER, s, font_size, fill)

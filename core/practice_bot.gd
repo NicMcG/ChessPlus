@@ -192,16 +192,26 @@ static func _reach_table(def: PieceDef, team: Piece.Team, board: Board) -> Packe
 
 static func _count_reach(def: PieceDef, from: Vector2i, team: Piece.Team, board: Board) -> int:
 	var reached := {}
+	var flip := 1 if team == Piece.Team.WHITE else -1
 	for rule in def.move_rules:
+		if not rule.path.is_empty():
+			for steps: Array in rule.path_variants():
+				var offset := MoveRule.path_offset(steps)
+				var landing := from + Vector2i(offset.x, offset.y * flip)
+				if board.in_bounds(landing):
+					reached[landing] = true
+			continue
 		var steps := rule.max_steps if rule.max_steps > 0 else maxi(board.width, board.height)
 		for dir in rule.directions:
-			var step := Vector2i(dir.x, dir.y if team == Piece.Team.WHITE else -dir.y)
+			var step := Vector2i(dir.x, dir.y * flip)
 			var pos := from
 			for i in range(steps):
 				pos += step
 				if not board.in_bounds(pos):
 					break
-				reached[pos] = true
+				# Leapt-over squares can't be reached.
+				if i >= rule.leap_steps:
+					reached[pos] = true
 	return reached.size()
 
 ## The best score the side to move can get, looking `depth` moves ahead.
