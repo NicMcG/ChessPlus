@@ -42,6 +42,8 @@ var sounds: GameSounds
 @onready var status_label: Label = %Status
 @onready var move_list: MoveList = %Moves
 @onready var play_from_here_button: Button = %PlayFromHere
+## Shown while a piece with an unused special ability is selected.
+@onready var ability_button: Button = %Ability
 @onready var new_game_button: Button = %NewGame
 @onready var undo_button: Button = %Undo
 @onready var menu_button: Button = %Menu
@@ -87,6 +89,9 @@ func _ready() -> void:
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
 	play_from_here_button.pressed.connect(play_from_here)
+	ability_button.icon = load("res://art/icons/%s.png" % Notation.ABILITY_ICON)
+	ability_button.pressed.connect(use_ability)
+	board_view.selection_changed.connect(_on_selection_changed)
 	move_list.move_tapped.connect(view_move)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
@@ -180,9 +185,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_area], _wide_box)
 		_wide_box.move_child(_board_area, 0)
-		ScreenShape.move_to([status_label, _moves_scroll, play_from_here_button, _buttons], _side)
+		ScreenShape.move_to([status_label, _moves_scroll, ability_button, play_from_here_button, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, _board_area, _moves_scroll, play_from_here_button, _buttons], _layout)
+		ScreenShape.move_to([status_label, _board_area, _moves_scroll, ability_button, play_from_here_button, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -307,8 +312,14 @@ func _ask_which_move(moves: Array[Move]) -> void:
 		child.queue_free()
 	for move in moves:
 		var button := Button.new()
-		button.icon = board_view.texture_for(move.promotion, move.piece.team) if move.promotion else null
-		if button.icon == null:
+		# The piece it would become (promotion) or bring back (Raise Dead).
+		if move.promotion:
+			button.icon = board_view.texture_for(move.promotion, move.piece.team)
+		elif move.raised:
+			button.icon = board_view.texture_for(move.raised.def, move.piece.team)
+			if button.icon == null:
+				button.text = move.raised.def.display_name
+		if button.icon == null and button.text == "":
 			button.text = Notation.san(state, move)
 		button.expand_icon = true
 		button.custom_minimum_size = Vector2(120, 120)
@@ -317,6 +328,29 @@ func _ask_which_move(moves: Array[Move]) -> void:
 			play(move))
 		promotion_choices.add_child(button)
 	promotion_overlay.show()
+
+## A piece was selected (or the selection cleared): offer its special ability,
+## if it has one it can use now.
+func _on_selection_changed(_square: Vector2i) -> void:
+	var moves := board_view.selected_ability_moves()
+	ability_button.visible = not moves.is_empty()
+	if not moves.is_empty():
+		ability_button.text = moves[0].piece.def.ability_name
+	else:
+		_update_text()
+
+## The ability button: Crack Shot asks which piece to shoot (on the board);
+## Raise Dead asks which lost piece to bring back (a picker, like promotion).
+func use_ability() -> void:
+	var moves := board_view.selected_ability_moves()
+	if moves.is_empty():
+		return
+	var piece := moves[0].piece
+	if piece.def.ability == PieceDef.Ability.RAISE_DEAD:
+		_ask_which_move(moves)
+	else:
+		board_view.aim_ability()
+		status_label.text = "%s: choose a target" % piece.def.ability_name
 
 ## Tapping outside the choices cancels.
 func _on_overlay_input(event: InputEvent) -> void:

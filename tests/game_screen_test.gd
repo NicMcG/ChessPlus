@@ -210,3 +210,56 @@ func test_undo_while_looking_back_returns_first() -> void:
 	check_eq(game.state.history.size(), 1, "And one move undone")
 	check(game.board_view.state == game.state, "Board shows the game")
 	game.free()
+
+# --- Special abilities ---------------------------------------------------------------
+
+func _open_fen(fen: String) -> Node:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.start_fen = fen
+	(Engine.get_main_loop() as SceneTree).root.add_child(game)
+	return game
+
+func test_ability_button_and_crack_shot() -> void:
+	var game := _open_fen("4k3/8/8/8/8/2n5/8/A3K3 w - - 0 1")
+	check(not game.ability_button.visible, "No button before selecting")
+	game.board_view.tap(Board.parse_square("a1"))
+	check(game.ability_button.visible, "Button shows for the Archer")
+	check_eq(game.ability_button.text, "Crack Shot", "Named after the ability")
+	game.use_ability()
+	check(game.board_view.aiming, "Choosing a target")
+	check_eq(game.status_label.text, "Crack Shot: choose a target", "Status asks for a target")
+	game.board_view.tap(Board.parse_square("c3"))
+	check_eq(game.state.history.size(), 1, "Shot taken")
+	check_eq(game.state.history[0].ability, PieceDef.Ability.CRACK_SHOT, "As a Crack Shot")
+	check(game.state.board.get_piece(Board.parse_square("a1")) != null, "Archer stayed")
+	check(not game.ability_button.visible, "Button hidden afterwards")
+	game.free()
+
+func test_tapping_a_target_normally_is_a_normal_capture() -> void:
+	var game := _open_fen("4k3/8/8/8/8/2n5/8/A3K3 w - - 0 1")
+	game.board_view.tap(Board.parse_square("a1"))
+	game.board_view.tap(Board.parse_square("c3"))
+	check_eq(game.state.history.size(), 1, "Moved")
+	check_eq(game.state.history[0].ability, PieceDef.Ability.NONE, "An ordinary capture")
+	check(game.state.board.get_piece(Board.parse_square("c3")).def.id == "archer", "Archer moved to c3")
+	game.free()
+
+func test_no_button_for_a_used_ability_or_ordinary_piece() -> void:
+	var game := _open_fen("4k3/8/8/8/8/2n5/8/A^3K3 w - - 0 1")
+	game.board_view.tap(Board.parse_square("a1"))
+	check(not game.ability_button.visible, "Used up")
+	game.board_view.tap(Board.parse_square("e1"))
+	check(not game.ability_button.visible, "The king has no ability")
+	game.free()
+
+func test_raise_dead_picker() -> void:
+	var game := _open_fen("3k4/8/8/8/8/8/3(NC)4/4K3 w - - 0 1")
+	game.state.lost[Piece.Team.WHITE].append(Piece.new(load("res://data/pieces/queen.tres"), Piece.Team.WHITE))
+	game.board_view.tap(Board.parse_square("d2"))
+	check_eq(game.ability_button.text, "Raise Dead", "Raise Dead button")
+	game.use_ability()
+	check(game.promotion_overlay.visible, "Picker shown")
+	check_eq(game.promotion_choices.get_child_count(), 1, "One lost piece to choose")
+	(game.promotion_choices.get_child(0) as Button).pressed.emit()
+	check_eq(game.state.board.get_piece(Board.parse_square("d2")).def.id, "queen", "Queen raised")
+	game.free()

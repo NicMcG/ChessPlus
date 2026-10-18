@@ -15,6 +15,9 @@ signal move_chosen(move: Move)
 signal choice_needed(moves: Array[Move])
 ## The player held a finger (or the mouse) on a piece: show its info card.
 signal info_requested(piece: Piece)
+## The selected piece changed (NO_SQUARE: nothing selected now). The game screen
+## uses it to show the selected piece's special ability button.
+signal selection_changed(square: Vector2i)
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
@@ -23,6 +26,8 @@ const LAST_MOVE_TINT := Color(0.95, 0.85, 0.2, 0.3)
 const CHECK_TINT := Color(0.9, 0.15, 0.1, 0.6)
 const TARGET_MARK := Color(0.1, 0.1, 0.1, 0.25)
 const HOVER_TINT := Color(1, 1, 1, 0.3)
+## Targets for a special ability (Crack Shot) are ringed in gold.
+const ABILITY_MARK := Color(0.95, 0.7, 0.1, 0.9)
 ## The see-through arrows players draw with the right mouse button.
 const ARROW_COLOR := Color(0.1, 0.55, 0.15, 0.6)
 ## How far (in pixels) the pointer must move while held before it counts as a drag.
@@ -44,6 +49,11 @@ var state: GameState
 var input_enabled := true
 var _selected := Board.NO_SQUARE
 var _selected_moves: Array[Move] = []
+## The selected piece's special-ability moves. They aren't offered by normal
+## taps: only after aim_ability() (the ability button).
+var _ability_moves: Array[Move] = []
+## True while choosing a target for an ability: only its targets are offered.
+var aiming := false
 
 # Pointer (mouse or finger) state.
 var _pressed := false
@@ -121,6 +131,16 @@ func show_move(move: Move) -> void:
 		_fades.append([move.captured, move.capture_square, false])
 	if move.breaks_shield():
 		_start_shake(move.to)
+	# A Ram that died capturing: it slides there (or stays put, for a shield) and vanishes.
+	if move.attacker_died:
+		if landed != move.from and not skip:
+			_slides[move.piece] = [move.from, landed]
+		else:
+			_fades.append([move.piece, move.from, false])
+	# Raise Dead: the Necromancer fades out as the returning piece fades in.
+	if move.ability == PieceDef.Ability.RAISE_DEAD:
+		_fades.append([move.piece, move.from, false])
+		_fades.append([move.raised, move.from, true])
 	_move_elapsed = 0.0
 
 ## Redraw after `moves` were undone (most recent first): each piece slides back
@@ -349,7 +369,28 @@ func _can_play() -> bool:
 
 func _select(square: Vector2i) -> void:
 	_selected = square
-	_selected_moves.assign(state.moves().filter(func(m: Move) -> bool: return m.from == square))
+	aiming = false
+	var piece_moves := state.moves().filter(func(m: Move) -> bool: return m.from == square)
+	_selected_moves.assign(piece_moves.filter(func(m: Move) -> bool: return m.ability == PieceDef.Ability.NONE))
+	_ability_moves.assign(piece_moves.filter(func(m: Move) -> bool: return m.ability != PieceDef.Ability.NONE))
+	selection_changed.emit(square)
+
+## The selected square, or NO_SQUARE.
+func selected_square() -> Vector2i:
+	return _selected
+
+## The selected piece's special-ability moves (empty if it has none to use).
+func selected_ability_moves() -> Array[Move]:
+	return _ability_moves
+
+## Choose a target for the selected piece's ability: from now on only the
+## ability's targets are shown and can be tapped (until the selection changes).
+func aim_ability() -> void:
+	if _selected == Board.NO_SQUARE or _ability_moves.is_empty():
+		return
+	aiming = true
+	_selected_moves.assign(_ability_moves)
+	queue_redraw()
 
 func _draw() -> void:
 	if state == null:
@@ -442,18 +483,28 @@ func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0) -> void:
 	if texture:
 		draw_texture_rect(texture, rect, false, Color(1, 1, 1, alpha))
 		return
-	# No image for this piece yet: draw its letter instead.
+	# No image for this piece yet: draw its letter(s) instead, outlined so they
+	# show on both square colours.
 	var font := ThemeDB.fallback_font
-	var font_size := int(rect.size.y * 0.6)
+	var font_size := int(rect.size.y * (0.6 if piece.def.symbol.length() == 1 else 0.45))
+	if font_size <= 0:
+		return  # The board has no size yet.
 	var color := Color.WHITE if piece.team == Piece.Team.WHITE else Color.BLACK
+	var outline := Color.BLACK if piece.team == Piece.Team.WHITE else Color.WHITE
 	color.a = alpha
-	var baseline := Vector2(rect.position.x, rect.position.y + rect.size.y * 0.72)
-	draw_string(font, baseline, piece.def.symbol.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, font_size, color)
+	outline.a = alpha
+	var baseline := Vector2(rect.position.x, rect.position.y + rect.size.y * 0.5 + font_size * 0.36)
+	var symbol := piece.def.symbol.to_upper()
+	draw_string_outline(font, baseline, symbol, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, font_size, maxi(2, int(rect.size.y * 0.04)), outline)
+	draw_string(font, baseline, symbol, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, font_size, color)
 
 ## A dot on an empty square, a ring around a piece that can be captured.
 func _draw_target(move: Move) -> void:
 	var rect := _square_rect(move.to)
 	var center := rect.get_center()
+	if aiming:
+		draw_arc(center, rect.size.x * 0.45, 0, TAU, 32, ABILITY_MARK, rect.size.x * 0.1, true)
+		return
 	if move.is_capture() and not state.board.is_empty(move.to):
 		draw_arc(center, rect.size.x * 0.45, 0, TAU, 32, TARGET_MARK, rect.size.x * 0.08, true)
 	else:
@@ -490,5 +541,10 @@ func _royal_squares(team: Piece.Team) -> Array[Vector2i]:
 	return squares
 
 func _clear_selection() -> void:
+	var had_selection := _selected != Board.NO_SQUARE
 	_selected = Board.NO_SQUARE
 	_selected_moves.clear()
+	_ability_moves.clear()
+	aiming = false
+	if had_selection:
+		selection_changed.emit(Board.NO_SQUARE)
