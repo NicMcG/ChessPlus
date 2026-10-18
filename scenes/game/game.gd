@@ -40,7 +40,8 @@ var sounds: GameSounds
 
 @onready var board_view: BoardView = %BoardView
 @onready var status_label: Label = %Status
-@onready var moves_label: Label = %Moves
+@onready var moves_label: RichTextLabel = %Moves
+@onready var play_from_here_button: Button = %PlayFromHere
 @onready var new_game_button: Button = %NewGame
 @onready var undo_button: Button = %Undo
 @onready var menu_button: Button = %Menu
@@ -54,6 +55,14 @@ var sounds: GameSounds
 var _wide_box: HBoxContainer
 var _side: VBoxContainer
 var wide := false
+
+## Looking back: the number of moves played in the position being shown, or -1
+## when showing the game as it is now. Looking back never changes the game.
+var viewing := -1
+## The position being looked at (a separate copy of the game).
+var _view_state: GameState
+## Highlights the move being looked at in the move list.
+const VIEWED_MOVE_COLOR := "#B5886399"
 
 var state: GameState
 
@@ -79,6 +88,13 @@ func _ready() -> void:
 		PieceInfo.open(self, piece.def, piece.team))
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
+	play_from_here_button.pressed.connect(play_from_here)
+	moves_label.meta_clicked.connect(func(meta: Variant) -> void: view_move(int(str(meta))))
+	# Bold move numbers: the normal font, thickened.
+	var bold := FontVariation.new()
+	bold.base_font = moves_label.get_theme_font("normal_font")
+	bold.variation_embolden = 0.9
+	moves_label.add_theme_font_override("bold_font", bold)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
 	promotion_overlay.gui_input.connect(_on_overlay_input)
@@ -90,13 +106,65 @@ func _ready() -> void:
 		new_game()
 
 func new_game() -> void:
-	if white_army and black_army:
-		state = ArmySetup.create_game(white_army, black_army, StandardSetup.create_rules())
-	elif start_fen.is_empty():
-		state = StandardSetup.create_game()
-	else:
-		state = Fen.parse(start_fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
+	state = _create_start_state()
 	_show_new_state()
+
+## The game's starting position: from the armies, start_fen, or standard chess.
+func _create_start_state() -> GameState:
+	if white_army and black_army:
+		return ArmySetup.create_game(white_army, black_army, StandardSetup.create_rules())
+	if start_fen.is_empty():
+		return StandardSetup.create_game()
+	return Fen.parse(start_fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
+
+## Show the position after the first `moves_played` moves, without changing the
+## game. The latest position (or anything past it) goes back to the game itself.
+func view_move(moves_played: int) -> void:
+	if moves_played < 0 or moves_played >= state.history.size():
+		back_to_game()
+		return
+	# Replay the moves on a fresh copy of the starting position.
+	var copy := _create_start_state()
+	for i in moves_played:
+		var move := copy.find_move(state.history[i].to_text())
+		if move == null:
+			back_to_game()
+			return
+		copy.make_move(move)
+	viewing = moves_played
+	_view_state = copy
+	board_view.show_game(copy)
+	_update_input()
+	_update_text()
+
+## Stop looking back and show the game as it is now.
+func back_to_game() -> void:
+	if viewing < 0:
+		return
+	viewing = -1
+	_view_state = null
+	board_view.show_game(state)
+	_update_input()
+	_update_text()
+
+## Against the bot: take the game back to the position being looked at, and
+## carry on from there.
+func play_from_here() -> void:
+	if viewing < 0 or bot_thinking:
+		return
+	var target := viewing
+	back_to_game()
+	while state.history.size() > target:
+		state.undo_move(state.history.back())
+	board_view.refresh()
+	sounds.play(GameSounds.Sound.MOVE)
+	_update_text()
+	_save_progress()
+	_start_bot_turn_if_needed()
+
+## The board takes moves only when showing the game now and it's not the bot's turn.
+func _update_input() -> void:
+	board_view.input_enabled = viewing < 0 and not bot_thinking
 
 ## The side-by-side layout for wide screens, unused (hidden) until needed.
 func _build_wide_layout() -> void:
@@ -119,9 +187,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_area], _wide_box)
 		_wide_box.move_child(_board_area, 0)
-		ScreenShape.move_to([status_label, _moves_scroll, _buttons], _side)
+		ScreenShape.move_to([status_label, _moves_scroll, play_from_here_button, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, _board_area, _moves_scroll, _buttons], _layout)
+		ScreenShape.move_to([status_label, _board_area, _moves_scroll, play_from_here_button, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -131,7 +199,9 @@ func is_bot_game() -> bool:
 ## Make a move (it must be legal) and update everything on screen.
 func play(move: Move) -> void:
 	state.make_move(move)
-	board_view.show_move(move)
+	# While looking back, the board keeps showing the old position.
+	if viewing < 0:
+		board_view.show_move(move)
 	sounds.play_for_move(state, move)
 	_update_text()
 	_save_progress()
@@ -142,6 +212,7 @@ func play(move: Move) -> void:
 func undo() -> void:
 	if not _can_undo():
 		return
+	back_to_game()
 	var undone: Array[Move] = [state.history.back()]
 	state.undo_move(undone[0])
 	if is_bot_game() and state.side_to_move == bot_team and not state.history.is_empty():
@@ -161,7 +232,7 @@ func make_bot_move() -> void:
 
 func _play_bot_move(move: Move) -> void:
 	bot_thinking = false
-	board_view.input_enabled = true
+	_update_input()
 	if move:
 		play(move)
 	else:
@@ -181,6 +252,8 @@ func _continue_saved_game(saved: SavedGame) -> void:
 func _show_new_state() -> void:
 	promotion_overlay.hide()
 	bot_thinking = false
+	viewing = -1
+	_view_state = null
 	board_view.show_game(state)
 	_update_text()
 	_save_progress()
@@ -200,10 +273,10 @@ func _save_progress() -> void:
 ## If it's the bot's turn: block the board, say it's thinking, then let it move.
 func _start_bot_turn_if_needed() -> void:
 	if not is_bot_game() or state.side_to_move != bot_team or state.outcome() != GameState.Outcome.NONE:
-		board_view.input_enabled = true
+		_update_input()
 		return
-	board_view.input_enabled = false
 	bot_thinking = true
+	_update_input()
 	_update_text()
 	_bot_turn_id += 1
 	var turn_id := _bot_turn_id
@@ -281,7 +354,40 @@ func _update_text() -> void:
 			status_label.text = "Draw by repetition"
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			status_label.text = "Draw: checkmate is impossible"
-	moves_label.text = Notation.move_list(state)
-	if state.history.is_empty():
-		moves_label.text = TIP
+	if viewing >= 0:
+		status_label.text = "Viewing %s" % _move_name(viewing - 1)
+	moves_label.text = _move_list_text()
 	undo_button.disabled = not _can_undo()
+	play_from_here_button.visible = is_bot_game() and viewing >= 0
+	play_from_here_button.disabled = bot_thinking
+
+## The move list with bold move numbers. Each move is a link: tapping it shows
+## the position after it (handled by view_move).
+func _move_list_text() -> String:
+	if state.history.is_empty():
+		return TIP
+	var parts: PackedStringArray = []
+	var entries := Notation.numbered_moves(state)
+	for i in entries.size():
+		if entries[i][0] != "":
+			parts.append("[b]%s[/b]" % entries[i][0])
+		var link := "[url=%d]%s[/url]" % [i + 1, entries[i][1]]
+		if i + 1 == viewing:
+			link = "[bgcolor=%s]%s[/bgcolor]" % [VIEWED_MOVE_COLOR, link]
+		parts.append(link)
+	var result := state.result_text()
+	if result != "*":
+		parts.append("[b]%s[/b]" % result)
+	return " ".join(parts)
+
+## A move written with its number, like "12. Nf3" or "12... Nf6".
+func _move_name(index: int) -> String:
+	var entries := Notation.numbered_moves(state)
+	var number := ""
+	for i in range(index, -1, -1):
+		if entries[i][0] != "":
+			number = entries[i][0]
+			break
+	if entries[index][0] == "":
+		number = number.trim_suffix(".") + "..."
+	return "%s %s" % [number, entries[index][1]]

@@ -48,6 +48,12 @@ func _run_all() -> void:
 		if not file.ends_with("_test.gd") or not _matches(file, filters):
 			continue
 		var script: GDScript = load(TEST_DIR + file)
+		# A file with a mistake in it doesn't load (or has no tests): count that as
+		# a failure rather than quietly skipping it.
+		if script == null or not script.can_instantiate() or _test_names(script, include_slow).is_empty():
+			failed += 1
+			print("  FAIL  %s could not be loaded (see the errors above)" % file)
+			continue
 		for test_name in _test_names(script, include_slow):
 			# A fresh copy per test, so one test's leftovers can't affect another.
 			var suite: TestSuite = script.new()

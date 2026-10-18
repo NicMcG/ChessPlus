@@ -43,23 +43,34 @@ static func find_move(state: GameState, text: String) -> Move:
 ## The game so far as a numbered move list, e.g. "1. e4 e5 2. Nf3 Nc6", with the
 ## result on the end if the game is over.
 static func move_list(state: GameState) -> String:
-	# Step back to the first position, then replay, writing each move as we go.
-	var moves := state.history.duplicate()
-	for i in range(moves.size() - 1, -1, -1):
-		state.undo_move(moves[i])
 	var parts: PackedStringArray = []
-	for i in range(moves.size()):
-		var move: Move = moves[i]
-		if state.side_to_move == Piece.Team.WHITE:
-			parts.append("%d." % state.fullmove_number)
-		elif i == 0:
-			parts.append("%d..." % state.fullmove_number)
-		parts.append(san(state, move))
-		state.make_move(move)
+	for entry in numbered_moves(state):
+		if entry[0] != "":
+			parts.append(entry[0])
+		parts.append(entry[1])
 	var result := state.result_text()
 	if result != "*":
 		parts.append(result)
 	return " ".join(parts)
+
+## Every move played, oldest first, as [move number, notation]: the number is
+## "1." before White's moves, "" before Black's, or "1..." if Black moved first.
+static func numbered_moves(state: GameState) -> Array:
+	# Step back to the first position, then replay, writing each move as we go.
+	var moves := state.history.duplicate()
+	for i in range(moves.size() - 1, -1, -1):
+		state.undo_move(moves[i])
+	var entries := []
+	for i in range(moves.size()):
+		var move: Move = moves[i]
+		var number := ""
+		if state.side_to_move == Piece.Team.WHITE:
+			number = "%d." % state.fullmove_number
+		elif i == 0:
+			number = "%d..." % state.fullmove_number
+		entries.append([number, san(state, move)])
+		state.make_move(move)
+	return entries
 
 ## Extra file and/or rank needed when another piece of the same type could also
 ## move to the same square: file if that's enough (Nbd2), otherwise rank (R1a2),
