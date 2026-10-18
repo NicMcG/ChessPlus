@@ -82,7 +82,13 @@ theme_override_colors/font_color = Color(1, 0.45, 0.4, 1)
 theme_override_font_sizes/font_size = 22
 autowrap_mode = 3
 
-[node name="Tray" type="GridContainer" parent="Margin/Layout"]
+[node name="TrayScroll" type="ScrollContainer" parent="Margin/Layout"]
+custom_minimum_size = Vector2(0, 130)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Tray" type="GridContainer" parent="Margin/Layout/TrayScroll"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 8
@@ -91,7 +97,6 @@ columns = 6
 
 [node name="CardScroll" type="ScrollContainer" parent="Margin/Layout"]
 layout_mode = 2
-size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
 [node name="Card" parent="Margin/Layout/CardScroll" instance=ExtResource("3_card")]

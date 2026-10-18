@@ -24,7 +24,7 @@ func test_costs_symbols_and_tags() -> void:
 	for id in expected:
 		check_eq([_def(id).symbol, _def(id).value], expected[id], id)
 	check(_def("wizard").is_royal_type() and _def("wizard").has_jump(), "Wizard: Royal, Jump")
-	check(not _def("rogue").has_jump(), "Rogue: no Jump keyword (Mac's call)")
+	check(_def("rogue").has_jump(), "Rogue: Jump")
 	check(_def("chariot").has_castle() and not _def("chariot").has_promote(), "Chariot: Castle, not Promote")
 	check(not _def("berserker").can_promote(), "Berserker doesn't promote")
 
@@ -136,5 +136,5 @@ func test_cards_show_the_new_moves() -> void:
 	check_eq(cavalry.squares.size(), 12, "Cavalry: twelve squares")
 	check(cavalry.squares[Vector2i(2, 1)] & PieceGuide.JUMP == 0, "Its L moves aren't jumps")
 	var rogue := PieceGuide.guide(_def("rogue"))
-	check(rogue.squares[Vector2i(0, 2)] & PieceGuide.JUMP == 0, "Rogue: hop squares are plain marks")
+	check(rogue.squares[Vector2i(0, 2)] & PieceGuide.JUMP, "Rogue: hop squares are jump marks")
 	check_eq(PieceGuide.guide(_def("berserker")).squares.size(), 6, "Berserker: six squares")

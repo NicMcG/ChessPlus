@@ -30,7 +30,10 @@ const TRAY_BUTTON_MAX := 170.0
 @onready var save_button: Button = %Save
 @onready var back_button: Button = %Back
 @onready var _layout: VBoxContainer = $Margin/Layout
-@onready var _card_scroll: Control = %Card.get_parent()
+@onready var _card_scroll: ScrollContainer = %Card.get_parent()
+## The piece-type buttons scroll inside this, so on a phone the card below them
+## always fits whole.
+@onready var _tray_scroll: ScrollContainer = %Tray.get_parent()
 ## On wide screens the piece card goes beside everything else, in this.
 var _wide_box: HBoxContainer
 var wide := false
@@ -73,10 +76,16 @@ func _ready() -> void:
 	_layout.get_parent().add_child(_wide_box)
 	resized.connect(fit_layout)
 	army_board.resized.connect(_fit_army_board)
+	card.minimum_size_changed.connect(_fit_card)
 	resized.connect(_fit_tray)
 	fit_layout()
-	# Start by showing the first piece in the tray (the king).
-	card.show_piece(_tray_buttons.keys()[0], team)
+	# Start by showing the king (every army needs one).
+	var first: PieceDef = _tray_buttons.keys()[0]
+	for def: PieceDef in _tray_buttons:
+		if def.is_king_type():
+			first = def
+			break
+	card.show_piece(first, team)
 	_refresh()
 
 ## Choose a piece type in the tray (null to choose nothing). The card switches
@@ -141,6 +150,7 @@ func fit_layout() -> void:
 			ScreenShape.move_to([_card_scroll], _layout)
 			_layout.move_child(_card_scroll, save_button.get_index())
 		_wide_box.visible = wide
+	_fit_card()
 	# The piece card: bigger beside the board (there's room), a little bigger below it.
 	card.set_zoom(CARD_ZOOM_WIDE if wide else CARD_ZOOM_TALL)
 	_fit_tray()
@@ -151,6 +161,16 @@ func _fit_army_board() -> void:
 	var square := army_board.size.x / army_board.columns
 	army_board.custom_minimum_size.y = clampf(square * army_board.rows, 150, 400)
 
+## Tall screens: the card gets all the height it needs (no scrolling) and the
+## tray above it scrolls instead. Wide screens: the card has its own column.
+func _fit_card() -> void:
+	if wide:
+		_card_scroll.custom_minimum_size.y = 0
+		_card_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	else:
+		_card_scroll.custom_minimum_size.y = card.get_combined_minimum_size().y
+		_card_scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+
 ## The piece-type buttons share the column's width equally (within limits), so
 ## they're as big as the space allows. Measured from the whole screen, not the
 ## tray (the tray grows with its buttons, so that would feed back on itself).
@@ -159,6 +179,8 @@ func _fit_tray() -> void:
 	var column := size.x - margin.get_theme_constant("margin_left") - margin.get_theme_constant("margin_right")
 	if wide:
 		column = (column - _wide_box.get_theme_constant("separation")) / 2
+	# Leave room for the tray's scroll bar.
+	column -= _tray_scroll.get_v_scroll_bar().get_combined_minimum_size().x + 4
 	var gap := tray.get_theme_constant("h_separation")
 	var width := floorf((column - gap * (tray.columns - 1)) / tray.columns)
 	width = clampf(width, TRAY_BUTTON_MIN, TRAY_BUTTON_MAX)
@@ -168,11 +190,8 @@ func _fit_tray() -> void:
 
 func _build_tray() -> void:
 	var defs := PieceCatalog.all_defs()
-	# King first, then the most expensive pieces.
-	defs.sort_custom(func(a: PieceDef, b: PieceDef) -> bool:
-		if a.is_king_type() != b.is_king_type():
-			return a.is_king_type()
-		return a.value > b.value)
+	# Alphabetical (Mac's choice).
+	defs.sort_custom(func(a: PieceDef, b: PieceDef) -> bool: return a.display_name < b.display_name)
 	# The chosen piece type gets a gold border, so it's obvious what you're placing.
 	var chosen_style := StyleBoxFlat.new()
 	chosen_style.bg_color = Color(0.25, 0.25, 0.27)
@@ -202,7 +221,10 @@ func _refresh() -> void:
 	problems_label.visible = not found.is_empty()
 	save_button.disabled = not found.is_empty()
 	for def in _tray_buttons:
-		_tray_buttons[def].text = _tray_detail(def)
+		var button: Button = _tray_buttons[def]
+		# No picture yet: show the piece's name too.
+		button.text = (def.display_name + "
+" if button.icon == null else "") + _tray_detail(def)
 	army_board.highlighted = _allowed_squares()
 	army_board.queue_redraw()
 

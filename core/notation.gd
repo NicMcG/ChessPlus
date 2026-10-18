@@ -9,6 +9,7 @@ extends RefCounted
 ##   Pictures (what players see, Mac's design): picture() gives a list of parts
 ##     (piece pictures, small icons and bits of text) that the move list draws:
 ##     [piece] e4, [piece] [crossed swords] d5, [piece] [cracked shield] d5,
+##     [pawn] a8 [arrow] [queen],
 ##     then a warning-triangle icon for check or a skull and crossbones for mate.
 
 const NO_LETTER_SYMBOL := "P"
@@ -49,6 +50,7 @@ const SHIELD_BREAK_ICON := "shield_break"
 const CHECK_ICON := "check"
 const CHECKMATE_ICON := "checkmate"
 const ABILITY_ICON := "ability"
+const PROMOTE_ICON := "promote"
 
 ## `move` (legal in `state`) in picture notation: a list of parts, each one of
 ##   {"piece": PieceDef, "team": Piece.Team}  a small picture of that piece
@@ -89,7 +91,7 @@ static func _picture(state: GameState, move: Move, check_suffix: String) -> Arra
 			parts.append({"icon": CAPTURE_ICON})
 		parts.append({"text": Board.square_name(move.to)})
 		if move.promotion:
-			parts.append({"text": "="})
+			parts.append({"icon": PROMOTE_ICON})
 			parts.append({"piece": move.promotion, "team": move.piece.team})
 	if check_suffix == "+":
 		parts.append({"icon": CHECK_ICON})
