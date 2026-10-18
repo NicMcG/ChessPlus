@@ -21,7 +21,7 @@ func test_undo_takes_back_one_move() -> void:
 	check(not game.undo_button.disabled, "Undo is on after moves")
 	game.undo()
 	check_eq(game.state.history.size(), 1, "One move left")
-	check_eq(game.moves_label.text, "1. e4", "Move list after undo")
+	check_eq(game.moves_label.get_parsed_text(), "1. e4", "Move list after undo")
 	check_eq(game.status_label.text, "Black to move", "Status after undo")
 	game.undo()
 	check_eq(Fen.write(game.state), Fen.STANDARD_START, "Back to the start")
@@ -131,4 +131,65 @@ func test_bot_takes_its_time() -> void:
 		await (Engine.get_main_loop() as SceneTree).process_frame
 	check_eq(game.state.history.size(), 2, "Answered in the end")
 	check(Time.get_ticks_msec() - started >= 400, "After at least the minimum time")
+	game.free()
+
+# --- Looking back through the moves ------------------------------------------------
+
+func test_move_numbers_are_bold_links() -> void:
+	var game := _open()
+	_play(game, "e4")
+	_play(game, "e5")
+	check_eq(game.moves_label.text, "[b]1.[/b] [url=1]e4[/url] [url=2]e5[/url]", "Bold number, moves are links")
+	game.free()
+
+func test_looking_back_leaves_the_game_alone() -> void:
+	var game := _open()
+	for san in ["e4", "e5", "Nf3"]:
+		_play(game, san)
+	var now := Fen.write(game.state)
+	game.view_move(1)
+	check_eq(game.viewing, 1, "Looking at the position after 1. e4")
+	check_eq(Fen.write(game.board_view.state), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", "Board shows it")
+	check_eq(Fen.write(game.state), now, "The game itself is unchanged")
+	check(not game.board_view.input_enabled, "No moving while looking back")
+	check(game.status_label.text == "Viewing 1. e4", "Status says so")
+	check(game.moves_label.text.contains("[bgcolor="), "Viewed move highlighted")
+	check(not game.play_from_here_button.visible, "Play from here is only for bot games")
+	game.view_move(3)
+	check_eq(game.viewing, -1, "Tapping the last move returns to the game")
+	check(game.board_view.state == game.state, "Board shows the game again")
+	check(game.board_view.input_enabled, "Moving allowed again")
+	game.free()
+
+func test_black_move_name() -> void:
+	var game := _open()
+	for san in ["e4", "e5", "Nf3"]:
+		_play(game, san)
+	game.view_move(2)
+	check(game.status_label.text == "Viewing 1... e5", "Black's move: 1... e5")
+	game.free()
+
+func test_play_from_here_against_the_bot() -> void:
+	var game := _open_bot_game(Piece.Team.BLACK)
+	_play(game, "e4")
+	_play(game, "d4")
+	check_eq(game.state.history.size(), 4, "Two moves each")
+	game.view_move(2)
+	check(game.play_from_here_button.visible, "Button shown while looking back")
+	game.play_from_here()
+	check_eq(game.viewing, -1, "Back to the game")
+	check_eq(game.state.history.size(), 2, "Game taken back to that position")
+	check_eq(game.state.history[0].to_text(), "e2-e4", "Starting with e4")
+	check(not game.play_from_here_button.visible, "Button hidden again")
+	game.free()
+
+func test_undo_while_looking_back_returns_first() -> void:
+	var game := _open()
+	for san in ["e4", "e5"]:
+		_play(game, san)
+	game.view_move(1)
+	game.undo()
+	check_eq(game.viewing, -1, "Back to the game")
+	check_eq(game.state.history.size(), 1, "And one move undone")
+	check(game.board_view.state == game.state, "Board shows the game")
 	game.free()
