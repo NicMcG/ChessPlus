@@ -166,7 +166,7 @@ func test_tapped_move_slides_then_stops() -> void:
 	check(not view.is_animating(), "Finished")
 	view.free()
 
-func test_dragged_move_does_not_slide() -> void:
+func test_dragged_move_slams_instead_of_sliding() -> void:
 	var view := _sized_view(StandardSetup.create_game())
 	# Make the move the way the game screen does.
 	view.move_chosen.connect(func(move: Move) -> void:
@@ -174,7 +174,9 @@ func test_dragged_move_does_not_slide() -> void:
 		view.show_move(move))
 	_drag(view, "e2", "e4")
 	check_eq(chosen.size(), 1, "Moved")
-	check(not view.is_animating(), "No slide: the piece is already there")
+	var piece := view.state.board.get_piece(_square("e4"))
+	check(view.current_animation() != null and view.current_animation().has_segment(piece, "slam"), "Dropped: it slams down")
+	check(not view.current_animation().has_segment(piece, "slide"), "No slide: the piece is already there")
 	view.free()
 
 func test_capture_fades_and_undo_slides_back() -> void:

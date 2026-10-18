@@ -18,6 +18,10 @@ signal info_requested(piece: Piece)
 ## The selected piece changed (NO_SQUARE: nothing selected now). The game screen
 ## uses it to show the selected piece's special ability button.
 signal selection_changed(square: Vector2i)
+## An animation has reached the moment a sound belongs to (a GameSounds.Sound).
+signal sound_cue(sound: int)
+## The move's animation (and check shake) has finished.
+signal animation_finished
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
@@ -76,18 +80,15 @@ var _long_press_possible := false
 
 # Animation. The game state has always already changed: these only change where
 # and how pieces are drawn for a moment afterwards.
-## Pieces sliding: piece -> [square it's drawn leaving, square it's going to].
-var _slides := {}
-## Pieces fading: [piece, square, fading in?]. Captured pieces fade out; when a
-## capture is undone, the piece fades back in.
-var _fades: Array = []
-## Seconds since the slide started (it's over once this reaches move_time).
-var _move_elapsed := 0.0
-## The square whose piece is shaking, and for how long it has been.
+## The move being animated (see MoveAnimation), or null.
+var _animation: MoveAnimation
+## The square whose piece is shaking "no" (an illegal tap), and for how long.
 var _shake_square := Board.NO_SQUARE
 var _shake_elapsed := 0.0
-## The player just dropped a dragged piece, so its move needs no slide.
-var _skip_next_slide := false
+## The player just dropped a dragged piece: its move slams down instead of sliding.
+var _dropped := false
+## Squares whose pieces aren't drawn (the checkmated king while it turns to dust).
+var hidden_squares: Array[Vector2i] = []
 
 # Arrows (PC): drag with the right mouse button from one square to another.
 ## Each arrow is [from square, to square].
@@ -110,74 +111,50 @@ func refresh() -> void:
 	_clear_selection()
 	_dragging = false
 	_pressed = false
-	_slides.clear()
-	_fades.clear()
+	_animation = null
+	hidden_squares.clear()
 	_shake_square = Board.NO_SQUARE
 	# A new move (or a different position) clears the arrows.
 	arrows.clear()
 	_arrow_start = Board.NO_SQUARE
 	queue_redraw()
 
-## Redraw after `move` was made, sliding the piece there (and the castling
-## partner too) and fading out what it captured. Not if the piece was dragged
-## there: it's already in place.
+## Redraw after `move` was made, and animate it (see MoveAnimation): slides,
+## hops, slams (if the player dragged it there), captures being knocked off and
+## so on, with sound_cue telling the game screen when each sound plays.
 func show_move(move: Move) -> void:
-	var skip := _skip_next_slide
-	_skip_next_slide = false
+	var dropped := _dropped
+	_dropped = false
 	refresh()
-	if move_time <= 0:
-		return
-	var landed := move.lands_on()
-	var moved := state.board.get_piece(landed)  # A promoted piece is a new Piece.
-	if moved and landed != move.from and not skip:
-		_slides[moved] = [move.from, landed]
-	if move.partner:
-		_slides[move.partner] = [move.partner_from, move.partner_to]
-	if move.captured:
-		_fades.append([move.captured, move.capture_square, false])
-	if move.breaks_shield():
-		_start_shake(move.to)
-	# A Ram that died capturing: it slides there (or stays put, for a shield) and vanishes.
-	if move.attacker_died:
-		if landed != move.from and not skip:
-			_slides[move.piece] = [move.from, landed]
-		else:
-			_fades.append([move.piece, move.from, false])
-	# Raise Dead: the Necromancer fades out as the returning piece fades in.
-	if move.ability == PieceDef.Ability.RAISE_DEAD:
-		_fades.append([move.piece, move.from, false])
-		_fades.append([move.raised, move.from, true])
-	_move_elapsed = 0.0
+	_start_animation(MoveAnimation.for_move(move, state, dropped, _speed()))
 
 ## Redraw after `moves` were undone (most recent first): each piece slides back
 ## and captured pieces fade back in.
 func show_undo(moves: Array[Move]) -> void:
 	refresh()
+	_start_animation(MoveAnimation.for_undo(moves, state, _speed()))
+
+## How fast animations play: move_time is how long a plain slide takes.
+func _speed() -> float:
+	return move_time / MoveAnimation.SLIDE if move_time > 0 else 1.0
+
+## Animations switched off (move_time 0): just play the sounds.
+func _start_animation(animation: MoveAnimation) -> void:
 	if move_time <= 0:
+		for sound: int in animation.all_sounds():
+			sound_cue.emit(sound)
+		animation_finished.emit()
 		return
-	for move in moves:
-		var piece := state.board.get_piece(move.from)
-		if piece:
-			_add_slide_back(piece, move.lands_on(), move.from)
-		if move.partner:
-			_add_slide_back(move.partner, move.partner_to, move.partner_from)
-		if move.captured:
-			_fades.append([move.captured, move.capture_square, true])
-	_move_elapsed = 0.0
+	_animation = animation
+	advance_animation(0.0)
 
-## True while pieces are still sliding or fading.
+## The animation playing now, or null (for tests).
+func current_animation() -> MoveAnimation:
+	return _animation
+
+## True while a move is still being animated.
 func is_animating() -> bool:
-	return not (_slides.is_empty() and _fades.is_empty())
-
-## The piece may already be sliding back from a later move: keep where it's
-## drawn leaving from and only change where it ends up.
-func _add_slide_back(piece: Piece, leaving: Vector2i, going_to: Vector2i) -> void:
-	if leaving == going_to:
-		return
-	if _slides.has(piece):
-		_slides[piece][1] = going_to
-	else:
-		_slides[piece] = [leaving, going_to]
+	return _animation != null
 
 func _start_shake(square: Vector2i) -> void:
 	_shake_square = square
@@ -216,7 +193,7 @@ func tap(square: Vector2i) -> bool:
 func pointer_down(pos: Vector2, touch := true) -> void:
 	_pressed = true
 	_dragging = false
-	_skip_next_slide = false
+	_dropped = false
 	_press_pos = pos
 	_pointer_pos = pos
 	var square := _square_at(pos)
@@ -248,9 +225,9 @@ func pointer_up(pos: Vector2) -> void:
 		_dragging = false
 		# Dropped on a legal square: move. Anywhere else: the piece goes back
 		# and stays selected.
-		_skip_next_slide = true
+		_dropped = true
 		if not _try_move_to(_square_at(pos)):
-			_skip_next_slide = false
+			_dropped = false
 		queue_redraw()
 	elif _pressed_selected:
 		_clear_selection()
@@ -262,11 +239,12 @@ func _process(delta: float) -> void:
 
 ## Move the animations on by `delta` seconds (tests call this to skip ahead).
 func advance_animation(delta: float) -> void:
-	if is_animating():
-		_move_elapsed += delta
-		if _move_elapsed >= move_time:
-			_slides.clear()
-			_fades.clear()
+	if _animation:
+		for sound: int in _animation.advance(delta):
+			sound_cue.emit(sound)
+		if _animation.is_done():
+			_animation = null
+			animation_finished.emit()
 		queue_redraw()
 	if _shake_square != Board.NO_SQUARE:
 		_shake_elapsed += delta
@@ -276,7 +254,7 @@ func advance_animation(delta: float) -> void:
 
 ## True while the piece on `square` is shaking (for tests).
 func is_shaking(square: Vector2i) -> bool:
-	return _shake_square == square
+	return _shake_square == square or (_animation != null and _animation.shake_squares().has(square))
 
 ## The right mouse button went down (PC): maybe the start of an arrow.
 func right_down(pos: Vector2) -> void:
@@ -419,27 +397,34 @@ func _draw() -> void:
 		var hover := _square_at(_pointer_pos)
 		if _selected_moves.any(func(m: Move) -> bool: return m.to == hover):
 			draw_rect(_square_rect(hover), HOVER_TINT)
-	var progress := _ease(clampf(_move_elapsed / move_time, 0.0, 1.0)) if move_time > 0 else 1.0
-	for fade: Array in _fades:
-		if not _slides.has(fade[0]):
-			_draw_piece(fade[0], _square_rect(fade[1]), progress if fade[2] else 1.0 - progress)
+	# Pieces the animation is moving are drawn where it says, not on their squares.
+	var poses := {}
+	var shaking := {}
+	var extras := []
+	if _animation:
+		for piece: Piece in _animation.tracks:
+			poses[piece] = _animation.pose(piece)
+		shaking = _animation.shake_squares()
+		extras = _animation.active_extras()
+	_draw_extras(extras, true)
 	for rank in range(board.height):
 		for file in range(board.width):
 			var square := Vector2i(file, rank)
 			var piece := board.get_piece(square)
 			# While dragging, the piece follows the pointer instead of its square.
-			# Sliding and fading pieces are drawn separately.
-			if piece and not (_dragging and square == _selected) and not _slides.has(piece) \
-					and not _fades.any(func(f: Array) -> bool: return f[0] == piece):
-				var rect := _square_rect(square)
-				if square == _shake_square:
-					rect.position.x += _shake_offset(rect.size.x)
-				_draw_piece(piece, rect)
-	# Sliding pieces last, so they pass over the others.
-	for piece: Piece in _slides:
-		var from_rect := _square_rect(_slides[piece][0])
-		var to_rect := _square_rect(_slides[piece][1])
-		_draw_piece(piece, Rect2(from_rect.position.lerp(to_rect.position, progress), to_rect.size))
+			if piece == null or (_dragging and square == _selected) or poses.has(piece) or square in hidden_squares:
+				continue
+			var rect := _square_rect(square)
+			if square == _shake_square:
+				rect.position.x += _shake_offset(rect.size.x)
+			if shaking.has(square):
+				rect.position.x += MoveAnimation.shake_offset(shaking[square]) * rect.size.x
+			_draw_piece(piece, rect)
+	# Moving pieces last, so they pass over the others.
+	for piece: Piece in poses:
+		if poses[piece].visible:
+			_draw_posed(piece, poses[piece])
+	_draw_extras(extras, false)
 	# On top of the pieces, so a piece on an edge square doesn't hide its label.
 	_draw_coordinates()
 	for move in _selected_moves:
@@ -510,21 +495,128 @@ func _draw_coordinates() -> void:
 			var bottom_right := rect.end - Vector2(width + s * 0.06, s * 0.07)
 			draw_string(font, bottom_right, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
-## Starts fast and slows down as it arrives.
-static func _ease(t: float) -> float:
-	return 1.0 - pow(1.0 - t, 3)
-
 ## Sideways wobble that dies away.
 func _shake_offset(square_size: float) -> float:
 	var t := _shake_elapsed / SHAKE_TIME
 	return sin(t * TAU * 3) * square_size * 0.08 * (1.0 - t)
 
-func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0) -> void:
+## The picture for this piece now (a Paladin whose shield broke has its own).
+func _piece_texture(piece: Piece) -> Texture2D:
 	var texture: Texture2D = null
 	if piece.def.has_shield() and piece.shield_broken:
 		texture = PieceArt.texture_for(piece.def, piece.team, piece_style, "wounded")
 	if texture == null:
 		texture = texture_for(piece.def, piece.team)
+	return texture
+
+## The middle of a square on screen, for a position in squares that can be
+## between squares (animations).
+func _point(pos: Vector2) -> Vector2:
+	var s := _square_size()
+	var column := state.board.width - 1 - pos.x if flipped else pos.x
+	var row := pos.y if flipped else state.board.height - 1 - pos.y
+	return _origin() + Vector2(column + 0.5, row + 0.5) * s
+
+## Draw a piece the animation is moving: `pose` is from MoveAnimation.pose.
+## It's scaled and turned about the middle of its bottom edge, so a slam
+## squashes it down onto the board and a knocked piece tips over.
+func _draw_posed(piece: Piece, pose: Dictionary) -> void:
+	var s := _square_size()
+	var lift: float = pose.lift
+	var bottom := _point(pose.pos) + Vector2(0, s / 2 - lift * s)
+	draw_set_transform(bottom, pose.angle, pose.scale)
+	var texture := _piece_texture(piece)
+	var sunk: float = pose.sunk
+	if sunk > 0 and texture:
+		# Going down into the board: only the part still above it shows.
+		var showing := 1.0 - sunk
+		var source := Rect2(Vector2.ZERO, texture.get_size() * Vector2(1, showing))
+		draw_texture_rect_region(texture, Rect2(-s / 2, -s * showing, s, s * showing), source, Color(1, 1, 1, pose.alpha))
+	elif sunk < 1.0:
+		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha)
+	draw_set_transform(Vector2.ZERO)
+
+## Draw the animation's extras: `under` = the ones that go below the pieces
+## (dust, red flash), otherwise the ones on top (cannonball, arrow, smoke, light).
+func _draw_extras(extras: Array, under: bool) -> void:
+	var s := _square_size()
+	for extra: Dictionary in extras:
+		var t: float = extra.t
+		var kind: String = extra.kind
+		if under != (kind in ["dust", "red_flash"]):
+			continue
+		match kind:
+			"dust":
+				var base := _point(extra.at) + Vector2(0, s * 0.42)
+				for i in 6:
+					var side := -1.0 if i % 2 == 0 else 1.0
+					var reach := (0.18 + 0.07 * i) * MoveAnimation.ease_out(t)
+					var puff := base + Vector2(side * reach * s, -s * (0.02 + 0.03 * (i % 3)) * t)
+					draw_circle(puff, s * (0.05 + 0.07 * t), Color(0.86, 0.79, 0.66, 0.7 * (1.0 - t)))
+			"red_flash":
+				var rect := Rect2(_point(extra.at) - Vector2(s, s) / 2, Vector2(s, s))
+				draw_rect(rect, Color(1, 0.1, 0.05, 0.55 * absf(sin(t * TAU)) * (1.0 - 0.4 * t)))
+			"light":
+				var center := _point(extra.at)
+				var fade := 1.0 - t
+				draw_circle(center, s * (0.25 + 0.55 * t), Color(1, 0.97, 0.75, 0.35 * fade))
+				draw_circle(center, s * (0.15 + 0.3 * t), Color(1, 1, 0.9, 0.6 * fade))
+				for ray in 8:
+					var direction := Vector2.from_angle(TAU * ray / 8.0 + t)
+					draw_line(center + direction * s * 0.2, center + direction * s * (0.35 + 0.45 * t), Color(1, 0.95, 0.6, 0.8 * fade), maxf(2, s * 0.04))
+			"ball":
+				if t < 1.0:
+					var from := _point(extra.from)
+					var to := _point(extra.to)
+					var height := s * 0.7 + 0.15 * from.distance_to(to)
+					var center := from.lerp(to, t) - Vector2(0, 4 * height * t * (1.0 - t))
+					draw_circle(center, s * 0.12, Color(0.12, 0.12, 0.13))
+					draw_circle(center - Vector2(s, s) * 0.035, s * 0.04, Color(0.5, 0.5, 0.55))
+			"smoke":
+				var center := _point(extra.at)
+				var puff_size: float = extra.size
+				var color: Color = extra.color
+				for i in 7:
+					var direction := Vector2.from_angle(TAU * i / 7.0 + 0.4)
+					var puff := center + direction * s * puff_size * 0.5 * MoveAnimation.ease_out(t) - Vector2(0, s * 0.25 * t)
+					draw_circle(puff, s * puff_size * (0.3 + 0.35 * t), Color(color, 0.55 * (1.0 - t)))
+			"arrow":
+				_draw_flying_arrow(extra)
+
+## Crack Shot's arrow: in flight it flies point-first from the Archer to the
+## target; then it stays stuck in the target (moving and fading with it), or,
+## if it only broke a shield, drops away.
+func _draw_flying_arrow(extra: Dictionary) -> void:
+	var s := _square_size()
+	var from := _point(extra.from)
+	var to := _point(extra.to)
+	var direction := (to - from).normalized()
+	# The point goes in past the middle of the target (impaled).
+	var tip := to + direction * s * 0.15
+	var alpha := 1.0
+	var since_hit: float = _animation.time - extra.end
+	if since_hit < 0:
+		tip = from.lerp(tip, extra.t)
+	elif extra.stuck_to:
+		var pose: Variant = _animation.pose(extra.stuck_to)
+		if pose == null or not pose.visible:
+			return
+		var sunk: float = pose.sunk
+		tip = _point(pose.pos) + direction * s * 0.15 + Vector2(0, sunk * s)
+		alpha = pose.alpha * (1.0 - sunk)
+	else:
+		var fall := clampf(since_hit / maxf(extra.until - extra.end, 0.001), 0.0, 1.0)
+		tip += Vector2(0, s * 0.4 * fall * fall)
+		alpha = 1.0 - fall
+	var tail := tip - direction * s * 0.8
+	var side := Vector2(-direction.y, direction.x)
+	draw_line(tail, tip - direction * s * 0.12, Color(0.45, 0.3, 0.15, alpha), maxf(2, s * 0.05))
+	draw_colored_polygon(PackedVector2Array([tip, tip - direction * s * 0.2 + side * s * 0.08, tip - direction * s * 0.2 - side * s * 0.08]), Color(0.3, 0.3, 0.32, alpha))
+	for fletch in [-1.0, 1.0]:
+		draw_line(tail + direction * s * 0.15, tail + side * fletch * s * 0.08, Color(0.85, 0.2, 0.15, alpha), maxf(2, s * 0.04))
+
+func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0) -> void:
+	var texture := _piece_texture(piece)
 	if texture:
 		draw_texture_rect(texture, rect, false, Color(1, 1, 1, alpha))
 		return
