@@ -46,7 +46,7 @@ const SHAKE_TIME := 0.3
 ## Which folder in res://art/pieces/ the piece images come from.
 @export var piece_style := "standard"
 ## How long (seconds) a move takes to slide across the board. 0 = no animation.
-@export var move_time := 0.18
+@export var move_time := 0.22
 ## Black's side at the bottom (the board turned round; pieces still upright).
 ## Set when this player is Black, online or against the bot.
 var flipped := false:
@@ -96,6 +96,9 @@ var arrows: Array = []
 ## Where the right button went down (NO_SQUARE when it isn't held).
 var _arrow_start := Board.NO_SQUARE
 var _arrow_pointer := Vector2.ZERO
+
+## Plain white silhouettes of piece pictures (for flashes), made when first needed.
+static var _silhouettes := {}
 
 func _ready() -> void:
 	# Smooth edges when the piece images are shrunk to fit the squares.
@@ -514,6 +517,23 @@ func _piece_texture(piece: Piece) -> Texture2D:
 		texture = texture_for(piece.def, piece.team)
 	return texture
 
+## A white silhouette of `texture` (same shape, every pixel white).
+static func silhouette(texture: Texture2D) -> Texture2D:
+	if not _silhouettes.has(texture):
+		var image := texture.get_image()
+		if image.is_compressed():
+			image.decompress()
+		image.convert(Image.FORMAT_RGBA8)
+		for y in image.get_height():
+			for x in image.get_width():
+				image.set_pixel(x, y, Color(1, 1, 1, image.get_pixel(x, y).a))
+		image.generate_mipmaps()
+		_silhouettes[texture] = ImageTexture.create_from_image(image)
+	return _silhouettes[texture]
+
+static func clear_cache() -> void:
+	_silhouettes.clear()
+
 ## The middle of a square on screen, for a position in squares that can be
 ## between squares (animations).
 func _point(pos: Vector2) -> Vector2:
@@ -538,7 +558,10 @@ func _draw_posed(piece: Piece, pose: Dictionary) -> void:
 		var source := Rect2(Vector2.ZERO, texture.get_size() * Vector2(1, showing))
 		draw_texture_rect_region(texture, Rect2(-s / 2, -s * showing, s, s * showing), source, Color(1, 1, 1, pose.alpha))
 	elif sunk < 1.0:
-		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha)
+		var flash: float = pose.flash
+		# White at first, turning red as it fades.
+		var flash_color := Color.WHITE.lerp(Color(1, 0.15, 0.1), 1.0 - flash)
+		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha, flash_color * flash)
 	draw_set_transform(Vector2.ZERO)
 
 ## Draw the animation's extras: `under` = the ones that go below the pieces
@@ -551,6 +574,15 @@ func _draw_extras(extras: Array, under: bool) -> void:
 		if under != (kind in ["dust", "red_flash"]):
 			continue
 		match kind:
+			"impact":
+				# A quick ring and sparks where the pieces collide.
+				var center := _point(extra.at)
+				var fade := 1.0 - t
+				draw_arc(center, s * (0.1 + 0.45 * t), 0, TAU, 24, Color(1, 0.95, 0.8, 0.8 * fade), maxf(2, s * 0.05 * fade))
+				for spark in 8:
+					var direction := Vector2.from_angle(TAU * spark / 8.0 + 0.3)
+					var reach := s * (0.15 + 0.5 * MoveAnimation.ease_out(t))
+					draw_line(center + direction * reach * 0.6, center + direction * reach, Color(1, 0.8, 0.3, fade), maxf(2, s * 0.035))
 			"dust":
 				var base := _point(extra.at) + Vector2(0, s * 0.42)
 				for i in 6:
@@ -620,10 +652,15 @@ func _draw_flying_arrow(extra: Dictionary) -> void:
 	for fletch in [-1.0, 1.0]:
 		draw_line(tail + direction * s * 0.15, tail + side * fletch * s * 0.08, Color(0.85, 0.2, 0.15, alpha), maxf(2, s * 0.04))
 
-func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0) -> void:
+## `flash`: a colour the piece flashes (its strength is how bright it is).
+func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0)) -> void:
 	var texture := _piece_texture(piece)
 	if texture:
 		draw_texture_rect(texture, rect, false, Color(1, 1, 1, alpha))
+		var strength := maxf(flash.r, maxf(flash.g, flash.b))
+		if strength > 0.01:
+			# The flash: the piece's outline filled with the colour, over it.
+			draw_texture_rect(silhouette(texture), rect, false, Color(flash / strength, strength * alpha))
 		return
 	# No image for this piece yet: draw its letter(s) instead, outlined so they
 	# show on both square colours.
