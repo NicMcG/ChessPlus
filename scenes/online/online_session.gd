@@ -8,7 +8,8 @@ extends Node
 ##
 ## A game on the server is one row (see OnlineBackend):
 ##   code              5 letters/digits players type to join, e.g. "K7QX2"
-##   white_id/black_id the players' device IDs (UserSettings.player_id)
+##   white_id/black_id the players' IDs (a fresh random one per game, see
+##                     UserSettings.new_player_id)
 ##   white_army/...    each army as plain data (SavedGame.army_to_dict)
 ##   time_ms           each player's starting time, 0 = no time limit
 ##   white_ms/black_ms time left for each player as of the last move
@@ -69,7 +70,7 @@ var _polling := false
 func _init(p_backend: OnlineBackend = null, p_player_id := "") -> void:
 	backend = p_backend if p_backend else SupabaseBackend.new()
 	add_child(backend)
-	player_id = p_player_id if p_player_id != "" else UserSettings.player_id()
+	player_id = p_player_id if p_player_id != "" else UserSettings.new_player_id()
 	rng.randomize()
 
 # --- Starting a game -------------------------------------------------------------

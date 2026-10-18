@@ -169,7 +169,7 @@ func start_online_game(session: OnlineSession) -> void:
 
 ## Pick up the online game this device was playing.
 func continue_online_game(backend: OnlineBackend = null) -> void:
-	var session := OnlineSession.new(backend)
+	var session := OnlineSession.new(backend, UserSettings.online_player_id())
 	add_child(session)
 	var result := await session.resume(UserSettings.online_game())
 	if not result.ok or session.status() != OnlineSession.PLAYING:
