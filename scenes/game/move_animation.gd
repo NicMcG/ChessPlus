@@ -191,22 +191,25 @@ func _crack_shot(move: Move) -> void:
 		_shake_target(move.to, hit)
 		_cue(hit, GameSounds.Sound.SHIELD_BREAK)
 
-## Using a special ability: everything planned so far waits a moment while
-## the activation sound plays, and the piece using it glows in its ability's
-## colour.
+## Using a special ability builds up first (Mac's design): the piece rises
+## towards the player a little, glowing in its ability's colour, as the
+## activation sound plays; then it settles and the ability's own effect plays
+## (a bit slower than other animations, to let it breathe).
 func _activation(move: Move) -> void:
-	const WAIT := 0.3
+	const WAIT := 0.75
+	const SLOWER := 1.3
 	for segments: Array in tracks.values():
 		for segment: Dictionary in segments:
-			segment.start += WAIT
-			segment.end += WAIT
+			segment.start = segment.start * SLOWER + WAIT
+			segment.end = segment.end * SLOWER + WAIT
 	for extra: Dictionary in extras:
-		extra.start += WAIT
-		extra.end += WAIT
+		extra.start = extra.start * SLOWER + WAIT
+		extra.end = extra.end * SLOWER + WAIT
 		if extra.has("until"):
-			extra.until += WAIT
+			extra.until = extra.until * SLOWER + WAIT
 	for cue: Array in cues:
-		cue[0] += WAIT
+		cue[0] = cue[0] * SLOWER + WAIT
+	_add(move.piece, {"kind": "charge", "at": Vector2(move.from), "start": 0.0, "end": WAIT})
 	_cue(0.0, GameSounds.Sound.ABILITY)
 	var glow: Color = move.piece.def.ability_gradient()[1].lerp(Color.WHITE, 0.3)
 	extras.append({"kind": "light", "at": Vector2(move.from), "start": 0.0, "end": WAIT + 0.15, "color": glow})
@@ -350,7 +353,7 @@ func pose(piece: Piece) -> Variant:
 ## A segment's pose `t` of the way (0..1) through it.
 static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 	var pose := {"visible": true, "pos": segment.get("at", Vector2.ZERO), "lift": 0.0,
-			"scale": Vector2.ONE, "angle": 0.0, "alpha": 1.0, "sunk": 0.0, "flash": 0.0}
+			"scale": Vector2.ONE, "angle": 0.0, "alpha": 1.0, "sunk": 0.0, "flash": 0.0, "shadow": 0.0}
 	match segment.kind:
 		"slide":
 			pose.pos = (segment.from as Vector2).lerp(segment.to, ease_out(t))
@@ -385,6 +388,12 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			pose.scale = Vector2.ONE * (1.0 + 0.3 * (1.0 - ease_out(t)))
 		"shake":
 			pose.pos = (segment.at as Vector2) + Vector2(shake_offset(t), 0)
+		"charge":
+			# Rises towards the player, holds there, then settles back down.
+			var up := smoothstep(0.0, 0.45, t) * (1.0 - smoothstep(0.8, 1.0, t))
+			pose.scale = Vector2.ONE * (1.0 + 0.35 * up)
+			pose.lift = 0.18 * up
+			pose.shadow = up
 		"impact":
 			# Squashed by the hit, then springs back, pushed back a touch.
 			var wobble := exp(-6.0 * t) * cos(15.0 * t)

@@ -271,3 +271,12 @@ func test_coordinates_follow_the_flip() -> void:
 	var numbers := view.edge_labels().filter(func(l: Array) -> bool: return (l[1] as String).is_valid_int())
 	check(numbers.all(func(l: Array) -> bool: return l[0].x == 7), "Flipped: numbers down the h-file side")
 	view.free()
+
+func test_pieces_with_an_unused_ability_glow() -> void:
+	var defs := PieceCatalog.all_defs()
+	var archer := Piece.new(defs.filter(func(d: PieceDef) -> bool: return d.id == "archer")[0], Piece.Team.WHITE)
+	check(BoardView.has_ability_ready(archer), "An Archer with Crack Shot ready glows")
+	archer.ability_used = true
+	check(not BoardView.has_ability_ready(archer), "Not once it's used")
+	var knight := Piece.new(load("res://data/pieces/knight.tres"), Piece.Team.WHITE)
+	check(not BoardView.has_ability_ready(knight), "Pieces without abilities don't")

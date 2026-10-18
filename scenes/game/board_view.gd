@@ -534,6 +534,21 @@ func _piece_texture(piece: Piece) -> Texture2D:
 		texture = texture_for(piece.def, piece.team)
 	return texture
 
+## A piece whose special ability hasn't been used yet (it glows, so both
+## players can see which pieces can still use theirs).
+static func has_ability_ready(piece: Piece) -> bool:
+	return piece.def.ability != PieceDef.Ability.NONE and not piece.ability_used
+
+## A faint glow around the edge of a piece in its ability's colours: its
+## silhouette drawn slightly offset all the way round, behind it.
+func _draw_ability_glow(texture: Texture2D, rect: Rect2, colors: PackedColorArray, alpha: float) -> void:
+	var outline := silhouette(texture)
+	var reach := rect.size.x * 0.035
+	for i in 12:
+		var offset := Vector2.from_angle(TAU * i / 12.0) * reach
+		var color := colors[0].lerp(colors[1], 0.5 + 0.5 * sin(TAU * i / 12.0)).lerp(Color.WHITE, 0.25)
+		draw_texture_rect(outline, Rect2(rect.position + offset, rect.size), false, Color(color, 0.22 * alpha))
+
 ## A white silhouette of `texture` (same shape, every pixel white).
 static func silhouette(texture: Texture2D) -> Texture2D:
 	if not _silhouettes.has(texture):
@@ -566,8 +581,13 @@ func _draw_posed(piece: Piece, pose: Dictionary) -> void:
 	var s := _square_size()
 	var lift: float = pose.lift
 	var bottom := _point(pose.pos) + Vector2(0, s / 2 - lift * s)
-	draw_set_transform(bottom, pose.angle, pose.scale)
 	var texture := _piece_texture(piece)
+	var shadow: float = pose.shadow
+	if shadow > 0 and texture:
+		# A soft shadow left on the board below a piece lifted towards the player.
+		var ground := Rect2(_point(pose.pos) - Vector2(s, s) / 2 + Vector2(s, s) * 0.05 * shadow, Vector2(s, s))
+		draw_texture_rect(silhouette(texture), ground, false, Color(0, 0, 0, 0.3 * shadow))
+	draw_set_transform(bottom, pose.angle, pose.scale)
 	var sunk: float = pose.sunk
 	if sunk > 0 and texture:
 		# Going down into the board: only the part still above it shows.
@@ -675,6 +695,8 @@ func _draw_flying_arrow(extra: Dictionary) -> void:
 func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0)) -> void:
 	var texture := _piece_texture(piece)
 	if texture:
+		if has_ability_ready(piece):
+			_draw_ability_glow(texture, rect, piece.def.ability_gradient(), alpha)
 		draw_texture_rect(texture, rect, false, Color(1, 1, 1, alpha))
 		var strength := maxf(flash.r, maxf(flash.g, flash.b))
 		if strength > 0.01:

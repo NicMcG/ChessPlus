@@ -175,3 +175,15 @@ func test_undo_slides_back_and_fades_in() -> void:
 	var animation := MoveAnimation.for_undo(undone, state)
 	check(animation.has_segment(move.piece, "slide"), "Slides back")
 	check(animation.has_segment(move.captured, "fade_in"), "Captured piece returns")
+
+func test_ability_builds_up_first() -> void:
+	var state := _game("4k3/8/8/8/8/2n5/8/A3K3 w - - 0 1")
+	var archer := state.board.get_piece(Vector2i(0, 0))
+	var move := _ability_move(state, PieceDef.Ability.CRACK_SHOT)
+	state.make_move(move)
+	var animation := MoveAnimation.for_move(move, state, false)
+	check(animation.has_segment(archer, "charge"), "The archer rises first")
+	animation.time = 0.5
+	var pose: Dictionary = animation.pose(archer)
+	check(pose.scale.x > 1.2 and pose.lift > 0.1, "Up towards the player")
+	check(animation.active_extras().all(func(e: Dictionary) -> bool: return e.kind != "arrow"), "No arrow yet")
