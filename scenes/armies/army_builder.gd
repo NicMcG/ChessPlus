@@ -18,7 +18,7 @@ var _scroll_at_press := 0
 
 ## How big the piece card is drawn (see PieceCard.zoom) on wide and tall screens.
 const CARD_ZOOM_WIDE := 1.5
-const CARD_ZOOM_TALL := 1.25
+const CARD_ZOOM_TALL := 0.95
 ## The range of widths for the piece-type buttons in the tray.
 const TRAY_BUTTON_MIN := 100.0
 const TRAY_BUTTON_MAX := 170.0
@@ -81,6 +81,7 @@ func _ready() -> void:
 	army_board.resized.connect(_fit_army_board)
 	card.minimum_size_changed.connect(_fit_card)
 	resized.connect(_fit_tray)
+	_tray_scroll.resized.connect(_fit_tray)
 	fit_layout()
 	# Start by showing the king (every army needs one).
 	var first: PieceDef = _tray_buttons.keys()[0]
@@ -209,8 +210,14 @@ func _fit_tray() -> void:
 	var gap := tray.get_theme_constant("h_separation")
 	var width := floorf((column - gap * (tray.columns - 1)) / tray.columns)
 	width = clampf(width, TRAY_BUTTON_MIN, TRAY_BUTTON_MAX)
+	# Tall screens: buttons a little shorter if that lets two whole rows show
+	# above the card (Mac's request), but never squatter than 3:4.
+	var height := width * 1.1
+	if not wide:
+		var two_rows := (_tray_scroll.size.y - tray.get_theme_constant("v_separation")) / 2
+		height = clampf(floorf(two_rows), width * 0.75, width * 1.1)
 	for button: Button in _tray_buttons.values():
-		button.custom_minimum_size = Vector2(width, roundf(width * 1.1))
+		button.custom_minimum_size = Vector2(width, height)
 		button.add_theme_font_size_override("font_size", roundi(width * 0.14))
 		var cost: Label = button.get_node("Cost")
 		cost.add_theme_font_size_override("font_size", roundi(width * 0.18))
