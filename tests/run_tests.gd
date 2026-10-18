@@ -30,7 +30,6 @@ func _ready() -> void:
 	SavedGame.save_path = "user://test_current_game.json"
 	SavedGame.delete_saved()
 	UserSettings.save_path = "user://test_settings.cfg"
-	UserSettings.reload()
 	# Wait until the scene tree has finished starting up, so tests can add
 	# scenes to it.
 	_run_all.call_deferred()
