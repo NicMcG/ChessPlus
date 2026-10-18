@@ -6,9 +6,10 @@
 #
 # What it does:
 #   1. Exports the "Web" preset into build/web/ (needs Godot's export templates).
-#   2. Copies just those built files into a fresh temporary git repository, plus an
+#   2. Patches the service worker (see tools/patch_service_worker.py).
+#   3. Copies just those built files into a fresh temporary git repository, plus an
 #      empty .nojekyll file (tells GitHub to serve the files exactly as they are).
-#   3. Force-pushes that as the gh-pages branch, replacing the previous build.
+#   4. Force-pushes that as the gh-pages branch, replacing the previous build.
 #      The branch only ever holds the latest build; the source code stays on main.
 set -euo pipefail
 
@@ -21,6 +22,7 @@ cd "$PROJECT"
 mkdir -p build/web
 "$GODOT" --headless --path . --export-release "Web" build/web/index.html > /dev/null 2>&1
 test -f build/web/index.html || { echo "Export failed: no build/web/index.html"; exit 1; }
+python tools/patch_service_worker.py build/web/index.service.worker.js
 
 cp build/web/* "$TMP/"
 : > "$TMP/.nojekyll"
