@@ -87,6 +87,8 @@ var _shake_square := Board.NO_SQUARE
 var _shake_elapsed := 0.0
 ## The player just dropped a dragged piece: its move slams down instead of sliding.
 var _dropped := false
+## Kings in check (while the game goes on): they keep trembling a little.
+var _check_squares: Array[Vector2i] = []
 ## Squares whose pieces aren't drawn (the checkmated king while it turns to dust).
 var hidden_squares: Array[Vector2i] = []
 
@@ -116,6 +118,9 @@ func refresh() -> void:
 	_pressed = false
 	_animation = null
 	hidden_squares.clear()
+	_check_squares.clear()
+	if state and state.outcome() == GameState.Outcome.NONE and state.is_in_check():
+		_check_squares = MoveAnimation.royal_squares(state, state.side_to_move)
 	_shake_square = Board.NO_SQUARE
 	# A new move (or a different position) clears the arrows.
 	arrows.clear()
@@ -244,6 +249,16 @@ func pointer_up(pos: Vector2) -> void:
 func _process(delta: float) -> void:
 	check_long_press(Time.get_ticks_msec())
 	advance_animation(delta)
+	if not _check_squares.is_empty():
+		queue_redraw()
+
+## The kings in check now (empty when nobody is), which tremble on the board.
+func check_squares() -> Array[Vector2i]:
+	return _check_squares
+
+## A small nervous jitter (in squares) for a king in check.
+static func tremble(seconds: float) -> Vector2:
+	return Vector2(sin(seconds * 53.0) + 0.6 * sin(seconds * 31.0), 0.5 * sin(seconds * 41.0)) * 0.012
 
 ## Move the animations on by `delta` seconds (tests call this to skip ahead).
 func advance_animation(delta: float) -> void:
@@ -427,6 +442,8 @@ func _draw() -> void:
 				rect.position.x += _shake_offset(rect.size.x)
 			if shaking.has(square):
 				rect.position.x += MoveAnimation.shake_offset(shaking[square]) * rect.size.x
+			if square in _check_squares:
+				rect.position += tremble(Time.get_ticks_msec() / 1000.0) * rect.size.x
 			_draw_piece(piece, rect)
 	# Moving pieces last, so they pass over the others.
 	for piece: Piece in poses:

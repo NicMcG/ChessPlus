@@ -110,6 +110,15 @@ var TIP := tip_text(DisplayServer.is_touchscreen_available())
 static func tip_text(touchscreen: bool) -> String:
 	return "Tip: %s any piece to see how it moves." % ("hold" if touchscreen else "right-click")
 
+## A king in check chatters softly (looped) until the check is over, once the
+## move's animation has finished. Not while looking back at old moves.
+func _update_check_sound() -> void:
+	var chatter := viewing < 0 and not board_view.check_squares().is_empty() and not board_view.is_animating()
+	if chatter:
+		sounds.play_loop(GameSounds.Sound.CHATTER)
+	elif sounds.looping == GameSounds.Sound.CHATTER:
+		sounds.stop_loop()
+
 func _ready() -> void:
 	sounds = GameSounds.new()
 	add_child(sounds)
@@ -981,6 +990,7 @@ func resign() -> void:
 	_after_online_change()
 
 func _process(_delta: float) -> void:
+	_update_check_sound()
 	if online == null or not online.timed():
 		return
 	var now := Time.get_ticks_msec()
