@@ -59,7 +59,9 @@ const JS := """
 			e.preventDefault();
 			o.dock(id, true);
 			try { el.focus({ preventScroll: true }); } catch (err) { el.focus(); }
-			if (o.focused !== id) { o.undock(el); o.replaceAll(); }
+			// The focus event can arrive a moment later; if the box never got
+			// focus, put it back.
+			setTimeout(function () { if (document.activeElement !== el) { o.undock(el); o.replaceAll(); } }, 500);
 		});
 		el.addEventListener('focus', function () {
 			o.focused = id;
