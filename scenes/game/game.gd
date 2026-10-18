@@ -637,14 +637,16 @@ func _show_rematch_offer() -> void:
 	if button:
 		button.text = "Accept rematch"
 
-## Rematch: choose an army, then either accept the opponent's rematch or set
-## one up (colours swapped, same time limit) and wait for them.
+## Rematch: accepting the opponent's rematch means choosing an army; setting one
+## up means choosing an army and a side (White, Black or Random, Mac's design),
+## then waiting for them. The time limit stays the same.
 func start_rematch() -> void:
-	var picker := ArmyPicker.new(library, "Your army for the rematch")
+	var accepting := _opponent_wants_rematch()
+	var picker := ArmyPicker.new(library, "Your army for the rematch", not accepting)
 	picker.chosen.connect(_rematch_with)
 	add_child(picker)
 
-func _rematch_with(army: Army) -> void:
+func _rematch_with(army: Army, side := OnlineSession.SIDE_RANDOM) -> void:
 	var button := game_over_panel.button("rematch")
 	if button:
 		button.disabled = true
@@ -653,7 +655,6 @@ func _rematch_with(army: Army) -> void:
 		return
 	game_over_panel.set_note("Setting up the rematch...")
 	var next := _new_session()
-	var side := OnlineSession.SIDE_BLACK if online.my_team == Piece.Team.WHITE else OnlineSession.SIDE_WHITE
 	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)))
 	if not created.ok:
 		_rematch_failed(next, "Couldn't set up a rematch: " + created.error)
