@@ -139,3 +139,62 @@ func test_small_wobble_is_still_a_tap() -> void:
 	view.pointer_down(view.square_center(_square("e4")))
 	check_eq(chosen.size(), 1, "Tap, tap still moves")
 	view.free()
+
+# --- Animation -------------------------------------------------------------------
+
+func _played(view: BoardView, text: String) -> Move:
+	var move := view.state.find_move(text)
+	view.state.make_move(move)
+	view.show_move(move)
+	return move
+
+func test_tapped_move_slides_then_stops() -> void:
+	var view := _view_for(StandardSetup.create_game())
+	_played(view, "e2-e4")
+	check(view.is_animating(), "Sliding after a tapped move")
+	view.advance_animation(view.move_time / 2)
+	check(view.is_animating(), "Still sliding halfway")
+	view.advance_animation(view.move_time)
+	check(not view.is_animating(), "Finished")
+	view.free()
+
+func test_dragged_move_does_not_slide() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	# Make the move the way the game screen does.
+	view.move_chosen.connect(func(move: Move) -> void:
+		view.state.make_move(move)
+		view.show_move(move))
+	_drag(view, "e2", "e4")
+	check_eq(chosen.size(), 1, "Moved")
+	check(not view.is_animating(), "No slide: the piece is already there")
+	view.free()
+
+func test_capture_fades_and_undo_slides_back() -> void:
+	var view := _view_for(StandardSetup.from_fen("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1"))
+	_played(view, "e4xd5")
+	check(view.is_animating(), "Capture animates")
+	view.advance_animation(1.0)
+	var move: Move = view.state.history.back()
+	view.state.undo_move(move)
+	var undone: Array[Move] = [move]
+	view.show_undo(undone)
+	check(view.is_animating(), "Undo animates")
+	view.advance_animation(1.0)
+	check(not view.is_animating(), "Finished")
+	view.free()
+
+func test_no_animation_when_turned_off() -> void:
+	var view := _view_for(StandardSetup.create_game())
+	view.move_time = 0
+	_played(view, "e2-e4")
+	check(not view.is_animating(), "Nothing slides")
+	view.free()
+
+func test_illegal_tap_shakes_the_piece() -> void:
+	var view := _view_for(StandardSetup.create_game())
+	view.tap(_square("e2"))
+	view.tap(_square("e5"))
+	check(view.is_shaking(_square("e2")), "e2 shakes")
+	view.advance_animation(1.0)
+	check(not view.is_shaking(_square("e2")), "Then stops")
+	view.free()

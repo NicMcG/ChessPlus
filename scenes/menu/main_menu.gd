@@ -12,3 +12,12 @@ func _ready() -> void:
 	%Continue.pressed.connect(func() -> void: continue_pressed.emit())
 	%Play.pressed.connect(func() -> void: play_pressed.emit())
 	%Armies.pressed.connect(func() -> void: armies_pressed.emit())
+	%Sound.pressed.connect(toggle_sound)
+	_show_sound()
+
+func toggle_sound() -> void:
+	UserSettings.set_sound_on(not UserSettings.sound_on())
+	_show_sound()
+
+func _show_sound() -> void:
+	%Sound.text = "Sound: " + ("on" if UserSettings.sound_on() else "off")

@@ -102,3 +102,35 @@ func test_menu_offers_continue_only_with_a_save() -> void:
 	check_eq(main.screen.state.history[0].to_text(), "e2-e4", "Starting with e4")
 	main.free()
 	SavedGame.delete_saved()
+
+# --- Sounds and the sound setting -------------------------------------------------
+
+func test_sounds_match_the_move() -> void:
+	var game := _open_game()
+	_play(game, "e4")
+	check_eq(game.sounds.last_played, GameSounds.Sound.MOVE, "Ordinary move")
+	_play(game, "d5")
+	_play(game, "exd5")
+	check_eq(game.sounds.last_played, GameSounds.Sound.CAPTURE, "Capture")
+	_play(game, "e6")
+	_play(game, "Bb5+")
+	check_eq(game.sounds.last_played, GameSounds.Sound.CHECK, "Check")
+	game.free()
+	SavedGame.delete_saved()
+
+func test_sounds_are_real_audio() -> void:
+	for sound in GameSounds.Sound.values():
+		var stream := GameSounds.stream_for(sound)
+		check(stream.get_length() > 0.05, "Sound %d has length" % sound)
+
+func test_sound_setting_is_remembered() -> void:
+	UserSettings.set_sound_on(false)
+	UserSettings.reload()
+	check(not UserSettings.sound_on(), "Off after reading the file again")
+	var menu: Node = load("res://scenes/menu/main_menu.tscn").instantiate()
+	(Engine.get_main_loop() as SceneTree).root.add_child(menu)
+	check_eq(menu.get_node("%Sound").text, "Sound: off", "Menu shows off")
+	menu.toggle_sound()
+	check(UserSettings.sound_on(), "Back on")
+	check_eq(menu.get_node("%Sound").text, "Sound: on", "Menu shows on")
+	menu.free()
