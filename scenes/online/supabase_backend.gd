@@ -26,6 +26,9 @@ func update(code: String, changes: Dictionary, conditions: Dictionary = {}) -> D
 		path += "&%s=eq.%s" % [column, str(conditions[column]).uri_encode()]
 	return await _request(HTTPClient.METHOD_PATCH, path, changes)
 
+func call_function(name: String, args: Dictionary) -> Dictionary:
+	return await _request(HTTPClient.METHOD_POST, "/rest/v1/rpc/" + name, args)
+
 ## Godot's names for why a request failed, shown in error messages.
 const RESULT_NAMES := {
 	HTTPRequest.RESULT_CHUNKED_BODY_SIZE_MISMATCH: "chunked body size mismatch",

@@ -285,3 +285,61 @@ func test_your_army_is_at_the_bottom() -> void:
 	check(guest_screen.board_view.flipped, "Black (guest): Black at the bottom")
 	host_screen.free()
 	guest_screen.free()
+
+# --- Draw offers, chat, rematch ---------------------------------------------------------
+
+func test_draw_offer_accepted() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var guest: OnlineSession = pair[1]
+	await host.offer_draw()
+	await guest.poll()
+	check_eq(guest.draw_offer(), "white", "Guest sees White's offer")
+	var second := await host.offer_draw()
+	check(second.rows.is_empty(), "Only one offer at a time")
+	await guest.answer_draw(true)
+	check_eq(guest.status(), OnlineSession.FINISHED, "Finished")
+	check_eq(guest.result_code(), "draw_agreed", "Agreed draw")
+	_free(pair)
+
+func test_draw_offer_declined_or_ignored() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var guest: OnlineSession = pair[1]
+	await guest.offer_draw()
+	await host.poll()
+	await host.answer_draw(false)
+	check_eq(host.draw_offer(), "", "Declined")
+	await guest.poll()
+	await guest.offer_draw()
+	await host.poll()
+	await host.send_moves(["e2-e4"], false)
+	check_eq(host.draw_offer(), "", "Moving turns the offer down")
+	check_eq(host.status(), OnlineSession.PLAYING, "Game goes on")
+	_free(pair)
+
+func test_chat_messages() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var guest: OnlineSession = pair[1]
+	await host.post_chat("Good luck!")
+	await guest.post_chat("  You too  ")
+	await host.poll()
+	check_eq(host.chat(), [{"from": "white", "text": "Good luck!"}, {"from": "black", "text": "You too"}], "Both messages, in order")
+	check(not (await host.post_chat("   ")).ok, "Empty messages are not sent")
+	await host.post_chat("x".repeat(300))
+	check_eq((host.chat().back().text as String).length(), 200, "Long messages are cut to 200")
+	_free(pair)
+
+func test_rematch_claim() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var guest: OnlineSession = pair[1]
+	await host.resign()
+	await guest.poll()
+	check((await host.claim_rematch("NEW01")).rows.size() == 1, "First claim wins")
+	var late := await guest.claim_rematch("NEW02")
+	check(late.rows.is_empty(), "Second claim loses")
+	await guest.poll()
+	check_eq(guest.rematch_code(), "NEW01", "Both see the same rematch")
+	_free(pair)

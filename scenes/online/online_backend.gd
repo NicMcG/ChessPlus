@@ -23,6 +23,12 @@ func fetch(_code: String) -> Dictionary:
 func update(_code: String, _changes: Dictionary, _conditions: Dictionary = {}) -> Dictionary:
 	return failed("not implemented")
 
+## Run one of the server's functions (see server/*.sql), e.g.
+## call_function("post_chat", {"game_code": ..., "sender": ..., "message": ...}).
+## rows holds the games it changed.
+func call_function(_name: String, _args: Dictionary) -> Dictionary:
+	return failed("not implemented")
+
 static func succeeded(rows: Array) -> Dictionary:
 	return {"ok": true, "rows": rows, "error": ""}
 

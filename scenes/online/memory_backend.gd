@@ -33,10 +33,26 @@ func update(code: String, changes: Dictionary, conditions: Dictionary = {}) -> D
 		return succeeded([])
 	var row: Dictionary = games[code]
 	for column in conditions:
-		if row.get(column) != conditions[column]:
+		# A column a row doesn't have yet counts as empty, like the real table's
+		# defaults ('' for text).
+		if row.get(column, "") != conditions[column]:
 			return succeeded([])
 	for column in changes:
 		row[column] = changes[column]
+	row["updated_at"] = Time.get_ticks_msec()
+	return succeeded([row.duplicate(true)])
+
+func call_function(name: String, args: Dictionary) -> Dictionary:
+	if offline:
+		return failed("offline")
+	if name != "post_chat":
+		return failed("no such function: " + name)
+	if not games.has(args.game_code):
+		return succeeded([])
+	var row: Dictionary = games[args.game_code]
+	var chat: Array = row.get("chat", [])
+	chat.append({"from": args.sender, "text": str(args.message).left(200)})
+	row["chat"] = chat
 	row["updated_at"] = Time.get_ticks_msec()
 	return succeeded([row.duplicate(true)])
 
