@@ -16,6 +16,9 @@ const NO_LETTER_SYMBOL := "P"
 ## The SAN for `move`, which must be a legal move in `state`'s current position.
 static func san(state: GameState, move: Move) -> String:
 	var text := ""
+	if move.ability == PieceDef.Ability.RAISE_DEAD:
+		# Text only (for tests and saving): NC!=Q
+		return move.piece.def.symbol.to_upper() + "!=" + move.raised.def.symbol.to_upper() + _check_suffix(state, move)
 	if move.is_castling():
 		text = "O-O" if move.to.x > move.from.x else "O-O-O"
 	else:
@@ -35,6 +38,9 @@ static func san(state: GameState, move: Move) -> String:
 		# Nothing moves, so it can never give check: there's never a + after it.
 		if move.breaks_shield():
 			text += "*"
+		# Crack Shot (text only): Axd5!
+		if move.ability == PieceDef.Ability.CRACK_SHOT:
+			text += "!"
 	return text + _check_suffix(state, move)
 
 ## Icon names for picture notation (pictures in res://art/icons/).
@@ -54,7 +60,17 @@ static func picture(state: GameState, move: Move) -> Array:
 
 static func _picture(state: GameState, move: Move, check_suffix: String) -> Array:
 	var parts := [{"piece": move.piece.def, "team": move.piece.team}]
-	if move.is_castling():
+	if move.ability != PieceDef.Ability.NONE:
+		# A special ability: [piece] [lightning bolt] [the piece it targets or brings back].
+		parts.append({"icon": ABILITY_ICON})
+		if move.ability == PieceDef.Ability.RAISE_DEAD:
+			parts.append({"piece": move.raised.def, "team": move.raised.team})
+		else:
+			var target := move.captured if move.captured else move.shield_target
+			parts.append({"piece": target.def, "team": target.team})
+			if move.breaks_shield():
+				parts.append({"icon": SHIELD_BREAK_ICON})
+	elif move.is_castling():
 		parts.append({"text": "O-O" if move.to.x > move.from.x else "O-O-O"})
 	else:
 		# Which piece of that type moved, when it isn't obvious: a pawn capturing

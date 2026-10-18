@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3]
+
+[ext_resource type="Script" path="res://core/move_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]
+
+[sub_resource type="Resource" id="Resource_rule1"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)])
+max_steps = 0
+
+[resource]
+script = ExtResource("2_def")
+id = "ram"
+display_name = "Ram"
+symbol = "RM"
+value = 3.5
+move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1")])
+dies_on_capture = true
+special_rule = "When it captures a piece (or breaks a shield), the Ram is removed from the board too."

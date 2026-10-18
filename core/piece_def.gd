@@ -30,6 +30,17 @@ enum Keyword { JUMP = 1, CASTLE = 2, PROMOTE = 4, SHIELD = 8 }
 ##   attacker stays where it is and uses its turn); the shield never comes back.
 @export_flags("Jump", "Castle", "Promote", "Shield") var keywords := 0
 
+## Once-per-game special abilities (each uses a turn).
+## CRACK_SHOT (Archer): capture something it could capture, without moving.
+## RAISE_DEAD (Necromancer): it leaves the board and one of its side's lost
+##   pieces (not a pawn type, not a Necromancer) comes back on its square, fresh.
+enum Ability { NONE, CRACK_SHOT, RAISE_DEAD }
+@export var ability: Ability = Ability.NONE
+
+## The Ram's rule: after capturing (or breaking a shield) it is removed from the
+## board too, and counts as lost.
+@export var dies_on_capture := false
+
 ## Shown on the piece card under "Special Rule": anything about how it plays that
 ## its types, keywords and move picture can't show. Empty for most pieces.
 @export_multiline var special_rule := ""

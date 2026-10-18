@@ -44,6 +44,19 @@ func _init(p_from: Vector2i, p_to: Vector2i, p_piece: Piece, p_captured: Piece =
 	captured = p_captured
 	capture_square = p_to
 
+## The special ability this move uses (PieceDef.Ability), NONE for ordinary moves.
+## A Crack Shot is a capture (or shield break) where the Archer stays put; a Raise
+## Dead has from == to (the Necromancer's square) and `raised` set.
+var ability: PieceDef.Ability = PieceDef.Ability.NONE
+## Raise Dead: the piece that comes back (a fresh piece of a lost piece's type),
+## and the lost piece it stands for (taken off the lost list while it's back).
+var raised: Piece
+var raised_from_lost: Piece
+## Filled in by make_move: where raised_from_lost was in the lost list, and
+## whether the moving piece died (a Ram capturing).
+var raised_lost_index := -1
+var attacker_died := false
+
 ## True for captures and for shield breaks (both are written with "x").
 func is_capture() -> bool:
 	return captured != null or breaks_shield()
@@ -51,15 +64,21 @@ func is_capture() -> bool:
 func breaks_shield() -> bool:
 	return shield_target != null
 
-## Where the moving piece ends up: `to`, or `from` if it only broke a shield.
+## Where the moving piece ends up: `to`, or `from` if it only broke a shield or
+## used Crack Shot (it shoots from where it stands).
 func lands_on() -> Vector2i:
-	return from if breaks_shield() else to
+	return from if breaks_shield() or ability == PieceDef.Ability.CRACK_SHOT else to
 
 func is_castling() -> bool:
 	return partner != null
 
 ## Simple text like "e2-e4", "e4xd5" or "e7-e8=Q". Used for testing, not real notation.
 func to_text() -> String:
+	# Abilities: "c1!g5" (Crack Shot on g5), "d1!=Q" (Raise Dead bringing back a queen).
+	if ability == PieceDef.Ability.RAISE_DEAD:
+		return Board.square_name(from) + "!=" + raised.def.symbol.to_upper()
+	if ability == PieceDef.Ability.CRACK_SHOT:
+		return Board.square_name(from) + "!" + Board.square_name(to)
 	var joiner := "x" if is_capture() else "-"
 	var text := Board.square_name(from) + joiner + Board.square_name(to)
 	if promotion:

@@ -36,11 +36,56 @@ static func pseudo_legal_moves(state: GameState, captures_only := false) -> Arra
 	var pieces := board.pieces_of(state.side_to_move)
 	for from: Vector2i in pieces:
 		var piece: Piece = pieces[from]
+		var first_new := moves.size()
 		for rule in piece.def.move_rules:
 			_add_rule_moves(state, from, piece, rule, moves, captures_only)
 		if not captures_only and piece.def.is_king_type() and not piece.has_moved:
 			_add_castling_moves(board, state.rules, from, piece, moves)
+		if piece.can_use_ability():
+			_add_ability_moves(state, from, piece, moves, first_new, captures_only)
 	return moves
+
+## A piece's special-ability moves. Crack Shot: a copy of each of its captures
+## (from `first_new` on in `moves`) in which it doesn't move. Raise Dead: one move
+## per type of lost piece that can come back.
+static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, moves: Array[Move], first_new: int, captures_only: bool) -> void:
+	match piece.def.ability:
+		PieceDef.Ability.CRACK_SHOT:
+			for i in range(first_new, moves.size()):
+				var capture: Move = moves[i]
+				if not capture.is_capture() or capture.promotion:
+					continue
+				var shot := Move.new(capture.from, capture.to, piece, capture.captured)
+				shot.capture_square = capture.capture_square
+				shot.shield_target = capture.shield_target
+				shot.ability = PieceDef.Ability.CRACK_SHOT
+				moves.append(shot)
+		PieceDef.Ability.RAISE_DEAD:
+			if captures_only:
+				return
+			for def in raisable_defs(state, piece.team):
+				var raise := Move.new(from, from, piece)
+				raise.ability = PieceDef.Ability.RAISE_DEAD
+				for lost_piece: Piece in state.lost[piece.team]:
+					if lost_piece.def == def:
+						raise.raised_from_lost = lost_piece
+						break
+				# Comes back as if the game had just started (shield, ability and all),
+				# but it has "moved": it can't castle.
+				raise.raised = Piece.new(def, piece.team)
+				raise.raised.has_moved = true
+				moves.append(raise)
+
+## The kinds of `team`'s lost pieces that Raise Dead could bring back: not pawn
+## types and not Necromancers (Raise Dead pieces). Each listed once.
+static func raisable_defs(state: GameState, team: Piece.Team) -> Array[PieceDef]:
+	var defs: Array[PieceDef] = []
+	for piece: Piece in state.lost[team]:
+		var def := piece.def
+		if def.is_pawn_type() or def.ability == PieceDef.Ability.RAISE_DEAD or defs.has(def):
+			continue
+		defs.append(def)
+	return defs
 
 ## True if any of `team`'s royal pieces is attacked, using the game's saved
 ## attack table (faster than is_in_check, which works it out from the board).
