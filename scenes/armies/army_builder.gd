@@ -13,6 +13,13 @@ signal saved(army: Army)
 const BOARD_WIDTH := 8
 const NAME_MAX_LENGTH := 20
 
+## How big the piece card is drawn (see PieceCard.zoom) on wide and tall screens.
+const CARD_ZOOM_WIDE := 2.0
+const CARD_ZOOM_TALL := 1.25
+## The range of widths for the piece-type buttons in the tray.
+const TRAY_BUTTON_MIN := 100.0
+const TRAY_BUTTON_MAX := 170.0
+
 @onready var name_edit: LineEdit = %NameEdit
 @onready var points_label: Label = %Points
 @onready var army_board: ArmyBoard = %ArmyBoard
@@ -66,6 +73,7 @@ func _ready() -> void:
 	_layout.get_parent().add_child(_wide_box)
 	resized.connect(fit_layout)
 	army_board.resized.connect(_fit_army_board)
+	resized.connect(_fit_tray)
 	fit_layout()
 	# Start by showing the first piece in the tray (the king).
 	card.show_piece(_tray_buttons.keys()[0], team)
@@ -133,12 +141,30 @@ func fit_layout() -> void:
 			ScreenShape.move_to([_card_scroll], _layout)
 			_layout.move_child(_card_scroll, save_button.get_index())
 		_wide_box.visible = wide
+	# The piece card: bigger beside the board (there's room), a little bigger below it.
+	card.set_zoom(CARD_ZOOM_WIDE if wide else CARD_ZOOM_TALL)
+	_fit_tray()
 
 ## The army board's squares are sized by the space it's given: make it tall
 ## enough for square squares across the full width (within limits).
 func _fit_army_board() -> void:
 	var square := army_board.size.x / army_board.columns
 	army_board.custom_minimum_size.y = clampf(square * army_board.rows, 150, 400)
+
+## The piece-type buttons share the column's width equally (within limits), so
+## they're as big as the space allows. Measured from the whole screen, not the
+## tray (the tray grows with its buttons, so that would feed back on itself).
+func _fit_tray() -> void:
+	var margin: MarginContainer = _wide_box.get_parent()
+	var column := size.x - margin.get_theme_constant("margin_left") - margin.get_theme_constant("margin_right")
+	if wide:
+		column = (column - _wide_box.get_theme_constant("separation")) / 2
+	var gap := tray.get_theme_constant("h_separation")
+	var width := floorf((column - gap * (tray.columns - 1)) / tray.columns)
+	width = clampf(width, TRAY_BUTTON_MIN, TRAY_BUTTON_MAX)
+	for button: Button in _tray_buttons.values():
+		button.custom_minimum_size = Vector2(width, roundf(width * 1.1))
+		button.add_theme_font_size_override("font_size", roundi(width * 0.14))
 
 func _build_tray() -> void:
 	var defs := PieceCatalog.all_defs()
@@ -159,9 +185,11 @@ func _build_tray() -> void:
 		button.add_theme_stylebox_override("hover_pressed", chosen_style)
 		button.icon = PieceArt.texture_for(def, team)
 		button.expand_icon = true
+		# The text never makes the button wider than the size it's given.
+		button.clip_text = true
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-		button.custom_minimum_size = Vector2(106, 118)
+		button.custom_minimum_size = Vector2(TRAY_BUTTON_MIN, roundf(TRAY_BUTTON_MIN * 1.1))
 		button.add_theme_font_size_override("font_size", 17)
 		button.toggled.connect(func(on: bool) -> void: select(def if on else null))
 		tray.add_child(button)

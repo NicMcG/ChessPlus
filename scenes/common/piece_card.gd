@@ -32,6 +32,9 @@ const EXPLANATIONS := {
 
 var def: PieceDef
 var team := Piece.Team.WHITE
+## How big the card is drawn: 1 = normal (the pop-up in games); the army builder
+## uses more. Change it with set_zoom.
+var zoom := 1.0
 ## The explanation bubble, and the type/keyword it's showing (null if hidden).
 var tooltip: PanelContainer
 var tooltip_owner: Control
@@ -45,8 +48,33 @@ func show_piece(p_def: PieceDef, p_team := Piece.Team.WHITE) -> void:
 
 func _ready() -> void:
 	_make_tooltip()
+	_apply_zoom()
 	if def:
 		_refresh()
+
+## Draw the card bigger (or smaller): 1.5 = everything half as big again.
+func set_zoom(p_zoom: float) -> void:
+	if is_equal_approx(p_zoom, zoom):
+		return
+	zoom = p_zoom
+	if is_node_ready():
+		_apply_zoom()
+		if def:
+			_refresh()
+
+## A size at the current zoom.
+func _z(value: float) -> int:
+	return roundi(value * zoom)
+
+## Sizes of the parts that come from the scene file.
+func _apply_zoom() -> void:
+	%Name.add_theme_font_size_override("font_size", _z(40))
+	%GuideBoard.custom_minimum_size = Vector2(_z(220), _z(220))
+	$Special/SpecialTitle.add_theme_font_size_override("font_size", _z(26))
+	%SpecialText.add_theme_font_size_override("font_size", _z(22))
+	var tip_label: Label = tooltip.get_child(0)
+	tip_label.custom_minimum_size = Vector2(_z(420), 0)
+	tip_label.add_theme_font_size_override("font_size", _z(22))
 
 ## E.g. "Free", "1 point", "3 points".
 static func cost_text(p_def: PieceDef) -> String:
@@ -147,7 +175,7 @@ func _refresh() -> void:
 	for texture in PieceArt.all_textures(def, team):
 		var picture := TextureRect.new()
 		picture.texture = texture
-		picture.custom_minimum_size = Vector2(88, 88)
+		picture.custom_minimum_size = Vector2(_z(88), _z(88))
 		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		%Pictures.add_child(picture)
@@ -178,7 +206,7 @@ func _fill_details() -> void:
 func _detail_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 24)
+	label.add_theme_font_size_override("font_size", _z(24))
 	label.add_theme_color_override("font_color", Color(0.78, 0.78, 0.78))
 	return label
 
@@ -197,10 +225,10 @@ func _fill_legend() -> void:
 		row.add_theme_constant_override("separation", 10)
 		var icon := LegendIcon.new()
 		icon.kind = kind
-		icon.custom_minimum_size = Vector2(36, 36)
+		icon.custom_minimum_size = Vector2(_z(36), _z(36))
 		var label := Label.new()
 		label.text = PieceGuideBoard.LEGEND[kind]
-		label.add_theme_font_size_override("font_size", 20)
+		label.add_theme_font_size_override("font_size", _z(20))
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -219,14 +247,14 @@ func _fill_keywords() -> void:
 		var style := StyleBoxFlat.new()
 		style.bg_color = colors[0]
 		style.set_corner_radius_all(8)
-		style.content_margin_left = 14
-		style.content_margin_right = 14
-		style.content_margin_top = 4
-		style.content_margin_bottom = 4
+		style.content_margin_left = _z(14)
+		style.content_margin_right = _z(14)
+		style.content_margin_top = _z(4)
+		style.content_margin_bottom = _z(4)
 		box.add_theme_stylebox_override("panel", style)
 		var label := Label.new()
 		label.text = keyword.to_upper()
-		label.add_theme_font_size_override("font_size", 22)
+		label.add_theme_font_size_override("font_size", _z(22))
 		label.add_theme_color_override("font_color", colors[1])
 		box.add_child(label)
 		_explain_on_hover(box, keyword)

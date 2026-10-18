@@ -19,11 +19,13 @@ func _ready() -> void:
 
 ## On a PC, open the window as big as the screen comfortably allows (it's drawn
 ## for a tall phone screen, so a small window shrinks everything and blurs the
-## text). Not in phone or web builds, nor when a size was asked for on the
-## command line (the screenshot tools do that).
+## text). Not in phone or web builds, nor when the window was opened at some
+## other size on purpose (the screenshot tools ask for one).
 func fit_window_to_screen() -> void:
 	var window := get_window()
-	if not OS.has_feature("pc") or DisplayServer.get_name() == "headless" 			or OS.get_cmdline_args().has("--resolution") or window.mode != Window.MODE_WINDOWED:
+	var normal_size := Vector2i(ProjectSettings.get_setting("display/window/size/window_width_override"),
+			ProjectSettings.get_setting("display/window/size/window_height_override"))
+	if not OS.has_feature("pc") or DisplayServer.get_name() == "headless" 			or window.size != normal_size or window.mode != Window.MODE_WINDOWED:
 		return
 	var area := DisplayServer.screen_get_usable_rect(window.current_screen)
 	# 90% of the screen's height (leaving room for the title bar), 16:10 shaped.
