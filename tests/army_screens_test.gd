@@ -120,7 +120,9 @@ func test_builder_shows_rule_problems() -> void:
 	for file in [1, 2, 6]:
 		builder.tap_square(Vector2i(file, 0))
 	check(builder.problems_label.text.contains("Too many knights"), "Three knights")
-	check(builder._tray_buttons[KNIGHT].text.contains("0 left"), "Tray shows none left")
+	check(builder._tray_buttons[KNIGHT].modulate.a < 1.0, "Tray fades a piece with none left")
+	check(builder._tray_buttons[QUEEN].modulate.a == 1.0, "Queen still to add")
+	check_eq(builder._tray_buttons[KNIGHT].get_node("Cost").text, "3", "Tray shows the cost")
 	builder.free()
 
 func test_builder_saves_and_edits_a_copy() -> void:

@@ -77,10 +77,26 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="AbilityTitle" type="Label" parent="Ability"]
+[node name="AbilityHeader" type="HBoxContainer" parent="Ability"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AbilityTitle" type="Label" parent="Ability/AbilityHeader"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
 text = "Special Ability"
+
+[node name="AbilityChip" type="PanelContainer" parent="Ability/AbilityHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="AbilityName" type="Label" parent="Ability/AbilityHeader/AbilityChip"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "ABILITY"
 
 [node name="AbilityText" type="Label" parent="Ability"]
 unique_name_in_owner = true

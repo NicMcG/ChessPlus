@@ -48,6 +48,15 @@ enum Ability { NONE, CRACK_SHOT, RAISE_DEAD }
 ## name (e.g. "Crack Shot") and what it does. Empty for most pieces.
 @export var ability_name := ""
 @export_multiline var ability_text := ""
+## The ability's colours, left to right: its name on the piece card and the
+## button in a game are filled with a gradient between them (Mac's design).
+@export var ability_colors := PackedColorArray()
+
+## ability_colors, or a grey gradient if the piece has none.
+func ability_gradient() -> PackedColorArray:
+	if ability_colors.size() >= 2:
+		return ability_colors
+	return PackedColorArray([Color("#4a4a4a"), Color("#9a9a9a")])
 
 func is_king_type() -> bool:
 	return types & Type.KING != 0

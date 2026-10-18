@@ -130,7 +130,8 @@ func _ready() -> void:
 	new_game_button.pressed.connect(new_game)
 	undo_button.pressed.connect(undo)
 	play_from_here_button.pressed.connect(play_from_here)
-	ability_button.icon = load("res://art/icons/%s.png" % Notation.ABILITY_ICON)
+	for color in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		ability_button.add_theme_color_override(color, Color.WHITE)
 	ability_button.pressed.connect(use_ability)
 	board_view.selection_changed.connect(_on_selection_changed)
 	move_list.move_tapped.connect(view_move)
@@ -388,9 +389,20 @@ func _on_selection_changed(_square: Vector2i) -> void:
 	var moves := board_view.selected_ability_moves()
 	ability_button.visible = not moves.is_empty()
 	if not moves.is_empty():
-		ability_button.text = moves[0].piece.def.ability_name
+		var def: PieceDef = moves[0].piece.def
+		ability_button.text = def.ability_name
+		_style_ability_button(def.ability_gradient())
 	else:
 		_update_text()
+
+## The ability button gets the piece's gradient: lighter under the mouse,
+## darker while pressed.
+func _style_ability_button(colors: PackedColorArray) -> void:
+	var style := GradientStyleBox.new(colors, 12, 16, 8)
+	ability_button.add_theme_stylebox_override("normal", style)
+	ability_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	ability_button.add_theme_stylebox_override("hover", style.shaded(0.15))
+	ability_button.add_theme_stylebox_override("pressed", style.shaded(-0.2))
 
 ## The ability button: Crack Shot asks which piece to shoot (on the board);
 ## Raise Dead asks which lost piece to bring back (a picker, like promotion).

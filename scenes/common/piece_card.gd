@@ -106,7 +106,8 @@ func _apply_zoom() -> void:
 	%GuideBoard.custom_minimum_size = Vector2(_z(220), _z(220))
 	$Special/SpecialTitle.add_theme_font_size_override("font_size", _z(26))
 	%SpecialText.add_theme_font_size_override("font_size", _z(22))
-	$Ability/AbilityTitle.add_theme_font_size_override("font_size", _z(26))
+	$Ability/AbilityHeader/AbilityTitle.add_theme_font_size_override("font_size", _z(26))
+	%AbilityName.add_theme_font_size_override("font_size", _z(22))
 	%AbilityText.add_theme_font_size_override("font_size", _z(22))
 	var tip_label: Label = tooltip.get_child(0)
 	tip_label.custom_minimum_size = Vector2(_z(420), 0)
@@ -225,7 +226,9 @@ func _refresh() -> void:
 	%Special.visible = not special.is_empty()
 	%SpecialText.text = "\n".join(special)
 	%Ability.visible = def.ability_name != ""
-	$Ability/AbilityTitle.text = "Special Ability: " + def.ability_name
+	# The name in a box like the keywords', filled with the piece's gradient.
+	%AbilityName.text = def.ability_name.to_upper()
+	%AbilityChip.add_theme_stylebox_override("panel", GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4)))
 	%AbilityText.text = def.ability_text
 
 ## "3 points" followed by the types in italics, e.g. "Free · King, Royal".
