@@ -178,22 +178,24 @@ func test_rematch_picker_asks_the_offerer_for_a_side() -> void:
 	offer.free()
 	accept.free()
 
-func test_checkmate_king_turns_to_dust_as_the_result_fades_in() -> void:
+func test_checkmate_king_turns_to_dust_then_a_tap_shows_the_result() -> void:
 	var game: Node = load("res://scenes/game/game.tscn").instantiate()
 	_root().add_child(game)
 	_play_all(game, FOOLS_MATE)
-	check(game.game_over_panel.visible, "Result is up")
-	check_eq(game.game_over_panel.modulate.a, 0.0, "But invisible until the king crumbles")
+	check(game.game_over_panel.visible, "Result is ready")
+	check_eq(game.game_over_panel.modulate.a, 0.0, "But not shown yet")
 	game.board_view.advance_animation(5.0)
 	await _frames(1)
 	var effect: CheckmateEffect = game._mate_effect
 	check(effect != null and effect.is_inside_tree(), "The checkmate effect runs")
 	var king_square := Board.parse_square("e1")
 	check(king_square in game.board_view.hidden_squares, "The king has left the board")
-	effect.advance(CheckmateEffect.RISE + CheckmateEffect.HOLD + 0.01)
-	check(game._result_fade != null, "The result starts fading in as it crumbles")
-	effect.advance(CheckmateEffect.length())
-	check(not king_square in game.board_view.hidden_squares, "Afterwards the board shows the king again")
+	effect.advance(CheckmateEffect.crumble_end() + 1.0)
+	check(game._result_fade == null, "The result waits for a tap, even after the dust has gone")
+	check(is_instance_valid(effect) and effect.is_inside_tree(), "CHECKMATE stays up")
+	effect.dismiss()
+	check(game._result_fade != null, "A tap brings up the result")
+	check(not king_square in game.board_view.hidden_squares, "The king is back on the board")
 	game.free()
 
 func test_undoing_checkmate_stops_the_effect() -> void:

@@ -636,7 +636,8 @@ func show_game_over() -> void:
 		_show_rematch_offer()
 
 ## Checkmate was just played: once the move's animation ends, the beaten king
-## rises off the board and crumbles to dust while the result screen fades in.
+## rises off the board and crumbles to dust as "CHECKMATE" appears; a tap then
+## brings up the result screen (see CheckmateEffect).
 func _play_checkmate_effect() -> void:
 	_stop_checkmate_effect()
 	var squares := MoveAnimation.royal_squares(state, state.side_to_move)
@@ -661,12 +662,14 @@ func _play_checkmate_effect() -> void:
 	effect.setup(texture, Rect2(square_rect.position - get_global_rect().position, square_rect.size))
 	effect.crumbling.connect(func() -> void:
 		sounds.play(GameSounds.Sound.DUST)
-		_result_fade = create_tween()
-		_result_fade.tween_property(game_over_panel, "modulate:a", 1.0, 2.0))
-	effect.finished.connect(func() -> void:
+		sounds.play(GameSounds.Sound.WIND))
+	# A tap anywhere: on to the usual result screen, and the king is back on the board.
+	effect.dismissed.connect(func() -> void:
 		board_view.hidden_squares.erase(squares[0])
 		board_view.queue_redraw()
-		_mate_effect = null)
+		_mate_effect = null
+		_result_fade = create_tween()
+		_result_fade.tween_property(game_over_panel, "modulate:a", 1.0, 0.4))
 	add_child(effect)
 	sounds.play(GameSounds.Sound.CHECKMATE)
 

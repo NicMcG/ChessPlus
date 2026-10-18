@@ -139,3 +139,5 @@ func test_sound_setting_is_remembered() -> void:
 	check(UserSettings.sound_on(), "Back on")
 	check_eq(menu.get_node("%Sound").text, "Sound: on", "Menu shows on")
 	menu.free()
+	# Tests run silently (see run_tests.gd).
+	UserSettings.set_sound_on(false)
