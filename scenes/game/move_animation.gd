@@ -1,0 +1,404 @@
+class_name MoveAnimation
+extends RefCounted
+
+## The plan for animating one move on the board: how each piece involved moves
+## over time, the extra things drawn (a cannonball, an arrow, smoke, dust, a
+## flash of light) and when each sound plays. BoardView plays it back and draws
+## it; this only describes it (and never touches the game itself, which has
+## already changed by the time the animation starts).
+##
+## Positions are in squares (file, rank as decimals, the middle of a1 = (0, 0)),
+## so the plan doesn't care whether the board is drawn flipped. "Lift" is in
+## squares too, straight up the screen (for pieces in the air).
+##
+## Mac's designs (Oct 2026): ordinary moves slide; moves that leap hop through
+## the air; a piece dropped by dragging slams down with a puff of dust; a
+## captured piece is knocked off the board; castling pieces both hop into place;
+## promotion flashes and turns the pawn into the new piece; the cannon fires a
+## cannonball over its screen, then rolls onto the square; Crack Shot's arrow
+## impales the target, which sinks into the board; Raise Dead sinks the
+## Necromancer into purple smoke and the raised piece rises out of it; check
+## shakes the king with a red flash.
+
+## Each piece's movements: Piece -> Array of segments (Dictionaries with "kind",
+## "start", "end" in seconds, and whatever that kind needs).
+var tracks := {}
+## Pieces that aren't drawn at all until their first segment starts.
+var hidden_before := {}
+## Things drawn that aren't pieces: Dictionaries with "kind", "start", "end".
+var extras: Array = []
+## [seconds, GameSounds.Sound], in time order.
+var cues: Array = []
+## Seconds since it started.
+var time := 0.0
+## How long it lasts.
+var length := 0.0
+## Every time in the plan is multiplied by this (1 = normal speed).
+var speed := 1.0
+
+## How long the basic pieces of motion take, in seconds at normal speed.
+const SLIDE := 0.18
+const HOP := 0.32
+const SLAM := 0.3
+const KNOCK := 0.38
+
+# --- Building a plan --------------------------------------------------------------
+
+## The animation for `move`, just made in `state`. `dragged`: the player dropped
+## the piece there by dragging (it's already in place, so it slams down).
+## `p_speed` scales every duration (1 = normal).
+static func for_move(move: Move, state: GameState, dragged: bool, p_speed := 1.0) -> MoveAnimation:
+	var a := MoveAnimation.new()
+	a.speed = p_speed
+	if move.ability == PieceDef.Ability.RAISE_DEAD:
+		a._raise_dead(move)
+	elif move.ability == PieceDef.Ability.CRACK_SHOT:
+		a._crack_shot(move)
+	elif move.captured and is_cannon_shot(move):
+		a._cannon(move, dragged)
+	elif move.breaks_shield():
+		a._shield_break(move, dragged)
+	elif move.partner:
+		a._castling(move, dragged)
+	else:
+		a._ordinary(move, state, dragged)
+	# Check (but not checkmate, which the game screen shows its own way): once
+	# everything has landed, the king shakes and flashes red.
+	if state.is_in_check() and state.outcome() == GameState.Outcome.NONE:
+		var at := a._end_of_plan()
+		for square in royal_squares(state, state.side_to_move):
+			var king := state.board.get_piece(square)
+			a._add(king, {"kind": "shake", "at": Vector2(square), "start": at, "end": at + 0.45})
+			a.extras.append({"kind": "red_flash", "at": Vector2(square), "start": at, "end": at + 0.6})
+		a._cue(at + 0.001, GameSounds.Sound.CHECK)
+	a._finish()
+	return a
+
+## Taking moves back: each piece slides back and captured pieces fade back in.
+## `moves` are the undone moves, most recent first; `state` is after undoing.
+static func for_undo(moves: Array[Move], state: GameState, p_speed := 1.0) -> MoveAnimation:
+	var a := MoveAnimation.new()
+	a.speed = p_speed
+	for move in moves:
+		var piece := state.board.get_piece(move.from)
+		if piece and move.lands_on() != move.from:
+			a._slide_back(piece, move.lands_on(), move.from)
+		if move.partner:
+			a._slide_back(move.partner, move.partner_to, move.partner_from)
+		if move.captured:
+			a._add(move.captured, {"kind": "fade_in", "at": Vector2(move.capture_square), "start": 0.0, "end": SLIDE})
+	a._cue(0.0, GameSounds.Sound.MOVE)
+	a._finish()
+	return a
+
+## A capture made by hopping over a screen (the cannon's way of capturing).
+static func is_cannon_shot(move: Move) -> bool:
+	return move.piece.def.move_rules.any(func(rule: MoveRule) -> bool: return rule.captures_by_hopping)
+
+## A move that leaps rather than travels: a Jump piece going further than one
+## square (the knight, elephant, the Wizard's and Rogue's leaps). Its one-square
+## steps still slide.
+static func is_leap(move: Move) -> bool:
+	var distance := maxi(absi(move.to.x - move.from.x), absi(move.to.y - move.from.y))
+	return move.piece.def.has_jump() and distance > 1
+
+static func royal_squares(state: GameState, team: Piece.Team) -> Array[Vector2i]:
+	var squares: Array[Vector2i] = []
+	var pieces := state.board.pieces_of(team)
+	for square: Vector2i in pieces:
+		if pieces[square].def.is_king_type():
+			squares.append(square)
+	return squares
+
+## The piece goes from its square to where it lands, then whatever it captured
+## is knocked off; a promoted pawn flashes and turns into its new piece; a Ram
+## that captured vanishes afterwards.
+func _ordinary(move: Move, state: GameState, dragged: bool) -> void:
+	var from := Vector2(move.from)
+	var landed := Vector2(move.lands_on())
+	var arrived := _travel(move.piece, from, landed, dragged, is_leap(move))
+	if move.captured:
+		_knock_off(move.captured, Vector2(move.capture_square), landed - from, arrived)
+		_cue(arrived, GameSounds.Sound.CAPTURE)
+	elif not dragged:
+		_cue(arrived, GameSounds.Sound.LAND if is_leap(move) else GameSounds.Sound.MOVE)
+	if move.promotion:
+		var promoted := state.board.get_piece(move.lands_on())
+		var swap := arrived + 0.15
+		_add(move.piece, {"kind": "fade_out", "at": landed, "start": swap, "end": swap + 0.05})
+		_add(promoted, {"kind": "pop", "at": landed, "start": swap, "end": swap + 0.35})
+		hidden_before[promoted] = true
+		extras.append({"kind": "light", "at": landed, "start": arrived, "end": arrived + 0.55})
+		_cue(arrived + 0.05, GameSounds.Sound.PROMOTE)
+	if move.attacker_died:
+		_add(move.piece, {"kind": "fade_out", "at": landed, "start": arrived + 0.15, "end": arrived + 0.5})
+
+## Castling (with any piece that has the Castle keyword): the king and its
+## partner both hop into place, one just after the other, each landing with a knock.
+func _castling(move: Move, dragged: bool) -> void:
+	var king_lands := _travel(move.piece, Vector2(move.from), Vector2(move.to), dragged, true)
+	_add(move.partner, {"kind": "hop", "from": Vector2(move.partner_from), "to": Vector2(move.partner_to), "start": 0.1, "end": 0.1 + HOP})
+	_cue(king_lands, GameSounds.Sound.CASTLE)
+	_cue(0.1 + HOP, GameSounds.Sound.CASTLE)
+
+## A shield breaks: the attacker lunges at it and back (it doesn't move), and
+## the shielded piece shakes as its shield cracks.
+func _shield_break(move: Move, dragged: bool) -> void:
+	var hit := 0.0
+	if not dragged:
+		_add(move.piece, {"kind": "bump", "at": Vector2(move.from), "dir": Vector2(move.to - move.from), "start": 0.0, "end": 0.3})
+		hit = 0.12
+	_shake_target(move.to, hit)
+	_cue(hit, GameSounds.Sound.SHIELD_BREAK)
+	if move.attacker_died:
+		_add(move.piece, {"kind": "fade_out", "at": Vector2(move.from), "start": 0.35, "end": 0.7})
+
+## The cannon recoils as it fires; the cannonball arcs over the screen piece
+## onto the target, which is blasted off in a puff of smoke; then the cannon
+## rolls onto the square it captured.
+func _cannon(move: Move, dragged: bool) -> void:
+	var from := Vector2(move.from)
+	var target := Vector2(move.capture_square)
+	var direction := (target - from).normalized()
+	var impact := 0.5
+	_add(move.piece, {"kind": "recoil", "at": from, "dir": direction, "start": 0.0, "end": 0.18})
+	extras.append({"kind": "smoke", "at": from + direction * 0.35, "start": 0.03, "end": 0.6, "color": Color(0.85, 0.85, 0.85), "size": 0.3})
+	extras.append({"kind": "ball", "from": from + direction * 0.3, "to": target, "start": 0.08, "end": impact})
+	_knock_off(move.captured, target, direction, impact)
+	extras.append({"kind": "smoke", "at": target, "start": impact, "end": impact + 0.7, "color": Color(0.55, 0.55, 0.55), "size": 0.5})
+	_add(move.piece, {"kind": "slide", "from": from, "to": Vector2(move.to), "start": impact + 0.2, "end": impact + 0.2 + 0.32})
+	_cue(0.03, GameSounds.Sound.CANNON_FIRE)
+	_cue(impact, GameSounds.Sound.CANNON_HIT)
+
+## Crack Shot: an arrow flies from the Archer and impales the target, which then
+## slowly sinks into the board and fades away. If it only breaks a shield, the
+## target shakes and the arrow drops away.
+func _crack_shot(move: Move) -> void:
+	var from := Vector2(move.from)
+	var target := Vector2(move.to)
+	var hit := 0.28
+	extras.append({"kind": "arrow", "from": from, "to": target, "start": 0.0, "end": hit,
+			"stuck_to": move.captured, "until": hit + 1.0 if move.captured else hit + 0.35})
+	_cue(0.0, GameSounds.Sound.ARROW_WHOOSH)
+	if move.captured:
+		_add(move.captured, {"kind": "hold", "at": target, "start": 0.0, "end": hit + 0.2})
+		_add(move.captured, {"kind": "sink", "at": target, "start": hit + 0.2, "end": hit + 1.0})
+		_cue(hit, GameSounds.Sound.ARROW_HIT)
+	else:
+		_shake_target(move.to, hit)
+		_cue(hit, GameSounds.Sound.SHIELD_BREAK)
+
+## Raise Dead: the Necromancer sinks into purple smoke and the raised piece
+## rises up out of it.
+func _raise_dead(move: Move) -> void:
+	var at := Vector2(move.from)
+	_add(move.piece, {"kind": "sink", "at": at, "start": 0.1, "end": 0.75})
+	extras.append({"kind": "smoke", "at": at, "start": 0.0, "end": 1.4, "color": Color(0.55, 0.2, 0.75), "size": 0.55})
+	_add(move.raised, {"kind": "rise", "at": at, "start": 0.6, "end": 1.3})
+	hidden_before[move.raised] = true
+	_cue(0.0, GameSounds.Sound.RAISE_DEAD)
+
+## Move `piece` from `from` to `to`: dropped there by dragging (a slam, with a
+## thud and a puff of dust), leaping (a hop) or sliding. Returns when it arrives.
+func _travel(piece: Piece, from: Vector2, to: Vector2, dragged: bool, leap: bool) -> float:
+	if dragged:
+		_add(piece, {"kind": "slam", "at": to, "start": 0.0, "end": SLAM})
+		extras.append({"kind": "dust", "at": to, "start": 0.0, "end": 0.45})
+		_cue(0.0, GameSounds.Sound.SLAM)
+		return 0.0
+	if from == to:
+		return 0.0
+	if leap:
+		_add(piece, {"kind": "hop", "from": from, "to": to, "start": 0.0, "end": HOP})
+		return HOP
+	_add(piece, {"kind": "slide", "from": from, "to": to, "start": 0.0, "end": SLIDE})
+	return SLIDE
+
+## The captured piece stays put until `at` seconds, then is knocked away in the
+## direction of the hit, spinning and fading.
+func _knock_off(piece: Piece, square: Vector2, direction: Vector2, at: float) -> void:
+	var dir := direction.normalized() if direction != Vector2.ZERO else Vector2(0, 1)
+	if at > 0:
+		_add(piece, {"kind": "hold", "at": square, "start": 0.0, "end": at})
+	_add(piece, {"kind": "knock", "at": square, "dir": dir, "start": at, "end": at + KNOCK,
+			"spin": 1.0 if dir.x >= 0 else -1.0})
+
+## The shielded piece on `square` shakes from `at` seconds (its shield cracking).
+## It's still on the board, so it's found there when the plan is played (see
+## shake_squares).
+func _shake_target(square: Vector2i, at: float) -> void:
+	extras.append({"kind": "shake_square", "at": Vector2(square), "start": at, "end": at + 0.35})
+
+func _slide_back(piece: Piece, leaving: Vector2i, going_to: Vector2i) -> void:
+	if tracks.has(piece):
+		var last: Dictionary = tracks[piece].back()
+		last["to"] = Vector2(going_to)
+		return
+	_add(piece, {"kind": "slide", "from": Vector2(leaving), "to": Vector2(going_to), "start": 0.0, "end": SLIDE})
+
+func _add(piece: Piece, segment: Dictionary) -> void:
+	if piece == null:
+		return
+	if not tracks.has(piece):
+		tracks[piece] = []
+	tracks[piece].append(segment)
+
+func _cue(at: float, sound: GameSounds.Sound) -> void:
+	cues.append([at, sound])
+
+## When everything planned so far has finished.
+func _end_of_plan() -> float:
+	var end := 0.0
+	for segments: Array in tracks.values():
+		for segment: Dictionary in segments:
+			end = maxf(end, segment.end)
+	for extra: Dictionary in extras:
+		end = maxf(end, extra.get("until", extra.end))
+	return end
+
+## Apply the speed, sort the sounds and work out the length.
+func _finish() -> void:
+	for segments: Array in tracks.values():
+		segments.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x.start < y.start)
+		for segment: Dictionary in segments:
+			segment.start *= speed
+			segment.end *= speed
+	for extra: Dictionary in extras:
+		extra.start *= speed
+		extra.end *= speed
+		if extra.has("until"):
+			extra.until *= speed
+	for cue: Array in cues:
+		cue[0] *= speed
+	cues.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
+	length = _end_of_plan()
+	for cue: Array in cues:
+		length = maxf(length, cue[0])
+
+# --- Playing it back --------------------------------------------------------------
+
+## True once it has finished.
+func is_done() -> bool:
+	return time >= length
+
+## Move on by `delta` seconds; returns the sounds whose time has come.
+func advance(delta: float) -> Array:
+	time = minf(time + delta, length)
+	var due := []
+	while _next_cue < cues.size() and cues[_next_cue][0] <= time:
+		due.append(cues[_next_cue][1])
+		_next_cue += 1
+	return due
+
+## The first sound not played yet.
+var _next_cue := 0
+
+## Every sound, for when animations are switched off.
+func all_sounds() -> Array:
+	return cues.map(func(cue: Array) -> GameSounds.Sound: return cue[1])
+
+## How `piece` is drawn now: {"visible", "pos", "lift", "scale", "angle",
+## "alpha", "sunk"} ("sunk" = how much of it, 0..1, has gone down into the board).
+## Null if this plan doesn't move it (it's drawn normally, on its square).
+func pose(piece: Piece) -> Variant:
+	if not tracks.has(piece):
+		return null
+	var segments: Array = tracks[piece]
+	var first: Dictionary = segments[0]
+	if time < first.start:
+		if hidden_before.has(piece):
+			return {"visible": false}
+		return segment_pose(first, 0.0)
+	var current: Dictionary = first
+	for segment: Dictionary in segments:
+		if segment.start <= time:
+			current = segment
+	var span: float = current.end - current.start
+	var t := clampf((time - current.start) / span, 0.0, 1.0) if span > 0 else 1.0
+	return segment_pose(current, t)
+
+## A segment's pose `t` of the way (0..1) through it.
+static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
+	var pose := {"visible": true, "pos": segment.get("at", Vector2.ZERO), "lift": 0.0,
+			"scale": Vector2.ONE, "angle": 0.0, "alpha": 1.0, "sunk": 0.0}
+	match segment.kind:
+		"slide":
+			pose.pos = (segment.from as Vector2).lerp(segment.to, ease_out(t))
+		"hop":
+			var from: Vector2 = segment.from
+			var to: Vector2 = segment.to
+			var height := 0.35 + 0.12 * from.distance_to(to)
+			pose.pos = from.lerp(to, smoothstep(0.0, 1.0, t))
+			pose.lift = 4.0 * height * t * (1.0 - t)
+			pose.scale = Vector2.ONE * (1.0 + 0.18 * sin(PI * t))
+		"slam":
+			# Squashed flat as it lands, then springs back.
+			var wobble := exp(-5.0 * t) * cos(13.0 * t)
+			pose.scale = Vector2(1.0 + 0.22 * wobble, 1.0 - 0.28 * wobble)
+		"knock":
+			var dir: Vector2 = segment.dir
+			pose.pos = (segment.at as Vector2) + dir * 1.1 * ease_out(t)
+			pose.lift = 0.5 * sin(PI * t)
+			pose.angle = segment.spin * 2.6 * t
+			pose.alpha = 1.0 - t * t
+			pose.scale = Vector2.ONE * (1.0 - 0.25 * t)
+			if t >= 1.0:
+				pose.visible = false
+		"fade_out":
+			pose.alpha = 1.0 - t
+			if t >= 1.0:
+				pose.visible = false
+		"fade_in":
+			pose.alpha = t
+		"pop":
+			pose.scale = Vector2.ONE * (1.0 + 0.3 * (1.0 - ease_out(t)))
+		"shake":
+			pose.pos = (segment.at as Vector2) + Vector2(shake_offset(t), 0)
+		"recoil":
+			pose.pos = (segment.at as Vector2) - (segment.dir as Vector2) * 0.18 * sin(PI * t)
+		"bump":
+			pose.pos = (segment.at as Vector2) + (segment.dir as Vector2).normalized() * 0.35 * sin(PI * t)
+		"sink":
+			pose.sunk = t
+			pose.alpha = 1.0 - t * 0.7
+			if t >= 1.0:
+				pose.visible = false
+		"rise":
+			pose.sunk = 1.0 - ease_out(t)
+			pose.alpha = minf(1.0, t * 1.5)
+	return pose
+
+## The squares whose pieces are shaking now (shields cracking), with how far
+## (0..1) each shake has got.
+func shake_squares() -> Dictionary:
+	var shaking := {}
+	for extra: Dictionary in extras:
+		if extra.kind == "shake_square" and time >= extra.start and time < extra.end:
+			shaking[Vector2i(extra.at)] = (time - extra.start) / (extra.end - extra.start)
+	return shaking
+
+## The extras showing now, each with how far (0..1) it has got as "t".
+func active_extras() -> Array:
+	var showing := []
+	for extra: Dictionary in extras:
+		var until: float = extra.get("until", extra.end)
+		if time >= extra.start and time <= until:
+			var copy := extra.duplicate()
+			copy["t"] = clampf((time - extra.start) / maxf(extra.end - extra.start, 0.0001), 0.0, 1.0)
+			showing.append(copy)
+	return showing
+
+## True if the plan moves `piece` with a segment of this kind (for tests).
+func has_segment(piece: Piece, kind: String) -> bool:
+	return tracks.has(piece) and tracks[piece].any(func(s: Dictionary) -> bool: return s.kind == kind)
+
+func has_extra(kind: String) -> bool:
+	return extras.any(func(e: Dictionary) -> bool: return e.kind == kind)
+
+## Starts fast and slows down as it arrives.
+static func ease_out(t: float) -> float:
+	return 1.0 - pow(1.0 - t, 3)
+
+## Sideways wobble (in squares) that dies away.
+static func shake_offset(t: float) -> float:
+	return sin(t * TAU * 3) * 0.08 * (1.0 - t)

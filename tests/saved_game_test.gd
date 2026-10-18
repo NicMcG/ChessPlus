@@ -107,21 +107,27 @@ func test_menu_offers_continue_only_with_a_save() -> void:
 
 func test_sounds_match_the_move() -> void:
 	var game := _open_game()
-	_play(game, "e4")
+	# The sounds come at moments in the animations: run each to the end.
+	var play_through := func(san: String) -> void:
+		_play(game, san)
+		game.board_view.advance_animation(5.0)
+	play_through.call("e4")
 	check_eq(game.sounds.last_played, GameSounds.Sound.MOVE, "Ordinary move")
-	_play(game, "d5")
-	_play(game, "exd5")
+	play_through.call("d5")
+	play_through.call("exd5")
 	check_eq(game.sounds.last_played, GameSounds.Sound.CAPTURE, "Capture")
-	_play(game, "e6")
-	_play(game, "Bb5+")
+	play_through.call("e6")
+	play_through.call("Bb5+")
 	check_eq(game.sounds.last_played, GameSounds.Sound.CHECK, "Check")
 	game.free()
 	SavedGame.delete_saved()
 
 func test_sounds_are_real_audio() -> void:
 	for sound in GameSounds.Sound.values():
-		var stream := GameSounds.make_stream(sound)
-		check(stream.get_length() > 0.05, "Sound %d has length" % sound)
+		var streams := GameSounds.streams_for(sound)
+		check(not streams.is_empty(), "Sound %d exists" % sound)
+		for stream in streams:
+			check(stream != null and stream.get_length() > 0.05, "Sound %d has length" % sound)
 
 func test_sound_setting_is_remembered() -> void:
 	UserSettings.set_sound_on(false)

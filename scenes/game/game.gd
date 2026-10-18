@@ -132,6 +132,7 @@ func _ready() -> void:
 	play_from_here_button.pressed.connect(play_from_here)
 	ability_button.pressed.connect(use_ability)
 	board_view.selection_changed.connect(_on_selection_changed)
+	board_view.sound_cue.connect(func(sound: int) -> void: sounds.play(sound))
 	move_list.move_tapped.connect(view_move)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
@@ -244,8 +245,10 @@ func play(move: Move, from_server := false) -> void:
 	state.make_move(move)
 	# While looking back, the board keeps showing the old position.
 	if viewing < 0:
+		# The board's animation plays each sound at the right moment.
 		board_view.show_move(move)
-	sounds.play_for_move(state, move)
+	else:
+		sounds.play_for_move(state, move)
 	_update_text()
 	_save_progress()
 	_start_bot_turn_if_needed()
@@ -265,7 +268,6 @@ func undo() -> void:
 		state.undo_move(undone[1])
 	promotion_overlay.hide()
 	board_view.show_undo(undone)
-	sounds.play(GameSounds.Sound.MOVE)
 	_update_text()
 	_save_progress()
 	_start_bot_turn_if_needed()
