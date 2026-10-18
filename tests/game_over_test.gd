@@ -177,3 +177,33 @@ func test_rematch_picker_asks_the_offerer_for_a_side() -> void:
 	check(accept.side_pick == null, "Accepting: army only")
 	offer.free()
 	accept.free()
+
+func test_checkmate_king_turns_to_dust_as_the_result_fades_in() -> void:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	_root().add_child(game)
+	_play_all(game, FOOLS_MATE)
+	check(game.game_over_panel.visible, "Result is up")
+	check_eq(game.game_over_panel.modulate.a, 0.0, "But invisible until the king crumbles")
+	game.board_view.advance_animation(5.0)
+	await _frames(1)
+	var effect: CheckmateEffect = game._mate_effect
+	check(effect != null and effect.is_inside_tree(), "The checkmate effect runs")
+	var king_square := Board.parse_square("e1")
+	check(king_square in game.board_view.hidden_squares, "The king has left the board")
+	effect.advance(CheckmateEffect.RISE + CheckmateEffect.HOLD + 0.01)
+	check(game._result_fade != null, "The result starts fading in as it crumbles")
+	effect.advance(CheckmateEffect.length())
+	check(not king_square in game.board_view.hidden_squares, "Afterwards the board shows the king again")
+	game.free()
+
+func test_undoing_checkmate_stops_the_effect() -> void:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	_root().add_child(game)
+	_play_all(game, FOOLS_MATE)
+	game.board_view.advance_animation(5.0)
+	await _frames(1)
+	game.undo()
+	check(game._mate_effect == null, "Effect gone")
+	check_eq(game.game_over_panel.modulate.a, 1.0, "Result screen back to normal")
+	check(game.board_view.hidden_squares.is_empty(), "King shown")
+	game.free()
