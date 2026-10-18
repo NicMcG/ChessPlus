@@ -66,8 +66,8 @@ static func delete_saved() -> void:
 
 func to_dict() -> Dictionary:
 	return {
-		"white": _army_to_dict(white_army),
-		"black": _army_to_dict(black_army),
+		"white": army_to_dict(white_army),
+		"black": army_to_dict(black_army),
 		"bot_team": bot_team,
 		"bot_level": bot_level,
 		"moves": Array(moves),
@@ -75,8 +75,8 @@ func to_dict() -> Dictionary:
 
 static func from_dict(data: Dictionary) -> SavedGame:
 	var saved := SavedGame.new()
-	saved.white_army = _army_from_dict(data.get("white", {}))
-	saved.black_army = _army_from_dict(data.get("black", {}))
+	saved.white_army = army_from_dict(data.get("white", {}))
+	saved.black_army = army_from_dict(data.get("black", {}))
 	if saved.white_army == null or saved.black_army == null:
 		return null
 	saved.bot_team = int(data.get("bot_team", -1))
@@ -86,14 +86,14 @@ static func from_dict(data: Dictionary) -> SavedGame:
 	return saved
 
 ## An army as plain data: its name and [piece id, file, row] for each piece.
-static func _army_to_dict(army: Army) -> Dictionary:
+static func army_to_dict(army: Army) -> Dictionary:
 	var pieces := []
 	for piece in army.pieces:
 		pieces.append([piece.def.id, piece.square.x, piece.square.y])
 	return {"name": army.army_name, "pieces": pieces}
 
 ## Back from plain data. Null if a piece type no longer exists.
-static func _army_from_dict(data: Dictionary) -> Army:
+static func army_from_dict(data: Dictionary) -> Army:
 	var by_id := {}
 	for def in PieceCatalog.all_defs():
 		by_id[def.id] = def
