@@ -65,6 +65,37 @@ func set_zoom(p_zoom: float) -> void:
 		if def:
 			_refresh()
 
+## How tall the card gets for the piece with the most to say, among `defs`,
+## when `width` wide at `zoom`: measured on an invisible card under `host`
+## (it takes a couple of frames per piece). Remembered, so asking again for the
+## same size is instant. Used to keep the card one size for every piece.
+static var _tallest := {}
+
+static func tallest_height(host: Node, defs: Array, width: float, p_zoom := 1.0) -> float:
+	var key := "%d|%.2f|%d" % [roundi(width), p_zoom, defs.size()]
+	if _tallest.has(key):
+		return _tallest[key]
+	var probe: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
+	probe.zoom = p_zoom
+	probe.top_level = true
+	probe.modulate.a = 0.0
+	probe.position = Vector2(-20000, 0)
+	host.add_child(probe)
+	var tallest := 0.0
+	var tree := Engine.get_main_loop() as SceneTree
+	for def: PieceDef in defs:
+		probe.show_piece(def)
+		probe.size = Vector2(width, 0)
+		for i in 2:
+			await tree.process_frame
+		# The screen closed while measuring (the card went with it): give up.
+		if not is_instance_valid(probe):
+			return tallest
+		tallest = maxf(tallest, probe.get_combined_minimum_size().y)
+	probe.queue_free()
+	_tallest[key] = tallest
+	return tallest
+
 ## A size at the current zoom.
 func _z(value: float) -> int:
 	return roundi(value * zoom)

@@ -111,6 +111,7 @@ func _ready() -> void:
 	_layout.add_child(clock_label)
 	_layout.move_child(clock_label, status_label.get_index() + 1)
 	_build_offer_bar()
+	PieceInfo.prepare(self)
 	game_over_panel = GameOverPanel.new()
 	game_over_panel.chosen.connect(_on_game_over_action)
 	add_child(game_over_panel)
