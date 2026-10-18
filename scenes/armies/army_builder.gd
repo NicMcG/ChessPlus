@@ -22,6 +22,11 @@ const NAME_MAX_LENGTH := 20
 @onready var team_button: Button = %TeamToggle
 @onready var save_button: Button = %Save
 @onready var back_button: Button = %Back
+@onready var _layout: VBoxContainer = $Margin/Layout
+@onready var _card_scroll: Control = %Card.get_parent()
+## On wide screens the piece card goes beside everything else, in this.
+var _wide_box: HBoxContainer
+var wide := false
 
 var rules := StandardSetup.create_rules()
 var library: ArmyLibrary
@@ -55,6 +60,13 @@ func _ready() -> void:
 	save_button.pressed.connect(save)
 	back_button.pressed.connect(func() -> void: closed.emit())
 	_build_tray()
+	_wide_box = HBoxContainer.new()
+	_wide_box.add_theme_constant_override("separation", 32)
+	_wide_box.hide()
+	_layout.get_parent().add_child(_wide_box)
+	resized.connect(fit_layout)
+	army_board.resized.connect(_fit_army_board)
+	fit_layout()
 	# Start by showing the first piece in the tray (the king).
 	card.show_piece(_tray_buttons.keys()[0], team)
 	_refresh()
@@ -106,6 +118,27 @@ func save() -> void:
 	army.army_name = army.army_name.strip_edges()
 	if library.save(army) == OK:
 		saved.emit(army)
+
+## The card beside the builder on a wide screen, below it on a tall one.
+func fit_layout() -> void:
+	var now_wide := ScreenShape.is_wide(size)
+	if now_wide != wide:
+		wide = now_wide
+		if wide:
+			ScreenShape.move_to([_layout, _card_scroll], _wide_box)
+			_layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_card_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		else:
+			ScreenShape.move_to([_layout], _wide_box.get_parent())
+			ScreenShape.move_to([_card_scroll], _layout)
+			_layout.move_child(_card_scroll, save_button.get_index())
+		_wide_box.visible = wide
+
+## The army board's squares are sized by the space it's given: make it tall
+## enough for square squares across the full width (within limits).
+func _fit_army_board() -> void:
+	var square := army_board.size.x / army_board.columns
+	army_board.custom_minimum_size.y = clampf(square * army_board.rows, 150, 400)
 
 func _build_tray() -> void:
 	var defs := PieceCatalog.all_defs()

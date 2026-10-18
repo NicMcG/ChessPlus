@@ -120,13 +120,12 @@ func test_sounds_match_the_move() -> void:
 
 func test_sounds_are_real_audio() -> void:
 	for sound in GameSounds.Sound.values():
-		var stream := GameSounds.stream_for(sound)
+		var stream := GameSounds.make_stream(sound)
 		check(stream.get_length() > 0.05, "Sound %d has length" % sound)
 
 func test_sound_setting_is_remembered() -> void:
 	UserSettings.set_sound_on(false)
-	UserSettings.reload()
-	check(not UserSettings.sound_on(), "Off after reading the file again")
+	check(not UserSettings.sound_on(), "Off when read back from the file")
 	var menu: Node = load("res://scenes/menu/main_menu.tscn").instantiate()
 	(Engine.get_main_loop() as SceneTree).root.add_child(menu)
 	check_eq(menu.get_node("%Sound").text, "Sound: off", "Menu shows off")

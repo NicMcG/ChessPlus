@@ -40,6 +40,14 @@ var sounds: GameSounds
 @onready var menu_button: Button = %Menu
 @onready var promotion_overlay: ColorRect = %PromotionOverlay
 @onready var promotion_choices: HBoxContainer = %PromotionChoices
+@onready var _layout: VBoxContainer = $Margin/Layout
+@onready var _board_area: Control = $Margin/Layout/BoardArea
+@onready var _moves_scroll: Control = $Margin/Layout/MovesScroll
+@onready var _buttons: Control = $Margin/Layout/Buttons
+## On wide screens: the board on the left, `_side` (status, moves, buttons) on the right.
+var _wide_box: HBoxContainer
+var _side: VBoxContainer
+var wide := false
 
 var state: GameState
 
@@ -49,6 +57,9 @@ const TIP := "Tip: hold any piece to see how it moves."
 func _ready() -> void:
 	sounds = GameSounds.new()
 	add_child(sounds)
+	_build_wide_layout()
+	resized.connect(fit_layout)
+	fit_layout()
 	board_view.move_chosen.connect(play)
 	board_view.choice_needed.connect(_ask_which_move)
 	board_view.info_requested.connect(func(piece: Piece) -> void:
@@ -73,6 +84,33 @@ func new_game() -> void:
 	else:
 		state = Fen.parse(start_fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
 	_show_new_state()
+
+## The side-by-side layout for wide screens, unused (hidden) until needed.
+func _build_wide_layout() -> void:
+	_wide_box = HBoxContainer.new()
+	_wide_box.add_theme_constant_override("separation", 24)
+	_wide_box.hide()
+	_layout.get_parent().add_child(_wide_box)
+	_side = VBoxContainer.new()
+	_side.custom_minimum_size.x = 620
+	_side.add_theme_constant_override("separation", 12)
+	_wide_box.add_child(_side)
+	_board_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+## Put the board beside the rest on a wide screen, above it on a tall one.
+func fit_layout() -> void:
+	var now_wide := ScreenShape.is_wide(size)
+	if now_wide == wide:
+		return
+	wide = now_wide
+	if wide:
+		ScreenShape.move_to([_board_area], _wide_box)
+		_wide_box.move_child(_board_area, 0)
+		ScreenShape.move_to([status_label, _moves_scroll, _buttons], _side)
+	else:
+		ScreenShape.move_to([status_label, _board_area, _moves_scroll, _buttons], _layout)
+	_layout.visible = not wide
+	_wide_box.visible = wide
 
 func is_bot_game() -> bool:
 	return bot_team >= 0

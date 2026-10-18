@@ -1,5 +1,7 @@
 [gd_scene format=3]
 
+[ext_resource type="Script" path="res://scenes/common/width_limit.gd" id="9_width"]
+
 [ext_resource type="Script" path="res://scenes/menu/match_setup.gd" id="1_setup"]
 
 [node name="MatchSetup" type="Control"]
@@ -22,6 +24,7 @@ mouse_filter = 2
 color = Color(0.17, 0.17, 0.18, 1)
 
 [node name="Margin" type="MarginContainer" parent="."]
+script = ExtResource("9_width")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
