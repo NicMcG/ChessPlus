@@ -4,14 +4,16 @@ extends Control
 ## A small board (5 x 5, bigger only if a jump needs it) with one piece in the
 ## middle, showing how it moves (worked out by PieceGuide):
 ##   filled circle = moves or captures    empty circle = moves only
-##   X = captures only                    pale = first move only
-##   filled square = jumps there          arrow line = moves any distance that way
+##   red X = captures only                pale = first move only
+##   yellow circle = jumps there          arrow line = moves any distance that way
 ##   dashed arrow line = moves any distance that way, but can't capture that way
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
 const MARK := Color(0.1, 0.1, 0.1, 0.75)
 const FIRST_MOVE_MARK := Color(0.1, 0.1, 0.1, 0.35)
+const CAPTURE_MARK := Color("#D42A1F")
+const JUMP_MARK := Color("#F5BE0B")
 
 ## Legend entries: kind -> text. Only the kinds a piece uses are listed.
 const LEGEND := {
@@ -66,14 +68,14 @@ static func draw_square_marker(canvas: CanvasItem, rect: Rect2, flags: int) -> v
 	var s := rect.size.x
 	match _kind(flags):
 		"jump":
-			var half := s * 0.17
-			canvas.draw_rect(Rect2(c - Vector2(half, half), Vector2(half, half) * 2), color)
+			canvas.draw_circle(c, s * 0.2, JUMP_MARK)
+			canvas.draw_arc(c, s * 0.2, 0, TAU, 24, MARK, s * 0.04, true)
 		"both":
 			canvas.draw_circle(c, s * 0.18, color)
 		"capture":
 			var d := s * 0.17
-			canvas.draw_line(c + Vector2(-d, -d), c + Vector2(d, d), color, s * 0.08, true)
-			canvas.draw_line(c + Vector2(-d, d), c + Vector2(d, -d), color, s * 0.08, true)
+			canvas.draw_line(c + Vector2(-d, -d), c + Vector2(d, d), CAPTURE_MARK, s * 0.09, true)
+			canvas.draw_line(c + Vector2(-d, d), c + Vector2(d, -d), CAPTURE_MARK, s * 0.09, true)
 		_:  # "move" and "first": an empty circle
 			canvas.draw_arc(c, s * 0.16, 0, TAU, 24, color, s * 0.07, true)
 

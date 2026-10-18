@@ -13,12 +13,18 @@ func _root() -> Node:
 
 # --- What the card says ---------------------------------------------------------------
 
-func test_details_line_shows_cost_and_types() -> void:
-	check_eq(PieceCard.details_text(_def("king")), "Free  ·  King, Royal", "King")
-	check_eq(PieceCard.details_text(_def("queen")), "9 points  ·  Royal", "Queen")
-	check_eq(PieceCard.details_text(_def("pawn")), "1 point  ·  Pawn", "Pawn")
-	check_eq(PieceCard.details_text(_def("cannon")), "4 points", "Cannon: no types")
-	check_eq(PieceCard.details_text(_def("elephant")), "1.5 points", "Elephant")
+func test_cost_and_types() -> void:
+	check_eq(PieceCard.cost_text(_def("king")), "Free", "King cost")
+	check_eq(PieceCard.cost_text(_def("pawn")), "1 point", "Pawn cost")
+	check_eq(PieceCard.cost_text(_def("elephant")), "1.5 points", "Elephant cost")
+	check_eq(PieceCard.type_names(_def("king")), PackedStringArray(["King", "Royal"]), "King types")
+	check_eq(PieceCard.type_names(_def("queen")), PackedStringArray(["Royal"]), "Queen types")
+	check_eq(PieceCard.type_names(_def("cannon")), PackedStringArray(), "Cannon: no types")
+
+func test_every_type_and_keyword_has_an_explanation() -> void:
+	for def in PieceCatalog.all_defs():
+		for tag in PieceCard.type_names(def) + PieceCard.keyword_names(def):
+			check(PieceCard.EXPLANATIONS.has(tag), tag + " is explained")
 
 func test_keywords() -> void:
 	check_eq(PieceCard.keyword_names(_def("knight")), PackedStringArray(["Jump"]), "Knight")
@@ -56,6 +62,26 @@ func test_card_fills_in() -> void:
 	check(not card.get_node("%Special").visible, "No special section")
 	card.show_piece(_def("cannon"))
 	check(card.get_node("%Special").visible, "Cannon has a special section")
+	card.free()
+
+func test_types_italic_keywords_capitals_and_explanations() -> void:
+	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
+	card.show_piece(_def("king"))
+	_root().add_child(card)
+	# Details row: "Free", "·", "King,", "Royal".
+	var details := card.get_node("%Details")
+	check_eq(details.get_child_count(), 4, "Cost, dot and two types")
+	var king_label: Label = details.get_child(2)
+	check_eq(king_label.text, "King,", "First type")
+	check(king_label.get_theme_font("font") is FontVariation, "Types are slanted (italic)")
+	card.show_tooltip(king_label, "King")
+	check(card.tooltip.visible, "Explanation shown")
+	check(card.tooltip.get_child(0).text.begins_with("Your most important piece"), "King explained")
+	card.show_tooltip(king_label, "King")
+	check(not card.tooltip.visible, "Second tap hides it")
+	card.show_piece(_def("paladin"))
+	var shield_box: PanelContainer = card.get_node("%Keywords").get_child(0)
+	check_eq(shield_box.get_child(0).text, "SHIELD", "Keywords in capitals")
 	card.free()
 
 # --- Pop-up in a game -------------------------------------------------------------------
