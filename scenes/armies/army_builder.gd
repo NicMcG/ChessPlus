@@ -18,7 +18,7 @@ var _scroll_at_press := 0
 
 ## How big the piece card is drawn (see PieceCard.zoom) on wide and tall screens.
 const CARD_ZOOM_WIDE := 1.5
-const CARD_ZOOM_TALL := 1.25
+const CARD_ZOOM_TALL := 0.85
 ## The range of widths for the piece-type buttons in the tray.
 const TRAY_BUTTON_MIN := 100.0
 const TRAY_BUTTON_MAX := 170.0

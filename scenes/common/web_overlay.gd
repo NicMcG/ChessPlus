@@ -41,10 +41,18 @@ const JS := """
 		el.addEventListener('input', function () { if (o.handler) o.handler(id, 'input', el.value); });
 		// While typing, the box sits just above the keyboard (iOS slides the page
 		// around when the keyboard opens, so the box's own spot can end up anywhere).
-		el.addEventListener('focus', function () { o.focused = id; o.dock(); setTimeout(o.dock, 300); });
+		el.addEventListener('focus', function () {
+			o.focused = id;
+			if (o.handler) o.handler(id, 'focus', el.value);
+			o.dock();
+			// Keep it above the keyboard while it slides in (and if it changes size).
+			clearInterval(o.dockTimer);
+			o.dockTimer = setInterval(o.dock, 200);
+		});
 		el.addEventListener('blur', function () {
-			if (o.focused === id) { o.focused = null; }
-			Object.assign(el.style, { background: 'transparent', border: 'none', borderRadius: '0', boxShadow: 'none', zIndex: 10 });
+			if (o.focused === id) { o.focused = null; clearInterval(o.dockTimer); }
+			if (o.handler) o.handler(id, 'blur', el.value);
+			Object.assign(el.style, { position: 'absolute', background: 'transparent', border: 'none', borderRadius: '0', boxShadow: 'none', zIndex: 10 });
 			window.scrollTo(0, 0);
 			o.replaceAll();
 		});
@@ -72,14 +80,17 @@ const JS := """
 	};
 	// The box being typed in, as a bar just above the keyboard (the bottom of the
 	// part of the page that's still visible).
+	// Positioned on the screen (fixed) from the visible area alone: when the
+	// keyboard opens, iOS both scrolls the page and moves the visible area, and
+	// counting both put the bar under the keyboard.
 	o.dock = function () {
 		const id = o.focused; const el = o.els[id]; if (!el) return;
 		const vv = window.visualViewport;
-		const left = (vv ? vv.offsetLeft : 0) + window.scrollX;
+		const left = vv ? vv.offsetLeft : 0;
 		const width = vv ? vv.width : window.innerWidth;
-		const bottom = (vv ? vv.offsetTop + vv.height : window.innerHeight) + window.scrollY;
+		const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
 		const height = 52;
-		Object.assign(el.style, { display: 'block', position: 'absolute', zIndex: 20,
+		Object.assign(el.style, { display: 'block', position: 'fixed', zIndex: 20,
 			left: (left + 10) + 'px', width: (width - 20) + 'px', top: (bottom - height - 10) + 'px', height: height + 'px',
 			fontSize: '18px', background: '#1d1d1f', border: '1px solid #8a8a8a', borderRadius: '12px',
 			boxShadow: '0 2px 12px rgba(0,0,0,0.6)' });
