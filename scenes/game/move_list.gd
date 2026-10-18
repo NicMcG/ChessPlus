@@ -129,8 +129,24 @@ func _move_button(parts: Array, text: String, moves_played: int, viewed: bool) -
 	button.add_theme_color_override("font_color", Color.WHITE)
 	button.add_theme_color_override("font_hover_color", HOVER_TEXT)
 	button.add_theme_color_override("font_pressed_color", HOVER_TEXT)
-	button.pressed.connect(func() -> void: move_tapped.emit(moves_played))
+	# A drag that starts on a move scrolls the list (the button passes it on to
+	# the scroll container around the list); a press that turned into a scroll
+	# doesn't count as a tap.
+	button.mouse_filter = Control.MOUSE_FILTER_PASS
+	button.button_down.connect(func() -> void: _scroll_at_press = _scrolled())
+	button.pressed.connect(func() -> void:
+		if absi(_scrolled() - _scroll_at_press) > 4:
+			return
+		move_tapped.emit(moves_played))
 	return button
+
+## Where the list was scrolled to when a move was pressed.
+var _scroll_at_press := 0
+
+## How far the scroll container holding the list is scrolled (0 if there's none).
+func _scrolled() -> int:
+	var scroll := get_parent() as ScrollContainer
+	return scroll.scroll_vertical if scroll else 0
 
 ## One part of a move's picture notation as a control.
 func _part(part: Dictionary, _viewed: bool) -> Control:

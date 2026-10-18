@@ -339,3 +339,23 @@ func test_new_game_asks_first() -> void:
 	check_eq(game.state.history.size(), 0, "New game after yes")
 	game.free()
 	SavedGame.delete_saved()
+
+func test_dragging_the_move_list_scrolls_without_choosing_a_move() -> void:
+	var game := _open()
+	for san in ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6", "d4", "exd4", "cxd4", "Bb4+", "Nc3", "Nxe4", "O-O", "Bxc3", "d5", "Bf6", "Re1", "Ne7", "Rxe4", "d6", "Bg5", "Bxg5", "Nxg5", "h6"]:
+		_play(game, san)
+	await (Engine.get_main_loop() as SceneTree).process_frame
+	var tapped := []
+	game.move_list.move_tapped.connect(func(n: int) -> void: tapped.append(n))
+	var button: Button = game.move_list.buttons[3]
+	check_eq(button.mouse_filter, Control.MOUSE_FILTER_PASS, "Drags pass through to the list")
+	var scroll: ScrollContainer = game.move_list.get_parent()
+	scroll.scroll_vertical = 0
+	button.button_down.emit()
+	scroll.scroll_vertical = 60
+	button.pressed.emit()
+	check(tapped.is_empty(), "A press that scrolled isn't a tap")
+	button.button_down.emit()
+	button.pressed.emit()
+	check_eq(tapped, [4], "A plain tap still picks the move")
+	game.free()
