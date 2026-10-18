@@ -30,7 +30,7 @@ func test_sliders_are_directions_not_squares() -> void:
 	check_eq(rook.slides.size(), 4, "Four directions")
 	check(rook.slides.all(func(s: Array) -> bool: return s[1] == MOVE | CAPTURE), "Moves and captures along them")
 	check_eq(_guide("queen").slides.size(), 8, "Queen: eight directions")
-	check_eq(_guide("lance").slides, [[Vector2i(0, 1), MOVE | CAPTURE]], "Lance: straight forward")
+	check_eq(_guide("lance").slides, [[Vector2i(0, 1), MOVE | CAPTURE, 1]], "Lance: straight forward")
 
 func test_cannon_slides_without_capturing() -> void:
 	var g := _guide("cannon")

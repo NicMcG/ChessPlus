@@ -5,7 +5,8 @@ extends VBoxContainer
 ##   header: its picture(s), name, cost and type(s) (types in italics)
 ##   a mini board showing how it moves, with a legend
 ##   its keywords as coloured boxes (in capitals)
-##   "Special": any rule the rest can't show (e.g. how the cannon captures)
+##   "Special Rule": anything the rest can't show (e.g. how the cannon captures)
+##   "Special Ability": a once-per-game action, with its name
 ## Hovering over a type or keyword (tapping, on a phone) shows a short
 ## explanation in a bubble.
 ## Used in the army builder (always showing the chosen piece) and in games
@@ -24,7 +25,7 @@ const EXPLANATIONS := {
 	"King": "Your most important piece: if it's checkmated, you lose. Every army has exactly one, starting in the middle of the back row. It can castle.",
 	"Royal": "An army can have only one royal piece besides its king.",
 	"Pawn": "Any number per army. It must turn into another piece when it reaches the far end. It can capture, and be captured, en passant. Moving it resets the 50-move count.",
-	"Jump": "Leaps straight to its square, so pieces in between can't block it.",
+	"Jump": "Leaps over pieces: the squares it jumps over can't block it (the yellow marks show where it lands).",
 	"Castle": "The king can castle with it while it's still in its back corner.",
 	"Promote": "Must turn into another piece when it reaches the far end (any non-pawn, non-king piece that started the game).",
 	"Shield": "The first capture only breaks its shield, and the attacker stays where it was. The second capture takes it. The shield never comes back.",
@@ -74,6 +75,8 @@ func _apply_zoom() -> void:
 	%GuideBoard.custom_minimum_size = Vector2(_z(220), _z(220))
 	$Special/SpecialTitle.add_theme_font_size_override("font_size", _z(26))
 	%SpecialText.add_theme_font_size_override("font_size", _z(22))
+	$Ability/AbilityTitle.add_theme_font_size_override("font_size", _z(26))
+	%AbilityText.add_theme_font_size_override("font_size", _z(22))
 	var tip_label: Label = tooltip.get_child(0)
 	tip_label.custom_minimum_size = Vector2(_z(420), 0)
 	tip_label.add_theme_font_size_override("font_size", _z(22))
@@ -100,17 +103,18 @@ static func keyword_names(p_def: PieceDef) -> PackedStringArray:
 		names.append("Jump")
 	if p_def.has_castle():
 		names.append("Castle")
-	if p_def.has_promote():
+	# Pawn types promote too, so they show the keyword as well.
+	if p_def.can_promote():
 		names.append("Promote")
 	if p_def.has_shield():
 		names.append("Shield")
 	return names
 
-## Rules that the types, keywords and picture can't show.
+## Rules that the types, keywords and picture can't show (from the piece's data).
 static func special_rules(p_def: PieceDef) -> PackedStringArray:
 	var rules: PackedStringArray = []
-	if p_def.move_rules.any(func(r: MoveRule) -> bool: return r.captures_by_hopping):
-		rules.append("Captures by jumping over exactly one piece (either side's) in a straight line, taking the first enemy beyond it. With nothing to jump over, it can't capture.")
+	if p_def.special_rule != "":
+		rules.append(p_def.special_rule)
 	return rules
 
 ## Show the explanation bubble for `tag` (a type or keyword) just below `item`.
@@ -189,6 +193,9 @@ func _refresh() -> void:
 	var special := special_rules(def)
 	%Special.visible = not special.is_empty()
 	%SpecialText.text = "\n".join(special)
+	%Ability.visible = def.ability_name != ""
+	$Ability/AbilityTitle.text = "Special Ability: " + def.ability_name
+	%AbilityText.text = def.ability_text
 
 ## "3 points" followed by the types in italics, e.g. "Free · King, Royal".
 func _fill_details() -> void:

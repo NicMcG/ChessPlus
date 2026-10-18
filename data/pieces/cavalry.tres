@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3]
+
+[ext_resource type="Script" path="res://core/move_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]
+
+[sub_resource type="Resource" id="Resource_rule1"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+
+[sub_resource type="Resource" id="Resource_rule2"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 0), Vector2i(-1, 0)])
+max_steps = 2
+
+[sub_resource type="Resource" id="Resource_rule3"]
+script = ExtResource("1_rule")
+path = Array[Vector2i]([Vector2i(1, 0), Vector2i(1, 0), Vector2i(0, 1)])
+mirror_files = true
+mirror_ranks = true
+
+[resource]
+script = ExtResource("2_def")
+id = "cavalry"
+display_name = "Cavalry"
+symbol = "CV"
+value = 3
+move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2"), SubResource("Resource_rule3")])
+special_rule = "Its L-shaped moves go 2 squares sideways, then 1 forward or back. Unlike a knight it can't jump: a piece on the way blocks them."

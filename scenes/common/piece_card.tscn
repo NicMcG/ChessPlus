@@ -63,9 +63,26 @@ theme_override_constants/separation = 4
 [node name="SpecialTitle" type="Label" parent="Special"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
-text = "Special"
+text = "Special Rule"
 
 [node name="SpecialText" type="Label" parent="Special"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+autowrap_mode = 3
+
+[node name="Ability" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="AbilityTitle" type="Label" parent="Ability"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Special Ability"
+
+[node name="AbilityText" type="Label" parent="Ability"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2

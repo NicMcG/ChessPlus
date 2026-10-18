@@ -17,3 +17,4 @@ symbol = "C"
 value = 4
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_move")])
 keywords = 0
+special_rule = "Captures by jumping over exactly one piece (either side's) in a straight line, taking the first enemy beyond it. With nothing to jump over, it can't capture."

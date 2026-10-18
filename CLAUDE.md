@@ -103,6 +103,18 @@ Steps 1–4 DONE: army data and rules, army builder screen, saving up to 10 armi
 * Symbols: one or two capital letters (Mac's decision). Notation writes them as-is (PDe4); FEN wraps two-letter symbols in brackets ((PD)/(pd)) and marks a broken shield with ' after the piece. A shield break is written like a capture with * on the end (Rxd5*); it moves nothing, so it never gives check.
 * Art: paladin approved (armoured knight behind a big cross shield; `<team>_paladin_wounded` without it, shown once the shield breaks via `PieceArt` variant "wounded"). Cannon (final): the round-one standing cannon (barrel pointing left on an eight-spoke wheel, trail behind), no base, 15% bigger (`piece_options/round5/`). Lance (final): barbed arrowhead on a bell-shaped base, from Mac's reference (`piece_options/round3/`). Man (final): just a linen coif, no person, like the king's crown and bishop's mitre — option coif_2 in `piece_options/round8/`, shaped after Mac's photo (pointed top with centre seam, sides ending in angular points at the jaw, hem around the opening, ties hanging down). All four custom pieces' art is now final. Sources in `res://art/source/piece_options/` (`make_pieces.py` scripts draw them).
 
+## Second batch of custom pieces (Mac's designs, Oct 2026)
+
+* Wizard (W, 8, Royal type, Jump): queen lines but can't stop on the 8 adjacent squares; leaps them (they can't block); blocked normally after that. `MoveRule.leap_steps = 1`.
+* Rogue (RO, 3.5, Jump, special rule): king steps, plus a 2-square hop over ONE of its own pieces (capture on landing allowed; can't hop enemies or empty squares). `leap_steps = 1, leap_over = OWN_PIECE, max_steps = 2`.
+* Chariot (CH, 4, Promote): orthogonal up to 4 squares.
+* Cavalry (CV, 3, special rule): diagonal step, sideways up to 2, and L-moves 2 sideways then 1 forward/back that do NOT jump (a piece on e.g. e4 blocks d4->f5). `MoveRule.path` [(1,0),(1,0),(0,1)] mirrored both ways.
+* Berserker (BR, 2.5, special rule): the 6 squares in the two rows ahead (files -1..+1); blocked like a rook: d6 via d5, c6 via c5 (`path` [(1,1),(0,1)] mirrored). Never moves back/sideways; doesn't promote.
+* Ram (RM, 3.5, special rule: dies when it captures, including breaking a shield), Archer (A, 4, Special Ability "Crack Shot": once per game per archer, capture something in its range without moving), Necromancer (NC, 3, can't capture; Special Ability "Raise Dead": once per game, it leaves the board and one of your lost non-pawn pieces (captured, or removed like a dead Ram) takes its square): NOT BUILT YET, waiting for Mac's notation design.
+* Mac: "any piece that can jump uses the Jump keyword" (explanation text broadened); all pawn types show the Promote keyword on their card; special abilities are written with * for now (clashes with the shield-break * — Mac to design notation for every non-normal move).
+* Piece card: "Special Rule" (`PieceDef.special_rule`, text in the .tres; the cannon's moved there) and "Special Ability" (`PieceDef.ability_name` / `ability_text`) sections. Pieces without art show their letters (`board_view_test.ART_TO_COME` lists them).
+* Attack detection: `MoveGenerator.attack_table` returns [lines, unusual]; leaping/path rules (`MoveRule.is_unusual()`) are checked from each such piece (`_rule_reaches`). `movement_pieces_test.test_attack_detection_matches_captures` cross-checks attacks against generated captures.
+
 ## Previous milestone: playable board (pass and play)
 
 Done: tap- and drag-to-move board, undo, promotion picker, results, move list, Cburnett pieces. Possible later: move animation (Tweens), menus, sounds.
