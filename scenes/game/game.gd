@@ -28,6 +28,8 @@ var bot: PracticeBot
 var bot_thinking := false
 ## Counts bot turns, so a turn that was overtaken (New game, Menu) is dropped.
 var _bot_turn_id := 0
+## A saved game to continue instead of starting a new one (set by the main scene).
+var resume: SavedGame
 
 @onready var board_view: BoardView = %BoardView
 @onready var status_label: Label = %Status
@@ -55,7 +57,10 @@ func _ready() -> void:
 	promotion_overlay.gui_input.connect(_on_overlay_input)
 	if is_bot_game():
 		bot = PracticeBot.new(bot_level)
-	new_game()
+	if resume:
+		_continue_saved_game(resume)
+	else:
+		new_game()
 
 func new_game() -> void:
 	if white_army and black_army:
@@ -64,11 +69,7 @@ func new_game() -> void:
 		state = StandardSetup.create_game()
 	else:
 		state = Fen.parse(start_fen, PieceCatalog.all_defs(), StandardSetup.create_rules())
-	promotion_overlay.hide()
-	bot_thinking = false
-	board_view.show_game(state)
-	_update_text()
-	_start_bot_turn_if_needed()
+	_show_new_state()
 
 func is_bot_game() -> bool:
 	return bot_team >= 0
@@ -78,6 +79,7 @@ func play(move: Move) -> void:
 	state.make_move(move)
 	board_view.refresh()
 	_update_text()
+	_save_progress()
 	_start_bot_turn_if_needed()
 
 ## Take back the last move (also after the game has ended). Against the bot it
@@ -91,6 +93,7 @@ func undo() -> void:
 	promotion_overlay.hide()
 	board_view.refresh()
 	_update_text()
+	_save_progress()
 	_start_bot_turn_if_needed()
 
 ## The bot plays its move now. Normally called by _start_bot_turn_if_needed
@@ -103,6 +106,36 @@ func make_bot_move() -> void:
 		play(move)
 	else:
 		_update_text()
+
+## Pick up a saved game where it left off. If it can't be rebuilt (for example
+## the rules changed since), start a new game with the same armies instead.
+func _continue_saved_game(saved: SavedGame) -> void:
+	var rebuilt := saved.create_state(StandardSetup.create_rules())
+	if rebuilt == null:
+		new_game()
+		return
+	state = rebuilt
+	_show_new_state()
+
+## Show `state` from scratch (after a new game or continuing a saved one).
+func _show_new_state() -> void:
+	promotion_overlay.hide()
+	bot_thinking = false
+	board_view.show_game(state)
+	_update_text()
+	_save_progress()
+	_start_bot_turn_if_needed()
+
+## Save the game so it can be continued after the app closes; once it's over,
+## remove the save so the menu stops offering to continue it. Only games started
+## from armies (from the menu) are saved.
+func _save_progress() -> void:
+	if white_army == null or black_army == null:
+		return
+	if state.outcome() != GameState.Outcome.NONE:
+		SavedGame.delete_saved()
+	else:
+		SavedGame.from_state(state, white_army, black_army, bot_team, bot_level).save()
 
 ## If it's the bot's turn: block the board, say it's thinking, then let it move.
 func _start_bot_turn_if_needed() -> void:
