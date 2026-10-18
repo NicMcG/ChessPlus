@@ -2,16 +2,21 @@ class_name ArmyPicker
 extends ColorRect
 
 ## A pop-up list of armies to choose from: "Standard" plus every saved army
-## that's legal. Emits `chosen` with the army, or `cancelled`.
+## that's legal, and (if asked for) which side to play: White, Black or
+## Random. Emits `chosen` with the army and side (an OnlineSession.SIDE_*
+## value; SIDE_RANDOM when no side was asked for), or `cancelled`.
 
-signal chosen(army: Army)
+signal chosen(army: Army, side: int)
 signal cancelled
 
 ## The armies offered, in order.
 var armies: Array[Army] = []
 
+## The side choice (only when `ask_side`).
+var side_pick: OptionButton
+
 ## `library` holds the saved armies (null = only Standard).
-func _init(library: ArmyLibrary = null, title := "Choose your army") -> void:
+func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side := false) -> void:
 	color = Color(0, 0, 0, 0.6)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -39,12 +44,24 @@ func _init(library: ArmyLibrary = null, title := "Choose your army") -> void:
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	heading.add_theme_font_size_override("font_size", 40)
 	column.add_child(heading)
+	if ask_side:
+		var side_label := Label.new()
+		side_label.text = "You play"
+		column.add_child(side_label)
+		side_pick = OptionButton.new()
+		for side in ["White", "Black", "Random"]:
+			side_pick.add_item(side)
+		side_pick.custom_minimum_size.y = 80
+		column.add_child(side_pick)
+		var army_label := Label.new()
+		army_label.text = "With"
+		column.add_child(army_label)
 	for army in armies:
 		var button := Button.new()
 		button.text = "%s  (%s pts)" % [army.army_name, Army.format_points(army.cost())]
 		button.custom_minimum_size.y = 80
 		button.pressed.connect(func() -> void:
-			chosen.emit(army)
+			chosen.emit(army, side_pick.selected if side_pick else OnlineSession.SIDE_RANDOM)
 			queue_free())
 		column.add_child(button)
 	var cancel := Button.new()

@@ -140,7 +140,7 @@ func test_online_chat() -> void:
 	host.free()
 	guest.free()
 
-func test_online_rematch_swaps_colours() -> void:
+func test_online_rematch_offerer_picks_the_side() -> void:
 	var pair: Array = await _online_pair(300000)
 	var host: Node = pair[0]
 	var guest: Node = pair[1]
@@ -152,7 +152,7 @@ func test_online_rematch_swaps_colours() -> void:
 	host.rematch_ready.connect(func(s: OnlineSession) -> void: host_next.append(s))
 	guest.rematch_ready.connect(func(s: OnlineSession) -> void: guest_next.append(s))
 	# The host offers a rematch...
-	await host._rematch_with(StandardSetup.army())
+	await host._rematch_with(StandardSetup.army(), OnlineSession.SIDE_WHITE)
 	check(host.game_over_panel.note_text().begins_with("Waiting"), "Host waits")
 	# ...the guest is told, and accepts.
 	await guest.online.poll()
@@ -164,8 +164,16 @@ func test_online_rematch_swaps_colours() -> void:
 	await host_session.poll()
 	check_eq(host_next.size(), 1, "Host goes to the rematch too")
 	if host_next.size() == 1 and guest_next.size() == 1:
-		check_eq(host_next[0].my_team, Piece.Team.BLACK, "Host was White, now Black")
-		check_eq(guest_next[0].my_team, Piece.Team.WHITE, "Guest was Black, now White")
+		check_eq(host_next[0].my_team, Piece.Team.WHITE, "Host chose White again")
+		check_eq(guest_next[0].my_team, Piece.Team.BLACK, "Guest gets the other side")
 		check(host_next[0].timed(), "Same time limit")
 	host.free()
 	guest.free()
+
+func test_rematch_picker_asks_the_offerer_for_a_side() -> void:
+	var offer := ArmyPicker.new(null, "Rematch", true)
+	check(offer.side_pick != null, "Offering: White / Black / Random")
+	var accept := ArmyPicker.new(null, "Rematch", false)
+	check(accept.side_pick == null, "Accepting: army only")
+	offer.free()
+	accept.free()
