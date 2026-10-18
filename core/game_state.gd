@@ -21,6 +21,9 @@ var halfmove_clock: int = 0
 var fullmove_number: int = 1
 ## Every move made so far, oldest first. undo_move takes the last one off.
 var history: Array[Move] = []
+## Each team's lost pieces (indexed by Piece.Team), oldest first: captured, or
+## removed by their own rules (a Ram that captured). Raise Dead brings them back.
+var lost: Array = [[], []]
 ## Each team's attack table (see MoveGenerator.attack_table), worked out the first
 ## time it's needed. It covers every piece type that team has at that point plus
 ## every promotion choice, so it stays right for the rest of the game.
@@ -44,6 +47,10 @@ func attack_table(team: Piece.Team) -> Array:
 		for def in rules.promotion_options:
 			if not defs.has(def):
 				defs.append(def)
+		# Lost pieces could come back (Raise Dead).
+		for piece: Piece in lost[team]:
+			if not defs.has(piece.def):
+				defs.append(piece.def)
 		_attack_tables[team] = MoveGenerator.attack_table(team, defs)
 	return _attack_tables[team]
 
@@ -84,13 +91,33 @@ func make_move(move: Move) -> void:
 	else:
 		halfmove_clock += 1
 	history.append(move)
-	if move.breaks_shield():
-		# Nothing moves: the shielded piece just loses its shield.
-		move.shield_target.shield_broken = true
-		en_passant_squares = []
-		en_passant_victim = Board.NO_SQUARE
+	if move.ability != PieceDef.Ability.NONE:
+		move.piece.ability_used = true
+	if move.ability == PieceDef.Ability.RAISE_DEAD:
+		# The Necromancer leaves; the lost piece's fresh copy takes its square.
+		move.raised_lost_index = lost[move.piece.team].find(move.raised_from_lost)
+		lost[move.piece.team].remove_at(move.raised_lost_index)
+		board.set_piece(move.from, move.raised)
+		_clear_en_passant()
 		_next_turn()
 		return
+	if move.breaks_shield():
+		# Nothing moves: the shielded piece just loses its shield. (A Ram dies doing it.)
+		move.shield_target.shield_broken = true
+		if move.piece.def.dies_on_capture:
+			_remove_dead_attacker(move, move.from)
+		_clear_en_passant()
+		_next_turn()
+		return
+	if move.ability == PieceDef.Ability.CRACK_SHOT:
+		# The Archer shoots from where it stands.
+		board.set_piece(move.capture_square, null)
+		lost[move.captured.team].append(move.captured)
+		_clear_en_passant()
+		_next_turn()
+		return
+	if move.captured:
+		lost[move.captured.team].append(move.captured)
 	board.set_piece(move.from, null)
 	board.set_piece(move.capture_square, null)
 	if move.promotion:
@@ -106,10 +133,22 @@ func make_move(move: Move) -> void:
 		board.set_piece(move.partner_from, null)
 		board.set_piece(move.partner_to, move.partner)
 		move.partner.has_moved = true
+	if move.captured and move.piece.def.dies_on_capture:
+		_remove_dead_attacker(move, move.to)
 	# En passant is only possible on the very next move.
 	en_passant_squares = move.skipped_squares
 	en_passant_victim = move.to if not move.skipped_squares.is_empty() else Board.NO_SQUARE
 	_next_turn()
+
+## A Ram that just captured is removed from `square` and counts as lost.
+func _remove_dead_attacker(move: Move, square: Vector2i) -> void:
+	board.set_piece(square, null)
+	lost[move.piece.team].append(move.piece)
+	move.attacker_died = true
+
+func _clear_en_passant() -> void:
+	en_passant_squares = []
+	en_passant_victim = Board.NO_SQUARE
 
 func _next_turn() -> void:
 	if side_to_move == Piece.Team.BLACK:
@@ -126,8 +165,23 @@ func undo_move(move: Move) -> void:
 	move.piece.has_moved = move.piece_had_moved
 	en_passant_squares = move.prev_en_passant_squares
 	en_passant_victim = move.prev_en_passant_victim
+	if move.ability != PieceDef.Ability.NONE:
+		move.piece.ability_used = false
+	if move.ability == PieceDef.Ability.RAISE_DEAD:
+		lost[move.piece.team].insert(move.raised_lost_index, move.raised_from_lost)
+		board.set_piece(move.from, move.piece)
+		return
+	if move.attacker_died:
+		lost[move.piece.team].pop_back()
+		move.attacker_died = false
 	if move.breaks_shield():
 		move.shield_target.shield_broken = false
+		board.set_piece(move.from, move.piece)  # Back, if it was a Ram that died.
+		return
+	if move.captured:
+		lost[move.captured.team].pop_back()
+	if move.ability == PieceDef.Ability.CRACK_SHOT:
+		board.set_piece(move.capture_square, move.captured)
 		return
 	if move.is_castling():
 		move.partner.has_moved = move.partner_had_moved
@@ -174,8 +228,15 @@ func _position_key() -> String:
 ## pieces that stay on one square color (like bishops), all on the same color.
 ## Custom pieces will need more thought here later.
 func _checkmate_impossible() -> bool:
+	# A Necromancer that can still bring a piece back changes everything.
+	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		if not MoveGenerator.raisable_defs(self, team).is_empty():
+			for piece: Piece in board.pieces_of(team).values():
+				if piece.can_use_ability() and piece.def.ability == PieceDef.Ability.RAISE_DEAD:
+					return false
 	var others: Array[Piece] = []
 	var square_colors := {}
+	var non_capturers := 0
 	for rank in range(board.height):
 		for file in range(board.width):
 			var piece := board.get_piece(Vector2i(file, rank))
@@ -183,16 +244,28 @@ func _checkmate_impossible() -> bool:
 				continue
 			if piece.def.is_pawn_type():
 				return false
+			# A piece that can never capture (a Necromancer with nothing to raise)
+			# can never give check.
+			if not _can_capture(piece.def):
+				non_capturers += 1
+				continue
 			others.append(piece)
 			square_colors[(file + rank) % 2] = true
 	if others.is_empty():
 		return true
+	# With pieces that can attack about, pieces that can't might still help trap
+	# a king: don't call it a draw.
+	if non_capturers > 0:
+		return false
 	if others.size() == 1 and _is_distant_leaper(others[0].def):
 		return true
 	for piece in others:
 		if not _stays_on_one_color(piece.def):
 			return false
 	return square_colors.size() == 1
+
+static func _can_capture(def: PieceDef) -> bool:
+	return def.move_rules.any(func(rule: MoveRule) -> bool: return rule.mode != MoveRule.Mode.MOVE_ONLY)
 
 ## A piece whose every move is a single jump of 3+ squares' distance (|x| + |y|),
 ## like a knight. Such a piece can't guard the squares around itself.

@@ -54,6 +54,8 @@ static func write(state: GameState) -> String:
 			row += piece.letter() if piece.def.symbol.length() == 1 else "(%s)" % piece.letter()
 			if piece.shield_broken:
 				row += "'"
+			if piece.ability_used:
+				row += "^"
 		if empty > 0:
 			row += str(empty)
 		rows.append(row)
@@ -86,6 +88,11 @@ static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 				if last:
 					last.shield_broken = true
 				continue
+			if token == "^":
+				# The piece just before this mark has used its special ability.
+				if last:
+					last.ability_used = true
+				continue
 			var letters := token.trim_prefix("(").trim_suffix(")")
 			var def: PieceDef = by_symbol.get(letters.to_upper())
 			if def == null:
@@ -108,7 +115,7 @@ static func _row_width(row: String) -> int:
 	for token in _tokens(row):
 		if token.is_valid_int():
 			width += token.to_int()
-		elif token != "'":
+		elif token != "'" and token != "^":
 			width += 1
 	return width
 
