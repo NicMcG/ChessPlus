@@ -175,6 +175,10 @@ static func _king_safety(board: Board, king: Piece, square: Vector2i, row: int, 
 ## type and side (and board size), then looked up.
 static var _reach_cache := {}  # PieceDef -> [White's counts, Black's counts]
 
+## Forget the worked-out reach counts (the test runner does this before quitting).
+static func clear_cache() -> void:
+	_reach_cache.clear()
+
 static func reach(def: PieceDef, square: Vector2i, team: Piece.Team, board: Board) -> int:
 	var tables: Array = _reach_cache.get(def, [])
 	if tables.is_empty() or tables[0].size() != board.width * board.height:

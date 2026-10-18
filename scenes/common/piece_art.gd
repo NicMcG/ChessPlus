@@ -10,6 +10,10 @@ const DEFAULT_STYLE := "standard"
 
 static var _cache := {}  # Image path (without extension) -> Texture2D, or null if none.
 
+## Forget every loaded picture (the test runner does this before quitting).
+static func clear_cache() -> void:
+	_cache.clear()
+
 ## Alternate pictures a piece may have (e.g. a paladin whose shield is broken).
 const VARIANTS: Array[String] = ["wounded"]
 

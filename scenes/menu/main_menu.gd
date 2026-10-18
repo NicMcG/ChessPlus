@@ -4,6 +4,8 @@ extends Control
 
 signal continue_pressed
 signal play_pressed
+signal online_pressed
+signal continue_online_pressed
 signal armies_pressed
 
 func _ready() -> void:
@@ -11,6 +13,12 @@ func _ready() -> void:
 	%Continue.visible = SavedGame.load_saved() != null
 	%Continue.pressed.connect(func() -> void: continue_pressed.emit())
 	%Play.pressed.connect(func() -> void: play_pressed.emit())
+	%Online.pressed.connect(func() -> void: online_pressed.emit())
+	# An online game in progress can be picked up again.
+	var online_code := UserSettings.online_game()
+	%ContinueOnline.visible = online_code != ""
+	%ContinueOnline.text = "Continue online game (%s)" % online_code
+	%ContinueOnline.pressed.connect(func() -> void: continue_online_pressed.emit())
 	%Armies.pressed.connect(func() -> void: armies_pressed.emit())
 	%Sound.pressed.connect(toggle_sound)
 	_show_sound()

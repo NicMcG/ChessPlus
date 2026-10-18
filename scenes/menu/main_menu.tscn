@@ -59,6 +59,21 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "Play"
 
+[node name="ContinueOnline" type="Button" parent="Center/Layout"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "Continue online game"
+
+[node name="Online" type="Button" parent="Center/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Play online"
+
 [node name="Armies" type="Button" parent="Center/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 110)

@@ -36,6 +36,16 @@ var bot_thinking := false
 var _bot_turn_id := 0
 ## A saved game to continue instead of starting a new one (set by the main scene).
 var resume: SavedGame
+## An online game (set by the main scene before the screen opens): the session
+## that talks to the server. Null for games on this device.
+var online: OnlineSession
+## Both players' clocks, in a timed online game.
+var clock_label: Label
+## Resigning needs a second tap: when the first tap was (or -1).
+var _resign_tapped_ms := -1
+## True while this player's move is on its way to the server.
+var _sending := false
+var _claiming_timeout := false
 var sounds: GameSounds
 
 @onready var board_view: BoardView = %BoardView
@@ -76,6 +86,12 @@ static func tip_text(touchscreen: bool) -> String:
 func _ready() -> void:
 	sounds = GameSounds.new()
 	add_child(sounds)
+	clock_label = Label.new()
+	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	clock_label.add_theme_font_size_override("font_size", 32)
+	clock_label.hide()
+	_layout.add_child(clock_label)
+	_layout.move_child(clock_label, status_label.get_index() + 1)
 	_bot_timer = Timer.new()
 	_bot_timer.one_shot = true
 	add_child(_bot_timer)
@@ -98,6 +114,9 @@ func _ready() -> void:
 	promotion_overlay.gui_input.connect(_on_overlay_input)
 	if is_bot_game():
 		bot = PracticeBot.new(bot_level)
+	if online:
+		_start_online()
+		return
 	if resume:
 		_continue_saved_game(resume)
 	else:
@@ -160,9 +179,10 @@ func play_from_here() -> void:
 	_save_progress()
 	_start_bot_turn_if_needed()
 
-## The board takes moves only when showing the game now and it's not the bot's turn.
+## The board takes moves only when showing the game now, it's not the bot's turn,
+## and (online) it's this player's turn.
 func _update_input() -> void:
-	board_view.input_enabled = viewing < 0 and not bot_thinking
+	board_view.input_enabled = viewing < 0 and not bot_thinking and _my_online_turn()
 
 ## The side-by-side layout for wide screens, unused (hidden) until needed.
 func _build_wide_layout() -> void:
@@ -185,17 +205,18 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_area], _wide_box)
 		_wide_box.move_child(_board_area, 0)
-		ScreenShape.move_to([status_label, _moves_scroll, ability_button, play_from_here_button, _buttons], _side)
+		ScreenShape.move_to([status_label, clock_label, _moves_scroll, ability_button, play_from_here_button, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, _board_area, _moves_scroll, ability_button, play_from_here_button, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _board_area, _moves_scroll, ability_button, play_from_here_button, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
 func is_bot_game() -> bool:
 	return bot_team >= 0
 
-## Make a move (it must be legal) and update everything on screen.
-func play(move: Move) -> void:
+## Make a move (it must be legal) and update everything on screen. Online, this
+## player's moves are sent to the server (`from_server` = it came from there).
+func play(move: Move, from_server := false) -> void:
 	state.make_move(move)
 	# While looking back, the board keeps showing the old position.
 	if viewing < 0:
@@ -204,6 +225,8 @@ func play(move: Move) -> void:
 	_update_text()
 	_save_progress()
 	_start_bot_turn_if_needed()
+	if online and not from_server:
+		_send_online_moves()
 
 ## Take back the last move (also after the game has ended). Against the bot it
 ## takes back the bot's reply too, so it's your turn again.
@@ -261,7 +284,8 @@ func _show_new_state() -> void:
 ## remove the save so the menu stops offering to continue it. Only games started
 ## from armies (from the menu) are saved.
 func _save_progress() -> void:
-	if white_army == null or black_army == null:
+	# Online games are kept on the server instead.
+	if online or white_army == null or black_army == null:
 		return
 	if state.outcome() != GameState.Outcome.NONE:
 		SavedGame.delete_saved()
@@ -361,13 +385,20 @@ func _on_overlay_input(event: InputEvent) -> void:
 func _update_text() -> void:
 	var mover := "White" if state.side_to_move == Piece.Team.WHITE else "Black"
 	var other := "Black" if state.side_to_move == Piece.Team.WHITE else "White"
-	if is_bot_game():
+	if online:
+		var my_turn := state.side_to_move == online.my_team
+		mover = "You" if my_turn else "Your opponent"
+		other = "Your opponent" if my_turn else "You"
+	elif is_bot_game():
 		var bots_turn := state.side_to_move == bot_team
 		mover = "Bot" if bots_turn else "You"
 		other = "You" if bots_turn else "The bot"
 	match state.outcome():
 		GameState.Outcome.NONE:
-			if is_bot_game():
+			if online:
+				var mine := state.side_to_move == online.my_team
+				status_label.text = ("Your move" if mine else "Your opponent's move") + (" - check!" if state.is_in_check() else "")
+			elif is_bot_game():
 				status_label.text = "Bot is thinking..." if bot_thinking else "Your move" + (" - check!" if state.is_in_check() else "")
 			else:
 				status_label.text = mover + " to move" + (" - check!" if state.is_in_check() else "")
@@ -381,9 +412,13 @@ func _update_text() -> void:
 			status_label.text = "Draw by repetition"
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			status_label.text = "Draw: checkmate is impossible"
+	if online and _online_ending() != "":
+		status_label.text = _online_ending()
 	if viewing >= 0:
 		status_label.text = "Viewing %s" % _move_name(viewing - 1)
 	var result := state.result_text()
+	if online and result == "*":
+		result = _online_result_text()
 	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result, viewing, TIP)
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
@@ -391,6 +426,132 @@ func _update_text() -> void:
 	undo_button.disabled = not _can_undo()
 	play_from_here_button.visible = is_bot_game() and viewing >= 0
 	play_from_here_button.disabled = bot_thinking
+
+# --- Online games ---------------------------------------------------------------
+
+## Set the screen up for an online game: the position from the server, this
+## player's side, the clocks, and Resign instead of Undo / New game.
+func _start_online() -> void:
+	if online.get_parent() != self:
+		add_child(online)
+	white_army = online.army(Piece.Team.WHITE)
+	black_army = online.army(Piece.Team.BLACK)
+	state = online.create_state(StandardSetup.create_rules())
+	if state == null:
+		state = _create_start_state()
+	undo_button.hide()
+	new_game_button.text = "Resign"
+	new_game_button.pressed.disconnect(new_game)
+	new_game_button.pressed.connect(resign)
+	clock_label.visible = online.timed()
+	online.changed.connect(_on_online_changed)
+	online.start_polling()
+	UserSettings.set_online_game(online.code if online.status() == OnlineSession.PLAYING else "")
+	_show_new_state()
+
+func _my_online_turn() -> bool:
+	if online == null:
+		return true
+	return online.status() == OnlineSession.PLAYING and state.side_to_move == online.my_team and not _sending
+
+## Send the moves so far after this player's move. If the connection fails, keep
+## trying until the server has it.
+func _send_online_moves() -> void:
+	_sending = true
+	_update_input()
+	var moves := state.history.map(func(m: Move) -> String: return m.to_text())
+	var finished := state.outcome() != GameState.Outcome.NONE
+	var result := await online.send_moves(moves, finished)
+	while not result.ok and is_inside_tree():
+		status_label.text = "Connection problem - trying again..."
+		await get_tree().create_timer(3.0).timeout
+		result = await online.send_moves(moves, finished)
+	_sending = false
+	if not is_inside_tree():
+		return
+	# The server had something newer (e.g. the opponent resigned): catch up.
+	if result.rows.is_empty():
+		await online.poll()
+	_after_online_change()
+
+## Something changed on the server: play any new moves from the opponent.
+func _on_online_changed(_row: Dictionary) -> void:
+	var server_moves := online.moves()
+	for i in range(state.history.size(), server_moves.size()):
+		var move := state.find_move(str(server_moves[i]))
+		if move == null:
+			status_label.text = "This game is out of step with the server."
+			return
+		play(move, true)
+	_after_online_change()
+
+func _after_online_change() -> void:
+	if online.status() != OnlineSession.PLAYING:
+		online.stop_polling()
+		UserSettings.set_online_game("")
+	_update_text()
+	_update_input()
+
+## Resign this online game (the first tap asks for a second one).
+func resign() -> void:
+	if online == null or online.status() != OnlineSession.PLAYING:
+		return
+	var now := Time.get_ticks_msec()
+	if _resign_tapped_ms < 0 or now - _resign_tapped_ms > 3000:
+		_resign_tapped_ms = now
+		new_game_button.text = "Tap again to resign"
+		get_tree().create_timer(3.0).timeout.connect(func() -> void:
+			if is_instance_valid(new_game_button):
+				new_game_button.text = "Resign")
+		return
+	_resign_tapped_ms = -1
+	new_game_button.text = "Resign"
+	await online.resign()
+	_after_online_change()
+
+func _process(_delta: float) -> void:
+	if online == null or not online.timed():
+		return
+	var now := Time.get_ticks_msec()
+	var white := _clock_text(online.clock_ms(Piece.Team.WHITE, now))
+	var black := _clock_text(online.clock_ms(Piece.Team.BLACK, now))
+	var you := " (you)"
+	clock_label.text = "White %s%s      Black %s%s" % [white, you if online.my_team == Piece.Team.WHITE else "",
+			black, you if online.my_team == Piece.Team.BLACK else ""]
+	# A clock that has run out ends the game (claimed by whoever notices first).
+	if not _claiming_timeout and online.out_of_time(online.side_to_move(), now):
+		_claim_timeout(online.side_to_move())
+
+func _claim_timeout(team: Piece.Team) -> void:
+	_claiming_timeout = true
+	await online.claim_timeout(team)
+	_claiming_timeout = false
+	_after_online_change()
+
+## "4:05", never below "0:00".
+static func _clock_text(ms: int) -> String:
+	var seconds := maxi(0, ceili(ms / 1000.0))
+	return "%d:%02d" % [seconds / 60, seconds % 60]
+
+## How a finished online game ended, if not on the board: "" otherwise.
+func _online_ending() -> String:
+	if online.status() == OnlineSession.CANCELLED:
+		return "This game was cancelled"
+	var code := online.result_code()
+	if online.status() != OnlineSession.FINISHED or code == "board" or code == "":
+		return ""
+	var losing_team := Piece.Team.WHITE if code.begins_with("white") else Piece.Team.BLACK
+	var you_lost := losing_team == online.my_team
+	if code.ends_with("resigned"):
+		return "You resigned" if you_lost else "Your opponent resigned - you win!"
+	return "You ran out of time" if you_lost else "Your opponent ran out of time - you win!"
+
+## "1-0" / "0-1" for a game that ended by resigning or time, else "*".
+func _online_result_text() -> String:
+	var code := online.result_code()
+	if online.status() != OnlineSession.FINISHED or code == "board" or code == "":
+		return "*"
+	return "0-1" if code.begins_with("white") else "1-0"
 
 func _scroll_moves_to_end() -> void:
 	if is_inside_tree():

@@ -75,6 +75,10 @@ func _run_all() -> void:
 				for failure in suite.failures:
 					print("        ", failure)
 	print("\n%d passed, %d failed" % [passed, failed])
+	# Empty the shared caches, so what's left at exit is a real leak worth a warning.
+	PieceArt.clear_cache()
+	PracticeBot.clear_cache()
+	MemoryBackend.clear()
 	get_tree().quit(1 if failed > 0 else 0)
 
 func _matches(file: String, filters: PackedStringArray) -> bool:
