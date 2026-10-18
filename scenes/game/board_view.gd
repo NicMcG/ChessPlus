@@ -165,6 +165,11 @@ func _start_shake(square: Vector2i) -> void:
 func texture_for(def: PieceDef, team: Piece.Team) -> Texture2D:
 	return PieceArt.texture_for(def, team, piece_style)
 
+## Where a square is on screen, in global coordinates.
+func square_screen_rect(square: Vector2i) -> Rect2:
+	var rect := _square_rect(square)
+	return Rect2(get_global_transform() * rect.position, rect.size * get_global_transform().get_scale())
+
 ## The middle of a square on screen.
 func square_center(square: Vector2i) -> Vector2:
 	return _square_rect(square).get_center()

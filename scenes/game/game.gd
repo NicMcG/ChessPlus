@@ -60,6 +60,14 @@ var draw_button: Button
 var offer_bar: HBoxContainer
 ## Was the game over at the last update (so the result shows once)?
 var _was_over := false
+## The last move played here was checkmate: the result screen waits for the
+## checkmate effect (see CheckmateEffect).
+var _mate_just_played := false
+var _mate_effect: CheckmateEffect
+## Counts checkmate effects started, so one waiting for the move's animation
+## knows if it has been cancelled meanwhile.
+var _mate_count := 0
+var _result_fade: Tween
 ## Chat messages already read.
 var _chat_seen := 0
 ## The rematch this player set up (its code), if any.
@@ -247,6 +255,7 @@ func play(move: Move, from_server := false) -> void:
 	if viewing < 0:
 		# The board's animation plays each sound at the right moment.
 		board_view.show_move(move)
+		_mate_just_played = state.outcome() == GameState.Outcome.CHECKMATE
 	else:
 		sounds.play_for_move(state, move)
 	_update_text()
@@ -536,6 +545,7 @@ func _update_game_over() -> void:
 		show_game_over()
 	elif not over:
 		game_over_panel.hide()
+		_stop_checkmate_effect()
 	_was_over = over
 
 func show_game_over() -> void:
@@ -551,8 +561,57 @@ func show_game_over() -> void:
 	if menu_button.visible:
 		buttons.append(["menu", "Menu"])
 	game_over_panel.show_result(texts[0], texts[1], buttons)
+	if _mate_just_played:
+		_mate_just_played = false
+		_play_checkmate_effect()
 	if online and _opponent_wants_rematch():
 		_show_rematch_offer()
+
+## Checkmate was just played: once the move's animation ends, the beaten king
+## rises off the board and crumbles to dust while the result screen fades in.
+func _play_checkmate_effect() -> void:
+	_stop_checkmate_effect()
+	var squares := MoveAnimation.royal_squares(state, state.side_to_move)
+	if squares.is_empty():
+		return
+	var king := state.board.get_piece(squares[0])
+	var texture := board_view.texture_for(king.def, king.team)
+	if texture == null:
+		return
+	game_over_panel.modulate.a = 0.0
+	_mate_count += 1
+	var this_one := _mate_count
+	if board_view.is_animating():
+		await board_view.animation_finished
+	if this_one != _mate_count or not is_over():
+		return  # Undone or a new game meanwhile.
+	var effect := CheckmateEffect.new()
+	_mate_effect = effect
+	board_view.hidden_squares.append(squares[0])
+	board_view.queue_redraw()
+	var square_rect := board_view.square_screen_rect(squares[0])
+	effect.setup(texture, Rect2(square_rect.position - get_global_rect().position, square_rect.size))
+	effect.crumbling.connect(func() -> void:
+		sounds.play(GameSounds.Sound.DUST)
+		_result_fade = create_tween()
+		_result_fade.tween_property(game_over_panel, "modulate:a", 1.0, 2.0))
+	effect.finished.connect(func() -> void:
+		board_view.hidden_squares.erase(squares[0])
+		board_view.queue_redraw()
+		_mate_effect = null)
+	add_child(effect)
+	sounds.play(GameSounds.Sound.CHECKMATE)
+
+## Remove the checkmate effect (the mate was undone, or a new game started).
+func _stop_checkmate_effect() -> void:
+	_mate_count += 1
+	if _result_fade:
+		_result_fade.kill()
+		_result_fade = null
+	game_over_panel.modulate.a = 1.0
+	if is_instance_valid(_mate_effect) and _mate_effect.is_inside_tree():
+		_mate_effect.queue_free()
+	_mate_effect = null
 
 ## The headline and the line under it, e.g. ["Checkmate!", "You win!"].
 func result_texts() -> Array:
