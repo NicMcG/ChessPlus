@@ -15,6 +15,7 @@ var library := ArmyLibrary.new()
 var screen: Node
 
 func _ready() -> void:
+	SystemFonts.install()
 	fit_window_to_screen()
 	show_main_menu()
 	if OS.has_feature("web") and "selftest=1" in str(JavaScriptBridge.eval("location.search")):

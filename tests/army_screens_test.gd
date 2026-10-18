@@ -139,13 +139,22 @@ func test_builder_saves_and_edits_a_copy() -> void:
 	check_eq(library.armies()[0].pieces.size(), 4, "Elephant added in the file")
 	builder.free()
 
-func test_phone_text_input_does_nothing_outside_phone_browsers() -> void:
+func test_phone_text_input_does_nothing_outside_browsers() -> void:
 	# Tests run on PC, so attaching must leave the LineEdit working normally.
-	check(not PhoneTextInput.in_phone_browser(), "Not a phone browser")
+	check(not PhoneTextInput.in_browser(), "Not a browser")
 	var edit := LineEdit.new()
 	PhoneTextInput.attach(edit, "Name")
-	check_eq(edit.gui_input.get_connections().size(), 0, "No tap handler added on PC")
+	check_eq(edit.get_child_count(), 0, "No web text box added on PC")
+	check(not edit.has_theme_color_override("font_color"), "Its text stays visible")
 	edit.free()
+
+func test_pc_borrows_system_fonts_for_emoji_and_other_alphabets() -> void:
+	SystemFonts.install()
+	var system_fonts := ThemeDB.fallback_font.fallbacks.filter(func(f: Font) -> bool: return f is SystemFont)
+	check_eq(system_fonts.size(), SystemFonts.FALLBACKS.size(), "Fallback fonts added")
+	SystemFonts.install()
+	check_eq(ThemeDB.fallback_font.fallbacks.filter(func(f: Font) -> bool: return f is SystemFont).size(),
+			SystemFonts.FALLBACKS.size(), "Only once")
 
 # --- Army list and match setup -------------------------------------------------
 
