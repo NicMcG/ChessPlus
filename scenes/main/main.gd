@@ -8,6 +8,7 @@ const ARMY_LIST := preload("res://scenes/armies/army_list.tscn")
 const ARMY_BUILDER := preload("res://scenes/armies/army_builder.tscn")
 const MATCH_SETUP := preload("res://scenes/menu/match_setup.tscn")
 const GAME := preload("res://scenes/game/game.tscn")
+const ONLINE_LOBBY := preload("res://scenes/online/online_lobby.tscn")
 
 var library := ArmyLibrary.new()
 ## The screen currently showing.
@@ -49,6 +50,8 @@ func show_main_menu() -> void:
 	var menu := MAIN_MENU.instantiate()
 	menu.continue_pressed.connect(continue_game)
 	menu.play_pressed.connect(show_match_setup)
+	menu.online_pressed.connect(show_online_lobby)
+	menu.continue_online_pressed.connect(continue_online_game)
 	menu.armies_pressed.connect(show_army_list)
 	_show(menu)
 
@@ -98,6 +101,39 @@ func continue_game() -> void:
 	game.resume = saved
 	game.menu_requested.connect(show_main_menu)
 	_show(game)
+
+## The online lobby: create a game (and wait for a friend) or join one by code.
+## `backend` is for tests (null = the real server).
+func show_online_lobby(backend: OnlineBackend = null) -> void:
+	var lobby := ONLINE_LOBBY.instantiate()
+	lobby.library = library
+	lobby.backend = backend
+	lobby.closed.connect(show_main_menu)
+	lobby.game_ready.connect(start_online_game)
+	_show(lobby)
+
+## Both players are in: open the game. The session moves from the lobby into
+## the game screen.
+func start_online_game(session: OnlineSession) -> void:
+	if session.get_parent():
+		session.get_parent().remove_child(session)
+	var game := GAME.instantiate()
+	game.online = session
+	game.menu_requested.connect(show_main_menu)
+	_show(game)
+
+## Pick up the online game this device was playing.
+func continue_online_game(backend: OnlineBackend = null) -> void:
+	var session := OnlineSession.new(backend)
+	add_child(session)
+	var result := await session.resume(UserSettings.online_game())
+	if not result.ok or session.status() != OnlineSession.PLAYING:
+		# It has ended (or gone) since: stop offering it.
+		UserSettings.set_online_game("")
+		session.queue_free()
+		show_main_menu()
+		return
+	start_online_game(session)
 
 ## Replace the current screen with `new_screen`.
 func _show(new_screen: Node) -> void:

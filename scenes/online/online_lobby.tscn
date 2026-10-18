@@ -1,0 +1,170 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/online/online_lobby.gd" id="1_lobby"]
+[ext_resource type="Script" path="res://scenes/common/width_limit.gd" id="9_width"]
+
+[node name="OnlineLobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_lobby")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.17, 0.17, 0.18, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 24
+script = ExtResource("9_width")
+
+[node name="Layout" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TopBar" type="HBoxContainer" parent="Margin/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Back" type="Button" parent="Margin/Layout/TopBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 70)
+layout_mode = 2
+text = "Back"
+
+[node name="Title" type="Label" parent="Margin/Layout/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 40
+text = "Play online"
+horizontal_alignment = 1
+
+[node name="Form" type="VBoxContainer" parent="Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="ArmyLabel" type="Label" parent="Margin/Layout/Form"]
+layout_mode = 2
+text = "Your army"
+
+[node name="Army" type="OptionButton" parent="Margin/Layout/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="CreateHeading" type="Label" parent="Margin/Layout/Form"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "Start a new game"
+
+[node name="SideLabel" type="Label" parent="Margin/Layout/Form"]
+layout_mode = 2
+text = "You play"
+
+[node name="Side" type="OptionButton" parent="Margin/Layout/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="TimeLabel" type="Label" parent="Margin/Layout/Form"]
+layout_mode = 2
+text = "Time for each player"
+
+[node name="Time" type="OptionButton" parent="Margin/Layout/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="Create" type="Button" parent="Margin/Layout/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "Create game"
+
+[node name="JoinHeading" type="Label" parent="Margin/Layout/Form"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "Or join a friend's game"
+
+[node name="JoinRow" type="HBoxContainer" parent="Margin/Layout/Form"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CodeEdit" type="LineEdit" parent="Margin/Layout/Form/JoinRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 40
+placeholder_text = "Code"
+max_length = 5
+
+[node name="Join" type="Button" parent="Margin/Layout/Form/JoinRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 90)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "Join"
+
+[node name="Waiting" type="VBoxContainer" parent="Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="SendLabel" type="Label" parent="Margin/Layout/Waiting"]
+layout_mode = 2
+text = "Send this code to your friend:"
+horizontal_alignment = 1
+
+[node name="Code" type="Label" parent="Margin/Layout/Waiting"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 110
+text = "K7QX2"
+horizontal_alignment = 1
+
+[node name="Copy" type="Button" parent="Margin/Layout/Waiting"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+text = "Copy code"
+
+[node name="WaitLabel" type="Label" parent="Margin/Layout/Waiting"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Waiting for them to join..."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Cancel" type="Button" parent="Margin/Layout/Waiting"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+text = "Cancel game"
+
+[node name="Message" type="Label" parent="Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.55, 0.45, 1)
+horizontal_alignment = 1
+autowrap_mode = 3
