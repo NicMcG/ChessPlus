@@ -106,7 +106,7 @@ func test_crack_shot_arrow_and_sink() -> void:
 	var animation := MoveAnimation.for_move(move, state, false)
 	check(animation.has_extra("arrow"), "An arrow flies")
 	check(animation.has_segment(victim, "sink"), "The target sinks into the board")
-	check_eq(_sounds(animation), [Sound.ARROW_WHOOSH, Sound.ARROW_HIT], "Whoosh, then thunk")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.ARROW_WHOOSH, Sound.ARROW_HIT], "Activation, whoosh, then thunk")
 
 func test_raise_dead_sinks_and_rises() -> void:
 	var state := _game("k7/8/8/8/8/8/3(NC)4/4K3 w - - 0 1")
@@ -118,7 +118,7 @@ func test_raise_dead_sinks_and_rises() -> void:
 	check(animation.has_segment(necromancer, "sink"), "Necromancer sinks")
 	check(animation.has_segment(move.raised, "rise"), "The raised piece rises")
 	check(animation.has_extra("smoke"), "Purple smoke")
-	check_eq(_sounds(animation), [Sound.RAISE_DEAD], "Eerie sound")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.RAISE_DEAD], "Activation, then the eerie sound")
 
 func test_check_shakes_the_king_last() -> void:
 	var state := StandardSetup.from_fen("4k3/8/8/8/8/8/8/4K2R w - - 0 1")

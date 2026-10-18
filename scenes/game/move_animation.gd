@@ -52,8 +52,10 @@ static func for_move(move: Move, state: GameState, dragged: bool, p_speed := 1.0
 	a.speed = p_speed
 	if move.ability == PieceDef.Ability.RAISE_DEAD:
 		a._raise_dead(move)
+		a._activation(move)
 	elif move.ability == PieceDef.Ability.CRACK_SHOT:
 		a._crack_shot(move)
+		a._activation(move)
 	elif move.captured and is_cannon_shot(move):
 		a._cannon(move, dragged)
 	elif move.breaks_shield():
@@ -181,13 +183,33 @@ func _crack_shot(move: Move) -> void:
 	extras.append({"kind": "arrow", "from": from, "to": target, "start": 0.0, "end": hit,
 			"stuck_to": move.captured, "until": hit + 1.0 if move.captured else hit + 0.35})
 	_cue(0.0, GameSounds.Sound.ARROW_WHOOSH)
+	_cue(hit, GameSounds.Sound.ARROW_HIT)
 	if move.captured:
 		_add(move.captured, {"kind": "hold", "at": target, "start": 0.0, "end": hit + 0.2})
 		_add(move.captured, {"kind": "sink", "at": target, "start": hit + 0.2, "end": hit + 1.0})
-		_cue(hit, GameSounds.Sound.ARROW_HIT)
 	else:
 		_shake_target(move.to, hit)
 		_cue(hit, GameSounds.Sound.SHIELD_BREAK)
+
+## Using a special ability: everything planned so far waits a moment while
+## the activation sound plays, and the piece using it glows in its ability's
+## colour.
+func _activation(move: Move) -> void:
+	const WAIT := 0.3
+	for segments: Array in tracks.values():
+		for segment: Dictionary in segments:
+			segment.start += WAIT
+			segment.end += WAIT
+	for extra: Dictionary in extras:
+		extra.start += WAIT
+		extra.end += WAIT
+		if extra.has("until"):
+			extra.until += WAIT
+	for cue: Array in cues:
+		cue[0] += WAIT
+	_cue(0.0, GameSounds.Sound.ABILITY)
+	var glow: Color = move.piece.def.ability_gradient()[1].lerp(Color.WHITE, 0.3)
+	extras.append({"kind": "light", "at": Vector2(move.from), "start": 0.0, "end": WAIT + 0.15, "color": glow})
 
 ## Raise Dead: the Necromancer sinks into purple smoke and the raised piece
 ## rises up out of it.

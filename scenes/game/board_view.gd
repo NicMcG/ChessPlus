@@ -613,11 +613,13 @@ func _draw_extras(extras: Array, under: bool) -> void:
 			"light":
 				var center := _point(extra.at)
 				var fade := 1.0 - t
-				draw_circle(center, s * (0.25 + 0.55 * t), Color(1, 0.97, 0.75, 0.35 * fade))
-				draw_circle(center, s * (0.15 + 0.3 * t), Color(1, 1, 0.9, 0.6 * fade))
+				# Golden by default (promotion); an ability's glow has its own colour.
+				var glow: Color = extra.get("color", Color(1, 0.95, 0.6))
+				draw_circle(center, s * (0.25 + 0.55 * t), Color(glow.lerp(Color.WHITE, 0.5), 0.35 * fade))
+				draw_circle(center, s * (0.15 + 0.3 * t), Color(glow.lerp(Color.WHITE, 0.75), 0.6 * fade))
 				for ray in 8:
 					var direction := Vector2.from_angle(TAU * ray / 8.0 + t)
-					draw_line(center + direction * s * 0.2, center + direction * s * (0.35 + 0.45 * t), Color(1, 0.95, 0.6, 0.8 * fade), maxf(2, s * 0.04))
+					draw_line(center + direction * s * 0.2, center + direction * s * (0.35 + 0.45 * t), Color(glow, 0.8 * fade), maxf(2, s * 0.04))
 			"ball":
 				if t < 1.0:
 					var from := _point(extra.from)
