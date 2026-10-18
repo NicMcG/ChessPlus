@@ -67,15 +67,21 @@ EYE_L = "M 15,22.5 L 21,24 C 21,26.8 19.6,28.3 17.8,28.3 C 15.8,28.3 14.6,25.8 1
 EYE_R = "M 30,22.5 L 24,24 C 24,26.8 25.4,28.3 27.2,28.3 C 29.2,28.3 30.4,25.8 30,22.5 Z"
 CHEEKS = ("M 14.2,20 C 13.8,18.6 14.6,17.6 15.8,17.4 M 30.8,20 C 31.2,18.6 30.4,17.6 29.2,17.4 "
           "M 14.5,33 C 14.3,31.6 15,30.6 16.2,30.4 M 30.5,33 C 30.7,31.6 30,30.6 28.8,30.4")
+# Drawn 20% bigger than first made (Mac: to match the other pieces), growing up
+# from the bottom of the jaw; line widths are divided by the same amount so the
+# outline stays the usual 1.5.
+NECRO_SCALE = 1.2
+
 def necromancer(team):
     fill, line = colours(team)
-    out = shape(SKULL, fill)
+    k = NECRO_SCALE
+    out = shape(SKULL, fill, "#000", 1.5 / k)
     eye_stroke = "#000" if team == "white" else "#fff"
-    out += shape(EYE_L, "#000", eye_stroke, 1.2) + shape(EYE_R, "#000", eye_stroke, 1.2)
-    out += detail("M 21.2,32 L 22.5,29.8 L 23.8,32", line, 1.3)
-    out += detail("M 19.5,35.5 L 19.5,38.8 M 22.5,35.5 L 22.5,38.8 M 25.5,35.5 L 25.5,38.8", line, 1.2)
-    out += detail(CHEEKS, line, 1)
-    return out
+    out += shape(EYE_L, "#000", eye_stroke, 1.2 / k) + shape(EYE_R, "#000", eye_stroke, 1.2 / k)
+    out += detail("M 21.2,32 L 22.5,29.8 L 23.8,32", line, 1.3 / k)
+    out += detail("M 19.5,35.5 L 19.5,38.8 M 22.5,35.5 L 22.5,38.8 M 25.5,35.5 L 25.5,38.8", line, 1.2 / k)
+    out += detail(CHEEKS, line, 1 / k)
+    return '<g transform="translate(22.5,39.5) scale(%s) translate(-22.5,-38.8)">%s</g>' % (k, out)
 
 PIECES = {"ram": ram, "rogue": rogue, "necromancer": necromancer}
 for name, draw in PIECES.items():
