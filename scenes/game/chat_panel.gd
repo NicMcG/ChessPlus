@@ -11,6 +11,11 @@ var _messages: VBoxContainer
 var _scroll: ScrollContainer
 var _input: LineEdit
 var _send: Button
+## Web version: the messages are shown by the browser in this page element
+## (laid over the message area), so emoji and every alphabet display properly.
+var _web_list := ""
+var _web_rect := Rect2()
+var _web_shown := false
 
 func _init() -> void:
 	color = Color(0, 0, 0, 0.55)
@@ -71,12 +76,32 @@ func _init() -> void:
 
 func _ready() -> void:
 	PhoneTextInput.attach(_input, "Message")
+	if WebOverlay.available():
+		_web_list = WebOverlay.create_list()
+
+func _process(_delta: float) -> void:
+	if _web_list == "":
+		return
+	var show := _scroll.is_visible_in_tree()
+	var rect := WebOverlay.canvas_rect(_scroll)
+	if show != _web_shown or rect != _web_rect:
+		_web_shown = show
+		_web_rect = rect
+		WebOverlay.place(_web_list, rect, 28 * WebOverlay.canvas_scale(_scroll), show, 12)
+
+func _exit_tree() -> void:
+	if _web_list != "":
+		WebOverlay.remove(_web_list)
+		_web_list = ""
 
 ## Show `messages` (from OnlineSession.chat()); `my_side` is "white"/"black".
 func show_messages(messages: Array, my_side: String) -> void:
 	for child in _messages.get_children():
 		_messages.remove_child(child)
 		child.queue_free()
+	if _web_list != "":
+		_show_in_browser(messages, my_side)
+		return
 	if messages.is_empty():
 		_messages.add_child(_message_label("No messages yet. Say hello!", Color(0.6, 0.6, 0.6)))
 	for message: Dictionary in messages:
@@ -85,6 +110,16 @@ func show_messages(messages: Array, my_side: String) -> void:
 		_messages.add_child(_message_label("%s: %s" % [who, message.get("text", "")],
 				Color("#FFD75E") if mine else Color.WHITE))
 	_scroll_to_end.call_deferred()
+
+func _show_in_browser(messages: Array, my_side: String) -> void:
+	var items := []
+	if messages.is_empty():
+		items.append({"text": "No messages yet. Say hello!", "color": "#999999"})
+	for message: Dictionary in messages:
+		var mine: bool = message.get("from", "") == my_side
+		items.append({"text": "%s: %s" % ["You" if mine else "Opponent", message.get("text", "")],
+				"color": "#FFD75E" if mine else "#FFFFFF"})
+	WebOverlay.set_items(_web_list, items)
 
 ## The message being typed (for tests).
 func typed_text() -> String:
