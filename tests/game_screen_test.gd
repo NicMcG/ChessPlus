@@ -142,6 +142,9 @@ func test_one_turn_per_line() -> void:
 		_play(game, san)
 	check_eq(game.move_list.lines(), PackedStringArray(["1. e4 e5", "2. Nf3"]), "One line per turn")
 	check_eq(game.move_list.buttons.size(), 3, "A button per move")
+	var first_row: HBoxContainer = game.move_list.buttons[0].get_child(0)
+	check(first_row.get_child(0).get_child(0) is TextureRect, "Starts with the pawn's picture")
+	check_eq(first_row.get_child(1).text, "e4", "Then the square")
 	game.move_list.buttons[0].pressed.emit()
 	check_eq(game.viewing, 1, "Tapping a move looks back at it")
 	game.free()
@@ -165,7 +168,7 @@ func test_looking_back_leaves_the_game_alone() -> void:
 	check_eq(Fen.write(game.board_view.state), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", "Board shows it")
 	check_eq(Fen.write(game.state), now, "The game itself is unchanged")
 	check(not game.board_view.input_enabled, "No moving while looking back")
-	check(game.status_label.text == "Viewing 1. e4", "Status says so")
+	check(game.status_label.text == "Viewing White's move 1", "Status says so")
 	var viewed_box: StyleBoxFlat = game.move_list.buttons[0].get_theme_stylebox("normal")
 	check_eq(viewed_box.bg_color, MoveList.VIEWED_BG, "Viewed move highlighted")
 	check(not game.play_from_here_button.visible, "Play from here is only for bot games")
@@ -180,7 +183,7 @@ func test_black_move_name() -> void:
 	for san in ["e4", "e5", "Nf3"]:
 		_play(game, san)
 	game.view_move(2)
-	check(game.status_label.text == "Viewing 1... e5", "Black's move: 1... e5")
+	check(game.status_label.text == "Viewing Black's move 1", "Black's first move")
 	game.free()
 
 func test_play_from_here_against_the_bot() -> void:

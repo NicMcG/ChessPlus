@@ -362,14 +362,13 @@ func _scroll_moves_to_end() -> void:
 	if is_inside_tree():
 		_moves_scroll.scroll_vertical = int(_moves_scroll.get_v_scroll_bar().max_value)
 
-## A move written with its number, like "12. Nf3" or "12... Nf6".
+## Which move `index` (0 = the first) was, e.g. "White's move 12".
 func _move_name(index: int) -> String:
-	var entries := Notation.numbered_moves(state)
-	var number := ""
-	for i in range(index, -1, -1):
-		if entries[i][0] != "":
-			number = entries[i][0]
-			break
-	if entries[index][0] == "":
-		number = number.trim_suffix(".") + "..."
-	return "%s %s" % [number, entries[index][1]]
+	var move: Move = state.history[index]
+	var side := "White" if move.piece.team == Piece.Team.WHITE else "Black"
+	# Count White's and Black's moves up to this one.
+	var number := 0
+	for i in range(index + 1):
+		if state.history[i].piece.team == move.piece.team:
+			number += 1
+	return "%s's move %d" % [side, number]
