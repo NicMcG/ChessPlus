@@ -28,6 +28,8 @@ enum Sound {
 	CHECKMATE,
 	## The checkmated king crumbling into dust.
 	DUST,
+	## A special ability being used (before its own effect starts).
+	ABILITY,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
@@ -49,7 +51,13 @@ const LAYERS := {
 	Sound.CANNON_FIRE: [["made", 0.0]],
 	Sound.CANNON_HIT: [[["impactMining_000", "impactMining_001"], 0.8, 2.0]],
 	Sound.ARROW_WHOOSH: [["made", 0.0]],
-	Sound.ARROW_HIT: [[["impactPlank_medium_000", "impactPlank_medium_001"], 1.1, 0.0]],
+	# The arrow striking home: a sharp wooden thunk with a punch behind it.
+	Sound.ARROW_HIT: [
+		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.1, 4.0],
+		[["impactPunch_medium_000", "impactPunch_medium_001", "impactPunch_medium_002"], 1.2, 0.0],
+	],
+	# A rising magical swell with a glassy sparkle.
+	Sound.ABILITY: [[["maximize_008"], 0.85, 0.0], [["glass_002", "glass_004"], 1.3, -6.0]],
 	Sound.RAISE_DEAD: [["made", 0.0]],
 	Sound.SHIELD_BREAK: [[["impactMetal_heavy_000", "impactMetal_heavy_001"], 1.0, -2.0]],
 	# A deep bell: the recorded strike, slowed right down, over a long made hum.
