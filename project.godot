@@ -28,6 +28,8 @@ window/handheld/orientation=1
 [gui]
 
 theme/custom="res://scenes/theme.tres"
+theme/default_font_antialiasing.windows=2
+theme/default_font_hinting.windows=2
 
 [physics]
 

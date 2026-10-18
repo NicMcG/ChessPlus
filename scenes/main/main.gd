@@ -14,7 +14,23 @@ var library := ArmyLibrary.new()
 var screen: Node
 
 func _ready() -> void:
+	fit_window_to_screen()
 	show_main_menu()
+
+## On a PC, open the window as big as the screen comfortably allows (it's drawn
+## for a tall phone screen, so a small window shrinks everything and blurs the
+## text). Not in phone or web builds, nor when a size was asked for on the
+## command line (the screenshot tools do that).
+func fit_window_to_screen() -> void:
+	var window := get_window()
+	if not OS.has_feature("pc") or DisplayServer.get_name() == "headless" 			or OS.get_cmdline_args().has("--resolution") or window.mode != Window.MODE_WINDOWED:
+		return
+	var area := DisplayServer.screen_get_usable_rect(window.current_screen)
+	# 90% of the screen's height (leaving room for the title bar), 16:10 shaped.
+	var height := int(area.size.y * 0.9)
+	var width := mini(int(height * 1.6), int(area.size.x * 0.95))
+	window.size = Vector2i(width, height)
+	window.position = area.position + (area.size - window.size) / 2
 
 func show_main_menu() -> void:
 	var menu := MAIN_MENU.instantiate()
