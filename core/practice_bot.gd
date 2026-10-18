@@ -13,7 +13,7 @@ extends RefCounted
 ##
 ## Levels: Easy looks 1 move ahead and adds a lot of randomness to its scores, so
 ## it makes human-like mistakes. Medium looks 2 moves ahead with a little
-## randomness. Hard looks as deep as it can (up to 4) within its time limit.
+## randomness. Hard looks as deep as it can (up to 6) within its time limit.
 
 enum Level { EASY, MEDIUM, HARD }
 
@@ -21,7 +21,7 @@ const LEVEL_NAMES := ["Easy", "Medium", "Hard"]
 const SETTINGS := {
 	Level.EASY: {"depth": 1, "noise": 150, "time_ms": 600},
 	Level.MEDIUM: {"depth": 2, "noise": 25, "time_ms": 1200},
-	Level.HARD: {"depth": 4, "noise": 0, "time_ms": 1500},
+	Level.HARD: {"depth": 6, "noise": 0, "time_ms": 1500},
 }
 ## Scores are in hundredths of a point ("centipawns"). Checkmate beats everything.
 const MATE := 1000000
@@ -35,6 +35,10 @@ var level: Level
 var nodes := 0
 var depth_reached := 0
 var _rng := RandomNumberGenerator.new()
+## "Killer moves": for each depth in the search (ply), the last two quiet moves
+## that refuted a line there. Trying them first in sibling positions usually
+## refutes those quickly too, which saves a lot of searching.
+var _killers: Array = []
 var _deadline := 0
 var _out_of_time := false
 
@@ -55,6 +59,7 @@ func choose_move(state: GameState) -> Move:
 		return null
 	nodes = 0
 	depth_reached = 0
+	_killers.clear()
 	_out_of_time = false
 	_deadline = Time.get_ticks_msec() + settings.time_ms
 	var noise: int = settings.noise
@@ -109,7 +114,6 @@ static func evaluate(state: GameState) -> int:
 	# First pass: how much non-pawn material each side has (for king safety), and
 	# what's needed to tell whether the side to move is in check.
 	var pieces_value := {Piece.Team.WHITE: 0.0, Piece.Team.BLACK: 0.0}
-	var enemy_defs: Array[PieceDef] = []
 	var own_royals: Array[Vector2i] = []
 	for rank in range(board.height):
 		for file in range(board.width):
@@ -118,9 +122,7 @@ static func evaluate(state: GameState) -> int:
 				continue
 			if not piece.def.is_pawn_type():
 				pieces_value[piece.team] += piece.def.value
-			if piece.team != mover and not enemy_defs.has(piece.def):
-				enemy_defs.append(piece.def)
-			elif piece.team == mover and piece.def.is_king_type():
+			if piece.team == mover and piece.def.is_king_type():
 				own_royals.append(Vector2i(file, rank))
 	var score := 0
 	for rank in range(board.height):
@@ -145,8 +147,10 @@ static func evaluate(state: GameState) -> int:
 				if row > 0:
 					value += 12
 			score += value if piece.team == mover else -value
+	var enemy := Piece.other_team(mover)
+	var table := state.attack_table(enemy)
 	for royal in own_royals:
-		if MoveGenerator.is_attacked_by_defs(board, royal, Piece.other_team(mover), enemy_defs):
+		if MoveGenerator.attacked_with(board, royal, enemy, table):
 			score -= CHECK_PENALTY
 			break
 	return score
@@ -211,9 +215,9 @@ func _search(state: GameState, depth: int, alpha: int, beta: int, ply: int) -> i
 		return _quiesce(state, alpha, beta, QUIESCENCE_DEPTH)
 	var mover := state.side_to_move
 	var any_legal := false
-	for move in _ordered(MoveGenerator.pseudo_legal_moves(state)):
+	for move in _ordered(MoveGenerator.pseudo_legal_moves(state), _killers_at(ply)):
 		state.make_move(move)
-		if MoveGenerator.is_in_check(state.board, mover):
+		if MoveGenerator.in_check(state, mover):
 			state.undo_move(move)
 			continue
 		any_legal = true
@@ -222,11 +226,13 @@ func _search(state: GameState, depth: int, alpha: int, beta: int, ply: int) -> i
 		if _out_of_time:
 			return 0
 		if score >= beta:
+			if not move.is_capture():
+				_remember_killer(move, ply)
 			return score
 		alpha = maxi(alpha, score)
 	if not any_legal:
 		# Checkmate (sooner is worse for the loser) or stalemate (a draw).
-		return -MATE + ply if MoveGenerator.is_in_check(state.board, mover) else 0
+		return -MATE + ply if MoveGenerator.in_check(state, mover) else 0
 	return alpha
 
 ## Only look at captures, until things are quiet, so the score isn't fooled by a
@@ -237,12 +243,11 @@ func _quiesce(state: GameState, alpha: int, beta: int, depth: int) -> int:
 		return stand_pat
 	alpha = maxi(alpha, stand_pat)
 	var mover := state.side_to_move
-	var captures := MoveGenerator.pseudo_legal_moves(state).filter(func(m: Move) -> bool: return m.is_capture())
-	for move in _ordered(captures):
+	for move in _ordered(MoveGenerator.pseudo_legal_moves(state, true)):
 		if _tick():
 			return 0
 		state.make_move(move)
-		if MoveGenerator.is_in_check(state.board, mover):
+		if MoveGenerator.in_check(state, mover):
 			state.undo_move(move)
 			continue
 		var score := -_quiesce(state, -beta, -alpha, depth - 1)
@@ -252,6 +257,24 @@ func _quiesce(state: GameState, alpha: int, beta: int, depth: int) -> int:
 		alpha = maxi(alpha, score)
 	return alpha
 
+## A number that identifies a move by its squares (for comparing killers).
+static func _move_key(move: Move) -> int:
+	return move.from.x + move.from.y * 64 + move.to.x * 4096 + move.to.y * 262144
+
+func _killers_at(ply: int) -> Array:
+	return _killers[ply] if ply < _killers.size() else []
+
+func _remember_killer(move: Move, ply: int) -> void:
+	while _killers.size() <= ply:
+		_killers.append([])
+	var key := _move_key(move)
+	var list: Array = _killers[ply]
+	if list.has(key):
+		return
+	list.push_front(key)
+	if list.size() > 2:
+		list.pop_back()
+
 ## Count a position; true once the time limit has passed.
 func _tick() -> bool:
 	nodes += 1
@@ -260,20 +283,31 @@ func _tick() -> bool:
 	return _out_of_time
 
 ## Most promising moves first (promotions, then taking valuable pieces with
-## cheap ones), which makes the pruning work much better.
-static func _ordered(moves: Array) -> Array[Move]:
+## cheap ones, then this depth's killer moves), which makes the pruning work
+## much better.
+static func _ordered(moves: Array, killers: Array = []) -> Array[Move]:
+	# Only the promising moves need sorting; quiet moves keep their order after them.
 	var scored: Array = []
+	var quiet: Array[Move] = []
 	for move: Move in moves:
 		var priority := 0.0
+		if not killers.is_empty() and killers.has(_move_key(move)):
+			priority += 10
 		if move.promotion:
 			priority += 1000 + move.promotion.value * 10
 		if move.captured:
 			priority += 100 + move.captured.def.value * 10 - move.piece.def.value
 		elif move.breaks_shield():
 			priority += 50 + move.shield_target.def.value * 5
-		scored.append([priority, move])
+		if priority == 0.0:
+			quiet.append(move)
+		else:
+			scored.append([priority, move])
+	if scored.is_empty():
+		return quiet
 	scored.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
 	var ordered: Array[Move] = []
 	for entry in scored:
 		ordered.append(entry[1])
+	ordered.append_array(quiet)
 	return ordered

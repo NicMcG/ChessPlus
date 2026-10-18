@@ -11,6 +11,9 @@ const NO_SQUARE := Vector2i(-1, -1)
 var width: int
 var height: int
 var _squares: Array[Piece] = []
+## Each team's pieces, as {square: piece}. Kept in step with _squares by
+## set_piece, so a side's pieces can be found without scanning every square.
+var _team_pieces: Array[Dictionary] = [{}, {}]
 
 func _init(p_width: int = 8, p_height: int = 8) -> void:
 	width = p_width
@@ -27,7 +30,18 @@ func get_piece(pos: Vector2i) -> Piece:
 
 func set_piece(pos: Vector2i, piece: Piece) -> void:
 	assert(in_bounds(pos), "Tried to place a piece off the board")
-	_squares[_index(pos)] = piece
+	var index := _index(pos)
+	var old := _squares[index]
+	if old:
+		_team_pieces[old.team].erase(pos)
+	_squares[index] = piece
+	if piece:
+		_team_pieces[piece.team][pos] = piece
+
+## One team's pieces as {square: piece}. Read it, don't change it: only
+## set_piece changes the board.
+func pieces_of(team: Piece.Team) -> Dictionary:
+	return _team_pieces[team]
 
 func is_empty(pos: Vector2i) -> bool:
 	return get_piece(pos) == null

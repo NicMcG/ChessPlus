@@ -21,6 +21,10 @@ var halfmove_clock: int = 0
 var fullmove_number: int = 1
 ## Every move made so far, oldest first. undo_move takes the last one off.
 var history: Array[Move] = []
+## Each team's attack table (see MoveGenerator.attack_table), worked out the first
+## time it's needed. It covers every piece type that team has at that point plus
+## every promotion choice, so it stays right for the rest of the game.
+var _attack_tables: Array = [null, null]
 
 func _init(p_board: Board, p_rules: GameRules) -> void:
 	board = p_board
@@ -29,6 +33,19 @@ func _init(p_board: Board, p_rules: GameRules) -> void:
 ## The legal moves for whoever's turn it is.
 func moves() -> Array[Move]:
 	return MoveGenerator.legal_moves(self)
+
+## `team`'s attack table: the lines its pieces can capture along (cached).
+func attack_table(team: Piece.Team) -> Array:
+	if _attack_tables[team] == null:
+		var defs: Array[PieceDef] = []
+		for piece: Piece in board.pieces_of(team).values():
+			if not defs.has(piece.def):
+				defs.append(piece.def)
+		for def in rules.promotion_options:
+			if not defs.has(def):
+				defs.append(def)
+		_attack_tables[team] = MoveGenerator.attack_table(team, defs)
+	return _attack_tables[team]
 
 ## True if the side to move has a royal piece under attack.
 func is_in_check() -> bool:
