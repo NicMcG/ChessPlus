@@ -30,6 +30,13 @@ const INFINITY := 10000000
 const QUIESCENCE_DEPTH := 3
 
 var level: Level
+## Used instead of SETTINGS[level] when not empty (the balancing tool sets its
+## own depth and time).
+var settings_override := {}
+## Piece values the evaluation uses instead of the pieces' costs: id -> points.
+## Empty in real games; the balancing tool sets it to values it has measured, so
+## the bot isn't biased towards the current costs.
+static var value_overrides := {}
 ## Positions looked at during the last choose_move, and how many moves deep it
 ## got (for tests and tuning).
 var nodes := 0
@@ -53,7 +60,7 @@ func _init(p_level := Level.MEDIUM, seed := -1) -> void:
 ## The move to play, or null if there are no legal moves. The state is used to
 ## try moves out, but is exactly as it was when this returns.
 func choose_move(state: GameState) -> Move:
-	var settings: Dictionary = SETTINGS[level]
+	var settings: Dictionary = settings_override if not settings_override.is_empty() else SETTINGS[level]
 	var moves := _ordered(state.moves())
 	if moves.is_empty():
 		return null
@@ -121,7 +128,7 @@ static func evaluate(state: GameState) -> int:
 			if piece == null:
 				continue
 			if not piece.def.is_pawn_type():
-				pieces_value[piece.team] += piece.def.value
+				pieces_value[piece.team] += piece_value(piece.def)
 			if piece.team == mover and piece.def.is_king_type():
 				own_royals.append(Vector2i(file, rank))
 	var score := 0
@@ -131,9 +138,10 @@ static func evaluate(state: GameState) -> int:
 			var piece := board.get_piece(square)
 			if piece == null:
 				continue
-			var value := int(piece.def.value * 100)
+			var points := piece_value(piece.def)
+			var value := int(points * 100)
 			if piece.has_active_shield():
-				value += int(piece.def.value * 50)
+				value += int(points * 50)
 			var forward := 1 if piece.team == Piece.Team.WHITE else -1
 			var row := rank if piece.team == Piece.Team.WHITE else board.height - 1 - rank
 			if piece.def.is_king_type():
@@ -154,6 +162,12 @@ static func evaluate(state: GameState) -> int:
 			score -= CHECK_PENALTY
 			break
 	return score
+
+## What the bot thinks a piece is worth: its cost, unless value_overrides says otherwise.
+static func piece_value(def: PieceDef) -> float:
+	if value_overrides.is_empty():
+		return def.value
+	return value_overrides.get(def.id, def.value)
 
 ## The opponent's pieces (not counting pawns) must be worth at least this many
 ## points for king safety to matter; with less, the king should join in.

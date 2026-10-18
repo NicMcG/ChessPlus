@@ -4,3 +4,6 @@
 
 # Exported builds (web, etc.)
 /build/
+
+# Balancing tool logs (the results .csv files are kept)
+balance/results/*/log_*.txt
