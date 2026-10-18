@@ -76,6 +76,14 @@ custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 text = "Play from here"
 
+[node name="Ability" type="Button" parent="Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_constants/icon_max_width = 40
+text = "Ability"
+
 [node name="Buttons" type="HBoxContainer" parent="Margin/Layout"]
 layout_mode = 2
 theme_override_constants/separation = 12

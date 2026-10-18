@@ -151,6 +151,7 @@ func _part(part: Dictionary, _viewed: bool) -> Control:
 	picture.texture = PieceArt.texture_for(part.piece, part.team)
 	if picture.texture == null:
 		# No picture for this piece yet: its letter(s).
+		picture.free()
 		var label := _make_label(part.piece.symbol)
 		label.add_theme_font_override("font", _bold)
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
