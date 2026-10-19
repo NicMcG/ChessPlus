@@ -345,7 +345,8 @@ pub fn run(cat: &Arc<Catalog>, args: &Args, pieces: &str) {
                     *t.reasons.entry(r2).or_insert(0) += 1;
                     t.done_pairs += 1;
                     let (n, _, elo, m, llr) = penta_stats(&t.penta, sprt);
-                    let decided = sprt.is_some() && (llr <= lo || llr >= hi);
+                    // Not before 200 pairs: early on the variance is badly estimated.
+                    let decided = sprt.is_some() && n >= 200 && (llr <= lo || llr >= hi);
                     if n % 25 == 0 || decided {
                         eprintln!(
                             "  {} games ({:.0}s): A +{} ={} -{}  Elo {:+.1} ±{:.1}{}",
