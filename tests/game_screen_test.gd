@@ -368,3 +368,13 @@ func test_king_in_check_trembles() -> void:
 	_play(game, "Ke7")
 	check(game.board_view.check_squares().is_empty(), "Out of check: still")
 	game.free()
+
+func test_captured_pieces_and_material() -> void:
+	var game := _open_fen("4k3/8/8/3p4/4P3/8/8/R3K3 w - - 0 1")
+	_play(game, "exd5")
+	check_eq(game.captured_bottom.pieces.size(), 1, "White captured one piece")
+	check_eq(game.captured_bottom.pieces[0].def.id, "pawn", "A pawn")
+	check_eq(game.captured_bottom.advantage_text(), "+6", "White is 6 ahead (rook + pawn against nothing)")
+	check_eq(game.captured_top.pieces.size(), 0, "Black captured nothing")
+	check_eq(game.captured_top.advantage_text(), "", "Black isn't ahead")
+	game.free()
