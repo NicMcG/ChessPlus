@@ -496,29 +496,11 @@ impl<'a> Searcher<'a> {
             .collect()
     }
 
-    /// A rough exchange estimate for a capture: what it wins, minus the
-    /// capturing piece if it is then lost (a Ram always is; other pieces when
-    /// the square is defended). Not a full exchange evaluation, but cheap and
-    /// it works for any piece type.
+    /// What a capture wins if both sides keep recapturing (static exchange
+    /// evaluation, `Position::see`).
+    #[inline]
     fn capture_gain(&self, p: &Position, m: Move) -> i32 {
-        let victim = self.values[kind_of(p.sq[m.capture_square() as usize])];
-        if m.flags & F_CRACK != 0 {
-            return victim;
-        }
-        let k = kind_of(p.sq[m.from as usize]);
-        let mut attacker = self.values[k];
-        let mut gain = victim;
-        if m.promo != 0 {
-            attacker = self.values[m.promo as usize - 1];
-            gain += attacker - self.values[k];
-        }
-        if self.r.info[k].dies {
-            return gain - self.values[k];
-        }
-        if attacker > victim && p.attacked(self.r, m.to as usize, 1 - p.side) {
-            return gain - attacker;
-        }
-        gain
+        p.see(self.r, m, &self.values)
     }
 
     #[inline]
