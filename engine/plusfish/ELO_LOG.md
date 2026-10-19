@@ -46,3 +46,4 @@ should be worth about as much.
 | clock 10+0.1 s, 1 thread | 800 | +81.8 ±14.1 |
 
 Lazy SMP adds to the clock result on top: 4 threads vs 1 = +102.5 ±24.1 (#5).
+| 22 | Hash table in buckets of two entries (replace the shallower/older one) | time 10+0.1 | 800 | +14.8 ±12.5 | kept (SPRT undecided at the game limit; range excludes 0) |
