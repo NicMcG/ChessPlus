@@ -836,8 +836,8 @@ func _draw_extras(extras: Array, layer: int) -> void:
 					points.append(top.lerp(strike, k) + Vector2(zig, 0))
 				points.append(strike)
 				var color: Color = extra.get("color", Color(0.9, 0.85, 1.0))
-				draw_polyline(points, Color(color, 0.6 * flash), maxf(6, s * 0.22), true)
-				draw_polyline(points, Color(1, 1, 1, flash), maxf(3, s * 0.08), true)
+				draw_polyline(points, Color(color, 0.7 * flash), maxf(8, s * 0.3), true)
+				draw_polyline(points, Color(1, 1, 1, flash), maxf(4, s * 0.11), true)
 				draw_circle(strike, s * 0.5 * flash, Color(color, 0.4 * flash))
 			"impact":
 				# A quick ring and sparks where the pieces collide.
@@ -878,6 +878,18 @@ func _draw_extras(extras: Array, layer: int) -> void:
 					var pos := _point((extra.from as Vector2).lerp(extra.to, k)) \
 							+ Vector2(0, -s * (0.25 + 0.12 * sin(k * TAU * 1.5 + i)))
 					_draw_note(pos, s * 0.34, Color(1.0, 0.82, 0.3, sin(PI * k)))
+			"impact_frame":
+				# An anime impact frame: for an instant the board goes stark white,
+				# with black lines bursting out from the hit.
+				var center := _point(extra.at)
+				var strength := 1.0 - t
+				var board_rect := Rect2(_origin(), Vector2(state.board.width, state.board.height) * s)
+				draw_rect(board_rect, Color(1, 1, 1, 0.75 * strength))
+				for i in 18:
+					var direction := Vector2.from_angle(TAU * i / 18.0 + 0.2)
+					var inner := s * (0.35 + 0.15 * (i % 3))
+					var outer := s * (2.5 + 1.0 * (i % 2))
+					draw_line(center + direction * inner, center + direction * outer, Color(0, 0, 0, 0.85 * strength), maxf(2, s * (0.08 - 0.02 * (i % 3))))
 			"swirl":
 				# Streaks of light whirling round the rising piece, faster and faster.
 				var center := _point(extra.at) - Vector2(0, s * extra.get("lift", 0.5) * smoothstep(0.0, 0.6, t))

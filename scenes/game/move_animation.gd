@@ -158,8 +158,8 @@ func _ordinary(move: Move, state: GameState, dragged: bool) -> void:
 ## there's a burst of light and it turns into the new piece, which finishes the
 ## turn, hangs there a moment and drops back onto its square.
 func _promotion(move: Move, promoted: Piece, at: Vector2, arrived: float) -> void:
-	const RISE := 0.6
-	const AFTER := 0.75
+	const RISE := 0.9
+	const AFTER := 1.0
 	var swap := arrived + RISE
 	_add(move.piece, {"kind": "promote_rise", "at": at, "start": arrived, "end": swap})
 	_add(move.piece, {"kind": "fade_out", "at": at, "start": swap, "end": swap})
@@ -174,8 +174,10 @@ func _promotion(move: Move, promoted: Piece, at: Vector2, arrived: float) -> voi
 	extras.append({"kind": "light", "at": at + Vector2(0, -0.0), "start": swap, "end": swap + 0.5, "size": 2.2, "lift": 0.55})
 	extras.append({"kind": "shockwave", "at": at, "start": swap, "end": swap + 0.55, "lift": 0.55})
 	_cue(arrived, GameSounds.Sound.PROMOTE)
+	# A holy choir behind it all (Mac).
+	_cue(arrived, GameSounds.Sound.CHOIR)
 	# A whoosh for each turn, faster and faster as it spins up.
-	for when in [0.12, 0.3, 0.42, 0.5, 0.56]:
+	for when in [0.18, 0.45, 0.63, 0.75, 0.84]:
 		_cue(arrived + when, GameSounds.Sound.SPIN)
 	_cue(swap, GameSounds.Sound.SPARKLE)
 	_cue(swap + AFTER, GameSounds.Sound.LAND)
@@ -268,6 +270,8 @@ func _crack_shot(move: Move) -> void:
 	_cue(0.0, GameSounds.Sound.BOW)
 	_cue(0.02, GameSounds.Sound.ARROW_WHOOSH)
 	_cue(hit, GameSounds.Sound.ARROW_HIT)
+	# An anime impact frame as it strikes: a flash of stark light and lines.
+	extras.append({"kind": "impact_frame", "at": target, "start": hit, "end": hit + 0.16})
 	if move.captured:
 		_add(move.captured, {"kind": "hold", "at": target, "start": 0.0, "end": hit + 0.2})
 		_add(move.captured, {"kind": "sink", "at": target, "start": hit + 0.2, "end": hit + 1.0})
@@ -344,7 +348,8 @@ func _song_of_slumber(move: Move) -> void:
 	extras.append({"kind": "notes", "from": Vector2(move.from), "to": Vector2(move.to), "start": 0.0, "end": 1.0})
 	extras.append({"kind": "light", "at": Vector2(move.to), "start": 0.7, "end": 1.3, "color": Color(1.0, 0.8, 0.35), "size": 0.9})
 	_add(move.frozen, {"kind": "drowse", "at": Vector2(move.to), "start": 0.7, "end": 1.5})
-	_cue(0.0, GameSounds.Sound.LULLABY)
+	_cue(0.0, GameSounds.Sound.STRUM)
+	_cue(0.35, GameSounds.Sound.LULLABY)
 
 ## Full Moon: like a promotion, the Werewolf rises spinning in a silvery
 ## moonlit glow, howling, and comes back down as the wolf.
@@ -376,21 +381,22 @@ func _haunt(move: Move) -> void:
 	hidden_before[move.piece] = true
 	_cue(0.0, GameSounds.Sound.HAUNT)
 
-## Raise Dead (Mac's design): a crack of lightning and thunder; the Necromancer
-## sinks into fog of its colour as wood creaks, and the raised piece rises out
-## of it.
+## Raise Dead (Mac's design): a snap of lightning and thunder with an impact
+## flash; the Necromancer sinks into fog of its colour, and the raised piece
+## rises out of it with a zombie's groan.
 func _raise_dead(move: Move) -> void:
 	var at := Vector2(move.from)
 	var fog: Color = move.piece.def.ability_gradient()[0]
-	extras.append({"kind": "lightning", "at": at, "start": 0.0, "end": 0.35, "color": fog.lerp(Color.WHITE, 0.6)})
+	extras.append({"kind": "lightning", "at": at, "start": 0.0, "end": 0.28, "color": fog.lerp(Color.WHITE, 0.6)})
 	_add(move.piece, {"kind": "sink", "at": at, "start": 0.15, "end": 0.9})
 	extras.append({"kind": "smoke", "at": at, "start": 0.05, "end": 1.7, "color": fog, "size": 0.75})
 	_add(move.raised, {"kind": "rise", "at": at, "start": 0.8, "end": 1.6})
 	hidden_before[move.raised] = true
+	extras.append({"kind": "impact_frame", "at": at, "start": 0.0, "end": 0.12})
 	_cue(0.0, GameSounds.Sound.THUNDER)
 	_cue(0.0, GameSounds.Sound.RAISE_DEAD)
-	_cue(0.25, GameSounds.Sound.CREAK)
-	_cue(0.85, GameSounds.Sound.CREAK)
+	# A zombie's groan as the raised piece rises from the grave (Mac).
+	_cue(0.8, GameSounds.Sound.GROAN)
 
 ## Move `piece` from `from` to `to`: dropped there by dragging (a slam, with a
 ## thud and a puff of dust), leaping (a hop) or sliding. Returns when it arrives.

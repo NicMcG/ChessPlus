@@ -290,6 +290,6 @@ func test_animations() -> void:
 	a = MoveAnimation.for_move(haunt, state, false)
 	a.time = 0.0
 	check(not a.pose(haunt.piece).visible, "Haunt: the Ghost isn't there at first")
-	check(GameSounds.Sound.HAUNT in a.all_sounds(), "...with its eerie note")
-	for sound in [GameSounds.Sound.LULLABY, GameSounds.Sound.HAUNT]:
-		check(GameSounds.make_stream(sound).data.size() > 0, "Sound %d is made" % sound)
+	check(GameSounds.Sound.HAUNT in a.all_sounds(), "...with its church bell")
+	for sound in [GameSounds.Sound.LULLABY, GameSounds.Sound.HAUNT, GameSounds.Sound.STRUM]:
+		check(not GameSounds.streams_for(sound).is_empty(), "Sound %d is a recording" % sound)
