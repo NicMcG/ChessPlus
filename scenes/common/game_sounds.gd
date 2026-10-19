@@ -47,6 +47,8 @@ enum Sound {
 	HAUNT,
 	## Full Moon: a wolf's howl.
 	HOWL,
+	## Full Moon: a growl before the howl.
+	GROWL,
 	## An ordinary move's wood scraping along the board as it slides.
 	SCRAPE,
 	## A tap where the selected piece can't go: a negative buzz.
@@ -144,6 +146,7 @@ const LAYERS := {
 	# Gothic: a big church bell's toll over a low boom.
 	Sound.HAUNT: [[["church_bell"], 0.85, 0.0], [["lowFrequency_explosion_001"], 0.7, -9.0]],
 	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
+	Sound.GROWL: [[["wolf_growl"], 0.85, 0.0]],
 	Sound.ILLEGAL: [[["error_005", "error_006"], 1.0, -6.0]],
 	Sound.BLOCKED: [[WOOD_HEAVY, 0.55, 3.0], [PLANK, 0.6, -2.0]],
 	# Short, soft and a little echoey (Mac).

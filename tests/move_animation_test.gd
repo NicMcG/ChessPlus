@@ -127,7 +127,7 @@ func test_raise_dead_sinks_and_rises() -> void:
 	check(animation.has_segment(necromancer, "sink"), "Necromancer sinks")
 	check(animation.has_segment(move.raised, "rise"), "The raised piece rises")
 	check(animation.has_extra("smoke"), "Purple smoke")
-	check_eq(_sounds(animation), [Sound.ABILITY, Sound.THUNDER, Sound.RAISE_DEAD, Sound.GROAN], "Activation, thunder, the swell, a zombie's groan")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.RAISE_DEAD, Sound.THUNDER, Sound.GROAN], "Activation, the swell, then once it's under, thunder, then a zombie's groan")
 	check(animation.has_extra("lightning"), "Lightning strikes")
 
 func test_check_shakes_the_king_last() -> void:
