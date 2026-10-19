@@ -8,6 +8,7 @@ Run from this folder:  python make_final_vampire_squire.py
 """
 import io
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -59,7 +60,8 @@ def vampire(team):
     out = shape(bat_path(), fill)
     # The wing bones: from each shoulder out to the wing's points.
     bones = ""
-    for tip in ((5.6, 9.4), (6.4, 21.4), (10.6, 26.4), (16.2, 30.6)):
+    # Just the middle two of each wing's four points (Mac).
+    for tip in ((6.4, 21.4), (10.6, 26.4)):
         for x, y in (tip, _mirror(tip)):
             sx = 15.2 if x < 22.5 else 29.8
             bones += "M %s,20.2 L %.2f,%.2f " % (sx, x, y)
@@ -84,16 +86,27 @@ def squire(team):
     out += '<path d="%s" fill="%s" fill-rule="evenodd" stroke="#000" stroke-width="1.5"/>' % (STIRRUP, fill)
     out += shape(SADDLE, fill)
     # The line between the seat and the flap below it.
-    out += detail("M 9.4,17.6 C 13.2,18 15.8,20 17.2,22.8 C 18.4,25.4 20.4,26.8 23.4,26.8 L 32.6,26.8 "
-                  "C 35.8,26.8 37.8,24.8 37.8,21.6 L 37.8,12", inner(team), 1.1)
+    # Kept clear of the outline at both ends.
+    out += detail("M 11.4,17.9 C 14.2,18.6 16.2,20.4 17.4,22.9 C 18.6,25.4 20.5,26.6 23.4,26.6 L 32.6,26.6 "
+                  "C 35.6,26.6 37.4,24.8 37.4,21.6 L 37.4,13.6", inner(team), 1.1)
     return out
 
 
+def shrink(body, k, centre=(22.5, 24)):
+    """Draw `body` at `k` times its size about `centre`, keeping the line widths
+    as they were (so outlines stay the usual thickness)."""
+    body = re.sub(r'stroke-width="([0-9.]+)"', lambda m: 'stroke-width="%.2f"' % (float(m.group(1)) / k), body)
+    cx, cy = centre
+    return '<g transform="translate(%.2f %.2f) scale(%s)">%s</g>' % (cx * (1 - k), cy * (1 - k), k, body)
+
+
 PIECES = {"vampire": vampire, "squire": squire}
+# Both drawn a touch smaller than first made (Mac).
+SHRINK = 0.92
 
 if __name__ == "__main__":
     for name, draw in PIECES.items():
         for team in ("white", "black"):
             path = os.path.join(HERE, "..", "pieces", "%s_%s.svg" % (team, name))
-            io.open(path, "w", encoding="utf-8", newline="\n").write(r16.HEAD + draw(team) + r16.TAIL)
+            io.open(path, "w", encoding="utf-8", newline="\n").write(r16.HEAD + shrink(draw(team), SHRINK) + r16.TAIL)
     print("wrote", len(PIECES) * 2, "files")
