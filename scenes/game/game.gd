@@ -84,6 +84,8 @@ var sounds: GameSounds
 @onready var undo_button: Button = %Undo
 @onready var redo_button: Button = %Redo
 @onready var menu_button: Button = %Menu
+## Resign, in local games (online games use the New game button's place).
+@onready var resign_button: Button = %Resign
 @onready var promotion_overlay: ColorRect = %PromotionOverlay
 @onready var promotion_choices: GridContainer = %PromotionChoices
 ## The shimmering purple behind Raise Dead's choices.
@@ -155,6 +157,7 @@ func _ready() -> void:
 	board_view.info_requested.connect(func(piece: Piece) -> void:
 		PieceInfo.open(self, piece.def, piece.team))
 	new_game_button.pressed.connect(ask_new_game)
+	resign_button.pressed.connect(resign_local)
 	undo_button.pressed.connect(undo)
 	redo_button.pressed.connect(redo)
 	play_from_here_button.pressed.connect(play_from_here)
@@ -177,7 +180,43 @@ func _ready() -> void:
 
 func new_game() -> void:
 	state = _create_start_state()
+	resigned = -1
+	_started_time = Time.get_unix_time_from_system()
 	_show_new_state()
+
+## When this game started (seconds since 1970), kept with the saved game.
+var _started_time := Time.get_unix_time_from_system()
+
+## In a local game, the side that resigned (Piece.Team), or -1. Against the bot
+## that's you; with two players on one device, whoever's turn it was.
+var resigned := -1
+
+## The Resign button (local games): the first tap asks for a second one. After
+## resigning, Undo takes the resignation back.
+func resign_local() -> void:
+	if online or is_over() or bot_thinking or viewing >= 0:
+		return
+	var now := Time.get_ticks_msec()
+	if _resign_tapped_ms < 0 or now - _resign_tapped_ms > 3000:
+		_resign_tapped_ms = now
+		resign_button.text = "Tap again"
+		get_tree().create_timer(3.0).timeout.connect(func() -> void:
+			if is_instance_valid(resign_button):
+				resign_button.text = "Resign")
+		return
+	_resign_tapped_ms = -1
+	resign_button.text = "Resign"
+	resigned = _my_team() if is_bot_game() else state.side_to_move
+	board_view.refresh()
+	_update_input()
+	_update_text()
+	_save_progress()
+
+## "1-0" / "0-1" after a local resignation, else "*".
+func _resigned_result() -> String:
+	if resigned < 0:
+		return "*"
+	return "0-1" if resigned == Piece.Team.WHITE else "1-0"
 
 ## The New game button: once moves have been played, check first (Mac's request).
 func ask_new_game() -> void:
@@ -255,7 +294,7 @@ func play_from_here() -> void:
 ## The board takes moves only when showing the game now, it's not the bot's turn,
 ## and (online) it's this player's turn.
 func _update_input() -> void:
-	board_view.input_enabled = viewing < 0 and not bot_thinking and _my_online_turn()
+	board_view.input_enabled = viewing < 0 and not bot_thinking and _my_online_turn() and resigned < 0
 	_refresh_ability_button()
 
 ## The side-by-side layout for wide screens, unused (hidden) until needed.
@@ -355,6 +394,13 @@ func play(move: Move, from_server := false) -> void:
 func undo() -> void:
 	if not _can_undo():
 		return
+	# After resigning, Undo takes the resignation back first.
+	if resigned >= 0:
+		resigned = -1
+		_update_input()
+		_update_text()
+		_save_progress()
+		return
 	back_to_game()
 	var undone: Array[Move] = [state.history.back()]
 	state.undo_move(undone[0])
@@ -395,7 +441,7 @@ func redo() -> void:
 	_start_bot_turn_if_needed()
 
 func _can_redo() -> bool:
-	return not redo_moves.is_empty() and not bot_thinking and online == null
+	return not redo_moves.is_empty() and not bot_thinking and online == null and resigned < 0
 
 ## The bot plays its move now. Normally called by _start_bot_turn_if_needed
 ## (after a short wait); tests call it directly.
@@ -413,6 +459,8 @@ func _play_bot_move(move: Move) -> void:
 ## Pick up a saved game where it left off. If it can't be rebuilt (for example
 ## the rules changed since), start a new game with the same armies instead.
 func _continue_saved_game(saved: SavedGame) -> void:
+	if saved.started_time > 0:
+		_started_time = saved.started_time
 	var rebuilt := saved.create_state(StandardSetup.create_rules())
 	if rebuilt == null:
 		new_game()
@@ -443,10 +491,11 @@ func _save_progress() -> void:
 	# Online games are kept on the server instead.
 	if online or white_army == null or black_army == null:
 		return
-	if state.outcome() != GameState.Outcome.NONE:
+	if state.outcome() != GameState.Outcome.NONE or resigned >= 0:
 		SavedGame.delete_saved()
 	else:
 		var saved := SavedGame.from_state(state, white_army, black_army, bot_team, bot_level)
+		saved.started_time = _started_time
 		saved.eval_bar = eval_bar_on
 		saved.save()
 
@@ -454,7 +503,7 @@ func _save_progress() -> void:
 func _start_bot_turn_if_needed() -> void:
 	if _redoing:
 		return
-	if not is_bot_game() or state.side_to_move != bot_team or state.outcome() != GameState.Outcome.NONE:
+	if not is_bot_game() or state.side_to_move != bot_team or state.outcome() != GameState.Outcome.NONE or resigned >= 0:
 		_update_input()
 		return
 	bot_thinking = true
@@ -485,6 +534,8 @@ func _start_bot_turn_if_needed() -> void:
 func _can_undo() -> bool:
 	if bot_thinking:
 		return false
+	if resigned >= 0:
+		return true
 	if is_bot_game():
 		return state.history.any(func(m: Move) -> bool: return m.piece.team != bot_team)
 	return not state.history.is_empty()
@@ -708,12 +759,19 @@ func _update_text() -> void:
 			status_label.text = "%s's king was under attack from the start: %s loses" % [exposed, exposed]
 	if online and _online_ending() != "":
 		status_label.text = _online_ending()
+	if resigned >= 0 and state.outcome() == GameState.Outcome.NONE:
+		var texts := result_texts()
+		status_label.text = "%s - %s" % [texts[0], texts[1]]
 	if viewing >= 0:
 		status_label.text = "Viewing %s" % _move_name(viewing - 1)
 	_status_base = status_label.text
 	var result := state.result_text()
 	if online and result == "*":
 		result = _online_result_text()
+	if result == "*":
+		result = _resigned_result()
+	resign_button.visible = online == null
+	resign_button.disabled = is_over() or bot_thinking or viewing >= 0
 	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result, viewing, TIP)
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
@@ -819,6 +877,8 @@ func _update_eval_bar() -> void:
 	var result := ""
 	if ply == state.history.size() and state.result_text() != "*":
 		result = state.result_text()
+	elif ply == state.history.size() and resigned >= 0:
+		result = _resigned_result()
 	elif found.get("outcome", "none") == "checkmate":
 		result = "1-0" if int(found["cp"]) > 0 else "0-1"
 	elif found.get("outcome", "none") != "none":
@@ -843,7 +903,7 @@ func _on_evaluated(ply: int, _result: Dictionary) -> void:
 # --- The result screen ----------------------------------------------------------
 
 func is_over() -> bool:
-	if state.outcome() != GameState.Outcome.NONE:
+	if state.outcome() != GameState.Outcome.NONE or resigned >= 0:
 		return true
 	return online != null and online.status() in [OnlineSession.FINISHED, OnlineSession.CANCELLED]
 
@@ -933,6 +993,12 @@ func _stop_checkmate_effect() -> void:
 ## The headline and the line under it, e.g. ["Checkmate!", "You win!"].
 func result_texts() -> Array:
 	var me := _my_team()
+	if resigned >= 0 and state.outcome() == GameState.Outcome.NONE:
+		if is_bot_game():
+			return ["You resigned", "The bot wins"]
+		var loser := "White" if resigned == Piece.Team.WHITE else "Black"
+		var winner := "Black" if resigned == Piece.Team.WHITE else "White"
+		return ["%s resigned" % loser, "%s wins" % winner]
 	if online:
 		var code := online.result_code()
 		if online.status() == OnlineSession.CANCELLED:
@@ -1158,6 +1224,7 @@ func _go_to_rematch(next: OnlineSession) -> void:
 func _start_online() -> void:
 	if online.get_parent() != self:
 		add_child(online)
+	resign_button.hide()
 	white_army = online.army(Piece.Team.WHITE)
 	black_army = online.army(Piece.Team.BLACK)
 	state = online.create_state(StandardSetup.create_rules())

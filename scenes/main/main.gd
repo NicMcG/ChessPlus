@@ -17,10 +17,22 @@ var screen: Node
 func _ready() -> void:
 	SystemFonts.install()
 	fit_window_to_screen()
+	# A local game left 2 days without a move ends; say so once (Mac).
+	var note := SavedGame.end_if_abandoned()
 	show_main_menu()
+	if note != "":
+		show_note("Game ended", note)
 	_watch_for_updates()
 	if OS.has_feature("web") and "selftest=1" in str(JavaScriptBridge.eval("location.search")):
 		_online_self_test()
+
+## A pop-up message with an OK button, over whatever is showing.
+func show_note(title: String, text: String) -> ModalPanel:
+	var panel := ModalPanel.new(title)
+	panel.add_text(text)
+	panel.add_button("OK", panel.close)
+	add_child(panel)
+	return panel
 
 ## Opened with ?selftest=1 (web only): check the online server can be reached
 ## from this browser, and print the answer to the browser's console.
