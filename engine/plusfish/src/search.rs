@@ -156,6 +156,8 @@ pub struct Searcher<'a> {
     /// Lazy SMP helpers search one ply deeper on odd thread numbers, so the
     /// threads don't all do the same work.
     depth_offset: i32,
+    /// The score of the root move that last raised alpha (its line is pv[0]).
+    root_score: i32,
 }
 
 fn is_mate(s: i32) -> bool {
@@ -210,6 +212,7 @@ impl<'a> Searcher<'a> {
             must_finish: false,
             root_excluded: Vec::new(),
             depth_offset: 0,
+            root_score: 0,
         }
     }
 
@@ -329,6 +332,11 @@ impl<'a> Searcher<'a> {
                     }
                 };
                 if self.stopped && (depth > 1 || idx > 0) {
+                    // Stopped part-way: a root move that was fully searched and
+                    // beat the window is better than the last depth's choice.
+                    if multipv == 1 && depth > 1 && self.pv_len[0] > 0 && !best.lines.is_empty() {
+                        best.lines[0] = Line { score: self.root_score, pv: self.pv[0][..self.pv_len[0]].to_vec() };
+                    }
                     break;
                 }
                 let pv: Vec<Move> = self.pv[0][..self.pv_len[0]].to_vec();
@@ -665,6 +673,9 @@ impl<'a> Searcher<'a> {
                 best_move = m;
                 if score > alpha {
                     alpha = score;
+                    if root {
+                        self.root_score = score;
+                    }
                     self.pv[ply][0] = m;
                     let n = self.pv_len[ply + 1].min(MAX_PLY - 1);
                     for k in 0..n {

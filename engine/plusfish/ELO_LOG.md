@@ -27,3 +27,4 @@ should be worth about as much.
 | 11 | Prune bad captures in the main search (gain < -120*depth, depth <= 4) | nodes 6k | 1200 | -18.0 ±11.5 | reverted |
 | 12 | LMR: +1 when not improving, -1 for killers/counter-moves | nodes 6k | 4258 | -3.0 ±6.0 | reverted (SPRT H0) |
 | 13 | Eval: "threatened" term, pieces attacked by a cheaper enemy piece (-30 mg / -25 eg, hand-set) | nodes 6k | 1122 | +21.7 ±12.1 | kept |
+| 14 | Use a root move from an unfinished iteration if it was fully searched and beat the window | nodes 6k | 5128 | +6.0 ±4.7 | kept |
