@@ -20,4 +20,5 @@ display_name = "Werewolf"
 symbol = "WF"
 value = 3
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
+form_name = "Wolf"
 special_rule = "A Werewolf that has used its Full Moon: a wolf for the rest of the game."

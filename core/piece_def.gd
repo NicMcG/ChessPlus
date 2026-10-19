@@ -46,6 +46,14 @@ enum Ability { NONE, CRACK_SHOT, RAISE_DEAD, HAUNT, SONG_OF_SLUMBER, FULL_MOON }
 ## res://data/pieces/forms/ so it isn't offered in the army builder).
 @export var transforms_into: PieceDef
 
+## Dark specks like the moon's craters over the ability's colours (on its
+## button, its box on the piece card and its glow on the board).
+@export var ability_craters := false
+
+## For a piece with two forms (the Werewolf): what its piece card's button calls
+## this form's moves ("Human" -> "Human moves", Mac).
+@export var form_name := ""
+
 ## The Ram's rule: after capturing (or breaking a shield) it is removed from the
 ## board too, and counts as lost.
 @export var dies_on_capture := false
