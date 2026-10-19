@@ -4,7 +4,8 @@ extends Node
 ## Plays the game's sound effects. Most are recordings from Kenney's free (CC0)
 ## "Impact Sounds" and "Interface Sounds" packs, in res://audio/sfx/; the rest
 ## are made by code (the cannon's boom, the arrow's whoosh, Raise Dead's swell,
-## the checkmate bell's long hum and the dust). A sound can be several layers played together
+## the checkmate bell's long hum and the dust), and the Werewolf's howl is a
+## public-domain recording of real wolves. A sound can be several layers played together
 ## (e.g. a capture is a heavy punch and a wooden crack at once). Recordings with
 ## several takes pick one at random each time, so repeats don't sound mechanical.
 ## Nothing plays while sound is switched off in the menu.
@@ -38,6 +39,9 @@ enum Sound {
 	LULLABY,
 	## Haunt: an eerie, wavering note.
 	HAUNT,
+	## Full Moon: a wolf's howl (a public-domain recording; see
+	## res://audio/sfx/Wolf_Howl_License.txt).
+	HOWL,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
@@ -76,6 +80,7 @@ const LAYERS := {
 	Sound.DUST: [["made", -12.0]],
 	Sound.LULLABY: [["made", -3.0]],
 	Sound.HAUNT: [["made", -5.0]],
+	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
 }
 
 ## Samples per second for the sounds made by code.
@@ -125,7 +130,7 @@ func _set_up(player: AudioStreamPlayer, sound: Sound, layer: Array) -> void:
 		player.volume_db = layer[1]
 	else:
 		var names: Array = layer[0]
-		player.stream = load("res://audio/sfx/%s.ogg" % names.pick_random())
+		player.stream = recording(names.pick_random())
 		player.pitch_scale = layer[1]
 		player.volume_db = layer[2]
 
@@ -137,8 +142,16 @@ static func streams_for(sound: Sound) -> Array[AudioStream]:
 			streams.append(made_stream(sound))
 		else:
 			for file_name: String in layer[0]:
-				streams.append(load("res://audio/sfx/%s.ogg" % file_name))
+				streams.append(recording(file_name))
 	return streams
+
+## A recording in res://audio/sfx/ by name: the .ogg file, or the .wav if
+## there's no .ogg (the wolf's howl).
+static func recording(file_name: String) -> AudioStream:
+	var path := "res://audio/sfx/%s.ogg" % file_name
+	if not ResourceLoader.exists(path):
+		path = "res://audio/sfx/%s.wav" % file_name
+	return load(path)
 
 static func made_stream(sound: Sound) -> AudioStreamWAV:
 	if not _made.has(sound):
