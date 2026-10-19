@@ -1,0 +1,19 @@
+Sounds cut from recordings on Wikimedia Commons (cut short, faded in and out,
+volume evened out):
+
+jester_giggle.wav
+  From "Short male snorts and giggles.ogg" by pfranzen, CC BY 3.0
+  https://commons.wikimedia.org/wiki/File:Short_male_snorts_and_giggles.ogg
+  https://creativecommons.org/licenses/by/3.0/
+  (needs a credit: shown on the main menu)
+
+thunder_crack.wav
+  From "Thunder crack 2B.ogg" by Jud McCranie, CC BY-SA 4.0
+  https://commons.wikimedia.org/wiki/File:Thunder_crack_2B.ogg
+  https://creativecommons.org/licenses/by-sa/4.0/
+  (needs a credit, and changed versions of this sound must be shared under the
+  same licence: shown on the main menu)
+
+sheep_baa.wav
+  From "Sheep bleating.ogg" (PDSounds), public domain - no credit needed.
+  https://commons.wikimedia.org/wiki/File:Sheep_bleating.ogg

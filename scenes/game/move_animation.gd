@@ -37,7 +37,7 @@ var length := 0.0
 var speed := 1.0
 
 ## How long the basic pieces of motion take, in seconds at normal speed.
-const SLIDE := 0.22
+const SLIDE := 0.3
 const HOP := 0.32
 const SLAM := 0.3
 const KNOCK := 0.38
@@ -131,6 +131,9 @@ func _ordinary(move: Move, state: GameState, dragged: bool) -> void:
 	var from := Vector2(move.from)
 	var landed := Vector2(move.lands_on())
 	var arrived := _travel(move.piece, from, landed, dragged, is_leap(move))
+	# Wood scraping along the board as it slides (Mac).
+	if not dragged and from != landed and not is_leap(move):
+		_cue(0.0, GameSounds.Sound.SCRAPE)
 	if move.captured and move.capture_square != move.to:
 		_en_passant(move, arrived, dragged)
 	elif move.captured:
@@ -139,10 +142,16 @@ func _ordinary(move: Move, state: GameState, dragged: bool) -> void:
 		_cue(arrived, GameSounds.Sound.CAPTURE)
 	elif not dragged and from != landed:
 		_cue(arrived, GameSounds.Sound.LAND if is_leap(move) else GameSounds.Sound.MOVE)
+	if move.gained_shield:
+		# A Vampire bites: a spray of blood, and it gains its dark red aura.
+		_cue(arrived, GameSounds.Sound.BITE)
+		extras.append({"kind": "blood", "at": Vector2(move.capture_square), "start": arrived, "end": arrived + 0.6})
 	if move.promotion:
 		_promotion(move, state.board.get_piece(move.lands_on()), landed, arrived)
 	if move.attacker_died:
-		_add(move.piece, {"kind": "fade_out", "at": landed, "start": arrived + 0.15, "end": arrived + 0.5})
+		# A Ram that dies charging (Mac: with a sheep's baa).
+		_add(move.piece, {"kind": "fade_out", "at": landed, "start": arrived + 0.15, "end": arrived + 0.6})
+		_cue(arrived + 0.15, GameSounds.Sound.SHEEP)
 
 ## Promotion (Mac's design): the pawn rises towards the player, growing and
 ## spinning faster and faster, glowing white, among sparkles; edge-on at the top
@@ -162,37 +171,61 @@ func _promotion(move: Move, promoted: Piece, at: Vector2, arrived: float) -> voi
 	_cue(swap, GameSounds.Sound.SPARKLE)
 	_cue(swap + AFTER, GameSounds.Sound.LAND)
 
-## En passant (my design for Mac): the pawn sweeps diagonally past the pawn it
-## captures; as it goes by, a slash streaks across that pawn, which is swept off
-## sideways, flashing.
+## En passant (my design, Mac's timing): the pawn sweeps diagonally past the
+## pawn it captures, a slash streaking across it as it goes by; the passed pawn
+## stands frozen for a beat, like an anime swordsman's victim, then topples over
+## and hits the board.
 func _en_passant(move: Move, arrived: float, dragged: bool) -> void:
 	var victim := Vector2(move.capture_square)
 	var hit := 0.0 if dragged else arrived * 0.55
-	var sideways := Vector2(move.capture_square - move.from)
-	_knock_off(move.captured, victim, sideways + Vector2(0, (move.from - move.to).y) * 0.3, hit)
+	var fall := arrived + 0.45
 	extras.append({"kind": "slash", "at": victim, "dir": Vector2(move.to - move.from), "start": hit, "end": hit + 0.28})
+	_add(move.captured, {"kind": "hold", "at": victim, "start": 0.0, "end": hit})
+	_add(move.captured, {"kind": "stun", "at": victim, "start": hit, "end": fall})
+	var side := 1.0 if move.capture_square.x >= move.from.x else -1.0
+	_add(move.captured, {"kind": "topple", "at": victim, "side": side, "start": fall, "end": fall + 0.5})
 	_cue(0.0 if dragged else hit * 0.4, GameSounds.Sound.SWIPE)
-	_cue(hit, GameSounds.Sound.CAPTURE)
+	_cue(fall + 0.32, GameSounds.Sound.FALL)
 
-## Castling (with any piece that has the Castle keyword): the king and its
-## partner both hop into place, one just after the other, each landing with a knock.
-func _castling(move: Move, dragged: bool) -> void:
-	var king_lands := _travel(move.piece, Vector2(move.from), Vector2(move.to), dragged, true)
-	_add(move.partner, {"kind": "hop", "from": Vector2(move.partner_from), "to": Vector2(move.partner_to), "start": 0.1, "end": 0.1 + HOP})
-	_cue(king_lands, GameSounds.Sound.CASTLE)
-	_cue(0.1 + HOP, GameSounds.Sound.CASTLE)
+## Castling (with any piece that has the Castle keyword; Mac's anime design):
+## the king and its partner dash past each other in a flash, trailing speed
+## lines, then both slam down with a heavy crack and a puff of dust.
+func _castling(move: Move, _dragged: bool) -> void:
+	const DASH := 0.16
+	var pieces := [[move.piece, Vector2(move.from), Vector2(move.to)], [move.partner, Vector2(move.partner_from), Vector2(move.partner_to)]]
+	for entry: Array in pieces:
+		_add(entry[0], {"kind": "dash", "from": entry[1], "to": entry[2], "start": 0.0, "end": DASH})
+		_add(entry[0], {"kind": "slam", "at": entry[2], "start": DASH, "end": DASH + SLAM})
+		extras.append({"kind": "speed_lines", "from": entry[1], "to": entry[2], "start": 0.0, "end": DASH + 0.15})
+		extras.append({"kind": "dust", "at": entry[2], "start": DASH, "end": DASH + 0.45})
+		extras.append({"kind": "impact", "at": entry[2] + Vector2(0, -0.35), "start": DASH, "end": DASH + 0.3})
+	_cue(0.0, GameSounds.Sound.CASTLE)
+	_cue(DASH, GameSounds.Sound.CASTLE_SLAM)
 
-## A shield breaks: the attacker lunges at it and back (it doesn't move), and
-## the shielded piece shakes as its shield cracks.
+## A shield breaks (Mac's design): the attacker charges as if to capture,
+## crashes into the shielded piece with a crack and a cloud of dust, and is
+## thrown back to its own square; the target is left without its shield (a
+## Paladin's picture changes, a Vampire's dark red aura goes).
 func _shield_break(move: Move, dragged: bool) -> void:
+	var from := Vector2(move.from)
+	var target := Vector2(move.to)
+	var toward := (target - from).normalized()
 	var hit := 0.0
 	if not dragged:
-		_add(move.piece, {"kind": "bump", "at": Vector2(move.from), "dir": Vector2(move.to - move.from), "start": 0.0, "end": 0.3})
-		hit = 0.12
-	_shake_target(move.to, hit)
+		hit = 0.2
+		var reach := target - toward * 0.55
+		_add(move.piece, {"kind": "slide", "from": from, "to": reach, "start": 0.0, "end": hit})
+		_add(move.piece, {"kind": "slide", "from": reach, "to": from, "start": hit, "end": hit + 0.32})
+		_cue(0.0, GameSounds.Sound.SCRAPE)
+	# Shown with its shield until the crash, then shaken.
+	_add(move.shield_target, {"kind": "hold", "at": target, "start": 0.0, "end": hit, "intact": true})
+	_add(move.shield_target, {"kind": "stun", "at": target, "start": hit, "end": hit + 0.4})
+	extras.append({"kind": "impact", "at": target - toward * 0.3, "start": hit, "end": hit + 0.3})
+	extras.append({"kind": "dust", "at": target, "start": hit, "end": hit + 0.5})
 	_cue(hit, GameSounds.Sound.SHIELD_BREAK)
 	if move.attacker_died:
-		_add(move.piece, {"kind": "fade_out", "at": Vector2(move.from), "start": 0.35, "end": 0.7})
+		_add(move.piece, {"kind": "fade_out", "at": from, "start": hit + 0.35, "end": hit + 0.75})
+		_cue(hit + 0.35, GameSounds.Sound.SHEEP)
 
 ## The cannon recoils as it fires; the cannonball arcs over the screen piece
 ## onto the target, which is blasted off in a puff of smoke; then the cannon
@@ -219,8 +252,12 @@ func _crack_shot(move: Move) -> void:
 	var target := Vector2(move.to)
 	var hit := 0.28
 	extras.append({"kind": "arrow", "from": from, "to": target, "start": 0.0, "end": hit,
-			"stuck_to": move.captured, "until": hit + 1.0 if move.captured else hit + 0.35})
-	_cue(0.0, GameSounds.Sound.ARROW_WHOOSH)
+			"stuck_to": move.captured, "until": hit + 1.0 if move.captured else hit + 0.35,
+			"trail": move.piece.def.ability_gradient()[1]})
+	# Magic humming under the whole shot, the bow's twang, the whoosh of flight.
+	_cue(0.0, GameSounds.Sound.MAGIC_HUM)
+	_cue(0.0, GameSounds.Sound.BOW)
+	_cue(0.02, GameSounds.Sound.ARROW_WHOOSH)
 	_cue(hit, GameSounds.Sound.ARROW_HIT)
 	if move.captured:
 		_add(move.captured, {"kind": "hold", "at": target, "start": 0.0, "end": hit + 0.2})
@@ -262,7 +299,7 @@ func _activation(move: Move) -> void:
 ## A Jester taking the hit: first the Jester and the piece it protects swap
 ## places with a swish, then the capture happens as planned (on the Jester).
 func _jester_swap(move: Move) -> void:
-	const SWAP := 0.24
+	const SWAP := 0.12
 	for segments: Array in tracks.values():
 		for segment: Dictionary in segments:
 			segment.start += SWAP
@@ -276,9 +313,21 @@ func _jester_swap(move: Move) -> void:
 		cue[0] += SWAP
 	var jester_from := Vector2(move.decoy_square)
 	var target_at := Vector2(move.capture_square)
-	_add(move.captured, {"kind": "hop", "from": jester_from, "to": target_at, "start": 0.0, "end": SWAP})
-	_add(move.decoy_piece, {"kind": "slide", "from": target_at, "to": jester_from, "start": 0.0, "end": SWAP})
+	# Mac's design: a mischievous giggle, and the two swap places almost at once,
+	# like ninjas, in a blur of speed lines.
+	_add(move.captured, {"kind": "dash", "from": jester_from, "to": target_at, "start": 0.0, "end": SWAP})
+	_add(move.decoy_piece, {"kind": "dash", "from": target_at, "to": jester_from, "start": 0.0, "end": SWAP})
+	for pair in [[jester_from, target_at], [target_at, jester_from]]:
+		extras.append({"kind": "speed_lines", "from": pair[0], "to": pair[1], "start": 0.0, "end": SWAP + 0.12})
+	_cue(0.0, GameSounds.Sound.GIGGLE)
 	_cue(0.0, GameSounds.Sound.SWIPE)
+	# Taking the hit, the Jester bursts like a balloon in a shower of confetti.
+	for segment: Dictionary in tracks[move.captured]:
+		if segment.kind == "knock":
+			segment.kind = "burst"
+			segment.end = segment.start + 0.18
+			extras.append({"kind": "confetti", "at": target_at, "start": segment.start, "end": segment.start + 1.1})
+			_cue(segment.start, GameSounds.Sound.POP)
 
 ## Song of Slumber: golden music notes drift from the Bard to its target, which
 ## sways drowsily as a soft lullaby plays (and then shows "Zz" while asleep).
@@ -297,6 +346,9 @@ func _full_moon(move: Move) -> void:
 	_add(move.piece, {"kind": "promote_rise", "at": at, "start": 0.0, "end": RISE, "as_def": move.piece.base_def, "glow": MOON_GLOW})
 	_add(move.piece, {"kind": "promote_reveal", "at": at, "start": RISE, "end": RISE + AFTER, "glow": MOON_GLOW})
 	extras.append({"kind": "light", "at": at, "start": RISE, "end": RISE + 0.6, "size": 2.0, "lift": 0.55, "color": MOON_GLOW})
+	# A great full moon fades in behind it (in front of the board), and fades
+	# once it's a wolf. It starts with the build-up (see _activation).
+	extras.append({"kind": "moon", "at": at, "start": -0.75 / 1.3, "end": RISE + AFTER + 0.3})
 	# The howl starts as it rises in the moonlight (Mac).
 	_cue(0.0, GameSounds.Sound.HOWL)
 	_cue(RISE, GameSounds.Sound.SPARKLE)
@@ -305,25 +357,31 @@ func _full_moon(move: Move) -> void:
 ## The Werewolf's moonlight.
 const MOON_GLOW := Color(0.85, 0.9, 1.0)
 
-## Haunt: a pale blue mist gathers on the square and the Ghost fades up out of it
-## to an eerie wavering note.
+## Haunt (Mac's design): a gothic bell tolls over a low boom, white-blue smoke
+## rises up out of the square, and the Ghost slowly rises with it.
 func _haunt(move: Move) -> void:
 	var at := Vector2(move.to)
-	extras.append({"kind": "smoke", "at": at, "start": 0.0, "end": 1.4, "color": Color(0.65, 0.85, 1.0), "size": 0.55})
-	extras.append({"kind": "light", "at": at, "start": 0.0, "end": 0.9, "color": Color(0.75, 0.9, 1.0)})
-	_add(move.piece, {"kind": "rise", "at": at, "start": 0.35, "end": 1.2})
+	extras.append({"kind": "rising_smoke", "at": at, "start": 0.0, "end": 2.4, "color": Color(0.85, 0.93, 1.0)})
+	extras.append({"kind": "light", "at": at, "start": 0.0, "end": 1.2, "color": Color(0.75, 0.9, 1.0)})
+	_add(move.piece, {"kind": "rise", "at": at, "start": 0.5, "end": 2.0})
 	hidden_before[move.piece] = true
 	_cue(0.0, GameSounds.Sound.HAUNT)
 
-## Raise Dead: the Necromancer sinks into purple smoke and the raised piece
-## rises up out of it.
+## Raise Dead (Mac's design): a crack of lightning and thunder; the Necromancer
+## sinks into fog of its colour as wood creaks, and the raised piece rises out
+## of it.
 func _raise_dead(move: Move) -> void:
 	var at := Vector2(move.from)
-	_add(move.piece, {"kind": "sink", "at": at, "start": 0.1, "end": 0.75})
-	extras.append({"kind": "smoke", "at": at, "start": 0.0, "end": 1.4, "color": Color(0.55, 0.2, 0.75), "size": 0.55})
-	_add(move.raised, {"kind": "rise", "at": at, "start": 0.6, "end": 1.3})
+	var fog: Color = move.piece.def.ability_gradient()[0]
+	extras.append({"kind": "lightning", "at": at, "start": 0.0, "end": 0.35, "color": fog.lerp(Color.WHITE, 0.6)})
+	_add(move.piece, {"kind": "sink", "at": at, "start": 0.15, "end": 0.9})
+	extras.append({"kind": "smoke", "at": at, "start": 0.05, "end": 1.7, "color": fog, "size": 0.75})
+	_add(move.raised, {"kind": "rise", "at": at, "start": 0.8, "end": 1.6})
 	hidden_before[move.raised] = true
+	_cue(0.0, GameSounds.Sound.THUNDER)
 	_cue(0.0, GameSounds.Sound.RAISE_DEAD)
+	_cue(0.25, GameSounds.Sound.CREAK)
+	_cue(0.85, GameSounds.Sound.CREAK)
 
 ## Move `piece` from `from` to `to`: dropped there by dragging (a slam, with a
 ## thud and a puff of dust), leaping (a hop) or sliding. Returns when it arrives.
@@ -457,6 +515,9 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			"scale": Vector2.ONE, "angle": 0.0, "alpha": 1.0, "sunk": 0.0, "flash": 0.0, "shadow": 0.0}
 	if segment.has("as_def"):
 		pose.as_def = segment.as_def
+	# Drawn as it was before its shield broke (until the crash).
+	if segment.get("intact", false):
+		pose.intact = true
 	match segment.kind:
 		"slide":
 			pose.pos = (segment.from as Vector2).lerp(segment.to, ease_out(t))
@@ -533,6 +594,31 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 		"rise":
 			pose.sunk = 1.0 - ease_out(t)
 			pose.alpha = minf(1.0, t * 1.5)
+		"dash":
+			# Very fast, with a little stretch along the way.
+			pose.pos = (segment.from as Vector2).lerp(segment.to, smoothstep(0.0, 1.0, t))
+			pose.scale = Vector2(1.0 + 0.25 * sin(PI * t), 1.0 - 0.1 * sin(PI * t))
+		"stun":
+			# Hit: a white flash and a quick tremble, then stillness.
+			pose.flash = clampf(1.0 - t * 4.0, 0.0, 1.0)
+			pose.flash_color = Color.WHITE
+			pose.pos = (segment.at as Vector2) + Vector2(shake_offset(minf(1.0, t * 2.0)) * 0.6, 0)
+		"topple":
+			# Tips over sideways and drops, fading out as it hits the board.
+			var side: float = segment.get("side", 1.0)
+			var fall := t * t
+			pose.angle = side * 1.5 * fall
+			pose.pos = (segment.at as Vector2) + Vector2(side * 0.25 * fall, -0.15 * fall)
+			pose.alpha = 1.0 - smoothstep(0.7, 1.0, t)
+			if t >= 1.0:
+				pose.visible = false
+		"burst":
+			# Swells for an instant, then is gone.
+			pose.scale = Vector2.ONE * (1.0 + 0.4 * t)
+			pose.flash = t
+			pose.flash_color = Color.WHITE
+			if t >= 1.0:
+				pose.visible = false
 		"drowse":
 			# Nodding off: a slow sway that dies away, sinking a touch.
 			pose.angle = 0.18 * sin(t * TAU * 1.5) * (1.0 - t)

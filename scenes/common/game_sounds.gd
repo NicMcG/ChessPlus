@@ -1,25 +1,29 @@
 class_name GameSounds
 extends Node
 
-## Plays the game's sound effects. Most are recordings from Kenney's free (CC0)
-## "Impact Sounds" and "Interface Sounds" packs, in res://audio/sfx/; the rest
-## are made by code (the cannon's boom, the arrow's whoosh, Raise Dead's swell,
-## the checkmate bell's long hum and the dust), and the Werewolf's howl is a
-## public-domain recording of real wolves. A sound can be several layers played together
-## (e.g. a capture is a heavy punch and a wooden crack at once). Recordings with
-## several takes pick one at random each time, so repeats don't sound mechanical.
-## Nothing plays while sound is switched off in the menu.
+## Plays the game's sound effects. Most are recordings in res://audio/sfx/ (their
+## licences are there): Kenney's free (CC0) Impact, Interface, RPG Audio, Sci-Fi
+## and Music Jingles packs, a public-domain wolf howl and sheep, and a giggle
+## and a thunder crack from Wikimedia Commons (credited on the main menu). The
+## rest are made by code (the cannon's boom, the arrow's whoosh, the bow's twang,
+## a balloon pop, Raise Dead's swell, the checkmate bell's long hum and the
+## dust). A sound can be several layers played together (e.g. a capture is a
+## punch, a slap and a wooden thwack at once). Recordings with several takes pick
+## one at random each time, so repeats don't sound mechanical. Nothing plays
+## while sound is switched off in the menu. Mac's direction (Oct 2026): sound
+## design in the spirit of anime: punchy, dramatic, magical.
 ##
 ## The board's animations say when each sound should play (BoardView's
 ## sound_cue signal), so e.g. a capture is heard when the pieces meet.
 
 enum Sound {
+	## A piece landing after an ordinary move (a wooden knock).
 	MOVE, CAPTURE, CHECK,
 	## A dragged piece dropped onto its square.
 	SLAM,
 	## A piece landing after a jump.
 	LAND,
-	## Each of the two pieces landing when castling.
+	## Castling: the two pieces dashing past each other.
 	CASTLE,
 	PROMOTE,
 	CANNON_FIRE, CANNON_HIT,
@@ -33,54 +37,100 @@ enum Sound {
 	ABILITY,
 	## The burst of light as a promoting pawn turns into its new piece.
 	SPARKLE,
-	## The quick swipe of an en passant capture.
+	## The quick slash of an en passant capture.
 	SWIPE,
-	## Song of Slumber: a few soft music-box notes, falling.
+	## Song of Slumber: a few soft pizzicato notes, falling, slowed right down.
 	LULLABY,
-	## Haunt: an eerie, wavering note.
+	## Haunt: a deep gothic bell over a low boom.
 	HAUNT,
-	## Full Moon: a wolf's howl (a public-domain recording; see
-	## res://audio/sfx/Wolf_Howl_License.txt).
+	## Full Moon: a wolf's howl.
 	HOWL,
+	## An ordinary move's wood scraping along the board as it slides.
+	SCRAPE,
+	## A tap where the selected piece can't go: a negative buzz.
+	ILLEGAL,
+	## A move stopped by a Parapet (or a Knight a Squire protects): a thock, like
+	## hitting a wall.
+	BLOCKED,
+	## While choosing a target for an ability: a magical whirr (it loops; see
+	## start_loop).
+	AIMING,
+	## Crack Shot: the bow's twang as the arrow is loosed, and the magic humming
+	## under the whole shot.
+	BOW, MAGIC_HUM,
+	## The Jester's giggle as it jumps in, and the balloon pop as it bursts.
+	GIGGLE, POP,
+	## Raise Dead: a crack of thunder, and wood creaking as the dead rise.
+	THUNDER, CREAK,
+	## A Ram that dies from its own charge.
+	SHEEP,
+	## A Vampire biting (gaining its shield).
+	BITE,
+	## Castling's two pieces slamming down.
+	CASTLE_SLAM,
+	## En passant: the passed pawn hitting the board after its dramatic pause.
+	FALL,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
 ## res://audio/sfx/ (one picked at random), pitch (1 = as recorded, lower =
 ## deeper), volume in decibels] or ["made", volume in decibels] for the sound
-## made by code (make_stream).
+## made by code (make_stream). A recording's layer can end with a Dictionary of
+## extras: "glide": [pitch, seconds] slides the pitch there as it plays.
+const WOOD_KNOCK := ["impactWood_light_000", "impactWood_light_001", "impactWood_light_002"]
+const WOOD_HEAVY := ["impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002"]
+const PUNCH_HEAVY := ["impactPunch_heavy_000", "impactPunch_heavy_001", "impactPunch_heavy_002"]
+const PUNCH_MEDIUM := ["impactPunch_medium_000", "impactPunch_medium_001", "impactPunch_medium_002"]
+const SLAP := ["impactSoft_heavy_000", "impactSoft_heavy_001", "impactSoft_heavy_002"]
+const PLANK := ["impactPlank_medium_000", "impactPlank_medium_001", "impactPlank_medium_002"]
 const LAYERS := {
-	Sound.MOVE: [[["impactWood_light_000", "impactWood_light_001", "impactWood_light_002"], 1.0, 0.0]],
-	Sound.CAPTURE: [
-		[["impactPunch_heavy_000", "impactPunch_heavy_001", "impactPunch_heavy_002"], 0.9, 2.0],
-		[["impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002"], 0.8, 0.0],
-		[["impactPlate_heavy_000", "impactPlate_heavy_001"], 0.7, -9.0],
-	],
+	Sound.MOVE: [[WOOD_KNOCK, 1.0, 0.0]],
+	Sound.SCRAPE: [[["scratch_004", "scratch_005"], 0.5, -9.0]],
+	# Punchy: a heavy punch, a flat slap and a wooden thwack together.
+	Sound.CAPTURE: [[PUNCH_HEAVY, 0.95, 3.0], [SLAP, 1.15, 2.0], [PLANK, 1.05, -2.0]],
 	Sound.CHECK: [[["impactBell_heavy_000"], 1.15, -4.0]],
-	Sound.SLAM: [[["impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002"], 0.85, 2.0]],
+	Sound.SLAM: [[WOOD_HEAVY, 0.85, 2.0]],
 	Sound.LAND: [[["impactWood_medium_000", "impactWood_medium_001", "impactWood_medium_002"], 1.0, 0.0]],
-	Sound.CASTLE: [[["impactWood_medium_000", "impactWood_medium_002"], 0.9, 0.0]],
-	# A rising swell as the pawn lifts and spins.
-	Sound.PROMOTE: [[["maximize_006"], 0.9, 2.0], [["maximize_008"], 0.7, -4.0]],
+	# Castling's dash: a quick blade-like swish.
+	Sound.CASTLE: [[["knifeSlice", "knifeSlice2"], 1.35, -4.0]],
+	Sound.CASTLE_SLAM: [[["impactMining_000", "impactMining_001"], 0.75, 3.0], [WOOD_HEAVY, 0.7, 2.0], [PUNCH_HEAVY, 0.8, 0.0]],
+	# An anime power-up: an engine whine climbing in pitch, with a shimmer.
+	Sound.PROMOTE: [[["spaceEngineSmall_002"], 0.6, -6.0, {"glide": [2.2, 0.7]}], [["forceField_002"], 1.2, -6.0]],
 	Sound.SPARKLE: [[["glass_002", "glass_004"], 1.5, 0.0], [["impactBell_heavy_000"], 2.0, -10.0]],
-	Sound.SWIPE: [["made", -2.0]],
+	Sound.SWIPE: [[["knifeSlice2"], 1.1, 0.0], ["made", -8.0]],
+	Sound.FALL: [[WOOD_HEAVY, 0.7, 2.0], [SLAP, 0.8, 0.0]],
 	Sound.CANNON_FIRE: [["made", 0.0]],
 	Sound.CANNON_HIT: [[["impactMining_000", "impactMining_001"], 0.8, 2.0]],
 	Sound.ARROW_WHOOSH: [["made", 0.0]],
-	# The arrow striking home: a sharp wooden thunk with a punch behind it.
+	Sound.BOW: [["made", 0.0], [["knifeSlice"], 1.8, -14.0]],
+	# The arrow striking home: thwack and crunch.
 	Sound.ARROW_HIT: [
 		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.1, 4.0],
-		[["impactPunch_medium_000", "impactPunch_medium_001", "impactPunch_medium_002"], 1.2, 0.0],
+		[PUNCH_MEDIUM, 1.2, 0.0],
+		[["explosionCrunch_000"], 1.5, -8.0],
 	],
+	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0], [["spaceEngineSmall_002"], 1.6, -18.0]],
 	# A rising magical swell with a glassy sparkle.
 	Sound.ABILITY: [[["maximize_008"], 0.85, 0.0], [["glass_002", "glass_004"], 1.3, -6.0]],
+	Sound.AIMING: [[["spaceEngineSmall_002"], 1.5, -14.0]],
 	Sound.RAISE_DEAD: [["made", 0.0]],
-	Sound.SHIELD_BREAK: [[["impactMetal_heavy_000", "impactMetal_heavy_001"], 1.0, -2.0]],
+	Sound.THUNDER: [[["thunder_crack"], 1.0, 0.0]],
+	Sound.CREAK: [[["creak1", "creak2"], 0.8, -2.0]],
+	# A crack and a break: glass shattering over metal.
+	Sound.SHIELD_BREAK: [[["impactGlass_heavy_001", "impactGlass_heavy_004"], 0.8, 0.0], [["impactMetal_heavy_000", "impactMetal_heavy_001"], 1.0, -4.0], [PLANK, 0.9, -4.0]],
 	# A deep bell: the recorded strike, slowed right down, over a long made hum.
 	Sound.CHECKMATE: [[["impactBell_heavy_002"], 0.45, 6.0], ["made", 3.0]],
 	Sound.DUST: [["made", -12.0]],
-	Sound.LULLABY: [["made", -3.0]],
-	Sound.HAUNT: [["made", -5.0]],
+	Sound.LULLABY: [[["jingles_PIZZI01"], 0.75, 0.0]],
+	# Gothic: a big bell slowed down, over a low boom.
+	Sound.HAUNT: [[["impactBell_heavy_001"], 0.5, 4.0], [["lowFrequency_explosion_001"], 0.7, -4.0]],
 	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
+	Sound.ILLEGAL: [[["error_005", "error_006"], 1.0, -6.0]],
+	Sound.BLOCKED: [[WOOD_HEAVY, 0.55, 3.0], [PLANK, 0.6, -2.0]],
+	Sound.GIGGLE: [[["jester_giggle"], 1.05, -2.0]],
+	Sound.POP: [["made", 0.0]],
+	Sound.SHEEP: [[["sheep_baa"], 1.0, -2.0]],
+	Sound.BITE: [[["chop"], 1.2, 2.0], [PUNCH_MEDIUM, 1.4, -4.0]],
 }
 
 ## Samples per second for the sounds made by code.
@@ -97,8 +147,16 @@ var last_played := -1
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 
+## Plays a looping sound (AIMING) until stop_loop.
+var _loop_player: AudioStreamPlayer
+var _loop_sound := -1
+## Pitch slides in progress, by player.
+var _glides := {}
+
 func _ready() -> void:
-	for i in 8:
+	_loop_player = AudioStreamPlayer.new()
+	add_child(_loop_player)
+	for i in 12:
 		var player := AudioStreamPlayer.new()
 		add_child(player)
 		_players.append(player)
@@ -124,6 +182,9 @@ func play(sound: Sound) -> void:
 		player.play()
 
 func _set_up(player: AudioStreamPlayer, sound: Sound, layer: Array) -> void:
+	if _glides.has(player):
+		(_glides[player] as Tween).kill()
+		_glides.erase(player)
 	if layer[0] is String:  # "made"
 		player.stream = made_stream(sound)
 		player.pitch_scale = 1.0
@@ -133,6 +194,38 @@ func _set_up(player: AudioStreamPlayer, sound: Sound, layer: Array) -> void:
 		player.stream = recording(names.pick_random())
 		player.pitch_scale = layer[1]
 		player.volume_db = layer[2]
+		var extras: Dictionary = layer[3] if layer.size() > 3 else {}
+		if extras.has("glide"):
+			var glide: Array = extras["glide"]
+			var tween := create_tween()
+			tween.tween_property(player, "pitch_scale", glide[0], glide[1])
+			_glides[player] = tween
+
+## Start `sound` looping (the whirr while choosing an ability's target), until
+## stop_loop. Starting the same one again does nothing.
+func start_loop(sound: Sound) -> void:
+	if _loop_sound == sound and _loop_player.playing:
+		return
+	_loop_sound = sound
+	last_played = sound
+	if not UserSettings.sound_on():
+		return
+	var layer: Array = LAYERS[sound][0]
+	var stream: AudioStream = recording((layer[0] as Array)[0]).duplicate()
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	_loop_player.stream = stream
+	_loop_player.pitch_scale = layer[1]
+	_loop_player.volume_db = layer[2]
+	_loop_player.play()
+
+func stop_loop() -> void:
+	_loop_sound = -1
+	if _loop_player:
+		_loop_player.stop()
+
+func is_looping() -> bool:
+	return _loop_sound >= 0
 
 ## Every recording or made sound for `sound` (for tests).
 static func streams_for(sound: Sound) -> Array[AudioStream]:
@@ -167,13 +260,21 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 	noise.seed = 7  # The same "random" sound every time.
 	var length: float = {Sound.CANNON_FIRE: 0.9, Sound.ARROW_WHOOSH: 0.3, Sound.SWIPE: 0.2,
 			Sound.RAISE_DEAD: 1.3, Sound.CHECKMATE: 6.0, Sound.DUST: 2.0,
-			Sound.LULLABY: 1.4, Sound.HAUNT: 1.3}.get(sound, 0.2)
+			Sound.BOW: 0.5, Sound.POP: 0.25}.get(sound, 0.2)
 	var count := int(length * RATE)
 	var data := PackedByteArray()
 	data.resize(count * 2)
 	# Smoothed noise values, for rumbles, scrapes and rushing air.
 	var low := 0.0
 	var band := 0.0
+	# A plucked string (Karplus-Strong): a short loop of noise, smoothed a little
+	# each time round, rings like a string. The bow's is low (about 98 Hz).
+	var string := PackedFloat32Array()
+	var string_at := 0
+	if sound == Sound.BOW:
+		string.resize(int(RATE / 98.0))
+		for k in string.size():
+			string[k] = noise.randf_range(-1.0, 1.0)
 	for i in count:
 		var t := float(i) / RATE
 		var white := noise.randf_range(-1.0, 1.0)
@@ -203,18 +304,14 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 				for partial: Array in [[0.5, 0.5, 0.35], [1.0, 0.45, 0.45], [1.19, 0.3, 0.7], [1.56, 0.22, 0.9], [2.0, 0.2, 1.1], [2.51, 0.12, 1.5]]:
 					ring += partial[1] * sin(TAU * base * partial[0] * t) * exp(-t * partial[2])
 				value = ring * minf(1.0, t * 40) * (1.0 + 0.08 * sin(TAU * 1.3 * t))
-			Sound.LULLABY:  # Music-box notes G, E, C: each a soft ping that rings away.
-				for note: Array in [[0.0, 784.0], [0.32, 659.3], [0.64, 523.3]]:
-					var since: float = t - note[0]
-					if since >= 0.0:
-						var ping := exp(-since * 4.0) * minf(1.0, since * 200)
-						value += 0.3 * ping * (sin(TAU * note[1] * since) + 0.25 * sin(TAU * note[1] * 2.0 * since))
-			Sound.HAUNT:  # A thin, wavering "oooo" that slides up and back down.
-				var glide := 1.0 + 0.25 * sin(PI * t / length)
-				var waver := 1.0 + 0.012 * sin(TAU * 5.5 * t)
-				band += (white - band) * 0.05
-				value = sin(PI * t / length) * (0.45 * sin(TAU * 440.0 * glide * waver * t) \
-						+ 0.12 * sin(TAU * 880.0 * glide * waver * t) + 0.25 * band)
+			Sound.BOW:  # A bowstring's twang: a low plucked string, plus a short thwip of air.
+				var pluck := string[string_at]
+				string[string_at] = 0.5 * (string[string_at] + string[(string_at + 1) % string.size()]) * 0.994
+				string_at = (string_at + 1) % string.size()
+				value = 0.75 * pluck * exp(-t * 6.0) + 0.4 * white * exp(-t * 60.0)
+			Sound.POP:  # A balloon bursting: a sharp crack of noise that dies at once.
+				band += (white - band) * 0.5
+				value = (0.9 * white + 0.6 * band) * exp(-t * 45.0) * minf(1.0, t * 3000.0)
 			Sound.DUST:  # A soft sandy hiss that drifts away.
 				band += (white - band) * 0.3
 				value = 0.5 * (white - band) * minf(1.0, t * 6) * exp(-t * 1.6)

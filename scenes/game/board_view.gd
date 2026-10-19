@@ -174,6 +174,21 @@ func current_animation() -> MoveAnimation:
 func is_animating() -> bool:
 	return _animation != null
 
+## Squares whose piece is swelling and shrinking back (a Parapet or Squire
+## stopping a move): square -> seconds so far.
+var _pulses := {}
+const PULSE_TIME := 0.35
+
+func pulse(square: Vector2i) -> void:
+	_pulses[square] = 0.0
+	queue_redraw()
+
+## How much bigger the piece on `square` is drawn now (1 = normal).
+func pulse_scale(square: Vector2i) -> float:
+	if not _pulses.has(square):
+		return 1.0
+	return 1.0 + 0.22 * sin(PI * clampf(_pulses[square] / PULSE_TIME, 0.0, 1.0))
+
 func _start_shake(square: Vector2i) -> void:
 	_shake_square = square
 	_shake_elapsed = 0.0
@@ -203,9 +218,17 @@ func tap(square: Vector2i) -> bool:
 	if piece and piece.team == state.side_to_move and square != _selected:
 		_select(square)
 	else:
-		# Somewhere the selected piece can't go: it shakes "no".
-		if _selected != Board.NO_SQUARE and square != _selected:
+		# Somewhere the selected piece can't go: it shakes "no", with a buzz. If
+		# a Parapet or a Squire is what stops it, that piece swells for a moment
+		# instead, with a thock like hitting a wall (Mac).
+		if _selected != Board.NO_SQUARE and square != _selected and not aiming:
 			_start_shake(_selected)
+			var stopped_by := MoveGenerator.blocker(state, _selected, square)
+			if stopped_by != Board.NO_SQUARE:
+				pulse(stopped_by)
+				sound_cue.emit(GameSounds.Sound.BLOCKED)
+			else:
+				sound_cue.emit(GameSounds.Sound.ILLEGAL)
 		_clear_selection()
 	queue_redraw()
 	return false
@@ -261,8 +284,18 @@ func _process(delta: float) -> void:
 	advance_animation(delta)
 	# Kings in check tremble, aiming rings close in and sleeping pieces' "Zz"
 	# bobs: keep redrawing.
-	if not _check_squares.is_empty() or aiming or (state and state.frozen_piece()):
+	if not _check_squares.is_empty() or aiming or (state and state.frozen_piece()) or _any_vampire_aura():
 		queue_redraw()
+
+## True if a Vampire has its shield (its aura pulses, so keep redrawing).
+func _any_vampire_aura() -> bool:
+	if state == null:
+		return false
+	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		for piece: Piece in state.board.pieces_of(team).values():
+			if piece.gained_shield:
+				return true
+	return false
 
 ## The kings in check now (empty when nobody is), which tremble on the board.
 func check_squares() -> Array[Vector2i]:
@@ -280,6 +313,11 @@ func advance_animation(delta: float) -> void:
 		if _animation.is_done():
 			_animation = null
 			animation_finished.emit()
+		queue_redraw()
+	for square: Vector2i in _pulses.keys():
+		_pulses[square] += delta
+		if _pulses[square] >= PULSE_TIME:
+			_pulses.erase(square)
 		queue_redraw()
 	if _shake_square != Board.NO_SQUARE:
 		_shake_elapsed += delta
@@ -455,7 +493,7 @@ func _draw() -> void:
 			poses[piece] = _animation.pose(piece)
 		shaking = _animation.shake_squares()
 		extras = _animation.active_extras()
-	_draw_extras(extras, true)
+	_draw_extras(extras, 0)
 	for rank in range(board.height):
 		for file in range(board.width):
 			var square := Vector2i(file, rank)
@@ -470,16 +508,25 @@ func _draw() -> void:
 				rect.position.x += MoveAnimation.shake_offset(shaking[square]) * rect.size.x
 			if square in _check_squares:
 				rect.position += tremble(Time.get_ticks_msec() / 1000.0) * rect.size.x
-			_draw_piece(piece, rect)
+			if _pulses.has(square):
+				var grow := pulse_scale(square)
+				rect = Rect2(rect.get_center() - rect.size * grow / 2, rect.size * grow)
+			# Choosing a target for its ability: a flickering aura of fire in its
+			# ability's colours (Mac).
+			if aiming and square == _selected:
+				_draw_fire_aura(rect, piece.def.ability_gradient())
 			if piece.gained_shield:
-				_draw_gained_shield(rect)
+				_draw_vampire_aura(piece, rect)
+			_draw_piece(piece, rect)
 			if piece == state.frozen_piece():
 				_draw_asleep(rect)
+	# Behind the moving pieces but over the others (the Full Moon's moon).
+	_draw_extras(extras, 1)
 	# Moving pieces last, so they pass over the others.
 	for piece: Piece in poses:
 		if poses[piece].visible:
 			_draw_posed(piece, poses[piece])
-	_draw_extras(extras, false)
+	_draw_extras(extras, 2)
 	# On top of the pieces, so a piece on an edge square doesn't hide its label.
 	_draw_coordinates()
 	if not (aiming and _aim_unmarked):
@@ -559,11 +606,11 @@ func _shake_offset(square_size: float) -> float:
 	return sin(t * TAU * 3) * square_size * 0.08 * (1.0 - t)
 
 ## The picture for this piece now (a Paladin whose shield broke has its own).
-func _piece_texture(piece: Piece, as_def: PieceDef = null) -> Texture2D:
+func _piece_texture(piece: Piece, as_def: PieceDef = null, intact := false) -> Texture2D:
 	if as_def:
 		return texture_for(as_def, piece.team)
 	var texture: Texture2D = null
-	if piece.def.has_shield() and piece.shield_broken:
+	if piece.def.has_shield() and piece.shield_broken and not intact:
 		texture = PieceArt.texture_for(piece.def, piece.team, piece_style, "wounded")
 	if texture == null:
 		texture = texture_for(piece.def, piece.team)
@@ -609,8 +656,80 @@ func _point(pos: Vector2) -> Vector2:
 	var row := pos.y if flipped else state.board.height - 1 - pos.y
 	return _origin() + Vector2(column + 0.5, row + 0.5) * s
 
-## A Vampire that has gained a shield: a small shield in the top-right corner of
-## its square (until it has its own art for it).
+## A Vampire's shield (Mac): a deep dark red aura round it, slowly pulsing,
+## gone once the shield is broken.
+func _draw_vampire_aura(piece: Piece, rect: Rect2) -> void:
+	var texture := _piece_texture(piece)
+	if texture == null:
+		return
+	var pulse_amount := 0.8 + 0.2 * sin(Time.get_ticks_msec() / 1000.0 * 3.0)
+	var center := rect.get_center() + Vector2(0, rect.size.y * 0.05)
+	var s := rect.size.x
+	# A soft dark red haze behind it, and its outline glowing deep red.
+	for ring in 4:
+		draw_circle(center, s * (0.55 - 0.1 * ring) * (0.95 + 0.08 * pulse_amount), Color(0.4, 0.0, 0.04, 0.16 * pulse_amount))
+	var dark_red := PackedColorArray([Color(0.5, 0.0, 0.05), Color(0.8, 0.05, 0.12)])
+	_draw_ability_glow(texture, rect.grow(s * 0.06), dark_red, pulse_amount)
+	_draw_ability_glow(texture, rect.grow(s * 0.02), dark_red, pulse_amount)
+
+## Fire licking up round a piece (in `colors`) while its ability is aimed
+## (Mac): rounded tongues of flame that sway and curl at their tips, rising up
+## past it from behind, a brighter core, a glow, and embers drifting up.
+func _draw_fire_aura(rect: Rect2, colors: PackedColorArray) -> void:
+	var s := rect.size.x
+	var seconds := Time.get_ticks_msec() / 1000.0
+	var base_y := rect.position.y + s * 0.92
+	var bright: Color = colors[colors.size() - 1]
+	draw_circle(rect.get_center() + Vector2(0, s * 0.1), s * 0.6, Color(bright, 0.16 + 0.06 * sin(seconds * 7.0)))
+	for layer in 3:
+		var color: Color = colors[0].lerp(bright, 0.3) if layer == 0 else (bright if layer == 1 else bright.lerp(Color.WHITE, 0.7))
+		var count := 5 if layer == 0 else (4 if layer == 1 else 3)
+		var size := 1.0 if layer == 0 else (0.75 if layer == 1 else 0.5)
+		# A glowing bed the flames rise from, so they merge at the bottom.
+		_draw_ellipse(Vector2(rect.get_center().x, base_y - s * 0.06 * size), Vector2(s * 0.62 * size, s * 0.16 * size), Color(color, 0.55 if layer == 0 else 0.8))
+		for i in count:
+			var k := (i + 0.5) / count
+			var x := rect.get_center().x + s * (k - 0.5) * (1.0 if layer == 0 else 0.75)
+			var flicker := 0.5 + 0.5 * sin(seconds * (10.0 + i * 1.7) + i * 2.3 + layer)
+			var height := s * (0.5 + 0.5 * sin(PI * k)) * (0.8 + 0.35 * flicker) * size
+			var width := s * 0.48 * size
+			_draw_flame(Vector2(x, base_y), width, height, seconds * 6.0 + i * 1.9 + layer, Color(color, 0.55 if layer == 0 else 0.8))
+	# Embers rising and fading.
+	for i in 8:
+		var k := fposmod(seconds * 0.9 + i * 0.37, 1.0)
+		var x := rect.position.x + s * (0.15 + 0.7 * fposmod(i * 0.618, 1.0)) + sin(seconds * 3.0 + i) * s * 0.05
+		draw_circle(Vector2(x, base_y - s * 1.2 * k), s * 0.025 * (1.0 - k), Color(bright.lerp(Color.WHITE, 0.5), 1.0 - k))
+
+func _draw_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
+	var points := PackedVector2Array()
+	for i in 20:
+		points.append(center + Vector2(cos(TAU * i / 20.0) * radii.x, sin(TAU * i / 20.0) * radii.y))
+	draw_colored_polygon(points, color)
+
+## One tongue of flame standing on `base`: wide and round at the bottom,
+## narrowing to a tip that sways and curls (`phase` sets where in its sway it is).
+func _draw_flame(base: Vector2, width: float, height: float, phase: float, color: Color) -> void:
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	var steps := 10
+	for j in steps:
+		var u := float(j) / steps
+		# Round at the bottom, tapering towards the tip.
+		# A fat round body narrowing quickly to a curling tip.
+		var half := width * 0.5 * sqrt(maxf(0.0, 1.0 - u)) * (1.0 - 0.55 * u)
+		var sway := sin(phase + u * 2.5) * width * 0.6 * u * u
+		var y := base.y - height * u
+		left.append(Vector2(base.x - half + sway, y))
+		right.append(Vector2(base.x + half + sway, y))
+	var tip := Vector2(base.x + sin(phase + 2.5) * width * 0.6, base.y - height)
+	var points := PackedVector2Array()
+	points.append_array(left)
+	points.append(tip)
+	right.reverse()
+	points.append_array(right)
+	draw_colored_polygon(points, color)
+
+## (The Vampire's shield used to be a small blue shield in the corner.)
 func _draw_gained_shield(rect: Rect2) -> void:
 	var s := rect.size.x
 	var top_right := rect.position + Vector2(s * 0.7, s * 0.06)
@@ -657,7 +776,8 @@ func _draw_posed(piece: Piece, pose: Dictionary) -> void:
 	# A pose can show the piece as another type ("as_def": a Werewolf still a
 	# Werewolf while it turns into a wolf).
 	var as_def: PieceDef = pose.get("as_def")
-	var texture := _piece_texture(piece, as_def)
+	var intact: bool = pose.get("intact", false)
+	var texture := _piece_texture(piece, as_def, intact)
 	var shadow: float = pose.shadow
 	if shadow > 0 and texture:
 		# A soft shadow left on the board below a piece lifted towards the player.
@@ -674,19 +794,94 @@ func _draw_posed(piece: Piece, pose: Dictionary) -> void:
 		var flash: float = pose.flash
 		# White at first, turning red as it fades.
 		var flash_color: Color = pose.get("flash_color", Color.WHITE.lerp(Color(1, 0.15, 0.1), 1.0 - flash))
-		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha, flash_color * flash, as_def)
+		if intact and piece.def.shield_on_capture:
+			_draw_vampire_aura(piece, Rect2(-s / 2, -s, s, s))
+		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha, flash_color * flash, as_def, intact)
 	draw_set_transform(Vector2.ZERO)
 
 ## Draw the animation's extras: `under` = the ones that go below the pieces
 ## (dust, red flash), otherwise the ones on top (cannonball, arrow, smoke, light).
-func _draw_extras(extras: Array, under: bool) -> void:
+func _draw_extras(extras: Array, layer: int) -> void:
 	var s := _square_size()
 	for extra: Dictionary in extras:
 		var t: float = extra.t
 		var kind: String = extra.kind
-		if under != (kind in ["dust", "red_flash"]):
+		var its_layer := 0 if kind in ["dust", "red_flash", "rising_smoke"] else (1 if kind in ["moon", "blood"] else 2)
+		if layer != its_layer:
 			continue
 		match kind:
+			"speed_lines":
+				# Anime dash lines streaking along the path, fading behind.
+				var from := _point(extra.from)
+				var to := _point(extra.to)
+				var along := (to - from).normalized()
+				var side := Vector2(-along.y, along.x)
+				var fade := 1.0 - t
+				for i in 7:
+					var offset := (i - 3) * s * 0.13
+					var head := from.lerp(to, minf(1.0, t * 1.4 + 0.1 * (i % 3)))
+					var tail := head - along * s * (0.8 + 0.3 * (i % 2))
+					draw_line(tail + side * offset, head + side * offset, Color(1, 1, 1, 0.75 * fade), maxf(1.5, s * 0.025))
+			"confetti":
+				# A burst of paper confetti that flutters down.
+				var center := _point(extra.at)
+				var colours := [Color("#e74c3c"), Color("#f1c40f"), Color("#2ecc71"), Color("#3498db"), Color("#9b59b6"), Color("#ff8fd0")]
+				for i in 26:
+					var angle := TAU * i / 26.0 + i * 0.37
+					var speed := s * (0.9 + 0.6 * fposmod(i * 0.618, 1.0))
+					var pos := center + Vector2.from_angle(angle) * speed * MoveAnimation.ease_out(t) + Vector2(0, s * 1.2 * t * t)
+					var spin := t * 12.0 + i
+					var size_px := Vector2(s * 0.09, s * 0.05)
+					draw_set_transform(pos, spin, Vector2(1, absf(cos(spin * 1.3))))
+					draw_rect(Rect2(-size_px / 2, size_px), Color(colours[i % colours.size()], 1.0 - smoothstep(0.7, 1.0, t)))
+					draw_set_transform(Vector2.ZERO)
+			"blood":
+				# A light spray of blood droplets, and a small splash that fades.
+				var center := _point(extra.at)
+				var fade := 1.0 - smoothstep(0.5, 1.0, t)
+				draw_circle(center + Vector2(0, s * 0.38), s * 0.14 * MoveAnimation.ease_out(minf(1.0, t * 3.0)), Color(0.55, 0.0, 0.05, 0.35 * fade))
+				for i in 14:
+					var angle := -PI * (0.05 + 0.9 * i / 13.0)
+					var reach := s * (0.5 + 0.3 * fposmod(i * 0.7, 1.0)) * MoveAnimation.ease_out(t)
+					var drop := center + Vector2.from_angle(angle) * reach + Vector2(0, s * 0.7 * t * t)
+					draw_circle(drop, s * (0.018 + 0.012 * (i % 3)), Color(0.72, 0.02, 0.06, fade))
+			"moon":
+				# A huge full moon, behind the rising Werewolf.
+				var center := _point(extra.at) - Vector2(0, s * 0.55)
+				var alpha := smoothstep(0.0, 0.2, t) * (1.0 - smoothstep(0.85, 1.0, t))
+				var r := s * 1.35
+				draw_circle(center, r * 1.25, Color(0.85, 0.9, 1.0, 0.18 * alpha))
+				draw_circle(center, r, Color(0.96, 0.95, 0.86, 0.92 * alpha))
+				for crater: Array in [[Vector2(-0.35, -0.25), 0.22], [Vector2(0.3, 0.1), 0.16], [Vector2(-0.1, 0.4), 0.12], [Vector2(0.4, -0.4), 0.09], [Vector2(-0.45, 0.2), 0.08]]:
+					draw_circle(center + (crater[0] as Vector2) * r, r * float(crater[1]), Color(0.82, 0.82, 0.75, 0.7 * alpha))
+			"rising_smoke":
+				# White-blue smoke rising up out of the square, wisp after wisp.
+				var color: Color = extra.color
+				var base := _point(extra.at) + Vector2(0, s * 0.45)
+				for i in 12:
+					var k := fposmod(t * 1.6 + i / 12.0, 1.0)
+					if t * 1.6 + i / 12.0 < 1.0 and k > t * 3.0:
+						continue
+					var x := base.x + s * 0.32 * sin(i * 2.1 + k * 4.0)
+					var puff := Vector2(x, base.y - s * 1.3 * k)
+					draw_circle(puff, s * (0.08 + 0.2 * k), Color(color, 0.5 * sin(PI * k) * (1.0 - smoothstep(0.8, 1.0, t))))
+			"lightning":
+				# A jagged bolt striking the square from the top of the board,
+				# flashing twice.
+				var strike := _point(extra.at)
+				var top := Vector2(strike.x + s * 0.6, _origin().y - s * 0.2)
+				var flash := (1.0 - t) * (0.6 + 0.4 * absf(sin(t * TAU * 2.0)))
+				var points := PackedVector2Array([top])
+				var pieces := 8
+				for i in range(1, pieces):
+					var k := float(i) / pieces
+					var zig := s * 0.35 * (1.0 if i % 2 == 0 else -1.0) * (1.0 - k)
+					points.append(top.lerp(strike, k) + Vector2(zig, 0))
+				points.append(strike)
+				var color: Color = extra.get("color", Color(0.9, 0.85, 1.0))
+				draw_polyline(points, Color(color, 0.6 * flash), maxf(6, s * 0.22), true)
+				draw_polyline(points, Color(1, 1, 1, flash), maxf(3, s * 0.08), true)
+				draw_circle(strike, s * 0.5 * flash, Color(color, 0.4 * flash))
 			"impact":
 				# A quick ring and sparks where the pieces collide.
 				var center := _point(extra.at)
@@ -798,14 +993,23 @@ func _draw_flying_arrow(extra: Dictionary) -> void:
 		alpha = 1.0 - fall
 	var tail := tip - direction * s * 0.8
 	var side := Vector2(-direction.y, direction.x)
+	# A glowing trail in the ability's colour behind the arrow in flight (Mac).
+	if since_hit < 0 and extra.has("trail"):
+		var trail: Color = extra.trail
+		var length := minf(from.distance_to(tail), s * 2.2)
+		for i in 6:
+			var k := float(i) / 6.0
+			var a := tail - direction * length * k
+			var b := tail - direction * length * (k + 1.0 / 6.0)
+			draw_line(a, b, Color(trail.lerp(Color.WHITE, 0.3), 0.75 * (1.0 - k)), maxf(2, s * (0.12 - 0.015 * i)))
 	draw_line(tail, tip - direction * s * 0.12, Color(0.45, 0.3, 0.15, alpha), maxf(2, s * 0.05))
 	draw_colored_polygon(PackedVector2Array([tip, tip - direction * s * 0.2 + side * s * 0.08, tip - direction * s * 0.2 - side * s * 0.08]), Color(0.3, 0.3, 0.32, alpha))
 	for fletch in [-1.0, 1.0]:
 		draw_line(tail + direction * s * 0.15, tail + side * fletch * s * 0.08, Color(0.85, 0.2, 0.15, alpha), maxf(2, s * 0.04))
 
 ## `flash`: a colour the piece flashes (its strength is how bright it is).
-func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0), as_def: PieceDef = null) -> void:
-	var texture := _piece_texture(piece, as_def)
+func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0), as_def: PieceDef = null, intact := false) -> void:
+	var texture := _piece_texture(piece, as_def, intact)
 	if texture:
 		if has_ability_ready(piece) and as_def == null:
 			_draw_ability_glow(texture, rect, piece.def.ability_gradient(), alpha)

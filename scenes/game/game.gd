@@ -613,6 +613,9 @@ func _on_selection_changed(_square: Vector2i) -> void:
 ## selected, it shows HAUNT while one of the player's captured Ghosts can come
 ## back (it isn't on the board to be selected).
 func _refresh_ability_button() -> void:
+	# The whirr of an ability being aimed stops once a target is chosen (or not).
+	if not board_view.aiming and sounds.is_looping():
+		sounds.stop_loop()
 	var square := board_view.selected_square()
 	var piece: Piece = state.board.get_piece(square) if state and square != Board.NO_SQUARE else null
 	# The captured Ghost glows in the row of captures while its square is chosen.
@@ -686,6 +689,7 @@ func use_ability() -> void:
 		var haunts := _haunt_moves()
 		if not haunts.is_empty():
 			board_view.aim_moves(haunts, false)
+			sounds.start_loop(GameSounds.Sound.AIMING)
 			_refresh_ability_button()
 			status_label.text = "%s: tap any empty square" % haunts[0].piece.def.ability_name
 		return
@@ -706,6 +710,8 @@ func use_ability() -> void:
 		play(moves[0])
 	else:
 		board_view.aim_ability()
+		# A magical whirr while the target is chosen (Mac).
+		sounds.start_loop(GameSounds.Sound.AIMING)
 		status_label.text = "%s: choose a target" % piece.def.ability_name
 
 ## The last message shown by show_notice (for tests).

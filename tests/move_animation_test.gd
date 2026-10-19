@@ -29,7 +29,7 @@ func test_ordinary_move_slides() -> void:
 	var pawn := state.board.get_piece(Vector2i(4, 1))
 	var animation := _animate(state, "e4")
 	check(animation.has_segment(pawn, "slide"), "The pawn slides")
-	check_eq(_sounds(animation), [Sound.MOVE], "A move sound")
+	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.MOVE], "Scraping along the board, then a knock")
 	check(is_equal_approx(animation.length, MoveAnimation.SLIDE), "As long as a slide")
 
 func test_knight_hops_and_lands() -> void:
@@ -48,7 +48,7 @@ func test_capture_knocks_the_piece_off() -> void:
 	var victim := state.board.get_piece(Vector2i(3, 4))
 	var animation := _animate(state, "exd5")
 	check(animation.has_segment(victim, "knock"), "Knocked off")
-	check_eq(_sounds(animation), [Sound.CAPTURE], "The capture's crash")
+	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.CAPTURE], "Scrape, then the capture's crash")
 	var attacker := state.board.get_piece(Vector2i(3, 4))
 	check(animation.has_segment(attacker, "impact"), "The attacker feels the hit")
 	check(animation.has_extra("impact"), "Sparks where they meet")
@@ -66,14 +66,17 @@ func test_dropped_piece_slams_with_dust() -> void:
 	check(animation.has_extra("dust"), "Puff of dust")
 	check_eq(_sounds(animation), [Sound.SLAM], "A heavy thud")
 
-func test_castling_hops_both_pieces() -> void:
+func test_castling_dashes_then_slams() -> void:
 	var state := StandardSetup.from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1")
 	var king := state.board.get_piece(Vector2i(4, 0))
 	var rook := state.board.get_piece(Vector2i(7, 0))
 	var animation := _animate(state, "O-O")
-	check(animation.has_segment(king, "hop"), "King hops")
-	check(animation.has_segment(rook, "hop"), "Rook hops")
-	check_eq(_sounds(animation), [Sound.CASTLE, Sound.CASTLE], "Two knocks")
+	for piece in [king, rook]:
+		check(animation.has_segment(piece, "dash"), "Dashes into place")
+		check(animation.has_segment(piece, "slam"), "Slams down")
+	check(animation.has_extra("speed_lines"), "Speed lines")
+	check(animation.has_extra("dust"), "Dust")
+	check_eq(_sounds(animation), [Sound.CASTLE, Sound.CASTLE_SLAM], "A swish, then a heavy slam")
 
 func test_promotion_flashes_into_the_new_piece() -> void:
 	var state := StandardSetup.from_fen("8/P6k/8/8/8/8/8/K7 w - - 0 1")
@@ -84,7 +87,7 @@ func test_promotion_flashes_into_the_new_piece() -> void:
 	check(animation.has_segment(queen, "promote_reveal"), "The queen appears and settles")
 	check(animation.has_extra("light"), "Burst of light")
 	check(animation.has_extra("sparkles"), "Sparkles")
-	check_eq(_sounds(animation), [Sound.MOVE, Sound.PROMOTE, Sound.SPARKLE, Sound.LAND], "Swell, sparkle, thud")
+	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.MOVE, Sound.PROMOTE, Sound.SPARKLE, Sound.LAND], "Scrape, swell, sparkle, thud")
 	animation.time = MoveAnimation.SLIDE + 0.45
 	var pose: Dictionary = animation.pose(pawn)
 	check(pose.lift > 0.3 and absf(pose.scale.y) > 1.5, "Up close to the player")
@@ -110,7 +113,7 @@ func test_crack_shot_arrow_and_sink() -> void:
 	var animation := MoveAnimation.for_move(move, state, false)
 	check(animation.has_extra("arrow"), "An arrow flies")
 	check(animation.has_segment(victim, "sink"), "The target sinks into the board")
-	check_eq(_sounds(animation), [Sound.ABILITY, Sound.ARROW_WHOOSH, Sound.ARROW_HIT], "Activation, whoosh, then thunk")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.MAGIC_HUM, Sound.BOW, Sound.ARROW_WHOOSH, Sound.ARROW_HIT], "Activation, magic, the bow, whoosh, then thwack")
 
 func test_raise_dead_sinks_and_rises() -> void:
 	var state := _game("k7/8/8/8/8/8/3(NC)4/4K3 w - - 0 1")
@@ -122,7 +125,8 @@ func test_raise_dead_sinks_and_rises() -> void:
 	check(animation.has_segment(necromancer, "sink"), "Necromancer sinks")
 	check(animation.has_segment(move.raised, "rise"), "The raised piece rises")
 	check(animation.has_extra("smoke"), "Purple smoke")
-	check_eq(_sounds(animation), [Sound.ABILITY, Sound.RAISE_DEAD], "Activation, then the eerie sound")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.THUNDER, Sound.RAISE_DEAD, Sound.CREAK, Sound.CREAK], "Activation, thunder, the swell, creaking")
+	check(animation.has_extra("lightning"), "Lightning strikes")
 
 func test_check_shakes_the_king_last() -> void:
 	var state := StandardSetup.from_fen("4k3/8/8/8/8/8/8/4K2R w - - 0 1")
@@ -130,7 +134,7 @@ func test_check_shakes_the_king_last() -> void:
 	var king := state.board.get_piece(Vector2i(4, 7))
 	check(animation.has_segment(king, "shake"), "The king shakes")
 	check(animation.has_extra("red_flash"), "Red flash")
-	check_eq(_sounds(animation), [Sound.MOVE, Sound.CHECK], "Move, then the check sound")
+	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.MOVE, Sound.CHECK], "Move, then the check sound")
 
 func test_checkmate_leaves_the_king_to_the_game_screen() -> void:
 	var state := StandardSetup.from_fen("6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")
@@ -148,10 +152,17 @@ func test_shield_break_shakes_the_target() -> void:
 			move = candidate
 	state.make_move(move)
 	var animation := MoveAnimation.for_move(move, state, false)
-	check(animation.has_segment(rook, "bump"), "The attacker lunges")
-	animation.advance(0.2)
-	check(animation.shake_squares().has(Vector2i(3, 3)), "The shielded piece shakes")
+	check(animation.has_segment(rook, "slide"), "The attacker charges in and back")
+	var paladin := move.shield_target
+	animation.time = 0.05
+	check(animation.pose(paladin).get("intact", false), "Still shown with its shield before the crash")
+	animation.time = 0.3
+	check(not animation.pose(paladin).get("intact", false), "Shieldless after it")
+	check(animation.has_segment(paladin, "stun"), "It reels from the crash")
+	check(animation.has_extra("dust"), "A cloud of dust")
 	check(Sound.SHIELD_BREAK in _sounds(animation), "Crack")
+	animation.time = animation.length
+	check_eq(animation.pose(rook).pos, Vector2(3, 0), "The attacker is back on its square")
 
 func test_sounds_come_at_their_moments() -> void:
 	var state := _game("4k3/4p3/8/8/8/4P3/8/K3C3 w - - 0 1")
@@ -196,6 +207,40 @@ func test_en_passant_swipe() -> void:
 	var state := StandardSetup.from_fen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1")
 	var victim := state.board.get_piece(Vector2i(3, 4))
 	var animation := _animate(state, "exd6")
-	check(animation.has_segment(victim, "knock"), "The passed pawn is swept off")
 	check(animation.has_extra("slash"), "A slash across it")
-	check_eq(_sounds(animation), [Sound.SWIPE, Sound.CAPTURE], "Swipe, then the crash")
+	check(animation.has_segment(victim, "stun"), "It stands frozen for a beat")
+	check(animation.has_segment(victim, "topple"), "Then topples over")
+	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.SWIPE, Sound.FALL], "Swipe, then it falls")
+
+func test_vampire_bites_and_ram_bleats() -> void:
+	var state := _game("4k3/8/8/3p4/2V5/8/8/4K3 w - - 0 1")
+	var animation := _animate(state, "Vxd5")
+	check(Sound.BITE in _sounds(animation), "The Vampire bites")
+	check(animation.has_extra("blood"), "A spray of blood")
+	state = _game("4k3/8/8/3p4/8/8/8/3(RM)K3 w - - 0 1")
+	animation = _animate(state, "RMxd5")
+	check(Sound.SHEEP in _sounds(animation), "A Ram dying from its own charge bleats")
+
+func test_full_moon_haunt_and_crack_shot_extras() -> void:
+	var state := _game("4k3/8/8/8/3(WW)4/8/8/4K3 w - - 0 1")
+	var animation := MoveAnimation.for_move(_play_ability(state, PieceDef.Ability.FULL_MOON), state, false)
+	check(animation.has_extra("moon"), "A great moon behind the Werewolf")
+	state = _game("3rk3/8/8/8/3G4/8/8/4K3 b - - 0 1")
+	state.make_move(state.find_move("d8xd4"))
+	animation = MoveAnimation.for_move(_play_ability(state, PieceDef.Ability.HAUNT), state, false)
+	check(animation.has_extra("rising_smoke"), "Smoke rises with the Ghost")
+	check(Sound.HAUNT in _sounds(animation), "The gothic bell")
+	state = _game("4k3/8/8/8/8/2n5/8/A3K3 w - - 0 1")
+	animation = MoveAnimation.for_move(_play_ability(state, PieceDef.Ability.CRACK_SHOT), state, false)
+	var arrows := animation.extras.filter(func(e: Dictionary) -> bool: return e.kind == "arrow")
+	check(arrows[0].has("trail"), "The arrow leaves a trail in the ability's colour")
+
+func _play_ability(state: GameState, ability: PieceDef.Ability) -> Move:
+	var move := _ability_move(state, ability)
+	state.make_move(move)
+	return move
+
+func test_every_sound_loads() -> void:
+	for sound: int in GameSounds.LAYERS:
+		for stream in GameSounds.streams_for(sound):
+			check(stream != null, "Sound %s loads" % GameSounds.Sound.keys()[sound])
