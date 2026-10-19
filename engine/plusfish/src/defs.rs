@@ -28,6 +28,26 @@ pub enum Ability {
     None,
     CrackShot,
     RaiseDead,
+    /// The Ghost: used after it has been lost, to come back onto any empty square.
+    Haunt,
+    /// The Bard: one enemy piece it could reach (not a king) can't move next turn.
+    SongOfSlumber,
+    /// The Werewolf: it turns into its `transforms_into` form for good.
+    FullMoon,
+}
+
+impl Ability {
+    /// The game's `PieceDef.Ability` number.
+    pub fn from_code(n: i32) -> Ability {
+        match n {
+            1 => Ability::CrackShot,
+            2 => Ability::RaiseDead,
+            3 => Ability::Haunt,
+            4 => Ability::SongOfSlumber,
+            5 => Ability::FullMoon,
+            _ => Ability::None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -97,9 +117,43 @@ pub struct PieceDef {
     pub keywords: u8,
     pub ability: Ability,
     pub dies_on_capture: bool,
+    /// The Parapet: nothing can leap over it, and a Cannon can't use it as a screen.
+    pub blocks_jumps: bool,
+    /// The Vampire: it gains a shield whenever it captures (if it hasn't one).
+    pub shield_on_capture: bool,
+    /// The Squire: these piece types (ids), on squares it could reach, can't be captured.
+    pub protects: Vec<String>,
+    /// The Jester: captures of its side's pieces it could reach hit it instead.
+    pub decoy: bool,
+    /// Full Moon: the id of the piece type it becomes.
+    pub transforms_into: Option<String>,
+    /// A form some other piece changes into (the Werewolf's wolf): never bought
+    /// for an army. Worked out by the catalog.
+    pub is_form: bool,
 }
 
 impl PieceDef {
+    /// A piece with no rules or tags yet, for readers to fill in.
+    pub fn blank() -> PieceDef {
+        PieceDef {
+            id: String::new(),
+            name: String::new(),
+            symbol: String::new(),
+            value: 0.0,
+            rules: Vec::new(),
+            types: 0,
+            keywords: 0,
+            ability: Ability::None,
+            dies_on_capture: false,
+            blocks_jumps: false,
+            shield_on_capture: false,
+            protects: Vec::new(),
+            decoy: false,
+            transforms_into: None,
+            is_form: false,
+        }
+    }
+
     pub fn is_king(&self) -> bool {
         self.types & T_KING != 0
     }
@@ -169,16 +223,28 @@ pub struct Catalog {
     pub defs: Vec<PieceDef>,
 }
 
-pub const MAX_KINDS: usize = 32;
+pub const MAX_KINDS: usize = 64;
+
+fn tres_files(dir: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut files: Vec<PathBuf> = fs::read_dir(dir)
+        .map_err(|e| format!("can't read piece folder {}: {}", dir.display(), e))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().map(|x| x == "tres").unwrap_or(false))
+        .collect();
+    files.sort();
+    Ok(files)
+}
 
 impl Catalog {
+    /// Every piece in the folder, then the forms pieces change into
+    /// (`forms/`, e.g. the Werewolf's wolf), last so the other pieces keep
+    /// their kind numbers.
     pub fn load_dir(dir: &Path) -> Result<Catalog, String> {
-        let mut files: Vec<PathBuf> = fs::read_dir(dir)
-            .map_err(|e| format!("can't read piece folder {}: {}", dir.display(), e))?
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.extension().map(|x| x == "tres").unwrap_or(false))
-            .collect();
-        files.sort();
+        let mut files = tres_files(dir)?;
+        let forms = dir.join("forms");
+        if forms.is_dir() {
+            files.extend(tres_files(&forms)?);
+        }
         let mut defs = Vec::new();
         for f in files {
             let text = fs::read_to_string(&f).map_err(|e| format!("{}: {}", f.display(), e))?;
@@ -191,13 +257,25 @@ impl Catalog {
         if defs.is_empty() {
             return Err(format!("no .tres piece files in {}", dir.display()));
         }
-        if defs.len() > MAX_KINDS {
-            return Err(format!("too many piece types ({}, max {})", defs.len(), MAX_KINDS));
+        Catalog::new(defs)
+    }
+
+    /// Checks the pieces and marks the forms that pieces change into.
+    pub fn new(mut defs: Vec<PieceDef>) -> Result<Catalog, String> {
+        if defs.is_empty() || defs.len() > MAX_KINDS {
+            return Err(format!("need 1 to {} piece types (got {})", MAX_KINDS, defs.len()));
         }
         let mut seen = HashMap::new();
         for d in &defs {
             if let Some(other) = seen.insert(d.symbol.to_uppercase(), d.id.clone()) {
                 return Err(format!("pieces {} and {} share the symbol {}", other, d.id, d.symbol));
+            }
+        }
+        let forms: Vec<String> = defs.iter().filter_map(|d| d.transforms_into.clone()).collect();
+        for f in &forms {
+            match defs.iter_mut().find(|d| d.id.to_lowercase() == f.to_lowercase()) {
+                Some(d) => d.is_form = true,
+                None => return Err(format!("unknown form {}", f)),
             }
         }
         Ok(Catalog { defs })
@@ -424,6 +502,11 @@ pub fn unquote(v: &str) -> String {
     }
 }
 
+/// The quoted strings in a value such as `Array[String](["knight"])`.
+pub fn parse_strings(v: &str) -> Vec<String> {
+    v.split('"').skip(1).step_by(2).map(|t| t.to_string()).collect()
+}
+
 fn parse_int(v: &str) -> i32 {
     v.trim().parse::<f64>().map(|f| f as i32).unwrap_or(0)
 }
@@ -468,18 +551,17 @@ pub fn parse_piece_tres(text: &str) -> Result<PieceDef, String> {
             }
         }
     }
+    // External resources by id. The Werewolf's form is one; its file name is its id.
+    let mut ext: HashMap<String, String> = HashMap::new();
+    for s in &sections {
+        if s.kind == "ext_resource" {
+            if let (Some(id), Some(path)) = (s.attrs.get("id"), s.attrs.get("path")) {
+                ext.insert(id.clone(), path.clone());
+            }
+        }
+    }
     let main = sections.iter().find(|s| s.kind == "resource").ok_or("no [resource] section")?;
-    let mut def = PieceDef {
-        id: String::new(),
-        name: String::new(),
-        symbol: String::new(),
-        value: 0.0,
-        rules: Vec::new(),
-        types: 0,
-        keywords: 0,
-        ability: Ability::None,
-        dies_on_capture: false,
-    };
+    let mut def = PieceDef::blank();
     for (k, v) in &main.props {
         match k.as_str() {
             "id" => def.id = unquote(v),
@@ -488,14 +570,17 @@ pub fn parse_piece_tres(text: &str) -> Result<PieceDef, String> {
             "value" => def.value = v.trim().parse().unwrap_or(0.0),
             "types" => def.types = parse_int(v) as u8,
             "keywords" => def.keywords = parse_int(v) as u8,
-            "ability" => {
-                def.ability = match parse_int(v) {
-                    1 => Ability::CrackShot,
-                    2 => Ability::RaiseDead,
-                    _ => Ability::None,
-                }
-            }
+            "ability" => def.ability = Ability::from_code(parse_int(v)),
             "dies_on_capture" => def.dies_on_capture = parse_bool(v),
+            "blocks_jumps" => def.blocks_jumps = parse_bool(v),
+            "shield_on_capture" => def.shield_on_capture = parse_bool(v),
+            "decoy" => def.decoy = parse_bool(v),
+            "protects" => def.protects = parse_strings(v),
+            "transforms_into" => {
+                let path = parse_refs(v, "ExtResource").first().and_then(|id| ext.get(id)).cloned().ok_or("transforms_into: missing resource")?;
+                let stem = path.rsplit('/').next().unwrap_or(&path).trim_end_matches(".tres").to_string();
+                def.transforms_into = Some(stem);
+            }
             "move_rules" => {
                 for id in parse_refs(v, "SubResource") {
                     def.rules.push(subs.get(&id).cloned().ok_or(format!("missing move rule {}", id))?);

@@ -5,7 +5,7 @@
 
 use crate::eval::*;
 use crate::position::*;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use crate::util::now_ms;
 
@@ -25,6 +25,96 @@ struct TTEntry {
     age: u8,
 }
 
+/// The transposition table: buckets of two entries (a new result replaces
+/// the shallower or older one). Entries are three 64-bit words: the key XOR
+/// the two data words, then the data. Threads can share it without locks: a
+/// half-written entry fails the key check and is just a miss.
+pub struct TT {
+    words: Vec<AtomicU64>,
+    mask: usize,
+}
+
+impl TT {
+    pub fn new(mb: usize) -> TT {
+        let entries = (mb.max(1) * 1024 * 1024 / 24).next_power_of_two() / 2;
+        let entries = entries.max(1024);
+        TT { words: (0..entries * 3).map(|_| AtomicU64::new(0)).collect(), mask: entries / 2 - 1 }
+    }
+
+    pub fn mb(&self) -> usize {
+        self.words.len() * 8 / (1024 * 1024)
+    }
+
+    pub fn clear(&self) {
+        for w in &self.words {
+            w.store(0, Ordering::Relaxed);
+        }
+    }
+
+    /// The entry for `key` (index, entry): the one holding it, or else the one
+    /// a new result would replace (whose key won't match).
+    #[inline(always)]
+    fn probe(&self, key: u64, age: u8) -> (usize, TTEntry) {
+        let b = ((key as usize) & self.mask) * 2;
+        let e0 = self.load(b);
+        if e0.key == key {
+            return (b, e0);
+        }
+        let e1 = self.load(b + 1);
+        if e1.key == key {
+            return (b + 1, e1);
+        }
+        let worth = |e: &TTEntry| if e.bound == 0 { -1000 } else { e.depth as i32 - if e.age != age { 8 } else { 0 } };
+        if worth(&e1) < worth(&e0) {
+            (b + 1, e1)
+        } else {
+            (b, e0)
+        }
+    }
+
+    #[inline(always)]
+    fn load(&self, slot: usize) -> TTEntry {
+        let i = slot * 3;
+        let k = self.words[i].load(Ordering::Relaxed);
+        let a = self.words[i + 1].load(Ordering::Relaxed);
+        let b = self.words[i + 2].load(Ordering::Relaxed);
+        TTEntry {
+            key: k ^ a ^ b,
+            mv: Move {
+                from: a as u8,
+                to: (a >> 8) as u8,
+                flags: (a >> 16) as u8 as u16 | ((b >> 40) as u8 as u16) << 8,
+                promo: (a >> 24) as u8,
+                extra: (a >> 32) as u8,
+                steps: (a >> 40) as u8,
+            },
+            score: (a >> 48) as u16 as i16,
+            eval: b as u16 as i16,
+            depth: (b >> 16) as u8 as i8,
+            bound: (b >> 24) as u8,
+            age: (b >> 32) as u8,
+        }
+    }
+
+    #[inline(always)]
+    fn store(&self, slot: usize, e: TTEntry) {
+        let m = e.mv;
+        let a = m.from as u64
+            | (m.to as u64) << 8
+            | (m.flags as u8 as u64) << 16
+            | (m.promo as u64) << 24
+            | (m.extra as u64) << 32
+            | (m.steps as u64) << 40
+            | (e.score as u16 as u64) << 48;
+        // The move's high flag bits ride in the second word.
+        let b = e.eval as u16 as u64 | (e.depth as u8 as u64) << 16 | (e.bound as u64) << 24 | (e.age as u64) << 32 | ((m.flags >> 8) as u64) << 40;
+        let i = slot * 3;
+        self.words[i].store(e.key ^ a ^ b, Ordering::Relaxed);
+        self.words[i + 1].store(a, Ordering::Relaxed);
+        self.words[i + 2].store(b, Ordering::Relaxed);
+    }
+}
+
 const B_EXACT: u8 = 1;
 const B_LOWER: u8 = 2;
 const B_UPPER: u8 = 3;
@@ -34,6 +124,10 @@ pub struct Limits {
     pub depth: Option<i32>,
     pub nodes: Option<u64>,
     pub movetime_ms: Option<u64>,
+    /// With a clock: the time we'd like to use. The search stops after a depth
+    /// once past it, sooner when the best move has stayed the same for a few
+    /// depths and later when it keeps changing. `movetime_ms` is the hard limit.
+    pub soft_ms: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -51,14 +145,28 @@ pub struct Report {
     pub lines: Vec<Line>,
 }
 
+/// The tables a search learns from (hash table, history), kept between moves
+/// of one game: `Searcher::into_tables` / `Searcher::with_tables`.
+pub struct SearchTables {
+    tt: Arc<TT>,
+    age: u8,
+    history: Vec<i32>,
+}
+
 pub struct Searcher<'a> {
     pub r: &'a Rules,
     pub et: &'a EvalTables,
     pub params: &'a Params,
-    tt: Vec<TTEntry>,
-    tt_mask: usize,
+    tt: Arc<TT>,
     age: u8,
     killers: [[Move; 2]; MAX_PLY + 2],
+    /// The move played to reach each ply (NONE after a null move).
+    played: [Move; MAX_PLY + 2],
+    /// Static evaluation at each ply (-INF when in check), for "improving".
+    evals: [i32; MAX_PLY + 2],
+    /// Counter-moves: the quiet reply that last refuted a move, by side and
+    /// that move's from/to squares.
+    counter: Vec<Move>,
     history: Vec<i32>,
     pv: Vec<[Move; MAX_PLY + 1]>,
     pv_len: [usize; MAX_PLY + 1],
@@ -74,6 +182,11 @@ pub struct Searcher<'a> {
     /// True while the first depth runs: limits don't apply until there's a move.
     must_finish: bool,
     root_excluded: Vec<Move>,
+    /// Lazy SMP helpers search one ply deeper on odd thread numbers, so the
+    /// threads don't all do the same work.
+    depth_offset: i32,
+    /// The score of the root move that last raised alpha (its line is pv[0]).
+    root_score: i32,
 }
 
 fn is_mate(s: i32) -> bool {
@@ -102,16 +215,17 @@ fn from_tt(s: i32, ply: usize) -> i32 {
 
 impl<'a> Searcher<'a> {
     pub fn new(r: &'a Rules, et: &'a EvalTables, params: &'a Params, tt_mb: usize) -> Searcher<'a> {
-        let entries = (tt_mb.max(1) * 1024 * 1024 / std::mem::size_of::<TTEntry>()).next_power_of_two() / 2;
         let values = (0..r.info.len()).map(|k| piece_value(params, k)).collect();
         Searcher {
             r,
             et,
             params,
-            tt: vec![TTEntry::default(); entries.max(1024)],
-            tt_mask: entries.max(1024) - 1,
+            tt: Arc::new(TT::new(tt_mb)),
             age: 0,
             killers: [[Move::NONE; 2]; MAX_PLY + 2],
+            played: [Move::NONE; MAX_PLY + 2],
+            evals: [-INF; MAX_PLY + 2],
+            counter: vec![Move::NONE; 2 * MAX_SQ * MAX_SQ],
             history: vec![0; 2 * MAX_SQ * MAX_SQ],
             pv: vec![[Move::NONE; MAX_PLY + 1]; MAX_PLY + 1],
             pv_len: [0; MAX_PLY + 1],
@@ -126,13 +240,30 @@ impl<'a> Searcher<'a> {
             stopped: false,
             must_finish: false,
             root_excluded: Vec::new(),
+            depth_offset: 0,
+            root_score: 0,
         }
     }
 
+    /// A searcher that carries on with tables from an earlier one.
+    pub fn with_tables(r: &'a Rules, et: &'a EvalTables, params: &'a Params, t: SearchTables) -> Searcher<'a> {
+        let mut s = Searcher::new(r, et, params, 1);
+        s.tt = t.tt;
+        s.age = t.age;
+        s.history = t.history;
+        s
+    }
+
+    pub fn into_tables(self) -> SearchTables {
+        SearchTables { tt: self.tt, age: self.age, history: self.history }
+    }
+
+    pub fn tt_mb(t: &SearchTables) -> usize {
+        t.tt.mb()
+    }
+
     pub fn clear(&mut self) {
-        for e in self.tt.iter_mut() {
-            *e = TTEntry::default();
-        }
+        self.tt.clear();
         for h in self.history.iter_mut() {
             *h = 0;
         }
@@ -148,9 +279,15 @@ impl<'a> Searcher<'a> {
             return true;
         }
         if self.must_finish {
-            // An outside "stop" still counts.
+            // An outside "stop" still counts, and so does a far-overrun node
+            // limit (a safety net: depth 1 should never take this long).
             if self.nodes & 1023 == 0 && self.stop.load(Ordering::Relaxed) {
                 self.stopped = true;
+            }
+            if let Some(n) = self.limits.nodes {
+                if self.nodes >= n.saturating_mul(64).max(1 << 20) {
+                    self.stopped = true;
+                }
             }
             return self.stopped;
         }
@@ -195,6 +332,8 @@ impl<'a> Searcher<'a> {
         }
         let multipv = multipv.max(1).min(root_moves.len());
         let mut prev_scores: Vec<i32> = vec![0; multipv];
+        let mut stable = 0;
+        let mut last_best = Move::NONE;
         for depth in 1..=max_depth {
             self.seldepth = 0;
             self.must_finish = depth == 1;
@@ -211,7 +350,7 @@ impl<'a> Searcher<'a> {
                 let score = loop {
                     self.keys.clear();
                     self.keys.extend_from_slice(history_keys);
-                    let s = self.negamax(pos, depth, alpha, beta, 0, true, false);
+                    let s = self.negamax(pos, depth + self.depth_offset, alpha, beta, 0, true, false);
                     if self.stopped {
                         break s;
                     }
@@ -230,6 +369,11 @@ impl<'a> Searcher<'a> {
                     }
                 };
                 if self.stopped && (depth > 1 || idx > 0) {
+                    // Stopped part-way: a root move that was fully searched and
+                    // beat the window is better than the last depth's choice.
+                    if multipv == 1 && depth > 1 && self.pv_len[0] > 0 && !best.lines.is_empty() {
+                        best.lines[0] = Line { score: self.root_score, pv: self.pv[0][..self.pv_len[0]].to_vec() };
+                    }
                     break;
                 }
                 let pv: Vec<Move> = self.pv[0][..self.pv_len[0]].to_vec();
@@ -261,6 +405,15 @@ impl<'a> Searcher<'a> {
             if multipv == 1 && is_mate(best.lines[0].score) && depth > 8 && (MATE - best.lines[0].score.abs()) < depth {
                 break;
             }
+            let first = best.lines[0].pv.first().copied().unwrap_or(Move::NONE);
+            stable = if first == last_best { stable + 1 } else { 0 };
+            last_best = first;
+            if let Some(soft) = limits.soft_ms {
+                let f = if stable >= 3 { 0.6 } else if stable == 0 && depth > 4 { 1.6 } else { 1.0 };
+                if (now_ms() - self.start) as f64 >= soft as f64 * f {
+                    break;
+                }
+            }
             if let Some(ms) = limits.movetime_ms {
                 // Don't start a depth we're unlikely to finish.
                 if (now_ms() - self.start) * 2 > ms && limits.depth.is_none() {
@@ -276,6 +429,50 @@ impl<'a> Searcher<'a> {
         best.nodes = self.nodes;
         best.ms = now_ms() - self.start;
         best
+    }
+
+    /// `search` on `threads` threads (Lazy SMP): helper threads search the
+    /// same position with their own move-ordering tables, sharing the hash
+    /// table, and stop when this (the main) thread finishes. Only the main
+    /// thread's limits and results count; the node total includes helpers.
+    /// Native only: the WebAssembly build has no threads.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn search_threads(&mut self, pos: &Position, history_keys: &[u64], limits: Limits, multipv: usize, threads: usize, report: impl FnMut(&Report)) -> Report {
+        if threads <= 1 {
+            return self.search(pos, history_keys, limits, multipv, report);
+        }
+        let helper_stop = Arc::new(AtomicBool::new(false));
+        let (r, et, params) = (self.r, self.et, self.params);
+        let age = self.age;
+        std::thread::scope(|sc| {
+            let mut handles = Vec::new();
+            for i in 1..threads {
+                let tt = self.tt.clone();
+                let hs = helper_stop.clone();
+                handles.push(sc.spawn(move || {
+                    let mut h = Searcher::new(r, et, params, 1);
+                    h.tt = tt;
+                    h.age = age;
+                    h.stop = hs;
+                    h.depth_offset = (i % 2) as i32;
+                    let lim = Limits { depth: limits.depth, nodes: None, movetime_ms: None, soft_ms: None };
+                    h.search(pos, history_keys, lim, 1, |_| {});
+                    h.nodes
+                }));
+            }
+            let mut rep = self.search(pos, history_keys, limits, multipv, report);
+            helper_stop.store(true, Ordering::SeqCst);
+            for h in handles {
+                rep.nodes += h.join().unwrap_or(0);
+            }
+            rep
+        })
+    }
+
+    /// Without threads (WebAssembly): an ordinary search.
+    #[cfg(target_arch = "wasm32")]
+    pub fn search_threads(&mut self, pos: &Position, history_keys: &[u64], limits: Limits, multipv: usize, _threads: usize, report: impl FnMut(&Report)) -> Report {
+        self.search(pos, history_keys, limits, multipv, report)
     }
 
     fn is_repetition(&self, p: &Position) -> bool {
@@ -299,8 +496,12 @@ impl<'a> Searcher<'a> {
                 }
                 let attacker = self.values[kind_of(p.sq[m.from as usize])];
                 if m.flags & F_CAPTURE != 0 {
-                    let victim = self.values[kind_of(p.sq[m.capture_square() as usize])];
+                    let victim = self.values[kind_of(p.sq[victim_square(*m) as usize])];
                     let crack = if m.flags & F_CRACK != 0 { 50 } else { 0 };
+                    if self.capture_gain(p, *m) < -50 {
+                        // Probably loses material: after the killers.
+                        return 650_000 + victim * 16 - attacker / 8;
+                    }
                     return 1_000_000 + victim * 16 - attacker / 8 + crack;
                 }
                 if m.promo != 0 {
@@ -315,12 +516,30 @@ impl<'a> Searcher<'a> {
                 if *m == self.killers[ply][1] {
                     return 690_000;
                 }
-                if m.flags & F_RAISE != 0 {
+                if ply > 0 && *m == self.counter_of(p.side, self.played[ply - 1]) {
+                    return 680_000;
+                }
+                if m.flags & (F_RAISE | F_HAUNT) != 0 {
                     return 600_000 + self.values[m.extra as usize];
                 }
                 self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize]
             })
             .collect()
+    }
+
+    /// What a capture wins if both sides keep recapturing (static exchange
+    /// evaluation, `Position::see`).
+    #[inline]
+    fn capture_gain(&self, p: &Position, m: Move) -> i32 {
+        p.see(self.r, m, &self.values)
+    }
+
+    #[inline]
+    fn counter_of(&self, side: usize, prev: Move) -> Move {
+        if prev == Move::NONE {
+            return Move::NONE;
+        }
+        self.counter[(side * MAX_SQ + prev.from as usize) * MAX_SQ + prev.to as usize]
     }
 
     fn negamax(&mut self, p: &Position, mut depth: i32, mut alpha: i32, mut beta: i32, ply: usize, is_pv: bool, was_null: bool) -> i32 {
@@ -352,14 +571,13 @@ impl<'a> Searcher<'a> {
             depth = 1;
         }
         if depth <= 0 {
-            return self.quiesce(p, alpha, beta, ply);
+            return self.quiesce(p, alpha, beta, ply, 0);
         }
         self.nodes += 1;
         // Transposition table.
-        let slot = (p.key as usize) & self.tt_mask;
-        let e = self.tt[slot];
+        let (_, e) = self.tt.probe(p.tt_key(), self.age);
         let mut tt_move = Move::NONE;
-        if e.key == p.key && e.bound != 0 {
+        if e.key == p.tt_key() && e.bound != 0 {
             tt_move = e.mv;
             let s = from_tt(e.score as i32, ply);
             if !is_pv && e.depth as i32 >= depth && !root {
@@ -368,12 +586,15 @@ impl<'a> Searcher<'a> {
                 }
             }
         }
-        let static_eval = if in_check { -INF } else if e.key == p.key && e.bound != 0 { e.eval as i32 } else { self.eval(p) };
+        let static_eval = if in_check { -INF } else if e.key == p.tt_key() && e.bound != 0 { e.eval as i32 } else { self.eval(p) };
         let us = p.side;
+        self.evals[ply] = static_eval;
+        // Is our position better than two plies ago? If not, prune harder.
+        let improving = !in_check && (ply < 2 || self.evals[ply - 2] == -INF || static_eval > self.evals[ply - 2]);
 
         if !is_pv && !in_check && !root {
             // Reverse futility pruning.
-            if depth <= 6 && static_eval - 90 * depth >= beta && !is_mate(beta) {
+            if depth <= 6 && static_eval - 90 * depth + if improving { 45 } else { 0 } >= beta && !is_mate(beta) {
                 return static_eval;
             }
             // Null move: if passing still beats beta, a real move surely will.
@@ -381,11 +602,13 @@ impl<'a> Searcher<'a> {
                 let mut child = p.clone();
                 child.ep = 0;
                 child.ep_victim = NO_SQ;
+                child.frozen = NO_SQ;
                 child.halfmove += 1;
                 child.set_side(r, 1 - us);
                 child.update_key(r);
                 let rd = 3 + depth / 4;
                 self.keys.push(p.key);
+                self.played[ply] = Move::NONE;
                 let s = -self.negamax(&child, depth - rd, -beta, -beta + 1, ply + 1, false, true);
                 self.keys.pop();
                 if self.stopped {
@@ -409,6 +632,8 @@ impl<'a> Searcher<'a> {
         let mut best_move = Move::NONE;
         let mut legal = 0;
         let orig_alpha = alpha;
+        let mut quiets_tried = [Move::NONE; 32];
+        let mut n_quiets = 0;
         self.keys.push(p.key);
         for i in 0..moves.len() {
             // Selection sort: the next best-ordered move.
@@ -421,6 +646,10 @@ impl<'a> Searcher<'a> {
             moves.swap(i, bi);
             scores.swap(i, bi);
             let m = moves[i];
+            // Captures that probably lose a lot, near the leaves.
+            if !is_pv && !in_check && depth <= 4 && legal > 0 && m.flags & F_CAPTURE != 0 && best > -MATE_BOUND && self.capture_gain(p, m) < -120 * depth {
+                continue;
+            }
             let mut child = p.clone();
             child.make(r, m);
             if child.leaves_king_attacked(p, r, m) {
@@ -428,9 +657,20 @@ impl<'a> Searcher<'a> {
             }
             legal += 1;
             let gives_check = child.in_check(r, child.side);
-            let quiet = !m.is_tactical() && m.flags & (F_RAISE | F_CASTLE) == 0;
+            let quiet = !m.is_tactical() && m.flags & (F_ABILITY | F_CASTLE) == 0;
+            // Quiet moves that put a piece where it's simply lost, near the leaves.
+            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 1 && best > -MATE_BOUND && p.see_quiet(r, m, &self.values) < -50 * depth * depth {
+                continue;
+            }
             // Late move pruning for quiet moves near the leaves.
-            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 4 + depth * depth * 3 && best > -MATE_BOUND {
+            let lmp_limit = if improving { 4 + depth * depth * 3 } else { 3 + depth * depth * 2 };
+            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > lmp_limit && best > -MATE_BOUND {
+                continue;
+            }
+            self.played[ply] = m;
+            // Futility pruning: near the leaves, a quiet move can't lift a
+            // position this far below alpha.
+            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 1 && static_eval + 100 + 120 * depth <= alpha && !is_mate(alpha) {
                 continue;
             }
             let ext = if gives_check && ply < 64 { 1 } else { 0 };
@@ -445,6 +685,7 @@ impl<'a> Searcher<'a> {
                     if is_pv {
                         red -= 1;
                     }
+                    red -= self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize] / 6000;
                     red = red.clamp(0, new_depth - 1);
                 }
                 let mut s = -self.negamax(&child, new_depth - red, -alpha - 1, -alpha, ply + 1, false, false);
@@ -459,11 +700,18 @@ impl<'a> Searcher<'a> {
             if self.stopped {
                 break;
             }
+            if quiet && n_quiets < quiets_tried.len() {
+                quiets_tried[n_quiets] = m;
+                n_quiets += 1;
+            }
             if score > best {
                 best = score;
                 best_move = m;
                 if score > alpha {
                     alpha = score;
+                    if root {
+                        self.root_score = score;
+                    }
                     self.pv[ply][0] = m;
                     let n = self.pv_len[ply + 1].min(MAX_PLY - 1);
                     for k in 0..n {
@@ -476,10 +724,19 @@ impl<'a> Searcher<'a> {
                                 self.killers[ply][1] = self.killers[ply][0];
                                 self.killers[ply][0] = m;
                             }
-                            let h = &mut self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize];
-                            *h += depth * depth;
-                            if *h > 400_000 {
-                                *h /= 2;
+                            if ply > 0 {
+                                let prev = self.played[ply - 1];
+                                if prev != Move::NONE {
+                                    self.counter[(us * MAX_SQ + prev.from as usize) * MAX_SQ + prev.to as usize] = m;
+                                }
+                            }
+                            // The move that cut off gains; the quiet moves tried
+                            // before it lose (bounded "gravity" updates).
+                            let bonus = (depth * depth * 16).min(1600);
+                            for (j, q) in quiets_tried[..n_quiets].iter().enumerate() {
+                                let b = if j + 1 == n_quiets { bonus } else { -bonus };
+                                let h = &mut self.history[(us * MAX_SQ + q.from as usize) * MAX_SQ + q.to as usize];
+                                *h += b - *h * b.abs() / 16384;
                             }
                         }
                         break;
@@ -505,17 +762,20 @@ impl<'a> Searcher<'a> {
         } else {
             B_UPPER
         };
-        let e = &mut self.tt[slot];
-        if e.key != p.key || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
-            *e = TTEntry {
-                key: p.key,
-                mv: best_move,
-                score: to_tt(best, ply).clamp(-INF, INF) as i16,
-                eval: static_eval.clamp(-INF, INF) as i16,
-                depth: depth.min(127) as i8,
-                bound,
-                age: self.age,
-            };
+        let (slot, e) = self.tt.probe(p.tt_key(), self.age);
+        if e.key != p.tt_key() || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
+            self.tt.store(
+                slot,
+                TTEntry {
+                    key: p.tt_key(),
+                    mv: best_move,
+                    score: to_tt(best, ply).clamp(-INF, INF) as i16,
+                    eval: static_eval.clamp(-INF, INF) as i16,
+                    depth: depth.min(127) as i8,
+                    bound,
+                    age: self.age,
+                },
+            );
         }
         best
     }
@@ -527,7 +787,10 @@ impl<'a> Searcher<'a> {
         })
     }
 
-    fn quiesce(&mut self, p: &Position, mut alpha: i32, beta: i32, ply: usize) -> i32 {
+    /// `qply`: plies since the main search ended. Check evasions (every move)
+    /// are only searched near the start: chains of capture-with-check and
+    /// evasion can otherwise grow without limit in busy army positions.
+    fn quiesce(&mut self, p: &Position, mut alpha: i32, beta: i32, ply: usize, qply: usize) -> i32 {
         self.pv_len[ply] = 0;
         self.nodes += 1;
         if ply > self.seldepth {
@@ -540,8 +803,21 @@ impl<'a> Searcher<'a> {
         if ply >= MAX_PLY {
             return self.eval(p);
         }
-        let in_check = p.in_check(r, p.side);
-        let stand = if in_check { -MATE + ply as i32 } else { self.eval(p) };
+        // Transposition table: any stored result is deep enough here.
+        let (_, e) = self.tt.probe(p.tt_key(), self.age);
+        let hit = e.key == p.tt_key() && e.bound != 0;
+        let mut tt_move = Move::NONE;
+        if hit {
+            let s = from_tt(e.score as i32, ply);
+            if e.bound == B_EXACT || (e.bound == B_LOWER && s >= beta) || (e.bound == B_UPPER && s <= alpha) {
+                return s;
+            }
+            tt_move = e.mv;
+        }
+        let orig_alpha = alpha;
+        let in_check = qply < Q_CHECK_PLIES && p.in_check(r, p.side);
+        let raw_eval = if in_check { -INF } else if hit { e.eval as i32 } else { self.eval(p) };
+        let stand = if in_check { -MATE + ply as i32 } else { raw_eval };
         if !in_check {
             if stand >= beta {
                 return stand;
@@ -551,8 +827,9 @@ impl<'a> Searcher<'a> {
         let mut moves = std::mem::take(&mut self.buffers[ply]);
         moves.clear();
         p.gen_pseudo(r, &mut moves, if in_check { GEN_ALL } else { GEN_TACTICAL });
-        let mut scores = self.order(p, &mut moves, Move::NONE, ply.min(MAX_PLY));
+        let mut scores = self.order(p, &mut moves, tt_move, ply.min(MAX_PLY));
         let mut best = stand;
+        let mut best_move = Move::NONE;
         let mut legal = 0;
         for i in 0..moves.len() {
             let mut bi = i;
@@ -564,10 +841,14 @@ impl<'a> Searcher<'a> {
             moves.swap(i, bi);
             scores.swap(i, bi);
             let m = moves[i];
+            // Captures that probably lose material.
+            if !in_check && m.flags & F_CAPTURE != 0 && self.capture_gain(p, m) < -50 {
+                continue;
+            }
             // Delta pruning: even winning this piece can't lift us to alpha.
             if !in_check && m.promo == 0 {
                 let gain = if m.flags & F_CAPTURE != 0 {
-                    self.values[kind_of(p.sq[m.capture_square() as usize])]
+                    self.values[kind_of(p.sq[victim_square(m) as usize])]
                 } else {
                     self.values[kind_of(p.sq[m.to as usize])] / 2
                 };
@@ -581,12 +862,13 @@ impl<'a> Searcher<'a> {
                 continue;
             }
             legal += 1;
-            let s = -self.quiesce(&child, -beta, -alpha, ply + 1);
+            let s = -self.quiesce(&child, -beta, -alpha, ply + 1, qply + 1);
             if self.stopped {
                 break;
             }
             if s > best {
                 best = s;
+                best_move = m;
                 if s > alpha {
                     alpha = s;
                     self.pv[ply][0] = m;
@@ -602,12 +884,32 @@ impl<'a> Searcher<'a> {
             }
         }
         self.buffers[ply] = moves;
+        if self.stopped {
+            return 0;
+        }
         if in_check && legal == 0 {
             return -MATE + ply as i32;
+        }
+        let (slot, e) = self.tt.probe(p.tt_key(), self.age);
+        if e.key != p.tt_key() || e.depth <= 0 || e.age != self.age {
+            let bound = if best >= beta {
+                B_LOWER
+            } else if best > orig_alpha {
+                B_EXACT
+            } else {
+                B_UPPER
+            };
+            self.tt.store(
+                slot,
+                TTEntry { key: p.tt_key(), mv: best_move, score: to_tt(best, ply).clamp(-INF, INF) as i16, eval: raw_eval.clamp(-INF, INF) as i16, depth: 0, bound, age: self.age },
+            );
         }
         best
     }
 }
+
+/// Quiescence plies in which a side in check searches all its moves.
+const Q_CHECK_PLIES: usize = 6;
 
 /// "+1.25", "-0.40" or "#3" / "#-2" (mate in N moves), for people.
 pub fn score_text(s: i32) -> String {

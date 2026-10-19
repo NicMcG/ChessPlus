@@ -140,11 +140,11 @@ func test_jester_takes_the_hit() -> void:
 	state = _game("k7/2b5/8/4P3/3J4/8/8/7K b - - 0 1")
 	check_eq(state.find_move("c7xe5").captured.def.id, "pawn", "Pawns aren't swapped")
 
-func test_jester_swap_animates_and_plusfish_steps_aside() -> void:
+func test_jester_swap_animates_and_plusfish_knows_it() -> void:
 	var state := _game("k7/2b5/8/4R3/3J4/8/8/7K b - - 0 1")
 	var jester := state.board.get_piece(Board.parse_square("d4"))
-	check(not PlusfishLink.supports(state), "Plusfish doesn't know the Jester's rule yet")
-	check(PlusfishLink.supports(StandardSetup.create_game()), "But it does know standard chess")
+	check(PlusfishLink.supports(state), "Plusfish knows the Jester's rule")
+	check(PlusfishLink.supports(StandardSetup.create_game()), "And standard chess")
 	var move := state.find_move("c7xe5")
 	state.make_move(move)
 	var animation := MoveAnimation.for_move(move, state, false)

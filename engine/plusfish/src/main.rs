@@ -11,6 +11,8 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 use plusfish_core::util::{Args, Rng};
 
+mod ematch;
+
 const HELP: &str = "\
 Plusfish - an analysis and balancing engine for Chess Plus
 
@@ -22,6 +24,7 @@ Analysis
               --moves \"e2-e4 e7-e5\"    moves to play first (move text or SAN)
               --depth N | --time SEC | --nodes N   (default: 5 seconds)
               --multipv K              show the K best moves
+              --threads N              search threads (default 1)  --hash MB (default 128)
   eval      Static evaluation with its biggest terms (same position options).
   uci       Run the UCI-style protocol on stdin/stdout (for GUIs and scripts).
   army      Check an army and show its cost and problems: plusfish army <army>
@@ -33,6 +36,8 @@ Balancing
               --params-b <file>        give side B a different evaluation
               --armies random          A/B test: random army pairs, played both ways
               --out games.jsonl        save the games
+  enginematch Two engine programs play each other (to test engine changes);
+              see plusfish enginematch --help
   tournament  Round robin between armies, with Elo ratings.
               --armies \"<a>;<b>;<c>\"  or a folder of saved .tres armies
               --games N per pairing (default 20)  --nodes N
@@ -53,7 +58,7 @@ Armies: \"standard\", \"random\", \"random:<seed>\", a saved .tres army file, or
 like \"RNBQKBNR/PPPPPPPP\" (back row / front row, files a-h, two-letter symbols
 in brackets: \"R(CV)B(W)KB(CV)R/PPPPPPPP\").
 
-Common options: --threads N (default: all cores)  --pieces <ChessPlus/data/pieces>
+Common options: --threads N (games at once; default: all cores)  --pieces <ChessPlus/data/pieces>
                 --params <file> (evaluation weights; \"none\" = from army costs)
 ";
 
@@ -130,6 +135,10 @@ fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let args = Args::parse(&raw);
     let cmd = args.words.first().map(|s| s.as_str()).unwrap_or("help");
+    if cmd == "enginematch" && args.flag("help") {
+        print!("{}", ematch::HELP);
+        return;
+    }
     if cmd == "help" || args.flag("help") {
         print!("{}", HELP);
         return;
@@ -161,13 +170,210 @@ fn main() {
                 println!("perft {} = {}  ({:.2}s, {:.1}M nodes/s)", depth, n, s, n as f64 / s / 1e6);
             }
         }
+        "enginematch" => {
+            let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));
+            ematch::run(&cat, &args, &dir.to_string_lossy());
+        }
+        "bench" => {
+            // Fixed positions (random armies, some moves in) searched to a fixed
+            // depth: the node total is a fingerprint of the search, nps its speed.
+            let depth: i32 = args.num("depth", 9);
+            let count: usize = args.num("count", 24);
+            let params = load_params(&cat, args.get("params"));
+            let mut total_nodes = 0u64;
+            let mut total_ms = 0u64;
+            for i in 0..count {
+                let mut rng = Rng::new(9000 + i as u64);
+                let (w, b) = random_pair(&cat, &mut rng, (BUDGET, BUDGET));
+                let mut g = army_game(&cat, &w, &b, 8, 8);
+                let r = g.rules.clone();
+                let et = EvalTables::new(&r);
+                {
+                    let mut s = Searcher::new(&r, &et, &params, 4);
+                    for _ in 0..(i * 3) % 40 {
+                        if g.outcome() != Outcome::None {
+                            break;
+                        }
+                        let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None, soft_ms: None }, 1, |_| {});
+                        g.play(rep.lines[0].pv.first().copied().unwrap_or_else(|| g.pos.legal_moves(&r)[0]));
+                    }
+                }
+                if g.outcome() != Outcome::None {
+                    continue;
+                }
+                let mut s = Searcher::new(&r, &et, &params, 16);
+                let t = std::time::Instant::now();
+                let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: Some(depth), nodes: None, movetime_ms: None, soft_ms: None }, 1, |_| {});
+                let ms = t.elapsed().as_millis() as u64;
+                total_nodes += rep.nodes;
+                total_ms += ms;
+                if args.flag("verbose") {
+                    println!("{:>2} {:>9} nodes {:>6} ms  {}  {}", i, rep.nodes, ms, score_text(rep.lines[0].score), fen(&g.pos, &r, true));
+                }
+            }
+            println!("bench: {} nodes  {} ms  {} nps", total_nodes, total_ms, total_nodes * 1000 / total_ms.max(1));
+        }
+        "speed" => {
+            // Times the basic operations on positions from the bench games.
+            let params = load_params(&cat, args.get("params"));
+            let mut sets: Vec<(Arc<Rules>, Vec<Position>)> = Vec::new();
+            for i in 0..24usize {
+                let mut rng = Rng::new(9000 + i as u64);
+                let (w, b) = random_pair(&cat, &mut rng, (BUDGET, BUDGET));
+                let mut g = army_game(&cat, &w, &b, 8, 8);
+                let r = g.rules.clone();
+                let et = EvalTables::new(&r);
+                let mut s = Searcher::new(&r, &et, &params, 4);
+                let mut list = Vec::new();
+                for _ in 0..40 {
+                    if g.outcome() != Outcome::None {
+                        break;
+                    }
+                    for m in g.pos.legal_moves(&r) {
+                        let mut c = g.pos.clone();
+                        c.make(&r, m);
+                        list.push(c);
+                    }
+                    let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None, soft_ms: None }, 1, |_| {});
+                    g.play(rep.lines[0].pv.first().copied().unwrap_or_else(|| g.pos.legal_moves(&r)[0]));
+                }
+                sets.push((r.clone(), list));
+            }
+            let n: usize = sets.iter().map(|s| s.1.len()).sum();
+            let time = |name: &str, f: &mut dyn FnMut(&Rules, &EvalTables, &Position) -> u64| {
+                let mut sink = 0u64;
+                let t = std::time::Instant::now();
+                for (r, list) in &sets {
+                    let et = EvalTables::new(r);
+                    for p in list {
+                        sink = sink.wrapping_add(f(r, &et, p));
+                    }
+                }
+                let ns = t.elapsed().as_nanos() as f64 / n as f64;
+                println!("{:<28} {:>8.0} ns  ({})", name, ns, sink % 7);
+            };
+            println!("{} positions", n);
+            time("evaluate", &mut |r, et, p| evaluate(p, r, et, &params) as u64);
+            time("gen_pseudo (all)", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                v.len() as u64
+            });
+            time("gen_pseudo (tactical)", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_TACTICAL);
+                v.len() as u64
+            });
+            time("in_check", &mut |r, _, p| p.in_check(r, p.side) as u64);
+            time("all moves: clone+make", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                let mut k = 0;
+                for &m in &v {
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    k ^= c.key;
+                }
+                k
+            });
+            time("all moves: +legality", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                let mut k = 0;
+                for &m in &v {
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    k += c.leaves_king_attacked(p, r, m) as u64;
+                }
+                k
+            });
+            time("all moves: +gives check", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                let mut k = 0;
+                for &m in &v {
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    k += c.leaves_king_attacked(p, r, m) as u64 + c.in_check(r, c.side) as u64;
+                }
+                k
+            });
+        }
+        "see-check" => {
+            // Compares the static exchange evaluation with a brute-force
+            // search of the legal captures on the same square.
+            fn exch(p: &Position, r: &Rules, s: usize, val: &[i32]) -> i32 {
+                let mut best = 0;
+                for m in p.legal_moves(r) {
+                    if m.to as usize != s || m.flags & F_CAPTURE == 0 || m.flags & (F_CRACK | F_EP) != 0 {
+                        continue;
+                    }
+                    let k = kind_of(p.sq[m.from as usize]);
+                    let mut gain = val[kind_of(p.sq[s])];
+                    if m.promo != 0 {
+                        gain += val[m.promo as usize - 1] - val[k];
+                    }
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    let sub = if r.info[k].dies { gain -= val[k]; 0 } else { exch(&c, r, s, val) };
+                    best = best.max(gain - sub);
+                }
+                best
+            }
+            let params = load_params(&cat, args.get("params"));
+            let (mut n, mut same, mut sign_same) = (0, 0, 0);
+            let mut shown = 0;
+            for i in 0..args.num("count", 200usize) {
+                let mut rng = Rng::new(5000 + i as u64);
+                let (w, b) = random_pair(&cat, &mut rng, (BUDGET, BUDGET));
+                let mut g = army_game(&cat, &w, &b, 8, 8);
+                let r = g.rules.clone();
+                let val: Vec<i32> = (0..r.info.len()).map(|k| piece_value(&params, k)).collect();
+                for _ in 0..80 {
+                    if g.outcome() != Outcome::None {
+                        break;
+                    }
+                    let legal = g.pos.legal_moves(&r);
+                    for &m in &legal {
+                        if m.flags & F_CAPTURE == 0 || m.flags & (F_CRACK | F_EP) != 0 {
+                            continue;
+                        }
+                        let k = kind_of(g.pos.sq[m.from as usize]);
+                        let mut gain = val[kind_of(g.pos.sq[m.to as usize])];
+                        if m.promo != 0 {
+                            gain += val[m.promo as usize - 1] - val[k];
+                        }
+                        let mut c = g.pos.clone();
+                        c.make(&r, m);
+                        let brute = if r.info[k].dies { gain - val[k] } else { gain - exch(&c, &r, m.to as usize, &val) };
+                        let see = g.pos.see(&r, m, &val);
+                        n += 1;
+                        if see == brute {
+                            same += 1;
+                        }
+                        if (see >= 0) == (brute >= 0) {
+                            sign_same += 1;
+                        } else if shown < args.num("show", 5) {
+                            shown += 1;
+                            println!("{}  {}  see {} brute {}", fen(&g.pos, &r, true), move_text(&r, m), see, brute);
+                        }
+                    }
+                    g.play(legal[rng.below(legal.len())]);
+                }
+            }
+            println!("{} captures: same value {:.1}%, same sign {:.1}%", n, same as f64 * 100.0 / n as f64, sign_same as f64 * 100.0 / n as f64);
+        }
         "perft-suite" => {
             if !verify::run_perft_suite(&cat) {
                 std::process::exit(1);
             }
         }
         "trace-games" => {
-            let text = verify::write_trace_games(&cat, args.num("count", 50), args.num("seed", 1), args.num("plies", 300));
+            let favor: Vec<usize> = args
+                .get("favor")
+                .map(|list| list.split(',').map(|id| cat.kind_by_id(id.trim()).unwrap_or_else(|| die(&format!("unknown piece {}", id)))).collect())
+                .unwrap_or_default();
+            let text = verify::write_trace_games(&cat, args.num("count", 50), args.num("seed", 1), args.num("plies", 300), &favor);
             print!("{}", text);
         }
         "trace-check" => {
@@ -239,13 +445,15 @@ fn main() {
                 movetime_ms: args.get("time").and_then(|v| v.parse::<f64>().ok()).map(|s| (s * 1000.0) as u64).or(
                     if args.get("depth").is_none() && args.get("nodes").is_none() { Some(5000) } else { None },
                 ),
+                soft_ms: None,
             };
             let multipv: usize = args.num("multipv", 1);
             let mut s = Searcher::new(r, &et, &params, args.num("hash", 128));
             let white_pov = g.pos.side == WHITE;
             println!("\nScores are from White's point of view, in pawns (+ = White better).");
             println!("{:>5} {:>8} {:>10} {:>7}  line", "depth", "score", "nodes", "time");
-            let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], limits, multipv, |rep| {
+            let search_threads: usize = args.num("threads", 1);
+            let rep = s.search_threads(&g.pos, &g.keys[..g.keys.len() - 1], limits, multipv, search_threads, |rep| {
                 for (i, l) in rep.lines.iter().enumerate() {
                     let sc = if white_pov { l.score } else { -l.score };
                     println!(
