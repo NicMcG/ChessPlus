@@ -328,6 +328,10 @@ impl<'a> Searcher<'a> {
                 if m.flags & F_CAPTURE != 0 {
                     let victim = self.values[kind_of(p.sq[m.capture_square() as usize])];
                     let crack = if m.flags & F_CRACK != 0 { 50 } else { 0 };
+                    if self.capture_gain(p, *m) < -50 {
+                        // Probably loses material: after the killers.
+                        return 650_000 + victim * 16 - attacker / 8;
+                    }
                     return 1_000_000 + victim * 16 - attacker / 8 + crack;
                 }
                 if m.promo != 0 {
@@ -348,6 +352,31 @@ impl<'a> Searcher<'a> {
                 self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize]
             })
             .collect()
+    }
+
+    /// A rough exchange estimate for a capture: what it wins, minus the
+    /// capturing piece if it is then lost (a Ram always is; other pieces when
+    /// the square is defended). Not a full exchange evaluation, but cheap and
+    /// it works for any piece type.
+    fn capture_gain(&self, p: &Position, m: Move) -> i32 {
+        let victim = self.values[kind_of(p.sq[m.capture_square() as usize])];
+        if m.flags & F_CRACK != 0 {
+            return victim;
+        }
+        let k = kind_of(p.sq[m.from as usize]);
+        let mut attacker = self.values[k];
+        let mut gain = victim;
+        if m.promo != 0 {
+            attacker = self.values[m.promo as usize - 1];
+            gain += attacker - self.values[k];
+        }
+        if self.r.info[k].dies {
+            return gain - self.values[k];
+        }
+        if attacker > victim && p.attacked(self.r, m.to as usize, 1 - p.side) {
+            return gain - attacker;
+        }
+        gain
     }
 
     fn negamax(&mut self, p: &Position, mut depth: i32, mut alpha: i32, mut beta: i32, ply: usize, is_pv: bool, was_null: bool) -> i32 {
@@ -591,6 +620,10 @@ impl<'a> Searcher<'a> {
             moves.swap(i, bi);
             scores.swap(i, bi);
             let m = moves[i];
+            // Captures that probably lose material.
+            if !in_check && m.flags & F_CAPTURE != 0 && self.capture_gain(p, m) < -50 {
+                continue;
+            }
             // Delta pruning: even winning this piece can't lift us to alpha.
             if !in_check && m.promo == 0 {
                 let gain = if m.flags & F_CAPTURE != 0 {

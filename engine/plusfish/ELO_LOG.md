@@ -14,3 +14,4 @@ should be worth about as much.
 
 | # | Change | Regime | Games | Elo ±95% | Kept? |
 |---|--------|--------|-------|----------|-------|
+| 1 | Bad captures (rough exchange estimate; Ram counts as lost): ordered after killers, skipped in quiescence | nodes 6k | 982 | +33.4 ±13.8 | kept |
