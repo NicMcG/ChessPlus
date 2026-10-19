@@ -131,6 +131,11 @@ pub struct Searcher<'a> {
     tt: Arc<TT>,
     age: u8,
     killers: [[Move; 2]; MAX_PLY + 2],
+    /// The move played to reach each ply (NONE after a null move).
+    played: [Move; MAX_PLY + 2],
+    /// Counter-moves: the quiet reply that last refuted a move, by side and
+    /// that move's from/to squares.
+    counter: Vec<Move>,
     history: Vec<i32>,
     pv: Vec<[Move; MAX_PLY + 1]>,
     pv_len: [usize; MAX_PLY + 1],
@@ -185,6 +190,8 @@ impl<'a> Searcher<'a> {
             tt: Arc::new(TT::new(tt_mb)),
             age: 0,
             killers: [[Move::NONE; 2]; MAX_PLY + 2],
+            played: [Move::NONE; MAX_PLY + 2],
+            counter: vec![Move::NONE; 2 * MAX_SQ * MAX_SQ],
             history: vec![0; 2 * MAX_SQ * MAX_SQ],
             pv: vec![[Move::NONE; MAX_PLY + 1]; MAX_PLY + 1],
             pv_len: [0; MAX_PLY + 1],
@@ -452,6 +459,9 @@ impl<'a> Searcher<'a> {
                 if *m == self.killers[ply][1] {
                     return 690_000;
                 }
+                if ply > 0 && *m == self.counter_of(p.side, self.played[ply - 1]) {
+                    return 680_000;
+                }
                 if m.flags & F_RAISE != 0 {
                     return 600_000 + self.values[m.extra as usize];
                 }
@@ -483,6 +493,14 @@ impl<'a> Searcher<'a> {
             return gain - attacker;
         }
         gain
+    }
+
+    #[inline]
+    fn counter_of(&self, side: usize, prev: Move) -> Move {
+        if prev == Move::NONE {
+            return Move::NONE;
+        }
+        self.counter[(side * MAX_SQ + prev.from as usize) * MAX_SQ + prev.to as usize]
     }
 
     fn negamax(&mut self, p: &Position, mut depth: i32, mut alpha: i32, mut beta: i32, ply: usize, is_pv: bool, was_null: bool) -> i32 {
@@ -548,6 +566,7 @@ impl<'a> Searcher<'a> {
                 child.update_key(r);
                 let rd = 3 + depth / 4;
                 self.keys.push(p.key);
+                self.played[ply] = Move::NONE;
                 let s = -self.negamax(&child, depth - rd, -beta, -beta + 1, ply + 1, false, true);
                 self.keys.pop();
                 if self.stopped {
@@ -597,6 +616,7 @@ impl<'a> Searcher<'a> {
             if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 4 + depth * depth * 3 && best > -MATE_BOUND {
                 continue;
             }
+            self.played[ply] = m;
             let ext = if gives_check && ply < 64 { 1 } else { 0 };
             let new_depth = depth - 1 + ext;
             let score;
@@ -644,6 +664,12 @@ impl<'a> Searcher<'a> {
                             if self.killers[ply][0] != m {
                                 self.killers[ply][1] = self.killers[ply][0];
                                 self.killers[ply][0] = m;
+                            }
+                            if ply > 0 {
+                                let prev = self.played[ply - 1];
+                                if prev != Move::NONE {
+                                    self.counter[(us * MAX_SQ + prev.from as usize) * MAX_SQ + prev.to as usize] = m;
+                                }
                             }
                             // The move that cut off gains; the quiet moves tried
                             // before it lose (bounded "gravity" updates).
