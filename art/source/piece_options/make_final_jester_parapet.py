@@ -34,10 +34,17 @@ def parapet(team):
 
 
 PIECES = {"jester": jester, "parapet": parapet}
+# The jester's cap drawn a touch smaller than first made (Mac).
+SHRINK = {"jester": 0.92}
 
 if __name__ == "__main__":
+    sys.path.insert(0, HERE)
+    import make_final_vampire_squire as vs  # noqa: E402 (for shrink)
     for name, draw in PIECES.items():
         for team in ("white", "black"):
             path = os.path.join(HERE, "..", "pieces", "%s_%s.svg" % (team, name))
-            io.open(path, "w", encoding="utf-8", newline="\n").write(r16.HEAD + draw(team) + r16.TAIL)
+            body = draw(team)
+            if name in SHRINK:
+                body = vs.shrink(body, SHRINK[name])
+            io.open(path, "w", encoding="utf-8", newline="\n").write(r16.HEAD + body + r16.TAIL)
     print("wrote", len(PIECES) * 2, "files")
