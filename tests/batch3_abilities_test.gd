@@ -279,6 +279,8 @@ func test_animations() -> void:
 	a = MoveAnimation.for_move(change, state, false)
 	a.time = 0.1
 	check_eq(a.pose(change.piece).get("as_def"), _def("werewolf"), "Full Moon: still drawn as the Werewolf while it builds up")
+	check(GameSounds.Sound.HOWL in a.all_sounds(), "...howling")
+	check(GameSounds.streams_for(GameSounds.Sound.HOWL)[0] != null, "The howl recording loads")
 	a.time = a.length - 0.01
 	check(a.pose(change.piece).get("as_def") == null, "...and as the wolf at the end")
 	state = _game("3rk3/8/8/8/3G4/8/8/4K3 b - - 0 1")

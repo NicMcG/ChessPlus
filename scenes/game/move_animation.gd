@@ -289,7 +289,7 @@ func _song_of_slumber(move: Move) -> void:
 	_cue(0.0, GameSounds.Sound.LULLABY)
 
 ## Full Moon: like a promotion, the Werewolf rises spinning in a silvery
-## moonlit glow and comes back down as the wolf.
+## moonlit glow, howling, and comes back down as the wolf.
 func _full_moon(move: Move) -> void:
 	const RISE := 0.6
 	const AFTER := 0.75
@@ -297,7 +297,8 @@ func _full_moon(move: Move) -> void:
 	_add(move.piece, {"kind": "promote_rise", "at": at, "start": 0.0, "end": RISE, "as_def": move.piece.base_def, "glow": MOON_GLOW})
 	_add(move.piece, {"kind": "promote_reveal", "at": at, "start": RISE, "end": RISE + AFTER, "glow": MOON_GLOW})
 	extras.append({"kind": "light", "at": at, "start": RISE, "end": RISE + 0.6, "size": 2.0, "lift": 0.55, "color": MOON_GLOW})
-	_cue(0.0, GameSounds.Sound.PROMOTE)
+	# The howl starts as it rises in the moonlight (Mac).
+	_cue(0.0, GameSounds.Sound.HOWL)
 	_cue(RISE, GameSounds.Sound.SPARKLE)
 	_cue(RISE + AFTER, GameSounds.Sound.LAND)
 
