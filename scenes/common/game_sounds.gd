@@ -4,11 +4,10 @@ extends Node
 ## Plays the game's sound effects. Most are recordings in res://audio/sfx/ (their
 ## licences are there): Kenney's free (CC0) Impact, Interface, RPG Audio, Sci-Fi
 ## and Music Jingles packs, OpenGameArt's CC0 "Scrapes" (the move sound), a
-## public-domain wolf howl and sheep, and a giggle
-## and a thunder crack from Wikimedia Commons (credited on the main menu). The
-## rest are made by code (the cannon's boom, the arrow's whoosh, the bow's twang,
-## a balloon pop, Raise Dead's swell, the checkmate bell's long hum and the
-## dust). A sound can be several layers played together (e.g. a capture is a
+## public-domain wolf howl and sheep, and a giggle, a thunder crack and a church
+## bell from Wikimedia Commons (credited on the main menu). Only two are made by
+## code, both ones Mac liked: the cannon's boom and the balloon pop (Mac: every
+## other made sound replaced by recordings). A sound can be several layers played together (e.g. a capture is a
 ## punch, a slap and a wooden thwack at once). Recordings with several takes pick
 ## one at random each time, so repeats don't sound mechanical. Nothing plays
 ## while sound is switched off in the menu. Mac's direction (Oct 2026): sound
@@ -71,6 +70,8 @@ enum Sound {
 	CASTLE_SLAM,
 	## En passant: the passed pawn hitting the board after its dramatic pause.
 	FALL,
+	## A promoting piece's spin: one whoosh per turn, coming faster and faster.
+	SPIN,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
@@ -86,8 +87,8 @@ const SLAP := ["impactSoft_heavy_000", "impactSoft_heavy_001", "impactSoft_heavy
 const PLANK := ["impactPlank_medium_000", "impactPlank_medium_001", "impactPlank_medium_002"]
 const LAYERS := {
 	Sound.MOVE: [[WOOD_KNOCK, 1.0, 0.0]],
-	# Something heavy pushed across stone (Mac: a chair or a stone block, not a squeak).
-	Sound.SCRAPE: [[["stone_scrape_1", "stone_scrape_2"], 0.8, -5.0]],
+	# Something heavy pushed across stone (Mac: short, low, no squeak).
+	Sound.SCRAPE: [[["stone_scrape_1", "stone_scrape_2"], 0.7, -5.0]],
 	# Punchy: a heavy punch, a flat slap and a wooden thwack together.
 	Sound.CAPTURE: [[PUNCH_HEAVY, 0.95, 3.0], [SLAP, 1.15, 2.0], [PLANK, 1.05, -2.0]],
 	Sound.CHECK: [[["impactBell_heavy_000"], 1.15, -4.0]],
@@ -96,44 +97,54 @@ const LAYERS := {
 	# Castling's dash: a quick blade-like swish.
 	Sound.CASTLE: [[["knifeSlice", "knifeSlice2"], 1.35, -4.0]],
 	Sound.CASTLE_SLAM: [[["impactMining_000", "impactMining_001"], 0.75, 3.0], [WOOD_HEAVY, 0.7, 2.0], [PUNCH_HEAVY, 0.8, 0.0]],
-	# An anime power-up: an engine whine climbing in pitch, with a shimmer.
-	Sound.PROMOTE: [[["spaceEngineSmall_002"], 0.6, -6.0, {"glide": [2.2, 0.7]}], [["forceField_002"], 1.2, -6.0]],
+	# Rushing whooshes as it spins up (Mac: whooshing, not whirring).
+	Sound.PROMOTE: [[["cloth1", "cloth2"], 1.2, 2.0], [["forceField_002"], 1.5, -10.0]],
+	Sound.SPIN: [[["cloth2", "knifeSlice"], 1.7, -3.0]],
 	Sound.SPARKLE: [[["glass_002", "glass_004"], 1.5, 0.0], [["impactBell_heavy_000"], 2.0, -10.0]],
-	Sound.SWIPE: [[["knifeSlice2"], 1.1, 0.0], ["made", -8.0]],
+	# A sword's schwing.
+	Sound.SWIPE: [[["drawKnife1", "drawKnife2", "drawKnife3"], 1.05, 8.0], [["knifeSlice2"], 1.0, -2.0]],
 	Sound.FALL: [[WOOD_HEAVY, 0.7, 2.0], [SLAP, 0.8, 0.0]],
 	Sound.CANNON_FIRE: [["made", 0.0]],
 	Sound.CANNON_HIT: [[["impactMining_000", "impactMining_001"], 0.8, 2.0]],
-	Sound.ARROW_WHOOSH: [["made", 0.0]],
-	Sound.BOW: [["made", 0.0], [["knifeSlice"], 1.8, -14.0]],
+	Sound.ARROW_WHOOSH: [[["cloth2"], 1.9, 0.0]],
+	# The bowstring released: a sharp thwip and a wooden thrum.
+	Sound.BOW: [[["drawKnife3"], 2.0, 0.0], [WOOD_KNOCK, 1.7, -6.0]],
 	# The arrow striking home: thwack and crunch.
 	Sound.ARROW_HIT: [
 		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.1, 4.0],
 		[PUNCH_MEDIUM, 1.2, 0.0],
 		[["explosionCrunch_000"], 1.5, -8.0],
 	],
-	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0], [["spaceEngineSmall_002"], 1.6, -18.0]],
+	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0]],
 	# A rising magical swell with a glassy sparkle.
 	Sound.ABILITY: [[["maximize_008"], 0.85, 0.0], [["glass_002", "glass_004"], 1.3, -6.0]],
-	Sound.AIMING: [[["spaceEngineSmall_002"], 1.5, -14.0]],
-	Sound.RAISE_DEAD: [["made", 0.0]],
+	# A rushing whoosh (it loops; see start_loop).
+	Sound.AIMING: [[["thrusterFire_003"], 1.3, -15.0]],
+	Sound.RAISE_DEAD: [[["forceField_000"], 0.55, -2.0]],
 	Sound.THUNDER: [[["thunder_crack"], 1.0, 0.0]],
 	Sound.CREAK: [[["creak1", "creak2"], 0.8, -2.0]],
-	# A crack and a break: glass shattering over metal.
-	Sound.SHIELD_BREAK: [[["impactGlass_heavy_001", "impactGlass_heavy_004"], 0.8, 0.0], [["impactMetal_heavy_000", "impactMetal_heavy_001"], 1.0, -4.0], [PLANK, 0.9, -4.0]],
-	# A deep bell: the recorded strike, slowed right down, over a long made hum.
-	Sound.CHECKMATE: [[["impactBell_heavy_002"], 0.45, 6.0], ["made", 3.0]],
-	Sound.DUST: [["made", -12.0]],
+	# Metal and stone breaking: glass and metal crashes over a stone smash.
+	Sound.SHIELD_BREAK: [
+		[["impactGlass_heavy_001", "impactGlass_heavy_002", "impactGlass_heavy_004"], 0.8, 2.0],
+		[["impactMetal_heavy_000", "impactMetal_heavy_001", "impactMetal_heavy_002"], 0.85, 1.0],
+		[["impactMining_000", "impactMining_001"], 0.9, 1.0],
+		[["explosionCrunch_001"], 1.4, -6.0],
+	],
+	# A deep bell: the recorded strike, slowed right down, over a long low rumble.
+	Sound.CHECKMATE: [[["impactBell_heavy_002"], 0.45, 6.0], [["lowFrequency_explosion_000"], 0.5, 0.0]],
+	Sound.DUST: [[["cloth1"], 0.5, -8.0]],
 	Sound.LULLABY: [[["jingles_PIZZI01"], 0.75, 0.0]],
-	# Gothic: a big bell slowed down, over a low boom.
-	Sound.HAUNT: [[["impactBell_heavy_001"], 0.5, 4.0], [["lowFrequency_explosion_001"], 0.7, -4.0]],
+	# Gothic: a big church bell's toll over a low boom.
+	Sound.HAUNT: [[["church_bell"], 0.85, 3.0], [["lowFrequency_explosion_001"], 0.7, -8.0]],
 	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
 	Sound.ILLEGAL: [[["error_005", "error_006"], 1.0, -6.0]],
 	Sound.BLOCKED: [[WOOD_HEAVY, 0.55, 3.0], [PLANK, 0.6, -2.0]],
-	# Short, soft, higher and echoing (Mac).
-	Sound.GIGGLE: [[["jester_giggle"], 1.3, -9.0]],
+	# Short, soft and a little echoey (Mac).
+	Sound.GIGGLE: [[["jester_giggle"], 1.15, -9.0]],
 	Sound.POP: [["made", 0.0]],
 	Sound.SHEEP: [[["sheep_baa"], 1.0, -2.0]],
-	Sound.BITE: [[["chop"], 1.2, 2.0], [PUNCH_MEDIUM, 1.4, -4.0]],
+	# A bite: a chomp and a crunch.
+	Sound.BITE: [[["chop"], 0.9, 4.0], [["explosionCrunch_002"], 1.9, -1.0], [SLAP, 1.4, -6.0]],
 }
 
 ## Samples per second for the sounds made by code.
@@ -157,12 +168,19 @@ var _loop_sound := -1
 var _glides := {}
 
 func _ready() -> void:
-	_loop_player = AudioStreamPlayer.new()
-	add_child(_loop_player)
+	_loop_player = _new_player()
 	for i in 12:
-		var player := AudioStreamPlayer.new()
-		add_child(player)
-		_players.append(player)
+		_players.append(_new_player())
+
+## A sound player, mixed by Godot itself: in the web version the default is to
+## hand each sound to the browser to play, and over a session those started
+## coming later and later (Mac's report, Oct 2026) until the app was restarted.
+func _new_player() -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+	add_child(player)
+	return player
+
 
 ## Older single-sound choice for a move that was just made in `state` (used when
 ## no animation is shown): check beats capture beats an ordinary move.
@@ -261,23 +279,13 @@ static func clear_cache() -> void:
 static func make_stream(sound: Sound) -> AudioStreamWAV:
 	var noise := RandomNumberGenerator.new()
 	noise.seed = 7  # The same "random" sound every time.
-	var length: float = {Sound.CANNON_FIRE: 0.9, Sound.ARROW_WHOOSH: 0.3, Sound.SWIPE: 0.2,
-			Sound.RAISE_DEAD: 1.3, Sound.CHECKMATE: 6.0, Sound.DUST: 2.0,
-			Sound.BOW: 0.5, Sound.POP: 0.25}.get(sound, 0.2)
+	var length: float = {Sound.CANNON_FIRE: 0.9, Sound.POP: 0.25}.get(sound, 0.2)
 	var count := int(length * RATE)
 	var data := PackedByteArray()
 	data.resize(count * 2)
 	# Smoothed noise values, for rumbles, scrapes and rushing air.
 	var low := 0.0
 	var band := 0.0
-	# A plucked string (Karplus-Strong): a short loop of noise, smoothed a little
-	# each time round, rings like a string. The bow's is low (about 98 Hz).
-	var string := PackedFloat32Array()
-	var string_at := 0
-	if sound == Sound.BOW:
-		string.resize(int(RATE / 98.0))
-		for k in string.size():
-			string[k] = noise.randf_range(-1.0, 1.0)
 	for i in count:
 		var t := float(i) / RATE
 		var white := noise.randf_range(-1.0, 1.0)
@@ -287,37 +295,9 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 				low += (white - low) * 0.04
 				value = 0.9 * sin(TAU * (70.0 - 30.0 * t) * t) * exp(-t * 5) \
 						+ 2.2 * low * exp(-t * 3.5) + 0.5 * white * exp(-t * 60)
-			Sound.ARROW_WHOOSH:  # Rushing air that swells and fades as it passes.
-				var cutoff := 0.05 + 0.25 * t / length
-				band += (white - band) * cutoff
-				value = 1.6 * band * sin(PI * t / length)
-			Sound.SWIPE:  # A short, sharp rush of air, brighter than the arrow's.
-				var cutoff := 0.2 + 0.5 * t / length
-				band += (white - band) * cutoff
-				value = 1.4 * (white - band * 0.5) * sin(PI * t / length) * (1.0 - t / length)
-			Sound.RAISE_DEAD:  # Two slightly out-of-tune low notes rising, with a breathy hiss.
-				var rise := 1.0 + 0.5 * t / length
-				var swell := sin(PI * t / length)
-				low += (white - low) * 0.1
-				value = swell * (0.35 * sin(TAU * 110 * rise * t) + 0.3 * sin(TAU * 131 * rise * t) \
-						+ 0.2 * sin(TAU * 165.5 * rise * t) + 0.6 * low)
-			Sound.CHECKMATE:  # A huge bell's hum: deep partials that ring on and slowly die.
-				var base := 49.0
-				var ring := 0.0
-				for partial: Array in [[0.5, 0.5, 0.35], [1.0, 0.45, 0.45], [1.19, 0.3, 0.7], [1.56, 0.22, 0.9], [2.0, 0.2, 1.1], [2.51, 0.12, 1.5]]:
-					ring += partial[1] * sin(TAU * base * partial[0] * t) * exp(-t * partial[2])
-				value = ring * minf(1.0, t * 40) * (1.0 + 0.08 * sin(TAU * 1.3 * t))
-			Sound.BOW:  # A bowstring's twang: a low plucked string, plus a short thwip of air.
-				var pluck := string[string_at]
-				string[string_at] = 0.5 * (string[string_at] + string[(string_at + 1) % string.size()]) * 0.994
-				string_at = (string_at + 1) % string.size()
-				value = 0.75 * pluck * exp(-t * 6.0) + 0.4 * white * exp(-t * 60.0)
 			Sound.POP:  # A balloon bursting: a sharp crack of noise that dies at once.
 				band += (white - band) * 0.5
 				value = (0.9 * white + 0.6 * band) * exp(-t * 45.0) * minf(1.0, t * 3000.0)
-			Sound.DUST:  # A soft sandy hiss that drifts away.
-				band += (white - band) * 0.3
-				value = 0.5 * (white - band) * minf(1.0, t * 6) * exp(-t * 1.6)
 		data.encode_s16(i * 2, int(clampf(value, -1.0, 1.0) * 32767))
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS

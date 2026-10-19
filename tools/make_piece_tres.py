@@ -33,7 +33,7 @@ PIECES = {
         ([(1, 0), (-1, 0)], 0, 0, {}),
         (DIAG, 1, 0, {}),
     ], extra={"blocks_jumps": "true"},
-        special_rule="Nothing can jump over it: Knights, Elephants, Catapults and the Wizard's and Rogue's leaps can't pass it, and a Cannon can't use it as a screen. (A Knight counts as moving 2 squares straight, then 1 to the side.)"),
+        special_rule="Your opponent's pieces can't jump over it: their Knights, Elephants, Catapults and the Wizard's and Rogue's leaps can't pass it, and their Cannons can't use it as a screen. Your own pieces can. (A Knight counts as moving 2 squares straight, then 1 to the side.)"),
     "vampire": dict(name="Vampire", symbol="V", value=4, rules=[
         ([(1, 0), (-1, 0), (0, -1)], 0, 0, {}),
         ([(1, 1), (-1, 1)], 1, 0, {}),

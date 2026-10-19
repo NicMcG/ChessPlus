@@ -14,6 +14,14 @@ thunder_crack.wav
   (needs a credit, and changed versions of this sound must be shared under the
   same licence: shown on the main menu)
 
+church_bell.wav
+  From "Samariter Church Bell I (Es).ogg" by Pete w. View, CC BY-SA 4.0
+  (the strike and its ring, cut short)
+  https://commons.wikimedia.org/wiki/File:Samariter_Church_Bell_I_(Es).ogg
+  https://creativecommons.org/licenses/by-sa/4.0/
+  (needs a credit, and changed versions of this sound must be shared under the
+  same licence: shown on the main menu)
+
 sheep_baa.wav
   From "Sheep bleating.ogg" (PDSounds), public domain - no credit needed.
   https://commons.wikimedia.org/wiki/File:Sheep_bleating.ogg

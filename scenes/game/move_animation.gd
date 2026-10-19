@@ -166,8 +166,17 @@ func _promotion(move: Move, promoted: Piece, at: Vector2, arrived: float) -> voi
 	_add(promoted, {"kind": "promote_reveal", "at": at, "start": swap, "end": swap + AFTER})
 	hidden_before[promoted] = true
 	extras.append({"kind": "sparkles", "at": at, "start": arrived + 0.1, "end": swap + 0.45})
-	extras.append({"kind": "light", "at": at + Vector2(0, -0.0), "start": swap, "end": swap + 0.5, "size": 1.8, "lift": 0.55})
+	# Anime power-up (Mac: more effects): a whirl of light round it as it spins,
+	# energy rising up into it, then a burst of light and a shockwave as it
+	# becomes the new piece.
+	extras.append({"kind": "swirl", "at": at, "start": arrived, "end": swap + 0.1, "lift": 0.55})
+	extras.append({"kind": "energy", "at": at, "start": arrived, "end": swap})
+	extras.append({"kind": "light", "at": at + Vector2(0, -0.0), "start": swap, "end": swap + 0.5, "size": 2.2, "lift": 0.55})
+	extras.append({"kind": "shockwave", "at": at, "start": swap, "end": swap + 0.55, "lift": 0.55})
 	_cue(arrived, GameSounds.Sound.PROMOTE)
+	# A whoosh for each turn, faster and faster as it spins up.
+	for when in [0.12, 0.3, 0.42, 0.5, 0.56]:
+		_cue(arrived + when, GameSounds.Sound.SPIN)
 	_cue(swap, GameSounds.Sound.SPARKLE)
 	_cue(swap + AFTER, GameSounds.Sound.LAND)
 

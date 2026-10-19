@@ -137,14 +137,14 @@ static func reach_squares(board: Board, from: Vector2i, piece: Piece) -> Diction
 			var step := _orient(dir, piece.team)
 			var to := from
 			for i in range(limit):
-				if _leap_blocked(board, to, step):
+				if _leap_blocked(board, to, step, piece.team):
 					break
 				to += step
 				if not board.in_bounds(to):
 					break
 				if i >= rule.leap_steps:
 					squares[to] = true
-				if not board.is_empty(to) and (i >= rule.leap_steps or board.get_piece(to).def.blocks_jumps):
+				if not board.is_empty(to) and (i >= rule.leap_steps or stops_jumps(board.get_piece(to), piece.team)):
 					break
 	return squares
 
@@ -164,21 +164,31 @@ static func blocker(state: GameState, from: Vector2i, to: Vector2i) -> Vector2i:
 			var guard: Piece = guards[square]
 			if target.def.id in guard.def.protects and reach_squares(board, square, guard).has(to):
 				return square
+	# The opponent's Parapets, each tried two ways: taken away (it was in the
+	# way of a slide), and turned into an ordinary piece (it stopped a leap, or
+	# a Cannon firing over it).
 	var parapets: Array[Vector2i] = []
-	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
-		var on_board := board.pieces_of(team)
-		for square: Vector2i in on_board.keys():
-			if on_board[square].def.blocks_jumps and square != to and square != from:
-				parapets.append(square)
+	var enemy_pieces := board.pieces_of(Piece.other_team(piece.team))
+	for square: Vector2i in enemy_pieces.keys():
+		if enemy_pieces[square].def.blocks_jumps and square != to:
+			parapets.append(square)
 	for square in parapets:
 		var parapet := board.get_piece(square)
-		board.set_piece(square, null)
-		var moves: Array[Move] = []
-		for rule in piece.def.move_rules:
-			_add_rule_moves(state, from, piece, rule, moves)
-		board.set_piece(square, parapet)
-		if moves.any(func(m: Move) -> bool: return m.to == to):
-			return square
+		var real_def := parapet.def
+		var plain: PieceDef = real_def.duplicate()
+		plain.blocks_jumps = false
+		for variant in [null, plain]:
+			if variant == null:
+				board.set_piece(square, null)
+			else:
+				parapet.def = variant
+			var moves: Array[Move] = []
+			for rule in piece.def.move_rules:
+				_add_rule_moves(state, from, piece, rule, moves)
+			parapet.def = real_def
+			board.set_piece(square, parapet)
+			if moves.any(func(m: Move) -> bool: return m.to == to):
+				return square
 	return Board.NO_SQUARE
 
 ## The squares a leap of `step` passes over on its way (not where it lands), as
@@ -211,15 +221,21 @@ static func passed_offsets(step: Vector2i) -> Array:
 	_passed_cache[step] = passed
 	return passed
 
-## True if a leap of `step` from `from` would pass over a Parapet (either side's).
-static func _leap_blocked(board: Board, from: Vector2i, step: Vector2i) -> bool:
+## True if a leap of `step` from `from`, by a piece of `team`, would pass over
+## one of the other side's Parapets (Mac: a Parapet only stops its opponents'
+## jumps, never its own side's).
+static func _leap_blocked(board: Board, from: Vector2i, step: Vector2i, team: Piece.Team) -> bool:
 	if absi(step.x) <= 1 and absi(step.y) <= 1:
 		return false
 	for offset: Vector2i in passed_offsets(step):
-		var over := board.get_piece(from + offset)
-		if over and over.def.blocks_jumps:
+		if stops_jumps(board.get_piece(from + offset), team):
 			return true
 	return false
+
+## True if `piece` is a Parapet that stops `team`'s pieces jumping over it (it's
+## on the other side).
+static func stops_jumps(piece: Piece, team: Piece.Team) -> bool:
+	return piece != null and piece.def.blocks_jumps and piece.team != team
 
 ## A piece's special-ability moves. Crack Shot: a copy of each of its captures
 ## (from `first_new` on in `moves`) in which it doesn't move. Raise Dead: one move
@@ -359,7 +375,7 @@ static func attacked_with(board: Board, square: Vector2i, by_team: Piece.Team, t
 				break
 			# A leap from here onwards would pass over a Parapet: nothing further
 			# along this line can attack.
-			if _leap_blocked(board, pos, step):
+			if _leap_blocked(board, pos, step, by_team):
 				break
 			var piece := board.get_piece(pos)
 			if piece == null:
@@ -371,8 +387,8 @@ static func attacked_with(board: Board, square: Vector2i, by_team: Piece.Team, t
 							and distance <= _step_limit(rule, piece, board):
 						return true
 			screens += 1
-			# A Parapet can't be a Cannon's screen.
-			if screens > 1 or not has_hop or piece.def.blocks_jumps:
+			# An opponent's Parapet can't be a Cannon's screen.
+			if screens > 1 or not has_hop or stops_jumps(piece, by_team):
 				break
 	# Leaping and bent-path pieces: check each one directly.
 	var unusual: Array = table[1]
@@ -403,11 +419,11 @@ static func _rule_reaches(board: Board, from: Vector2i, piece: Piece, rule: Move
 		if count <= rule.leap_steps or count > limit or step * count != delta:
 			continue
 		for i in range(1, count + 1):
-			if _leap_blocked(board, from + step * (i - 1), step):
+			if _leap_blocked(board, from + step * (i - 1), step, piece.team):
 				return false
 		for i in range(1, count):
 			var between := board.get_piece(from + step * i)
-			if between and between.def.blocks_jumps and i <= rule.leap_steps:
+			if stops_jumps(between, piece.team) and i <= rule.leap_steps:
 				return false
 			if i <= rule.leap_steps:
 				if rule.leap_over == MoveRule.LeapOver.OWN_PIECE and (between == null or between.team != piece.team):
@@ -449,7 +465,7 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 		if pawn_like:
 			passed = []
 		for i in range(limit):
-			if _leap_blocked(board, to, step):
+			if _leap_blocked(board, to, step, piece.team):
 				break
 			to += step
 			if not board.in_bounds(to):
@@ -458,7 +474,7 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 			# can only leap one of its own pieces, and nothing leaps a Parapet).
 			if i < rule.leap_steps:
 				var leapt := board.get_piece(to)
-				if leapt and leapt.def.blocks_jumps:
+				if stops_jumps(leapt, piece.team):
 					break
 				if rule.leap_over == MoveRule.LeapOver.OWN_PIECE:
 					var over := board.get_piece(to)
@@ -481,8 +497,8 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 			# Something is in the way. A hopping rule jumps it to look for a capture;
 			# otherwise capture it if it's an enemy and the rule allows. Stop either way.
 			if rule.captures_by_hopping:
-				# A Parapet can't be a Cannon's screen.
-				if rule.mode != MoveRule.Mode.MOVE_ONLY and not target.def.blocks_jumps:
+				# An opponent's Parapet can't be a Cannon's screen.
+				if rule.mode != MoveRule.Mode.MOVE_ONLY and not stops_jumps(target, piece.team):
 					_add_hop_capture(state, from, to, step, limit - i - 1, piece, moves)
 			elif target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
 				_append(state, _capture(from, to, piece, target), moves)

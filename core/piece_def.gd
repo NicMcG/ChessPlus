@@ -50,10 +50,10 @@ enum Ability { NONE, CRACK_SHOT, RAISE_DEAD, HAUNT, SONG_OF_SLUMBER, FULL_MOON }
 ## board too, and counts as lost.
 @export var dies_on_capture := false
 
-## The Parapet's rule: nothing can jump over it. Leaps (Knight, Elephant,
-## Catapult), the Wizard's and Rogue's leaps all stop at it, whichever side it's
-## on, and a Cannon can't use it as a screen. A Knight counts as moving two
-## squares straight first, then one to the side.
+## The Parapet's rule: the opponent's pieces can't jump over it (its own side's
+## can, Mac). Their leaps (Knight, Elephant, Catapult) and the Wizard's and
+## Rogue's leaps stop at it, and their Cannons can't use it as a screen. A
+## Knight counts as moving two squares straight first, then one to the side.
 @export var blocks_jumps := false
 
 ## The Vampire's rule: it starts without a shield and gains one whenever it
