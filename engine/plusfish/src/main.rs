@@ -24,6 +24,7 @@ Analysis
               --moves \"e2-e4 e7-e5\"    moves to play first (move text or SAN)
               --depth N | --time SEC | --nodes N   (default: 5 seconds)
               --multipv K              show the K best moves
+              --threads N              search threads (default 1)  --hash MB (default 128)
   eval      Static evaluation with its biggest terms (same position options).
   uci       Run the UCI-style protocol on stdin/stdout (for GUIs and scripts).
   army      Check an army and show its cost and problems: plusfish army <army>
@@ -57,7 +58,7 @@ Armies: \"standard\", \"random\", \"random:<seed>\", a saved .tres army file, or
 like \"RNBQKBNR/PPPPPPPP\" (back row / front row, files a-h, two-letter symbols
 in brackets: \"R(CV)B(W)KB(CV)R/PPPPPPPP\").
 
-Common options: --threads N (default: all cores)  --pieces <ChessPlus/data/pieces>
+Common options: --threads N (games at once; default: all cores)  --pieces <ChessPlus/data/pieces>
                 --params <file> (evaluation weights; \"none\" = from army costs)
 ";
 
