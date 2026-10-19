@@ -167,6 +167,8 @@ func _ready() -> void:
 	move_list.move_tapped.connect(view_move)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
+	if testing_position:
+		menu_button.text = "Setup"
 	promotion_overlay.gui_input.connect(_on_overlay_input)
 	if is_bot_game():
 		bot = PracticeBot.new(bot_level)
@@ -183,6 +185,10 @@ func new_game() -> void:
 	resigned = -1
 	_started_time = Time.get_unix_time_from_system()
 	_show_new_state()
+
+## Testing mode (Mac's design): the game starts from this position, set up by
+## hand; two players, the eval bar always on, and Menu goes back to the setup.
+var testing_position: TestingPosition
 
 ## When this game started (seconds since 1970), kept with the saved game.
 var _started_time := Time.get_unix_time_from_system()
@@ -240,6 +246,8 @@ var new_game_confirm: ConfirmationDialog
 
 ## The game's starting position: from the armies, start_fen, or standard chess.
 func _create_start_state() -> GameState:
+	if testing_position:
+		return testing_position.create_state()
 	if white_army and black_army:
 		return ArmySetup.create_game(white_army, black_army, StandardSetup.create_rules())
 	if start_fen.is_empty():
@@ -838,7 +846,7 @@ func shown_ply() -> int:
 var eval_bar_on := false
 
 func live_eval() -> bool:
-	if is_bot_game() or eval_bar_on:
+	if is_bot_game() or eval_bar_on or testing_position:
 		return true
 	return online != null and bool(online.row.get("eval_bar", false))
 
@@ -937,7 +945,7 @@ func show_game_over() -> void:
 		buttons.append(["again", "New game"])
 	buttons.append(["board", "View board"])
 	if menu_button.visible:
-		buttons.append(["menu", "Menu"])
+		buttons.append(["menu", menu_button.text])
 	game_over_panel.show_result(texts[0], texts[1], buttons)
 	if _mate_just_played:
 		_mate_just_played = false

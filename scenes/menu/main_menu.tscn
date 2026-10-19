@@ -88,6 +88,13 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "My armies"
 
+[node name="Testing" type="Button" parent="Scroll/Center/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Testing mode"
+
 [node name="Sound" type="Button" parent="Scroll/Center/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 80)

@@ -9,6 +9,7 @@ const ARMY_BUILDER := preload("res://scenes/armies/army_builder.tscn")
 const MATCH_SETUP := preload("res://scenes/menu/match_setup.tscn")
 const GAME := preload("res://scenes/game/game.tscn")
 const ONLINE_LOBBY := preload("res://scenes/online/online_lobby.tscn")
+const POSITION_SETUP := preload("res://scenes/testing/position_setup.tscn")
 
 var library := ArmyLibrary.new()
 ## The screen currently showing.
@@ -109,6 +110,7 @@ func show_main_menu() -> void:
 	menu.online_pressed.connect(show_online_lobby)
 	menu.continue_online_pressed.connect(continue_online_game)
 	menu.armies_pressed.connect(show_army_list)
+	menu.testing_pressed.connect(show_testing_setup)
 	_show(menu)
 	_update_if_ready()
 
@@ -184,6 +186,24 @@ func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeB
 	game.bot_team = bot_team
 	game.bot_level = bot_level
 	game.menu_requested.connect(show_main_menu)
+	_show(game)
+
+## Testing mode: set up a position (`position` to carry on editing one, or
+## null for the standard start).
+func show_testing_setup(position: TestingPosition = null) -> void:
+	var setup := POSITION_SETUP.instantiate()
+	if position:
+		setup.setup = position
+	setup.back_pressed.connect(show_main_menu)
+	setup.start_pressed.connect(start_testing_game)
+	_show(setup)
+
+## A two-player game from a Testing mode position. Its Setup button goes back to
+## editing that position.
+func start_testing_game(position: TestingPosition) -> void:
+	var game := GAME.instantiate()
+	game.testing_position = position
+	game.menu_requested.connect(func() -> void: show_testing_setup(position.copy()))
 	_show(game)
 
 ## Pick up the saved game, if there is one.
