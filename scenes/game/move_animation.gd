@@ -388,7 +388,8 @@ func _full_moon(move: Move) -> void:
 const MOON_GLOW := Color(0.85, 0.9, 1.0)
 
 ## Haunt (Mac's design): a gothic bell tolls over a low boom, white-blue smoke
-## rises up out of the square, and the Ghost slowly rises with it.
+## rises up out of the square with a howling wind, and the Ghost slowly rises
+## with it.
 func _haunt(move: Move) -> void:
 	var at := Vector2(move.to)
 	extras.append({"kind": "rising_smoke", "at": at, "start": 0.0, "end": 2.4, "color": Color(0.85, 0.93, 1.0)})
@@ -396,6 +397,8 @@ func _haunt(move: Move) -> void:
 	_add(move.piece, {"kind": "rise", "at": at, "start": 0.5, "end": 2.0})
 	hidden_before[move.piece] = true
 	_cue(0.0, GameSounds.Sound.HAUNT)
+	# Then a howling wind rises with the smoke (Mac).
+	_cue(0.3, GameSounds.Sound.WIND)
 
 ## Raise Dead (Mac's design): the Necromancer sinks into fog of its colour;
 ## once it's gone under, a snap of lightning and thunder with an impact flash,

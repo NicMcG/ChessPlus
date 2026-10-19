@@ -43,8 +43,8 @@ enum Sound {
 	SWIPE,
 	## Song of Slumber: a few soft pizzicato notes, falling, slowed right down.
 	LULLABY,
-	## Haunt: a deep gothic bell over a low boom.
-	HAUNT,
+	## Haunt: a deep gothic bell over a low boom, then a howling wind.
+	HAUNT, WIND,
 	## Full Moon: a wolf's howl.
 	HOWL,
 	## Full Moon: a growl before the howl.
@@ -157,6 +157,8 @@ const LAYERS := {
 	Sound.LULLABY: [[["lullaby"], 0.9, -4.0]],
 	# Gothic: a big church bell's toll over a low boom.
 	Sound.HAUNT: [[["church_bell"], 0.85, 0.0], [["lowFrequency_explosion_001"], 0.7, -9.0]],
+	# A gust of howling wind as the Ghost rises (Mac).
+	Sound.WIND: [[["wind_howl_1", "wind_howl_2"], 1.0, -2.0]],
 	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
 	Sound.GROWL: [[["wolf_growl"], 0.85, 0.0]],
 	Sound.ILLEGAL: [[["error_005", "error_006"], 1.0, -6.0]],

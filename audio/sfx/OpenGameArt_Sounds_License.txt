@@ -19,5 +19,7 @@ blade_stab.wav      the same pack (seax-sheathe-01.wav, 0.12-0.37 s)
 electric_charge.wav  the same pack (paralyzer-discharge-01.wav, first 0.5 s, pitched down),
                     mixed with Kenney Sci-Fi spaceEngineLow_000 (see Kenney_SciFi_License.txt)
                     https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx
+wind_howl_*.wav     "Wind" by IgnasD (Wind.ogg / Wind2.ogg, 1.4-3.9 s: the gust)
+                    https://opengameart.org/content/wind
 stone_scrape_*.wav  see OpenGameArt_Scrapes_License.txt
 laser_echo_*.wav    Kenney Sci-Fi laserLarge_001/002 with a short echo, see Kenney_SciFi_License.txt
