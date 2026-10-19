@@ -5,7 +5,7 @@
 
 use crate::eval::*;
 use crate::position::*;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use crate::util::now_ms;
 
@@ -23,6 +23,71 @@ struct TTEntry {
     depth: i8,
     bound: u8,
     age: u8,
+}
+
+/// The transposition table. Entries are three 64-bit words: the key XOR the
+/// two data words, then the data. Threads can share it without locks: a
+/// half-written entry fails the key check and is just a miss.
+pub struct TT {
+    words: Vec<AtomicU64>,
+    mask: usize,
+}
+
+impl TT {
+    pub fn new(mb: usize) -> TT {
+        let entries = (mb.max(1) * 1024 * 1024 / 24).next_power_of_two() / 2;
+        let entries = entries.max(1024);
+        TT { words: (0..entries * 3).map(|_| AtomicU64::new(0)).collect(), mask: entries - 1 }
+    }
+
+    pub fn mb(&self) -> usize {
+        self.words.len() * 8 / (1024 * 1024)
+    }
+
+    pub fn clear(&self) {
+        for w in &self.words {
+            w.store(0, Ordering::Relaxed);
+        }
+    }
+
+    #[inline(always)]
+    fn slot(&self, key: u64) -> usize {
+        (key as usize) & self.mask
+    }
+
+    #[inline(always)]
+    fn load(&self, slot: usize) -> TTEntry {
+        let i = slot * 3;
+        let k = self.words[i].load(Ordering::Relaxed);
+        let a = self.words[i + 1].load(Ordering::Relaxed);
+        let b = self.words[i + 2].load(Ordering::Relaxed);
+        TTEntry {
+            key: k ^ a ^ b,
+            mv: Move { from: a as u8, to: (a >> 8) as u8, flags: (a >> 16) as u8, promo: (a >> 24) as u8, extra: (a >> 32) as u8, steps: (a >> 40) as u8 },
+            score: (a >> 48) as u16 as i16,
+            eval: b as u16 as i16,
+            depth: (b >> 16) as u8 as i8,
+            bound: (b >> 24) as u8,
+            age: (b >> 32) as u8,
+        }
+    }
+
+    #[inline(always)]
+    fn store(&self, slot: usize, e: TTEntry) {
+        let m = e.mv;
+        let a = m.from as u64
+            | (m.to as u64) << 8
+            | (m.flags as u64) << 16
+            | (m.promo as u64) << 24
+            | (m.extra as u64) << 32
+            | (m.steps as u64) << 40
+            | (e.score as u16 as u64) << 48;
+        let b = e.eval as u16 as u64 | (e.depth as u8 as u64) << 16 | (e.bound as u64) << 24 | (e.age as u64) << 32;
+        let i = slot * 3;
+        self.words[i].store(e.key ^ a ^ b, Ordering::Relaxed);
+        self.words[i + 1].store(a, Ordering::Relaxed);
+        self.words[i + 2].store(b, Ordering::Relaxed);
+    }
 }
 
 const B_EXACT: u8 = 1;
@@ -54,8 +119,7 @@ pub struct Report {
 /// The tables a search learns from (hash table, history), kept between moves
 /// of one game: `Searcher::into_tables` / `Searcher::with_tables`.
 pub struct SearchTables {
-    tt: Vec<TTEntry>,
-    tt_mask: usize,
+    tt: Arc<TT>,
     age: u8,
     history: Vec<i32>,
 }
@@ -64,8 +128,7 @@ pub struct Searcher<'a> {
     pub r: &'a Rules,
     pub et: &'a EvalTables,
     pub params: &'a Params,
-    tt: Vec<TTEntry>,
-    tt_mask: usize,
+    tt: Arc<TT>,
     age: u8,
     killers: [[Move; 2]; MAX_PLY + 2],
     history: Vec<i32>,
@@ -111,14 +174,12 @@ fn from_tt(s: i32, ply: usize) -> i32 {
 
 impl<'a> Searcher<'a> {
     pub fn new(r: &'a Rules, et: &'a EvalTables, params: &'a Params, tt_mb: usize) -> Searcher<'a> {
-        let entries = (tt_mb.max(1) * 1024 * 1024 / std::mem::size_of::<TTEntry>()).next_power_of_two() / 2;
         let values = (0..r.info.len()).map(|k| piece_value(params, k)).collect();
         Searcher {
             r,
             et,
             params,
-            tt: vec![TTEntry::default(); entries.max(1024)],
-            tt_mask: entries.max(1024) - 1,
+            tt: Arc::new(TT::new(tt_mb)),
             age: 0,
             killers: [[Move::NONE; 2]; MAX_PLY + 2],
             history: vec![0; 2 * MAX_SQ * MAX_SQ],
@@ -142,24 +203,21 @@ impl<'a> Searcher<'a> {
     pub fn with_tables(r: &'a Rules, et: &'a EvalTables, params: &'a Params, t: SearchTables) -> Searcher<'a> {
         let mut s = Searcher::new(r, et, params, 1);
         s.tt = t.tt;
-        s.tt_mask = t.tt_mask;
         s.age = t.age;
         s.history = t.history;
         s
     }
 
     pub fn into_tables(self) -> SearchTables {
-        SearchTables { tt: self.tt, tt_mask: self.tt_mask, age: self.age, history: self.history }
+        SearchTables { tt: self.tt, age: self.age, history: self.history }
     }
 
     pub fn tt_mb(t: &SearchTables) -> usize {
-        t.tt.len() * std::mem::size_of::<TTEntry>() / (1024 * 1024)
+        t.tt.mb()
     }
 
     pub fn clear(&mut self) {
-        for e in self.tt.iter_mut() {
-            *e = TTEntry::default();
-        }
+        self.tt.clear();
         for h in self.history.iter_mut() {
             *h = 0;
         }
@@ -412,8 +470,8 @@ impl<'a> Searcher<'a> {
         }
         self.nodes += 1;
         // Transposition table.
-        let slot = (p.key as usize) & self.tt_mask;
-        let e = self.tt[slot];
+        let slot = self.tt.slot(p.key);
+        let e = self.tt.load(slot);
         let mut tt_move = Move::NONE;
         if e.key == p.key && e.bound != 0 {
             tt_move = e.mv;
@@ -571,17 +629,20 @@ impl<'a> Searcher<'a> {
         } else {
             B_UPPER
         };
-        let e = &mut self.tt[slot];
+        let e = self.tt.load(slot);
         if e.key != p.key || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
-            *e = TTEntry {
-                key: p.key,
-                mv: best_move,
-                score: to_tt(best, ply).clamp(-INF, INF) as i16,
-                eval: static_eval.clamp(-INF, INF) as i16,
-                depth: depth.min(127) as i8,
-                bound,
-                age: self.age,
-            };
+            self.tt.store(
+                slot,
+                TTEntry {
+                    key: p.key,
+                    mv: best_move,
+                    score: to_tt(best, ply).clamp(-INF, INF) as i16,
+                    eval: static_eval.clamp(-INF, INF) as i16,
+                    depth: depth.min(127) as i8,
+                    bound,
+                    age: self.age,
+                },
+            );
         }
         best
     }
@@ -607,8 +668,8 @@ impl<'a> Searcher<'a> {
             return self.eval(p);
         }
         // Transposition table: any stored result is deep enough here.
-        let slot = (p.key as usize) & self.tt_mask;
-        let e = self.tt[slot];
+        let slot = self.tt.slot(p.key);
+        let e = self.tt.load(slot);
         let hit = e.key == p.key && e.bound != 0;
         let mut tt_move = Move::NONE;
         if hit {
@@ -694,7 +755,7 @@ impl<'a> Searcher<'a> {
         if in_check && legal == 0 {
             return -MATE + ply as i32;
         }
-        let e = &mut self.tt[slot];
+        let e = self.tt.load(slot);
         if e.key != p.key || e.depth <= 0 || e.age != self.age {
             let bound = if best >= beta {
                 B_LOWER
@@ -703,15 +764,10 @@ impl<'a> Searcher<'a> {
             } else {
                 B_UPPER
             };
-            *e = TTEntry {
-                key: p.key,
-                mv: best_move,
-                score: to_tt(best, ply).clamp(-INF, INF) as i16,
-                eval: raw_eval.clamp(-INF, INF) as i16,
-                depth: 0,
-                bound,
-                age: self.age,
-            };
+            self.tt.store(
+                slot,
+                TTEntry { key: p.key, mv: best_move, score: to_tt(best, ply).clamp(-INF, INF) as i16, eval: raw_eval.clamp(-INF, INF) as i16, depth: 0, bound, age: self.age },
+            );
         }
         best
     }
