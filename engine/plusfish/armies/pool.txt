@@ -1,0 +1,12 @@
+# Chess Plus army pool (Plusfish, October 2026). See reports/ARMY_POOL.md.
+# army | name | niche | style | cost | Elo vs Standard (head to head, 60 games, 95% range) | Elo within the pool (+-95%)
+# Measured in a round robin of the pool + Standard + the Berserker Wall, 60 games per pairing, 6000 nodes per move.
+# Use: plusfish match --armies pool:armies/pool.txt ...   (each pairing played with both colours)
+(CH)N(CV)PKBPP/LAP(NC)MB(RO)L | Lancer Host | no royal, 4-6 pawns | sliders+ability | 38.5 | +127 [+52, +215] | +170 ±38
+PW1K(RO)(BR)P1/L(CH)PEBBAA | Wizard Bishops | Wizard, 0-3 pawns | sliders+ability | 39 | +708 [+515, above +1000] | +115 ±37
+(CH)NBKE(RM)PP/L(CV)P(NC)NBAL | Knights and Lances | no royal, 0-3 pawns | sliders+ability | 39 | +147 [+64, +251] | +78 ±36
+LPP(CV)KQBP/L(NC)PP(CH)PPA | Queen Lance Line | Queen, 7+ pawns | sliders+ability | 38 | +436 [+316, +792] | +41 ±35
+AP(CH)1K(NC)QB/PBPPPA(NC)P | Twin Necromancers | Queen, 4-6 pawns | sliders+ability | 39 | +483 [+362, +882] | +18 ±35
+WP1K(RO)P(RM)1/L(NC)PP(CV)BAA | Wizard Archers | Wizard, 4-6 pawns | sliders+ability | 38.5 | +545 [+403, above +1000] | -12 ±35
+CB2KP(CH)L/(BR)BQ(CV)(CH)1(NC)1 | Queen Chariots | Queen, 0-3 pawns | sliders+ability | 39 | +830 [+640, above +1000] | -114 ±36
+CPPMKW(RM)L/APPP(CH)PPL | Wizard Pawn Wall | Wizard, 7+ pawns | sliders+ability | 38.5 | +313 [+221, +464] | -297 ±43

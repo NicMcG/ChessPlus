@@ -311,7 +311,9 @@ fn main() {
             if start_is_broken(&g0) {
                 eprintln!("warning: a king starts in check in this pairing (White could capture Black's king).");
             }
-            println!("A: {}  ({} points)\nB: {}  ({} points)", a.to_text(&cat, 8), a.cost(&cat), b.to_text(&cat, 8), b.cost(&cat));
+            if args.get("armies").is_none() {
+                println!("A: {}  ({} points)\nB: {}  ({} points)", a.to_text(&cat, 8), a.cost(&cat), b.to_text(&cat, 8), b.cost(&cat));
+            }
             println!("{} games, {} nodes per move, {} threads, A and B swap colours each game", games, cfg.nodes, threads(&args));
             let tally = Mutex::new([0f64; 3]);
             let progress = |rec: &GameRecord, n: usize| {

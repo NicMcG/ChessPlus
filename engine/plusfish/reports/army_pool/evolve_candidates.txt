@@ -1,0 +1,293 @@
+# army | niche | style | cost | rating | +-95% | games
+LPP(CV)KQBP/L(NC)PP(CH)PPA | Queen, 7+ pawns | sliders+ability | 38 | 484 | 74 | 134
+(CH)N(CV)PKBPP/LAP(NC)MB(RO)L | no royal, 4-6 pawns | sliders+ability | 38.5 | 458 | 73 | 134
+WP1K(RO)P(RM)1/L(NC)PP(CV)BAA | Wizard, 4-6 pawns | sliders+ability | 38.5 | 436 | 86 | 96
+LPP(CV)KQBP/LPP(NC)(CV)PPA | Queen, 7+ pawns | sliders+ability | 37 | 435 | 57 | 188
+1PP(CV)KQBP/L(BR)L(NC)(CV)PPA | Queen, 4-6 pawns | sliders+ability | 37.5 | 420 | 59 | 180
+L(BR)P(CV)KQBP/LPP(NC)(CV)PPA | Queen, 4-6 pawns | sliders+ability | 38.5 | 411 | 117 | 48
+CB2KP(CH)L/(BR)BQ(CV)(CH)1(NC)1 | Queen, 0-3 pawns | sliders+ability | 39 | 388 | 87 | 96
+AP(CH)1K(NC)QB/PBPPPA(NC)P | Queen, 4-6 pawns | sliders+ability | 39 | 377 | 83 | 96
+LPP(CV)KABP/QPP(NC)(CV)PPA | Queen, 7+ pawns | sliders+ability | 38.5 | 377 | 79 | 96
+(CH)NBKE(RM)PP/L(CV)P(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 39 | 371 | 58 | 178
+AP(CH)(NC)KPQB/PM2PA(NC)P | Queen, 4-6 pawns | sliders+ability | 38 | 371 | 84 | 96
+(BR)B2KP(NC)L/CBQ(CV)(CH)1(NC)1 | Queen, 0-3 pawns | sliders+ability | 38 | 370 | 73 | 130
+(CH)N(CV)PKBPP/LAP(NC)NB(RO)L | no royal, 4-6 pawns | sliders+ability | 38.5 | 366 | 46 | 266
+(BR)(NC)2KP(NC)L/CBQ(CV)(CH)1B1 | Queen, 0-3 pawns | sliders+ability | 38 | 365 | 45 | 332
+PW1K(RO)P(BR)1/L(CH)PPBBAA | Wizard, 4-6 pawns | sliders+ability | 38.5 | 363 | 61 | 152
+APP(NC)K(RM)QB/PBPPPA(NC)1 | Queen, 4-6 pawns | sliders+ability | 38.5 | 362 | 80 | 96
+(BR)(NC)2KC(NC)(RM)/PBQ(CV)(CH)1B1 | Queen, 0-3 pawns | sliders+ability | 39 | 361 | 115 | 48
+(CH)(NC)(CV)PK(RM)PP/L(RO)P(NC)NBAL | no royal, 4-6 pawns | sliders+ability | 39 | 361 | 83 | 96
+LPP(CV)KQBP/APP(NC)(CV)PPA | Queen, 7+ pawns | sliders+ability | 38.5 | 358 | 51 | 222
+QP(CH)(NC)K1AB/PBPPPA(NC)P | Queen, 4-6 pawns | sliders+ability | 39 | 358 | 80 | 96
+(BR)(NC)2KC(NC)L/PBQ(CV)(CH)1B1 | Queen, 0-3 pawns | sliders+ability | 38 | 354 | 24 | 1036
+PW(NC)K(RO)PC1/L1PP(CV)BAA | Wizard, 4-6 pawns | sliders+ability | 39 | 353 | 79 | 96
+(BR)(NC)(RM)1K1(NC)L/PBQ(CV)(CH)1B1 | Queen, 0-3 pawns | sliders+ability | 37.5 | 353 | 80 | 96
+(BR)C2KP(NC)L/BBQ(CV)(CH)1(NC)1 | Queen, 0-3 pawns | sliders+ability | 38 | 351 | 115 | 48
+PW1K(RO)(BR)P1/L(CH)PEBBAA | Wizard, 0-3 pawns | sliders+ability | 39 | 349 | 47 | 252
+(CH)NBEK(RM)PP/L(CV)P(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 39 | 346 | 33 | 532
+AP(CH)(NC)K1QB/PBP(NC)PA1P | Queen, 4-6 pawns | sliders+ability | 38 | 344 | 81 | 96
+P(NC)WK(RO)(BR)2/L(CH)PEB1AA | Wizard, 0-3 pawns | sliders+ability | 38 | 342 | 82 | 96
+(CH)NBKE(RM)P1/L(CV)P(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 38 | 337 | 114 | 48
+AP(CH)(NC)K1QB/PB1PPA(NC)P | Queen, 4-6 pawns | sliders+ability | 38 | 336 | 46 | 274
+P1WK(RO)(BR)PP/L(CH)1EBBAA | Wizard, 0-3 pawns | sliders+ability | 39 | 334 | 113 | 48
+PWBK(RO)(BR)PA/L(CH)PE1B1C | Wizard, 0-3 pawns | sliders+ability | 39 | 334 | 112 | 48
+PW1K(RO)(BR)PA/L(CH)PENB1A | Wizard, 0-3 pawns | sliders+ability | 39 | 331 | 108 | 48
+AP(CH)(NC)K1QB/AB1PPP(NC)P | Queen, 4-6 pawns | sliders+ability | 38 | 330 | 111 | 48
+APP(NC)K1QB/PBPPPA(NC)(CH) | Queen, 4-6 pawns | sliders+ability | 39 | 330 | 50 | 222
+(CH)N(CV)PKBPP/L(RO)P(NC)NBAL | no royal, 4-6 pawns | sliders+ability | 38.5 | 328 | 46 | 276
+1P(NC)1KW(RM)L/ABP(RO)(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38 | 328 | 80 | 96
+AP(CH)(NC)K1QB/PBPPPA(NC)P | Queen, 4-6 pawns | sliders+ability | 39 | 326 | 60 | 150
+PW1K(RO)(BR)1P/L(CH)PEBBAA | Wizard, 0-3 pawns | sliders+ability | 39 | 325 | 63 | 148
+(CV)(NC)WKP1(CV)1/LMPP(NC)B(BR)A | Wizard, 0-3 pawns | steppers+ability | 38 | 324 | 116 | 48
+P(NC)WK(CV)(BR)2/L(CH)PPBB(BR)A | Wizard, 0-3 pawns | sliders+ability | 38.5 | 322 | 49 | 246
+(BR)B(CV)1KP1L/CBQ(CV)(CH)1(NC)1 | Queen, 0-3 pawns | sliders+ability | 38 | 322 | 81 | 96
+PW1K(RO)PM1/L(NC)PP(CV)BAA | Wizard, 4-6 pawns | sliders+ability | 38 | 320 | 55 | 184
+P(NC)WK(CV)1B1/L(CH)(RM)P(NC)1(BR)A | Wizard, 0-3 pawns | sliders+ability | 38.5 | 318 | 113 | 48
+(CH)E(CV)PKBPP/LAP(NC)NB(RO)L | no royal, 4-6 pawns | sliders+ability | 37 | 318 | 52 | 198
+PW1K(RO)P(PD)1/L(CH)PP(CV)BAA | Wizard, 4-6 pawns | sliders+ability | 38 | 317 | 110 | 48
+WP1MK(CV)(RM)L/ABPP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38.5 | 317 | 78 | 96
+LPP(CV)KQBP/AP1(NC)(CV)PPA | Queen, 4-6 pawns | sliders+ability | 37.5 | 315 | 111 | 48
+P1WK(RO)(PD)1P/L(CH)PEBBAA | Wizard, 0-3 pawns | sliders+ability | 38.5 | 314 | 79 | 96
+PW1K(RO)PM1/L(CH)PP(CV)BAA | Wizard, 4-6 pawns | sliders+ability | 39 | 314 | 52 | 202
+P1WK(RO)(BR)1(NC)/L(CH)PPB1AA | Wizard, 0-3 pawns | sliders+ability | 37.5 | 313 | 60 | 166
+AP(CH)(NC)K1QB/PM1PPA(NC)P | Queen, 4-6 pawns | sliders+ability | 38 | 313 | 60 | 160
+P(NC)WK(CV)(BR)2/L(CH)PP(NC)B(BR)A | Wizard, 0-3 pawns | steppers+ability | 38.5 | 312 | 69 | 118
+PW1K(RO)(BR)PA/L(CH)PEBB1A | Wizard, 0-3 pawns | sliders+ability | 39 | 311 | 43 | 294
+P(NC)WK(CV)MB1/L(CH)PP(NC)1(BR)A | Wizard, 0-3 pawns | steppers+ability | 39 | 309 | 109 | 48
+P(NC)WK(CV)(BR)2/L(CH)PPB1AA | Wizard, 0-3 pawns | sliders+ability | 37 | 307 | 57 | 184
+1L1KPP(CV)L/(NC)(CH)QPB(BR)(BR)C | Queen, 0-3 pawns | sliders+ability | 39 | 307 | 109 | 48
+1L1KP(CV)PL/(BR)(CH)Q(CV)B1(NC)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 307 | 109 | 48
+1P(NC)(CH)KW(RM)L/AB1P(RO)PPL | Wizard, 4-6 pawns | sliders+ability | 38 | 306 | 80 | 96
+LNNPK(RM)PP/(RO)LA(NC)(NC)BPM | no royal, 4-6 pawns | sliders+ability | 38 | 305 | 113 | 48
+PN(CV)PK(RM)(CH)P/LA1(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 38.5 | 304 | 79 | 96
+P(NC)WK(CV)1(CV)1/L(CH)PP(NC)B(BR)A | Wizard, 0-3 pawns | steppers+ability | 39 | 304 | 60 | 168
+P(NC)WK(CV)1B1/L(CH)PP(NC)B(BR)A | Wizard, 0-3 pawns | sliders+ability | 39 | 302 | 66 | 134
+1(NC)QK1(CV)(CV)(NC)/L(CH)PPB1(BR)(RM) | Queen, 0-3 pawns | sliders+ability | 38.5 | 302 | 110 | 48
+(CH)N(CV)PK(RM)PP/L(RO)P(NC)NBAL | no royal, 4-6 pawns | sliders+ability | 39 | 301 | 49 | 230
+P(NC)WK(NC)(BR)2/L(CH)PP(CV)B(BR)A | Wizard, 0-3 pawns | steppers+ability | 38.5 | 301 | 80 | 96
+1B2KP(CV)L/(BR)BQ(CV)(CH)1(NC)C | Queen, 0-3 pawns | sliders+ability | 38 | 301 | 91 | 68
+P1WK(RO)(BR)1P/L(CH)PEBBAA | Wizard, 0-3 pawns | sliders+ability | 39 | 300 | 41 | 324
+1P(NC)(RO)KW(RM)L/ABPP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 39 | 300 | 32 | 526
+1P(NC)MKW(RM)L/ABPP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38.5 | 298 | 56 | 180
+BP1MKW(RM)L/ABPP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38.5 | 297 | 109 | 48
+P(NC)WK(CV)1B1/L(CH)PP(NC)E(BR)A | Wizard, 0-3 pawns | sliders+ability | 37.5 | 297 | 108 | 48
+(CH)N(CV)PK(RM)PP/(RO)LA(NC)MBPL | no royal, 4-6 pawns | sliders+ability | 39 | 295 | 108 | 48
+(CH)NBKE(PD)PP/L(CV)P(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 37.5 | 293 | 110 | 48
+CPP(CV)KWBL/APP(NC)(CV)PPL | Wizard, 4-6 pawns | sliders+ability | 39 | 292 | 109 | 48
+(CH)P(CV)PK1PN/L(RO)B(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 37.5 | 291 | 77 | 96
+L(CV)P(CV)KQBP/APP(NC)PPPA | Queen, 7+ pawns | sliders+ability | 38.5 | 291 | 107 | 48
+P1BK(RO)(BR)1P/L(CH)PEBWAA | Wizard, 0-3 pawns | sliders+ability | 39 | 290 | 109 | 48
+1LPKPQ1L/(NC)(CH)1(CV)B(CV)(BR)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 289 | 110 | 48
+(CH)N(CV)PK(RM)PP/L(RO)A(NC)NBPL | no royal, 4-6 pawns | sliders+ability | 39 | 289 | 48 | 236
+1NRPK(RM)BP/L(RO)P(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 39 | 288 | 78 | 96
+L(BR)P(CV)KWBP/APP(NC)(CV)1PA | Wizard, 4-6 pawns | sliders+ability | 38 | 287 | 108 | 48
+1L1K1P(CV)L/(BR)BQ(CV)(CH)1(NC)C | Queen, 0-3 pawns | sliders+ability | 37.5 | 284 | 78 | 94
+(CH)PP(CV)KWBP/APP(CV)(NC)PPA | Wizard, 7+ pawns | sliders+ability | 39 | 281 | 78 | 96
+PPWK(RO)R1E/L(CH)PPBBA1 | Wizard, 4-6 pawns | sliders+ability | 38.5 | 280 | 78 | 96
+PW1K(RO)PM1/L(NC)PPPBAA | Wizard, 4-6 pawns | sliders+ability | 36 | 279 | 111 | 48
+P1WK(RO)(BR)1E/L(CH)PPBBAA | Wizard, 0-3 pawns | sliders+ability | 39 | 279 | 47 | 252
+P(NC)WK(RO)(BR)2/L(CH)PPB1AA | Wizard, 0-3 pawns | sliders+ability | 37.5 | 279 | 50 | 224
+(CH)PN1K(RM)PP/(RO)LA(NC)(NC)(BR)CL | no royal, 0-3 pawns | sliders+ability | 38.5 | 279 | 112 | 48
+(CH)1N1KCPP/(RM)BA(NC)(NC)(RM)BL | no royal, 0-3 pawns | sliders+ability | 38.5 | 278 | 78 | 96
+(CH)N(CV)PK(RM)PP/L(RO)1(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 38 | 277 | 59 | 152
+1L1KPP(CV)L/(BR)BQ(CV)(CH)1(NC)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 276 | 81 | 84
+1L1KPP(CV)L/(BR)(CH)Q(CV)B1(NC)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 275 | 85 | 76
+(CH)NNPK(RM)PP/(RO)LA(NC)MBPL | no royal, 4-6 pawns | sliders+ability | 39 | 274 | 107 | 48
+(NC)PWMK1(RM)L/ABPP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38.5 | 273 | 106 | 48
+(NC)P1MKW(RM)L/ABPE(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 39 | 272 | 76 | 96
+(CH)M(NC)(RM)K1PP/L(RO)A(CV)NBPL | no royal, 0-3 pawns | sliders+ability | 38 | 271 | 78 | 96
+1(NC)QK(CV)1(CV)(NC)/L(CH)PPB1(BR)C | Queen, 0-3 pawns | sliders+ability | 39 | 271 | 66 | 130
+(CH)N(CV)PK(RM)PP/(RO)LA(NC)NBPL | no royal, 4-6 pawns | sliders+ability | 39 | 271 | 39 | 362
+AP(CH)(NC)K1Q(RO)/PM(NC)PPA1P | Queen, 4-6 pawns | sliders+ability | 38.5 | 271 | 47 | 240
+P1WK(RO)L1P/L(CH)PEBBAA | Wizard, 0-3 pawns | sliders+ability | 39 | 269 | 59 | 158
+(BR)B2KP(CV)L/CBQ(CV)(CH)1(NC)1 | Queen, 0-3 pawns | sliders+ability | 38 | 269 | 61 | 144
+1LQKP1(CV)L/(NC)(CH)P(CV)B1(BR)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 268 | 67 | 122
+(CH)PA(NC)K1Q(RO)/PM(NC)PPA1P | Queen, 4-6 pawns | sliders+ability | 38.5 | 267 | 54 | 182
+(CH)NNPK(RM)PP/(RO)LA(NC)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 39 | 267 | 35 | 454
+AP(CH)(NC)K1Q(RO)/PMA1P(NC)PP | Queen, 4-6 pawns | sliders+ability | 38.5 | 265 | 105 | 48
+(CH)(PD)NPK(CV)PP/(RO)LA(NC)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 37.5 | 264 | 107 | 48
+(CH)N(CV)PK(RM)PP/L(RO)A(NC)NBLP | no royal, 4-6 pawns | sliders+ability | 39 | 263 | 107 | 48
+(NC)P1MKW(RM)L/ABPP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38.5 | 261 | 46 | 256
+L1WK(RO)(BR)1E/P(CH)PPBBAA | Wizard, 0-3 pawns | sliders+ability | 39 | 260 | 105 | 48
+(CH)2(RM)KCPP/NBA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 38.5 | 259 | 104 | 48
+(CH)2PKCPN/(RM)BA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 38.5 | 259 | 105 | 48
+AP(RM)(NC)K1Q(RO)/PM1PPA(NC)P | Queen, 4-6 pawns | sliders+ability | 38 | 258 | 105 | 48
+PBWK(RO)(BR)1E/L(CH)PPB1AA | Wizard, 0-3 pawns | sliders+ability | 39 | 258 | 106 | 48
+P(NC)WK(RO)(BR)1A/L(CH)PPB2A | Wizard, 0-3 pawns | sliders+ability | 37.5 | 257 | 105 | 48
+(CH)NBPK(RM)PP/(RO)LA(NC)(NC)NPL | no royal, 4-6 pawns | sliders+ability | 39 | 257 | 105 | 48
+(CH)1N1K(RM)PP/(RM)BA(NC)(NC)BCL | no royal, 0-3 pawns | sliders+ability | 38.5 | 256 | 54 | 184
+P(NC)WK(CV)1B1/L(CH)PP(NC)1(BR)A | Wizard, 0-3 pawns | sliders+ability | 36 | 251 | 78 | 88
+(CH)MQ(NC)KPB(RO)/PP1PPA(RM)P | Queen, 4-6 pawns | sliders+ability | 39 | 251 | 104 | 48
+(CH)PA(NC)K1Q(RO)/PMPPPA(BR)P | Queen, 4-6 pawns | sliders+ability | 39 | 251 | 34 | 466
+2PKPL(CV)L/(NC)(CH)Q(CV)B1(BR)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 250 | 106 | 48
+P(NC)WK(CV)PL(PD)/BPPP(NC)B(BR)A | Wizard, 4-6 pawns | steppers+ability | 39 | 247 | 83 | 76
+(CH)2NKCPP/(RM)BA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 38.5 | 247 | 39 | 346
+(CH)PN1K(RM)PP/(RM)LA(NC)(NC)BCL | no royal, 0-3 pawns | sliders+ability | 39 | 246 | 61 | 136
+P(NC)WK2(BR)(NC)/L(CH)PPB(CV)(CV)C | Wizard, 0-3 pawns | steppers+ability | 39 | 246 | 108 | 48
+(CH)(RM)(CV)PKN1P/(RO)LA(NC)NBP(RO) | no royal, 0-3 pawns | sliders+ability | 39 | 245 | 76 | 96
+(CH)PN1K(RM)PP/(RO)LA(NC)(NC)BCL | no royal, 0-3 pawns | sliders+ability | 39 | 245 | 53 | 184
+1(NC)QK(CV)1(CV)(NC)/L(RO)PPB1(BR)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 243 | 106 | 48
+2(RM)K1P(CV)L/(BR)BQ(PD)(CH)1(NC)C | Queen, 0-3 pawns | sliders+ability | 37.5 | 241 | 103 | 48
+(CH)M(CV)1K(RM)PP/L(RO)A(NC)NBPL | no royal, 0-3 pawns | sliders+ability | 38 | 237 | 54 | 180
+ANNPK(BR)PP/(RO)LA(NC)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 38 | 236 | 106 | 48
+(CH)PNNK(RM)PP/(RO)LA(NC)(NC)B1L | no royal, 0-3 pawns | sliders+ability | 38 | 235 | 69 | 116
+(CH)N(CV)PK(RM)PP/(RO)LA(NC)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 39 | 234 | 38 | 370
+(CH)PP(CV)KWBP/APP(NC)(CV)PPA | Wizard, 7+ pawns | sliders+ability | 39 | 233 | 40 | 326
+P(NC)WK(CV)PB(PD)/LPPP(NC)B(BR)A | Wizard, 4-6 pawns | steppers+ability | 39 | 233 | 78 | 84
+A1WK(RO)(BR)1P/L(CH)PPBBEA | Wizard, 0-3 pawns | sliders+ability | 39 | 232 | 105 | 48
+LPP(CV)KWBP/APP(NC)(CV)PPA | Wizard, 7+ pawns | sliders+ability | 37.5 | 232 | 48 | 226
+(CV)P1MKW(RM)L/ABPP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38.5 | 231 | 50 | 212
+(BR)(CV)PPKW(RM)L/AEP1PP(CH)L | Wizard, 4-6 pawns | sliders+ability | 36.5 | 229 | 103 | 48
+(CH)1P1KCNP/(RM)BA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 38.5 | 229 | 103 | 48
+CMPPKW(RM)L/AEP1PP(CH)L | Wizard, 4-6 pawns | sliders+ability | 38 | 227 | 77 | 88
+(CH)1N1KCPP/(RM)BA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 38.5 | 226 | 36 | 402
+(CH)MQ(NC)KPB(RO)/PPPPPA(BR)P | Queen, 7+ pawns | sliders+ability | 39 | 226 | 53 | 186
+1LQKP1(CV)(NC)/(NC)(CH)(CV)PB1(BR)C | Queen, 0-3 pawns | sliders+ability | 39 | 225 | 82 | 80
+C(CV)PPK(RM)WL/AEP1PP(CH)L | Wizard, 4-6 pawns | sliders+ability | 38 | 223 | 103 | 48
+(CH)M(CV)(NC)K(RM)PP/L(RO)A1NB1L | no royal, 0-3 pawns | sliders+ability | 37 | 223 | 102 | 48
+(CH)(RM)ENKCP1/1BA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 39 | 222 | 106 | 48
+(CH)MQ(NC)KAB(RO)/PPPPPP(BR)P | Queen, 7+ pawns | sliders+ability | 39 | 217 | 27 | 714
+(RO)1N1KCPP/(RM)BA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 38 | 217 | 104 | 48
+(CH)MQ(NC)KPBN/PPPPP(BR)AP | Queen, 7+ pawns | sliders+ability | 38.5 | 215 | 30 | 574
+P(BR)PK(CV)WL(PD)/BPPP(NC)B(NC)A | Wizard, 4-6 pawns | steppers+ability | 39 | 213 | 61 | 138
+(CH)MQ(NC)KPBN/PPEPP(BR)AP | Queen, 4-6 pawns | sliders+ability | 39 | 211 | 106 | 48
+L(CV)B(CV)KLB(PD)/AP(BR)(RO)P(NC)(CH)P | no royal, 0-3 pawns | sliders+ability | 39 | 211 | 102 | 48
+(CH)N(CV)PK(RM)1P/(RO)LA(NC)NBPL | no royal, 0-3 pawns | sliders+ability | 38 | 211 | 104 | 48
+QP1(NC)KA(CH)P/PMPP(RO)A(BR)P | Queen, 4-6 pawns | sliders+ability | 39 | 211 | 104 | 48
+CMPPKW(RM)L/APP1(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 37.5 | 210 | 83 | 74
+(CH)P1(NC)KAQ(RO)/PMP(BR)PAPP | Queen, 4-6 pawns | sliders+ability | 39 | 209 | 104 | 48
+P(NC)WK(CV)E(CV)(NC)/L(CH)PPB1(BR)L | Wizard, 0-3 pawns | steppers+ability | 39 | 209 | 61 | 152
+P(NC)WK(CV)1(CV)1/L(CH)PP(NC)B(BR)C | Wizard, 0-3 pawns | steppers+ability | 39 | 208 | 84 | 74
+P(BR)(CV)KPWB(PD)/BPPP(NC)L(NC)A | Wizard, 4-6 pawns | steppers+ability | 39 | 208 | 101 | 48
+(CH)(NC)WK(CV)1(CV)(NC)/LPPPBL(BR)E | Wizard, 0-3 pawns | steppers+ability | 39 | 207 | 105 | 48
+(CH)MQ(NC)KA1(RO)/PPPPPA(BR)P | Queen, 4-6 pawns | sliders+ability | 39 | 207 | 56 | 170
+(CH)P1(NC)KAQ(RO)/PMPPPA(BR)P | Queen, 4-6 pawns | sliders+ability | 39 | 205 | 53 | 188
+(CH)1ENKCP1/(RM)BA(NC)(NC)B(RM)L | no royal, 0-3 pawns | sliders+ability | 39 | 205 | 53 | 186
+LPP(CV)KWBP/(CH)PP(NC)(CV)PPA | Wizard, 7+ pawns | sliders+ability | 37.5 | 203 | 103 | 48
+(CH)PQ(NC)KPBN/PMPPP(BR)AP | Queen, 7+ pawns | sliders+ability | 38.5 | 202 | 105 | 48
+(CH)PNNK(RM)PP/(RO)LA(NC)MB1L | no royal, 0-3 pawns | sliders+ability | 38 | 202 | 103 | 48
+P(NC)WK(CV)E1(NC)/L(CH)PPB(CV)(BR)L | Wizard, 0-3 pawns | steppers+ability | 39 | 201 | 104 | 48
+1(PD)(NC)(RO)K1C(RO)/LRPPP1(CV)Q | Queen, 0-3 pawns | sliders+ability | 38.5 | 201 | 104 | 48
+R(PD)(NC)(RO)K1C(RO)/LPP1P1(CV)Q | Queen, 0-3 pawns | sliders+ability | 38.5 | 200 | 82 | 82
+(CH)MQK(NC)PBN/PPPPP(BR)AP | Queen, 7+ pawns | sliders+ability | 38.5 | 199 | 34 | 456
+R(CV)A(NC)KQ(PD)(CH)/1LP1PP1(RO) | Queen, 0-3 pawns | sliders+ability | 39 | 199 | 103 | 48
+AMQ(NC)KAB(RO)/PPPPPP(BR)P | Queen, 7+ pawns | sliders+ability | 39 | 199 | 103 | 48
+1LPKP1(CV)L/(NC)(CH)Q(CV)B1(BR)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 199 | 79 | 80
+B(NC)WK(CV)1(CV)(NC)/L(CH)PPP1(BR)C | Wizard, 0-3 pawns | steppers+ability | 39 | 198 | 100 | 48
+1L1KPP(CV)L/(NC)(CH)Q(CV)B1(BR)C | Queen, 0-3 pawns | sliders+ability | 38.5 | 198 | 78 | 84
+CPPMKW(RM)L/APPP(CH)PPL | Wizard, 7+ pawns | sliders+ability | 38.5 | 197 | 46 | 238
+LPPPKWBP/AP(CV)(NC)(CV)PPA | Wizard, 7+ pawns | sliders+ability | 37.5 | 197 | 105 | 48
+(NC)P1(NC)KW(RM)L/ABPP(CH)PP(CV) | Wizard, 4-6 pawns | sliders+ability | 39 | 197 | 74 | 96
+(CH)MQ(NC)KPBN/P1PPP(BR)AP | Queen, 4-6 pawns | sliders+ability | 37.5 | 196 | 103 | 48
+(CH)QM(NC)KPBN/PPPPPMAP | Queen, 7+ pawns | sliders+ability | 39 | 196 | 103 | 48
+(CH)PA(NC)K1Q(RO)/PMP1PA(BR)P | Queen, 4-6 pawns | sliders+ability | 38 | 196 | 104 | 48
+PPP(CV)KWBP/APP(NC)(CV)PLA | Wizard, 7+ pawns | sliders+ability | 37.5 | 194 | 66 | 124
+C(CV)PPKW(RM)L/AEP1PP(CH)L | Wizard, 4-6 pawns | sliders+ability | 38 | 191 | 64 | 120
+P(NC)WK(CV)1(CV)(NC)/L(CH)PPB1(BR)C | Wizard, 0-3 pawns | steppers+ability | 39 | 191 | 53 | 186
+PMPPKW(RM)L/APC1(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 37.5 | 190 | 101 | 48
+R1(NC)1KPC(RO)/LAP(PD)P2Q | Queen, 0-3 pawns | sliders+ability | 36 | 188 | 103 | 48
+(CH)CWK(CV)1(CV)(NC)/LPLPBP(BR)1 | Wizard, 0-3 pawns | sliders+ability | 38.5 | 187 | 105 | 48
+(CH)N(CV)(CH)K(RM)PP/(RO)LA(NC)(NC)1PL | no royal, 0-3 pawns | sliders+ability | 39 | 183 | 102 | 48
+CPPMKW(RM)L/AP1P(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 37.5 | 181 | 101 | 48
+(CH)(CV)B(CV)KLB(PD)/AP(BR)(RO)P(NC)LP | no royal, 0-3 pawns | sliders+ability | 39 | 179 | 70 | 102
+(CV)PPMKW(RM)L/APPE(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38 | 177 | 102 | 48
+AWBK(RO)(PD)(PD)A/(CH)1P(NC)1(RO)1P | Wizard, 0-3 pawns | leapers+ability | 39 | 176 | 104 | 48
+CPPMKW(RM)L/APPP(CH)1PL | Wizard, 4-6 pawns | sliders+ability | 37.5 | 175 | 100 | 48
+P(BR)PK(CV)WB(PD)/BPPP(NC)L(NC)A | Wizard, 4-6 pawns | steppers+ability | 39 | 175 | 58 | 150
+(CV)PPMKW(RM)L/APEP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38 | 175 | 102 | 48
+(CH)(BR)NPKCP1/(RM)BA(NC)(NC)B(RM)1 | no royal, 0-3 pawns | sliders+ability | 38.5 | 175 | 102 | 48
+R(NC)PMKW(RM)L/APPPPPPL | Wizard, 7+ pawns | sliders+ability | 38.5 | 174 | 76 | 88
+PAPKBW1N/(PD)(CH)1P(CH)NAP | Wizard, 4-6 pawns | sliders+ability | 39 | 170 | 73 | 94
+1(NC)PK(CV)WL(PD)/BPPP(NC)B(BR)A | Wizard, 4-6 pawns | steppers+ability | 38 | 169 | 100 | 48
+(CH)PQ(NC)KAB(RO)/PMPPPP(BR)P | Queen, 7+ pawns | sliders+ability | 39 | 169 | 100 | 48
+P1PMKW(RM)L/APCP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 37.5 | 168 | 101 | 48
+R(NC)E(PD)KQAN/PPBPPLPP | Queen, 4-6 pawns | sliders+ability | 39 | 168 | 76 | 88
+(CH)1Q(NC)KNB(RO)/PPPPPB(BR)(PD) | Queen, 4-6 pawns | sliders+ability | 38 | 167 | 35 | 424
+(CH)(CV)B(NC)K(PD)(RM)(PD)/AP(BR)(RO)P(NC)LP | no royal, 0-3 pawns | sliders+ability | 39 | 165 | 102 | 48
+R(CV)PNKW(RM)L/APPPPPPL | Wizard, 7+ pawns | sliders+ability | 38.5 | 165 | 102 | 48
+P(NC)WK(CV)1(CV)L/(NC)(CH)PPB1(BR)C | Wizard, 0-3 pawns | steppers+ability | 39 | 164 | 100 | 48
+(CH)(CV)B(NC)K(PD)B(PD)/AP(BR)(RO)P(NC)LP | no royal, 0-3 pawns | sliders+ability | 38.5 | 164 | 41 | 314
+R1(NC)(RO)K1C(RO)/LPP(PD)P1(CV)Q | Queen, 0-3 pawns | sliders+ability | 38.5 | 163 | 61 | 136
+R1(NC)(RO)K2(RO)/LPP(PD)PC(CV)Q | Queen, 0-3 pawns | sliders+ability | 38.5 | 162 | 101 | 48
+(CH)1QNK(NC)B(RO)/PPPPPB(BR)(PD) | Queen, 4-6 pawns | sliders+ability | 38 | 155 | 102 | 48
+(CH)(NC)WK(CV)E(CV)(NC)/LPPPBL(BR)1 | Wizard, 0-3 pawns | steppers+ability | 39 | 155 | 63 | 134
+L(BR)(NC)QKC(RO)N/PPPP(BR)PPL | Queen, 4-6 pawns | sliders+ability | 38.5 | 154 | 99 | 48
+(CV)P1MKW(CH)L/AM1P(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38 | 154 | 103 | 48
+PPPMKW(RM)L/APPPP(CV)(CH)L | Wizard, 7+ pawns | sliders+ability | 37.5 | 154 | 74 | 96
+CNA(CV)K(RO)(CV)A/MPL(RO)PP1L | no royal, 0-3 pawns | sliders+ability | 39 | 153 | 104 | 48
+(CH)(RO)B(NC)K(PD)B(PD)/AP(BR)(RO)P(NC)LP | no royal, 0-3 pawns | sliders+ability | 39 | 152 | 81 | 86
+(CH)MQ(NC)KAB(RO)/PPP1PP(BR)P | Queen, 4-6 pawns | sliders+ability | 38 | 151 | 72 | 94
+PA(CH)KBW1N/(PD)(CH)1PPNAP | Wizard, 4-6 pawns | sliders+ability | 39 | 150 | 49 | 214
+P(NC)PK(CV)WL1/BPPP(NC)B(BR)A | Wizard, 4-6 pawns | sliders+ability | 37 | 150 | 103 | 48
+R(CV)PMKW(RM)L/APPPPPPL | Wizard, 7+ pawns | sliders+ability | 38.5 | 150 | 62 | 132
+PPPKMWBL/APP(NC)(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37 | 148 | 74 | 96
+R(CV)PMKW(RM)L/APPEPPPL | Wizard, 4-6 pawns | sliders+ability | 39 | 147 | 99 | 48
+P(NC)PK(CV)WL(PD)/BPPP(NC)B(BR)A | Wizard, 4-6 pawns | steppers+ability | 39 | 146 | 43 | 276
+(CV)PPMKW(BR)L/APPP(CH)PPL | Wizard, 7+ pawns | sliders+ability | 36.5 | 145 | 100 | 48
+R(PD)(NC)(CV)KQC(RO)/BPP1P1(RO)1 | Queen, 0-3 pawns | sliders+ability | 39 | 141 | 100 | 48
+(CV)PPMKW(RM)L/A1PP(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 36.5 | 140 | 100 | 48
+(RM)M(PD)QKBA(RO)/PAPPPPPP | Queen, 7+ pawns | sliders+ability | 39 | 137 | 47 | 250
+R(NC)BK(CV)BMQ/PPPPPL1(BR) | Queen, 4-6 pawns | sliders+ability | 39 | 132 | 103 | 48
+R(NC)QK(CV)C(RO)(NC)/2L(PD)1C2 | Queen, 0-3 pawns | sliders+ability | 39 | 131 | 100 | 48
+(CV)PPMKW(RM)L/APP(PD)(CH)PPL | Wizard, 4-6 pawns | sliders+ability | 38.5 | 130 | 100 | 48
+CPPMKWPB/APPP(CH)P(RM)L | Wizard, 7+ pawns | sliders+ability | 39 | 129 | 102 | 48
+(CH)N(CV)AK(RM)(RM)P/PLP(NC)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 39 | 123 | 99 | 48
+(CH)NNAK(RM)(RM)P/PLP(NC)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 39 | 122 | 57 | 148
+(CH)(RM)NQK(CV)(RO)N/(BR)PPPPPPE | Queen, 4-6 pawns | sliders | 39 | 121 | 101 | 48
+(CH)(NC)WK(CV)E(CV)(NC)/LPLPBP(BR)1 | Wizard, 0-3 pawns | steppers+ability | 39 | 119 | 83 | 80
+PACKBW1N/(PD)(CH)APP(BR)1P | Wizard, 4-6 pawns | sliders+ability | 38.5 | 118 | 99 | 48
+NPPMKW(RM)L/APPP(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37.5 | 118 | 74 | 96
+(CH)1Q(NC)KNB(RO)/PPPPPB(BR)P | Queen, 4-6 pawns | sliders+ability | 37 | 115 | 67 | 110
+RM(CV)KAMQ(CV)/(BR)PLPP2P | Queen, 4-6 pawns | sliders+ability | 39 | 112 | 104 | 48
+PP(CV)MKW(RM)L/APPP(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37.5 | 107 | 102 | 48
+(CH)(CV)AEKMQR/3P(BR)(RM)1L | Queen, 0-3 pawns | sliders+ability | 39 | 106 | 79 | 84
+M(PD)(NC)AKM(NC)A/PPPPP(PD)PQ | Queen, 4-6 pawns | sliders+ability | 39 | 105 | 100 | 48
+E(NC)E(PD)KQAN/PPBPPL(CH)P | Queen, 4-6 pawns | sliders+ability | 38.5 | 100 | 73 | 90
+R(PD)P(RO)KQC(RO)/LPP1(NC)1(CV)1 | Queen, 0-3 pawns | sliders+ability | 38.5 | 99 | 99 | 48
+PPPMKWBL/APP(NC)(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37 | 98 | 59 | 146
+(RM)M(PD)QK1A(RO)/1ALBPPPP | Queen, 4-6 pawns | sliders+ability | 38.5 | 97 | 99 | 48
+R(PD)(NC)(RO)KQC(RO)/LPP1P1(CV)1 | Queen, 0-3 pawns | sliders+ability | 38.5 | 96 | 67 | 110
+R(RO)(NC)(RO)KPC1/LPP(PD)P2Q | Queen, 4-6 pawns | sliders+ability | 36.5 | 95 | 72 | 92
+R(PD)(NC)(CV)KQC(RO)/LPP1P1(RO)1 | Queen, 0-3 pawns | sliders+ability | 38.5 | 92 | 67 | 118
+PPP(CV)KWBL/APP(NC)(CV)PPL | Wizard, 7+ pawns | sliders+ability | 36 | 92 | 59 | 160
+R(CV)AMKW(RM)L/PPPPPPPL | Wizard, 7+ pawns | sliders+ability | 38.5 | 91 | 71 | 94
+(CV)PPMKW(RM)L/APPP(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37.5 | 90 | 28 | 676
+(CH)ACKBW1N/(PD)PAPPN1P | Wizard, 4-6 pawns | sliders+ability | 39 | 88 | 77 | 82
+RQEAK(NC)(RO)M/EPPP(CV)PP1 | Queen, 4-6 pawns | sliders+ability | 38.5 | 84 | 80 | 82
+PPPMKW(RM)L/APPP(CH)P(CV)L | Wizard, 7+ pawns | sliders+ability | 37.5 | 83 | 75 | 96
+PPP(CV)KWBL/APP(NC)(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37 | 75 | 40 | 350
+R(NC)EBKQAR/PP1PPLPP | Queen, 4-6 pawns | sliders+ability | 39 | 70 | 67 | 114
+(RM)M(PD)QKBA(RO)/1APPPPPP | Queen, 4-6 pawns | sliders+ability | 38 | 70 | 61 | 132
+R1(NC)(RO)KPC(RO)/LPP(PD)P2Q | Queen, 4-6 pawns | sliders+ability | 36.5 | 67 | 72 | 94
+(CV)PPMKW(RM)L/APPP(CH)PP(CH) | Wizard, 7+ pawns | sliders+ability | 39 | 65 | 104 | 48
+PACKBW1N/(PD)(CH)APPN1P | Wizard, 4-6 pawns | sliders+ability | 39 | 63 | 47 | 218
+(NC)C(RM)MKW(RM)L/PPPPP(NC)PL | Wizard, 4-6 pawns | sliders+ability | 39 | 54 | 99 | 48
+PPPMKW(RM)L/APP(NC)(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37.5 | 54 | 63 | 138
+(CH)ACKBWAN/(PD)P1PPN1P | Wizard, 4-6 pawns | sliders+ability | 39 | 54 | 77 | 86
+PPPMKW(RM)L/APP(CV)(CH)PPL | Wizard, 7+ pawns | sliders+ability | 37.5 | 53 | 64 | 134
+(CH)NNMK(RM)(RM)P/PLP(BR)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 37.5 | 46 | 45 | 244
+(CH)NNPK(RM)(RM)P/PLP(CV)(NC)BML | no royal, 4-6 pawns | sliders+ability | 38 | 45 | 99 | 48
+(RM)(RO)(PD)QKBAM/1APPPPPP | Queen, 4-6 pawns | sliders+ability | 38 | 33 | 99 | 48
+(CH)W(RO)(NC)KA(RM)C/1MM1(PD)1P1 | Wizard, 0-3 pawns | sliders+ability | 39 | 22 | 101 | 48
+R(CV)A1KW(RM)L/(CV)PPPPPPL | Wizard, 4-6 pawns | sliders+ability | 37.5 | 21 | 99 | 48
+RNNMK(RM)(RM)P/PLP(BR)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 38.5 | 19 | 99 | 48
+R(RO)(NC)(RO)KPC1/(RM)PP(PD)P2Q | Queen, 4-6 pawns | sliders+ability | 37.5 | 17 | 100 | 48
+(CH)NNMK(RM)(RO)P/PLP(BR)(NC)BPL | no royal, 4-6 pawns | sliders+ability | 37.5 | 8 | 99 | 48
+(CH)WNK(RM)NEE/PP(CV)P(CV)1PA | Wizard, 4-6 pawns | leapers+ability | 38.5 | 7 | 101 | 48
+(CH)NNMK(RM)(RM)(NC)/PLP(BR)PBPL | no royal, 4-6 pawns | sliders+ability | 37.5 | -26 | 76 | 88
+(CH)NNMK(RM)(RM)P/PLP(BR)(BR)BPL | no royal, 4-6 pawns | sliders | 37 | -28 | 100 | 48
+(RM)(PD)(RO)(NC)KE(CV)A/WPP1P(RO)EL | Wizard, 0-3 pawns | leapers+ability | 39 | -32 | 78 | 82
+RC(RM)MKW(RM)L/PPPPPPPL | Wizard, 7+ pawns | sliders | 39 | -39 | 48 | 224
+(CH)(RO)E(CV)KMW(NC)/E(CV)N1PP(RO)1 | Wizard, 0-3 pawns | leapers+ability | 39 | -44 | 101 | 48
+RMAKB(NC)MN/PPL(RO)2RE | no royal, 0-3 pawns | sliders+ability | 38.5 | -45 | 101 | 48
+W(PD)(RO)K(NC)(RM)(RM)A/PPPPPNPP | Wizard, 7+ pawns | leapers+ability | 37.5 | -59 | 102 | 48
+(CH)MCK(RM)CW(NC)/P2(BR)P(BR)PE | Wizard, 0-3 pawns | sliders+ability | 39 | -60 | 102 | 48
+(CH)B(RO)BKA(PD)(CH)/(RO)EPEP(CV)MP | no royal, 0-3 pawns | sliders+ability | 39 | -77 | 102 | 48
+RCPPKW(RM)L/PPPPMPPL | Wizard, 7+ pawns | sliders | 36.5 | -92 | 107 | 48
+RAM(PD)KMCR/PP(BR)(CH)PPPP | no royal, 4-6 pawns | sliders+ability | 38.5 | -115 | 83 | 76
+(CH)(PD)(PD)K(CV)EAR/MPAPP(NC)NE | no royal, 0-3 pawns | sliders+ability | 39 | -143 | 105 | 48
+(CH)WMKA(PD)CR/(PD)P1PP1MP | Wizard, 4-6 pawns | sliders+ability | 39 | -168 | 86 | 80
+RWAK(PD)E(CH)R/PPPPPPPP | Wizard, 7+ pawns | sliders+ability | 37.5 | -179 | 115 | 48
+RWAK(PD)EAR/PPPPPPPP | Wizard, 7+ pawns | sliders+ability | 37.5 | -195 | 72 | 120
+RWAK(PD)RAE/PPPPPPPP | Wizard, 7+ pawns | sliders+ability | 37.5 | -236 | 121 | 48
+R(RM)MK(PD)B(NC)N/EPBM(NC)PP(BR) | no royal, 0-3 pawns | steppers+ability | 38.5 | -262 | 98 | 76

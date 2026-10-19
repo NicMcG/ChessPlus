@@ -1,0 +1,9 @@
+# army | niche | style | cost | rating vs Standard (evolution estimate) | games | exposure
+LPP(CV)KQBP/L(NC)PP(CH)PPA | Queen, 7+ pawns | sliders+ability | 38 | +484 ±74 | 134 | 2.3%
+(CH)N(CV)PKBPP/LAP(NC)MB(RO)L | no royal, 4-6 pawns | sliders+ability | 38.5 | +458 ±73 | 134 | 2.3%
+WP1K(RO)P(RM)1/L(NC)PP(CV)BAA | Wizard, 4-6 pawns | sliders+ability | 38.5 | +436 ±86 | 96 | 1.0%
+1PP(CV)KQBP/L(BR)L(NC)(CV)PPA | Queen, 4-6 pawns | sliders+ability | 37.5 | +420 ±59 | 180 | 2.3%
+(CH)NBKE(RM)PP/L(CV)P(NC)NBAL | no royal, 0-3 pawns | sliders+ability | 39 | +371 ±58 | 178 | 1.0%
+(BR)(NC)2KC(NC)L/PBQ(CV)(CH)1B1 | Queen, 0-3 pawns | sliders+ability | 38 | +354 ±24 | 1036 | 2.3%
+PW1K(RO)(BR)PA/L(CH)PEBB1A | Wizard, 0-3 pawns | sliders+ability | 39 | +311 ±43 | 294 | 1.0%
+(CH)PP(CV)KWBP/APP(CV)(NC)PPA | Wizard, 7+ pawns | sliders+ability | 39 | +281 ±78 | 96 | 2.3%

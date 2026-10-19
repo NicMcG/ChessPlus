@@ -56,11 +56,11 @@ pub struct EvolveConfig {
     /// Candidates per generation.
     pub batch: usize,
     /// Games (both colours, so even) in each racing stage: screen, second
-    /// look, full test.
-    pub stages: [usize; 3],
+    /// look, full test, confirmation.
+    pub stages: [usize; 4],
     /// How far below the elite (Elo) a candidate may be and still go on to
     /// the next stage.
-    pub margins: [f64; 2],
+    pub margins: [f64; 3],
     pub min_cost: f64,
     /// Most broken starts allowed against random armies (fraction).
     pub max_exposure: f64,
@@ -83,8 +83,8 @@ impl Default for EvolveConfig {
             generations: 60,
             max_minutes: 150.0,
             batch: 30,
-            stages: [12, 12, 24],
-            margins: [60.0, 25.0],
+            stages: [12, 12, 24, 48],
+            margins: [60.0, 25.0, 0.0],
             min_cost: 36.0,
             max_exposure: 0.03,
             random_refs: 4,
@@ -602,6 +602,17 @@ fn write_archive(st: &State, cat: &Catalog, checker: &StartChecker, dir: &Path) 
         );
     }
     std::fs::write(dir.join("archive.txt"), s).expect("can't write archive");
+    // Every well-tested army, for picking a varied pool (near-copies of an
+    // elite can be swapped for a distinct runner-up).
+    let mut s = String::from("# army | niche | style | cost | rating | +-95% | games
+");
+    let mut all: Vec<&Entry> = st.entries.iter().filter(|e| !e.is_ref && e.games.len() >= 48).collect();
+    all.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap());
+    for e in all {
+        s += &format!("{} | {} | {} | {} | {:.0} | {:.0} | {}
+", e.key, niche_name(niche(cat, &e.army)), style(cat, &e.army), e.army.cost(cat), e.rating, 1.96 * e.se, e.games.len());
+    }
+    std::fs::write(dir.join("candidates.txt"), s).expect("can't write candidates");
 }
 
 pub fn evolve(cat: &Arc<Catalog>, params: &Params, cfg: &EvolveConfig) {
@@ -686,14 +697,15 @@ pub fn evolve(cat: &Arc<Catalog>, params: &Params, cfg: &EvolveConfig) {
         // 2. Racing.
         let mut alive = cands.clone();
         let mut changed = 0;
-        for stage in 0..3 {
+        let last = cfg.stages.len() - 1;
+        for stage in 0..=last {
             let mut jobs = Vec::new();
             for &c in &alive {
                 jobs.extend(schedule(&st, &checker, c, cfg.stages[stage], &mut rng));
             }
-            if stage == 2 {
+            if stage >= 2 {
                 // Elites being challenged get at least as many games.
-                let target: usize = cfg.stages.iter().sum();
+                let target: usize = cfg.stages[..=stage].iter().sum();
                 let mut seen = HashSet::new();
                 for &c in &alive {
                     if let Some(e) = st.archive[niche(cat, &st.entries[c].army)] {
@@ -723,7 +735,7 @@ pub fn evolve(cat: &Arc<Catalog>, params: &Params, cfg: &EvolveConfig) {
                     Some(e) if e == c => {}
                     Some(e) => {
                         let er = st.entries[e].rating;
-                        if stage < 2 {
+                        if stage < last {
                             if r > er - cfg.margins[stage] {
                                 next.push(c);
                             }

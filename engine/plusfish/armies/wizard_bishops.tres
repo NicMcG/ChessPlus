@@ -1,0 +1,89 @@
+[gd_resource type="Resource" script_class="Army" format=3]
+
+[ext_resource type="Script" path="res://core/army.gd" id="1_army"]
+[ext_resource type="Script" path="res://core/army_piece.gd" id="2_piece"]
+[ext_resource type="Resource" path="res://data/pieces/pawn.tres" id="3_pawn"]
+[ext_resource type="Resource" path="res://data/pieces/wizard.tres" id="4_wizard"]
+[ext_resource type="Resource" path="res://data/pieces/king.tres" id="5_king"]
+[ext_resource type="Resource" path="res://data/pieces/rogue.tres" id="6_rogue"]
+[ext_resource type="Resource" path="res://data/pieces/berserker.tres" id="7_berserker"]
+[ext_resource type="Resource" path="res://data/pieces/lance.tres" id="8_lance"]
+[ext_resource type="Resource" path="res://data/pieces/chariot.tres" id="9_chariot"]
+[ext_resource type="Resource" path="res://data/pieces/elephant.tres" id="10_elephant"]
+[ext_resource type="Resource" path="res://data/pieces/bishop.tres" id="11_bishop"]
+[ext_resource type="Resource" path="res://data/pieces/archer.tres" id="12_archer"]
+
+[sub_resource type="Resource" id="Resource_p1"]
+script = ExtResource("2_piece")
+def = ExtResource("3_pawn")
+square = Vector2i(0, 0)
+
+[sub_resource type="Resource" id="Resource_p2"]
+script = ExtResource("2_piece")
+def = ExtResource("4_wizard")
+square = Vector2i(1, 0)
+
+[sub_resource type="Resource" id="Resource_p3"]
+script = ExtResource("2_piece")
+def = ExtResource("5_king")
+square = Vector2i(3, 0)
+
+[sub_resource type="Resource" id="Resource_p4"]
+script = ExtResource("2_piece")
+def = ExtResource("6_rogue")
+square = Vector2i(4, 0)
+
+[sub_resource type="Resource" id="Resource_p5"]
+script = ExtResource("2_piece")
+def = ExtResource("7_berserker")
+square = Vector2i(5, 0)
+
+[sub_resource type="Resource" id="Resource_p6"]
+script = ExtResource("2_piece")
+def = ExtResource("3_pawn")
+square = Vector2i(6, 0)
+
+[sub_resource type="Resource" id="Resource_p7"]
+script = ExtResource("2_piece")
+def = ExtResource("8_lance")
+square = Vector2i(0, 1)
+
+[sub_resource type="Resource" id="Resource_p8"]
+script = ExtResource("2_piece")
+def = ExtResource("9_chariot")
+square = Vector2i(1, 1)
+
+[sub_resource type="Resource" id="Resource_p9"]
+script = ExtResource("2_piece")
+def = ExtResource("3_pawn")
+square = Vector2i(2, 1)
+
+[sub_resource type="Resource" id="Resource_p10"]
+script = ExtResource("2_piece")
+def = ExtResource("10_elephant")
+square = Vector2i(3, 1)
+
+[sub_resource type="Resource" id="Resource_p11"]
+script = ExtResource("2_piece")
+def = ExtResource("11_bishop")
+square = Vector2i(4, 1)
+
+[sub_resource type="Resource" id="Resource_p12"]
+script = ExtResource("2_piece")
+def = ExtResource("11_bishop")
+square = Vector2i(5, 1)
+
+[sub_resource type="Resource" id="Resource_p13"]
+script = ExtResource("2_piece")
+def = ExtResource("12_archer")
+square = Vector2i(6, 1)
+
+[sub_resource type="Resource" id="Resource_p14"]
+script = ExtResource("2_piece")
+def = ExtResource("12_archer")
+square = Vector2i(7, 1)
+
+[resource]
+script = ExtResource("1_army")
+army_name = "Wizard Bishops"
+pieces = Array[ExtResource("2_piece")]([SubResource("Resource_p1"), SubResource("Resource_p2"), SubResource("Resource_p3"), SubResource("Resource_p4"), SubResource("Resource_p5"), SubResource("Resource_p6"), SubResource("Resource_p7"), SubResource("Resource_p8"), SubResource("Resource_p9"), SubResource("Resource_p10"), SubResource("Resource_p11"), SubResource("Resource_p12"), SubResource("Resource_p13"), SubResource("Resource_p14")])

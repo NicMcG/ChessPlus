@@ -1,0 +1,23 @@
+Standard                     RNBQKBNR/PPPPPPPP                     39 pts  legal
+Queen Lance Line             LPP(CV)KQBP/L(NC)PP(CH)PPA            38 pts  legal
+Lancer Host                  (CH)N(CV)PKBPP/LAP(NC)MB(RO)L       38.5 pts  legal
+Wizard Archers               WP1K(RO)P(RM)1/L(NC)PP(CV)BAA       38.5 pts  legal
+Queen Chariots               CB2KP(CH)L/(BR)BQ(CV)(CH)1(NC)1       39 pts  legal
+Twin Necromancers            AP(CH)1K(NC)QB/PBPPPA(NC)P            39 pts  legal
+Knights and Lances           (CH)NBKE(RM)PP/L(CV)P(NC)NBAL         39 pts  legal
+Wizard Bishops               PW1K(RO)(BR)P1/L(CH)PEBBAA            39 pts  legal
+Wizard Pawn Wall             CPPMKW(RM)L/APPP(CH)PPL             38.5 pts  legal
+Berserker Wall               RNBQKBNR/1(BR)PPP(BR)2                39 pts  legal
+
+rank army                            Elo  +-95%   score    vs Std  +-95%   h2h Std   in pool  +-95%
+1    Lancer Host                    +232     38   71.9%      +639     71     67.5%      +187     36
+2    Wizard Bishops                 +221     37   70.7%      +628     70     98.3%      +176     36
+3    Knights and Lances             +158     36   64.4%      +564     68     70.0%      +113     35
+4    Queen Lance Line               +151     36   63.7%      +557     68     92.5%      +105     35
+5    Twin Necromancers              +125     35   61.0%      +531     68     94.2%       +79     34
+6    Wizard Archers                 +109     35   59.4%      +516     67     95.8%       +64     34
+7    Queen Chariots                  +26     34   50.7%      +433     66     99.2%       -19     34
+8    Wizard Pawn Wall               -128     36   35.2%      +279     64     85.8%      -173     37
+9    Standard                       -407     51   13.6%         0                 
+10   Berserker Wall                 -487     57    9.3%       -81     71     74.2%      -533     58
+White's first-move edge: +171 Elo

@@ -199,9 +199,13 @@ keeps its best army:
   (references and current elites, both colours), with a weak prior (mean 0,
   sd 200) so a few lucky games don't crown a champion.
 * **Racing**: every candidate plays 12 games; it plays 12 more if within 60
-  Elo of its niche's elite, then 24 more if within 25; it replaces the elite
-  only if still rated higher after that (the elite is topped up to the same
-  number of games). An empty niche takes the first army that lands in it.
+  Elo of its niche's elite, 24 more if within 25, and 48 more (96 in all) if
+  ahead; it replaces the elite only if still rated higher after that. From
+  the third stage on, the elite is topped up to the same number of games.
+  The last stage matters: with only 48 games, the luckiest of hundreds of
+  challengers took over niches at +400 to +500, and over-rated elites
+  inflated the ratings of everyone who played them. An empty niche takes the
+  first army that lands in it.
 * **The king-capture bug**: pairings where a king starts attacked are never
   played, and candidates whose king is attacked, or who attack the other
   king, at the start against more than `--max-exposure` (3%) of 300 random
