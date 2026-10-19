@@ -1,0 +1,157 @@
+extends TestSuite
+
+## Testing mode (Mac's design, Oct 2026): set up any position, with captured
+## pieces and either side to move, and play it as two players with the eval bar on.
+
+func _def(id: String) -> PieceDef:
+	for def in PieceCatalog.all_defs():
+		if def.id == id:
+			return def
+		if def.transforms_into and def.transforms_into.id == id:
+			return def.transforms_into
+	return null
+
+func _kings(position: TestingPosition) -> void:
+	position.place(Board.parse_square("e1"), _def("king"), Piece.Team.WHITE)
+	position.place(Board.parse_square("e8"), _def("king"), Piece.Team.BLACK)
+
+func test_standard_position_plays_like_chess() -> void:
+	var state := TestingPosition.standard().create_state()
+	check_eq(state.moves().size(), 20, "20 first moves")
+	check_eq(Fen.write(state).split(" ")[0], "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR", "Same board")
+
+func test_black_to_move_and_captured_pieces() -> void:
+	var position := TestingPosition.new()
+	_kings(position)
+	position.place(Board.parse_square("d2"), _def("necromancer"), Piece.Team.WHITE)
+	position.captured.append([_def("queen"), Piece.Team.WHITE])
+	position.captured.append([_def("ghost"), Piece.Team.BLACK])
+	position.side_to_move = Piece.Team.BLACK
+	check(position.problems().is_empty(), "A fine position: %s" % [position.problems()])
+	var state := position.create_state()
+	check_eq(state.side_to_move, Piece.Team.BLACK, "Black moves first")
+	check_eq(state.lost[Piece.Team.WHITE].size(), 1, "White has lost a queen")
+	check(state.moves().any(func(m: Move) -> bool: return m.ability == PieceDef.Ability.HAUNT), "Black's captured Ghost can Haunt")
+	state.make_move(state.moves()[0])
+	check(state.find_move("d2!=Q") != null, "White's Necromancer can raise the captured Queen")
+
+func test_pieces_start_unmoved() -> void:
+	var position := TestingPosition.new()
+	_kings(position)
+	position.place(Board.parse_square("a1"), _def("rook"), Piece.Team.WHITE)
+	position.place(Board.parse_square("c3"), _def("pawn"), Piece.Team.WHITE)
+	var state := position.create_state()
+	check(state.find_move("c3-c5") != null, "A pawn anywhere gets its double step")
+	check(state.find_move("e1-c1") != null, "The King can castle with a Rook in its corner")
+
+func test_wolf_form_can_be_placed() -> void:
+	var position := TestingPosition.new()
+	_kings(position)
+	position.place(Board.parse_square("d4"), _def("werewolf_wolf"), Piece.Team.WHITE)
+	var piece := position.create_state().board.get_piece(Board.parse_square("d4"))
+	check_eq(piece.starting_def(), _def("werewolf"), "It knows it was a Werewolf")
+	check(not piece.can_use_ability(), "No Full Moon left")
+
+func test_problems() -> void:
+	var position := TestingPosition.new()
+	check_eq(position.problems(), PackedStringArray(["White needs exactly one King.", "Black needs exactly one King."]), "Empty board")
+	_kings(position)
+	position.place(Board.parse_square("d1"), _def("king"), Piece.Team.WHITE)
+	check(position.problems().has("White needs exactly one King."), "Two white Kings")
+	position.remove_at(Board.parse_square("d1"))
+	position.place(Board.parse_square("a8"), _def("pawn"), Piece.Team.WHITE)
+	check(position.problems().has("White's Pawn can't start on the far row."), "Pawn on the far row")
+	position.remove_at(Board.parse_square("a8"))
+	position.place(Board.parse_square("e4"), _def("rook"), Piece.Team.WHITE)
+	check_eq(position.problems(), PackedStringArray(["Black's King is in check, but it's White's move."]), "Black would start in check with White to move")
+	position.side_to_move = Piece.Team.BLACK
+	check(position.problems().is_empty(), "Fine with Black to move")
+
+func test_copy_is_separate() -> void:
+	var position := TestingPosition.standard()
+	var other := position.copy()
+	other.remove_at(Board.parse_square("e1"))
+	check(not position.get_at(Board.parse_square("e1")).is_empty(), "The original keeps its King")
+
+# --- The setup screen and the game ---------------------------------------------------
+
+func _open_setup() -> Node:
+	var setup: Node = load("res://scenes/testing/position_setup.tscn").instantiate()
+	(Engine.get_main_loop() as SceneTree).root.add_child(setup)
+	return setup
+
+func test_setting_up_a_position() -> void:
+	var setup := _open_setup()
+	check(setup.start_button.disabled == false, "Starts on the standard position, ready to play")
+	setup.clear_board()
+	check(setup.start_button.disabled, "An empty board can't start")
+	check(setup.problems_label.text.contains("needs exactly one King"), "And says why")
+	setup.choose(_def("king"))
+	setup.tap_square(Board.parse_square("e1"))
+	setup.toggle_tray_team()
+	setup.tap_square(Board.parse_square("e8"))
+	check(not setup.start_button.disabled, "Two Kings: ready")
+	setup.choose(_def("rook"))
+	setup.tap_square(Board.parse_square("a8"))
+	check_eq(setup.setup.get_at(Board.parse_square("a8")), [_def("rook"), Piece.Team.BLACK], "A black Rook on a8")
+	setup.tap_square(Board.parse_square("a8"))
+	check(setup.setup.get_at(Board.parse_square("a8")).is_empty(), "Tapping the same piece again takes it off")
+	setup.tap_square(Board.parse_square("a8"))
+	setup.choose(null)
+	setup.tap_square(Board.parse_square("a8"))
+	check(setup.setup.get_at(Board.parse_square("a8")).is_empty(), "Remove takes off whatever is tapped")
+	setup.set_side_to_move(Piece.Team.BLACK)
+	check_eq(setup.setup.side_to_move, Piece.Team.BLACK, "Black to move")
+	setup.free()
+
+func test_captured_pieces_in_setup() -> void:
+	var setup := _open_setup()
+	setup.choose(null)
+	check(setup.add_captured_button.disabled, "Nothing chosen: nothing to add")
+	setup.choose(_def("queen"))
+	setup.add_captured()
+	setup.toggle_tray_team()
+	setup.add_captured()
+	check_eq(setup.setup.captured, [[_def("queen"), Piece.Team.WHITE], [_def("queen"), Piece.Team.BLACK]], "A white and a black Queen captured")
+	setup.remove_captured(0)
+	check_eq(setup.setup.captured, [[_def("queen"), Piece.Team.BLACK]], "Tapping one puts it back")
+	setup.free()
+
+func test_tray_has_every_piece_and_the_wolf() -> void:
+	var defs: Array[PieceDef] = load("res://scenes/testing/position_setup.gd").tray_defs()
+	check_eq(defs.size(), PieceCatalog.all_defs().size() + 1, "Every piece type plus the wolf form")
+
+func test_game_from_a_testing_position() -> void:
+	var position := TestingPosition.new()
+	position.place(Board.parse_square("e1"), _def("king"), Piece.Team.WHITE)
+	position.place(Board.parse_square("e8"), _def("king"), Piece.Team.BLACK)
+	position.place(Board.parse_square("d7"), _def("pawn"), Piece.Team.BLACK)
+	position.captured.append([_def("rook"), Piece.Team.WHITE])
+	position.side_to_move = Piece.Team.BLACK
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.testing_position = position
+	(Engine.get_main_loop() as SceneTree).root.add_child(game)
+	check_eq(game.state.side_to_move, Piece.Team.BLACK, "Black moves first")
+	check_eq(game.state.lost[Piece.Team.WHITE].size(), 1, "White's Rook is already captured")
+	check(game.live_eval(), "The eval bar is always on")
+	game.play(Notation.find_move(game.state, "d5"))
+	game.new_game()
+	check_eq(game.state.history.size(), 0, "New game starts the same position again")
+	check_eq(game.state.side_to_move, Piece.Team.BLACK, "...with Black to move")
+	check(SavedGame.load_saved() == null, "Testing games aren't saved")
+	game.free()
+
+func test_main_menu_to_testing_and_back() -> void:
+	SavedGame.delete_saved()
+	var main: Node = load("res://scenes/main/main.tscn").instantiate()
+	(Engine.get_main_loop() as SceneTree).root.add_child(main)
+	main.show_testing_setup()
+	var setup: Node = main.screen
+	check(setup.has_method("tap_square"), "Testing mode's setup screen")
+	setup.start_pressed.emit(setup.setup.copy())
+	var game: Node = main.screen
+	check(game.testing_position != null, "A testing game")
+	check_eq(game.menu_button.text, "Setup", "Its Menu button goes back to the setup")
+	game.menu_requested.emit()
+	check(main.screen.has_method("tap_square"), "Back on the setup screen")
+	main.free()
