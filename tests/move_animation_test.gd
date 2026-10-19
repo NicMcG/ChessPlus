@@ -80,10 +80,14 @@ func test_promotion_flashes_into_the_new_piece() -> void:
 	var pawn := state.board.get_piece(Vector2i(0, 6))
 	var animation := _animate(state, "a8=Q")
 	var queen := state.board.get_piece(Vector2i(0, 7))
-	check(animation.has_segment(pawn, "fade_out"), "The pawn vanishes")
-	check(animation.has_segment(queen, "pop"), "The queen pops in")
+	check(animation.has_segment(pawn, "promote_rise"), "The pawn rises and spins")
+	check(animation.has_segment(queen, "promote_reveal"), "The queen appears and settles")
 	check(animation.has_extra("light"), "Burst of light")
-	check(Sound.PROMOTE in _sounds(animation), "Promotion chime")
+	check(animation.has_extra("sparkles"), "Sparkles")
+	check_eq(_sounds(animation), [Sound.MOVE, Sound.PROMOTE, Sound.SPARKLE, Sound.LAND], "Swell, sparkle, thud")
+	animation.time = MoveAnimation.SLIDE + 0.45
+	var pose: Dictionary = animation.pose(pawn)
+	check(pose.lift > 0.3 and absf(pose.scale.y) > 1.5, "Up close to the player")
 	check(not animation.pose(queen).visible, "Queen not shown at first")
 
 func test_cannon_fires_then_rolls_over() -> void:
@@ -187,3 +191,11 @@ func test_ability_builds_up_first() -> void:
 	var pose: Dictionary = animation.pose(archer)
 	check(pose.scale.x > 1.2 and pose.lift > 0.1, "Up towards the player")
 	check(animation.active_extras().all(func(e: Dictionary) -> bool: return e.kind != "arrow"), "No arrow yet")
+
+func test_en_passant_swipe() -> void:
+	var state := StandardSetup.from_fen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1")
+	var victim := state.board.get_piece(Vector2i(3, 4))
+	var animation := _animate(state, "exd6")
+	check(animation.has_segment(victim, "knock"), "The passed pawn is swept off")
+	check(animation.has_extra("slash"), "A slash across it")
+	check_eq(_sounds(animation), [Sound.SWIPE, Sound.CAPTURE], "Swipe, then the crash")

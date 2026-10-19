@@ -597,7 +597,7 @@ func _draw_posed(piece: Piece, pose: Dictionary) -> void:
 	elif sunk < 1.0:
 		var flash: float = pose.flash
 		# White at first, turning red as it fades.
-		var flash_color := Color.WHITE.lerp(Color(1, 0.15, 0.1), 1.0 - flash)
+		var flash_color: Color = pose.get("flash_color", Color.WHITE.lerp(Color(1, 0.15, 0.1), 1.0 - flash))
 		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha, flash_color * flash)
 	draw_set_transform(Vector2.ZERO)
 
@@ -631,15 +631,32 @@ func _draw_extras(extras: Array, under: bool) -> void:
 				var rect := Rect2(_point(extra.at) - Vector2(s, s) / 2, Vector2(s, s))
 				draw_rect(rect, Color(1, 0.1, 0.05, 0.55 * absf(sin(t * TAU)) * (1.0 - 0.4 * t)))
 			"light":
-				var center := _point(extra.at)
+				var center := _point(extra.at) - Vector2(0, s * extra.get("lift", 0.0))
+				var r: float = s * extra.get("size", 1.0)
 				var fade := 1.0 - t
 				# Golden by default (promotion); an ability's glow has its own colour.
 				var glow: Color = extra.get("color", Color(1, 0.95, 0.6))
-				draw_circle(center, s * (0.25 + 0.55 * t), Color(glow.lerp(Color.WHITE, 0.5), 0.35 * fade))
-				draw_circle(center, s * (0.15 + 0.3 * t), Color(glow.lerp(Color.WHITE, 0.75), 0.6 * fade))
+				draw_circle(center, r * (0.25 + 0.55 * t), Color(glow.lerp(Color.WHITE, 0.5), 0.35 * fade))
+				draw_circle(center, r * (0.15 + 0.3 * t), Color(glow.lerp(Color.WHITE, 0.75), 0.6 * fade))
 				for ray in 8:
 					var direction := Vector2.from_angle(TAU * ray / 8.0 + t)
-					draw_line(center + direction * s * 0.2, center + direction * s * (0.35 + 0.45 * t), Color(glow, 0.8 * fade), maxf(2, s * 0.04))
+					draw_line(center + direction * r * 0.2, center + direction * r * (0.35 + 0.45 * t), Color(glow, 0.8 * fade), maxf(2, r * 0.04))
+			"sparkles":
+				# Little four-pointed stars twinkling round a rising piece.
+				var center := _point(extra.at) - Vector2(0, s * 0.45 * smoothstep(0.0, 0.4, t))
+				for i in 10:
+					var angle := TAU * i / 10.0 + t * 3.0
+					var radius := s * (0.55 + 0.25 * sin(i * 1.7 + t * 9.0))
+					var twinkle := absf(sin(t * 14.0 + i * 2.1)) * sin(PI * t)
+					_draw_star(center + Vector2.from_angle(angle) * radius, s * 0.09 * twinkle, Color(1, 0.95, 0.7, twinkle))
+			"slash":
+				# A white streak across the passed pawn.
+				var center := _point(extra.at)
+				var along := (_point(extra.at + (extra.dir as Vector2)) - center).normalized()
+				var reach := s * 0.6 * MoveAnimation.ease_out(minf(1.0, t * 2.0))
+				var fade := 1.0 - smoothstep(0.4, 1.0, t)
+				draw_line(center - along * s * 0.6, center - along * s * 0.6 + along * reach * 2.0, Color(1, 1, 1, 0.9 * fade), maxf(3, s * 0.07))
+				draw_line(center - along * s * 0.5, center - along * s * 0.5 + along * reach * 1.6, Color(1, 0.85, 0.5, 0.6 * fade), maxf(2, s * 0.03))
 			"ball":
 				if t < 1.0:
 					var from := _point(extra.from)
@@ -658,6 +675,16 @@ func _draw_extras(extras: Array, under: bool) -> void:
 					draw_circle(puff, s * puff_size * (0.3 + 0.35 * t), Color(color, 0.55 * (1.0 - t)))
 			"arrow":
 				_draw_flying_arrow(extra)
+
+## A small four-pointed star (a sparkle).
+func _draw_star(center: Vector2, radius: float, color: Color) -> void:
+	if radius < 0.5:
+		return
+	var thin := radius * 0.28
+	draw_colored_polygon(PackedVector2Array([
+		center + Vector2(0, -radius), center + Vector2(thin, -thin), center + Vector2(radius, 0), center + Vector2(thin, thin),
+		center + Vector2(0, radius), center + Vector2(-thin, thin), center + Vector2(-radius, 0), center + Vector2(-thin, -thin),
+	]), color)
 
 ## Crack Shot's arrow: in flight it flies point-first from the Archer to the
 ## target; then it stays stuck in the target (moving and fading with it), or,
