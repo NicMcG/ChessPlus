@@ -201,6 +201,7 @@ pub fn eval_request(input: &str, emit: &mut dyn FnMut(String)) -> Result<(), Str
         depth: req.get("depth").and_then(|v| v.as_f64()).map(|d| d as i32),
         nodes: Some(num(&req, "nodes", 100_000.0) as u64),
         movetime_ms: None,
+        soft_ms: None,
     };
     // The position after each number of moves.
     let mut positions = vec![game.start.clone()];

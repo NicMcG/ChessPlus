@@ -28,3 +28,6 @@ should be worth about as much.
 | 12 | LMR: +1 when not improving, -1 for killers/counter-moves | nodes 6k | 4258 | -3.0 ±6.0 | reverted (SPRT H0) |
 | 13 | Eval: "threatened" term, pieces attacked by a cheaper enemy piece (-30 mg / -25 eg, hand-set) | nodes 6k | 1122 | +21.7 ±12.1 | kept |
 | 14 | Use a root move from an unfinished iteration if it was fully searched and beat the window | nodes 6k | 5128 | +6.0 ±4.7 | kept |
+| 15 | Eval: extra term for threatened pieces of the side not to move | nodes 6k | 8000 | +1.6 ±4.4 | reverted |
+| 16 | Eval: king-zone attacks squared (-1.5 mg) | nodes 6k | 8000 | +1.3 ±4.4 | reverted |
+| 17 | Time management: soft target (left/35 + 3/4 inc), hard limit up to 4x; stop early when the best move is stable, later when it keeps changing | time 10+0.1 | 512 | +30.6 ±17.1 | kept |

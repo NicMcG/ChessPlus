@@ -143,11 +143,13 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                 }
                 stop.store(false, Ordering::SeqCst);
                 let num = |key: &str| words.iter().position(|&w| w == key).and_then(|i| words.get(i + 1)).and_then(|v| v.parse::<u64>().ok());
-                let mut limits = Limits { depth: num("depth").map(|d| d as i32), nodes: num("nodes"), movetime_ms: num("movetime") };
+                let mut limits = Limits { depth: num("depth").map(|d| d as i32), nodes: num("nodes"), movetime_ms: num("movetime"), soft_ms: None };
                 let my_time = if game.pos.side == 0 { num("wtime") } else { num("btime") };
                 let my_inc = if game.pos.side == 0 { num("winc") } else { num("binc") };
                 if let Some(t) = my_time {
-                    limits.movetime_ms = Some(time_for_move(t, my_inc.unwrap_or(0)));
+                    let (soft, hard) = time_for_move(t, my_inc.unwrap_or(0));
+                    limits.movetime_ms = Some(hard);
+                    limits.soft_ms = Some(soft);
                 }
                 let infinite = words.contains(&"infinite");
                 if !infinite && limits.depth.is_none() && limits.nodes.is_none() && limits.movetime_ms.is_none() {
@@ -223,9 +225,12 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
     }
 }
 
-/// How long to think with `left` ms on the clock and `inc` ms added per move.
-pub fn time_for_move(left: u64, inc: u64) -> u64 {
-    (left / 30 + inc * 3 / 4).min(left.saturating_sub(left / 10 + 20)).max(5)
+/// How long to think with `left` ms on the clock and `inc` ms added per move:
+/// (the time we aim for, the most we'll take).
+pub fn time_for_move(left: u64, inc: u64) -> (u64, u64) {
+    let soft = left / 35 + inc * 3 / 4;
+    let hard = (soft * 4).min(left / 4 + inc).min(left.saturating_sub(left / 10 + 20)).max(5);
+    (soft.min(hard), hard)
 }
 
 /// The evaluation split into its biggest parts (White's point of view).

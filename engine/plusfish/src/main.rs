@@ -193,7 +193,7 @@ fn main() {
                         if g.outcome() != Outcome::None {
                             break;
                         }
-                        let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None }, 1, |_| {});
+                        let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None, soft_ms: None }, 1, |_| {});
                         g.play(rep.lines[0].pv.first().copied().unwrap_or_else(|| g.pos.legal_moves(&r)[0]));
                     }
                 }
@@ -202,7 +202,7 @@ fn main() {
                 }
                 let mut s = Searcher::new(&r, &et, &params, 16);
                 let t = std::time::Instant::now();
-                let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: Some(depth), nodes: None, movetime_ms: None }, 1, |_| {});
+                let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: Some(depth), nodes: None, movetime_ms: None, soft_ms: None }, 1, |_| {});
                 let ms = t.elapsed().as_millis() as u64;
                 total_nodes += rep.nodes;
                 total_ms += ms;
@@ -233,7 +233,7 @@ fn main() {
                         c.make(&r, m);
                         list.push(c);
                     }
-                    let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None }, 1, |_| {});
+                    let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None, soft_ms: None }, 1, |_| {});
                     g.play(rep.lines[0].pv.first().copied().unwrap_or_else(|| g.pos.legal_moves(&r)[0]));
                 }
                 sets.push((r.clone(), list));
@@ -376,6 +376,7 @@ fn main() {
                 movetime_ms: args.get("time").and_then(|v| v.parse::<f64>().ok()).map(|s| (s * 1000.0) as u64).or(
                     if args.get("depth").is_none() && args.get("nodes").is_none() { Some(5000) } else { None },
                 ),
+                soft_ms: None,
             };
             let multipv: usize = args.num("multipv", 1);
             let mut s = Searcher::new(r, &et, &params, args.num("hash", 128));
