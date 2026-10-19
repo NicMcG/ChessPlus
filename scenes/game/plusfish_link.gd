@@ -37,6 +37,10 @@ static var pretend_available := false
 var results := {}
 
 var _request := {}
+## The moves the current results belong to, and the starting position's request
+## without moves (so a different game or a changed line isn't mixed up with it).
+var _moves_so_far: Array = []
+var _start_key := ""
 var _queue: Array[int] = []
 var _thread: Thread
 var _pid := -1
@@ -76,16 +80,48 @@ static func available() -> bool:
 ## The last position goes first, then the rest from the end backwards.
 func analyse(start: GameState, moves: Array) -> void:
 	stop()
-	results.clear()
+	_forget_other_lines(start, moves)
 	_request = request_for(start, moves)
 	_queue.clear()
 	for ply in range(moves.size(), -1, -1):
-		_queue.append(ply)
+		if not results.has(ply):
+			_queue.append(ply)
 	_run()
+
+## During a game (the eval bar while playing): evaluate only the newest
+## position, keeping what's known about earlier ones on the same line.
+func analyse_live(start: GameState, moves: Array) -> void:
+	stop()
+	_forget_other_lines(start, moves)
+	_request = request_for(start, moves)
+	if not results.has(moves.size()):
+		_queue.append(moves.size())
+	_run()
+
+## Results only stay if they're for the same starting position and the moves
+## so far are the same line (a taken-back move, a new game: start again).
+func _forget_other_lines(start: GameState, moves: Array) -> void:
+	var key := JSON.stringify(request_for(start, []))
+	var same := key == _start_key and _moves_so_far.size() <= moves.size() \
+			and moves.slice(0, _moves_so_far.size()) == _moves_so_far
+	if not same:
+		var common := 0
+		if key == _start_key:
+			while common < mini(_moves_so_far.size(), moves.size()) and _moves_so_far[common] == moves[common]:
+				common += 1
+		else:
+			common = -1
+		for ply: int in results.keys():
+			if ply > common:
+				results.erase(ply)
+	_start_key = key
+	_moves_so_far = moves.duplicate()
 
 ## Look at this position next (the one on the screen).
 func prioritise(ply: int) -> void:
-	if results.has(ply) or not _queue.has(ply) or _queue.front() == ply:
+	if results.has(ply) or _request.is_empty() or ply > _moves_so_far.size():
+		return
+	if not _queue.is_empty() and _queue.front() == ply:
 		return
 	_queue.erase(ply)
 	_queue.push_front(ply)

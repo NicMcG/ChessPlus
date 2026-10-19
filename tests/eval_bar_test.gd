@@ -83,6 +83,21 @@ func test_request_mirrors_black_armies_as_the_game_does() -> void:
 
 # --- The game screen --------------------------------------------------------------------
 
+func test_bar_during_the_game_only_when_chosen() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_game()
+	game.eval_bar_on = true
+	_play_all(game, ["e4"])
+	check(game.eval_bar.visible, "Chosen: shown during the game")
+	game.plusfish.results[1] = {"ply": 1, "cp": 30, "mate": null, "outcome": "none", "best": "e7-e5", "best_san": "e5"}
+	game._on_evaluated(1, game.plusfish.results[1])
+	check(game.eval_bar.known, "Shows the score")
+	check(game.board_view.hint_arrow.is_empty(), "But no best-move arrow while the game is on")
+	game.free()
+	PlusfishLink.pretend_available = false
+	PlusfishLink.enabled = false
+
 func test_bar_only_after_the_game() -> void:
 	PlusfishLink.enabled = true
 	PlusfishLink.pretend_available = true

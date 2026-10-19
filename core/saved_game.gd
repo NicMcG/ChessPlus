@@ -19,6 +19,8 @@ var black_army: Army
 ## The bot's Piece.Team, or -1 for a two-player game.
 var bot_team := -1
 var bot_level := PracticeBot.Level.MEDIUM
+## The eval bar was chosen for this game (it's always on against the bot).
+var eval_bar := false
 var moves: PackedStringArray = []
 
 ## A record of `state`, which was started from these armies and settings.
@@ -70,6 +72,7 @@ func to_dict() -> Dictionary:
 		"black": army_to_dict(black_army),
 		"bot_team": bot_team,
 		"bot_level": bot_level,
+		"eval_bar": eval_bar,
 		"moves": Array(moves),
 	}
 
@@ -81,6 +84,7 @@ static func from_dict(data: Dictionary) -> SavedGame:
 		return null
 	saved.bot_team = int(data.get("bot_team", -1))
 	saved.bot_level = int(data.get("bot_level", PracticeBot.Level.MEDIUM))
+	saved.eval_bar = bool(data.get("eval_bar", false))
 	for text in data.get("moves", []):
 		saved.moves.append(str(text))
 	return saved

@@ -445,7 +445,9 @@ func _save_progress() -> void:
 	if state.outcome() != GameState.Outcome.NONE:
 		SavedGame.delete_saved()
 	else:
-		SavedGame.from_state(state, white_army, black_army, bot_team, bot_level).save()
+		var saved := SavedGame.from_state(state, white_army, black_army, bot_team, bot_level)
+		saved.eval_bar = eval_bar_on
+		saved.save()
 
 ## If it's the bot's turn: block the board, say it's thinking, then let it move.
 func _start_bot_turn_if_needed() -> void:
@@ -708,10 +710,36 @@ func _start_analysis() -> void:
 func shown_ply() -> int:
 	return viewing if viewing >= 0 else state.history.size()
 
+## Whether the eval bar shows while the game is on (Mac's design): always
+## against the bot; chosen when setting up a game on one device or an online one
+## (the creator chooses for both players). After any game it shows anyway.
+var eval_bar_on := false
+
+func live_eval() -> bool:
+	if is_bot_game() or eval_bar_on:
+		return true
+	return online != null and bool(online.row.get("eval_bar", false))
+
+## While the game is on, ask Plusfish about the newest position (once per move).
+var _live_moves := -1
+
+func _start_live_analysis() -> void:
+	if _live_moves == state.history.size():
+		return
+	_live_moves = state.history.size()
+	var moves := []
+	for move in state.history:
+		moves.append(move.to_text())
+	plusfish.analyse_live(_create_start_state(), moves)
+
 ## Show (or hide) the bar, the best-move arrow and the eval in the status line
-## for the position on the board. Only after the game: never while it's on.
+## for the position on the board. The bar shows after the game, and during it
+## if live_eval(); the best-move hints only ever after the game, so the engine
+## never tells anyone what to play.
 func _update_eval_bar() -> void:
-	var on := is_over() and PlusfishLink.available()
+	var on := (is_over() or live_eval()) and PlusfishLink.available()
+	if on and not is_over():
+		_start_live_analysis()
 	eval_bar.visible = on
 	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if on else 1.0
 	status_label.text = _status_base
@@ -735,7 +763,7 @@ func _update_eval_bar() -> void:
 	elif found.get("outcome", "none") != "none":
 		result = "1/2-1/2"
 	eval_bar.set_score(int(found["cp"]), found.get("mate"), result)
-	var best: String = found.get("best", "")
+	var best: String = found.get("best", "") if is_over() else ""
 	board_view.hint_arrow = _arrow_for(best)
 	if best != "" and result == "":
 		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
@@ -748,7 +776,7 @@ func _arrow_for(move_text: String) -> Array:
 	return [Board.parse_square(found.get_string(1)), Board.parse_square(found.get_string(2))]
 
 func _on_evaluated(ply: int, _result: Dictionary) -> void:
-	if is_over() and ply == shown_ply():
+	if (is_over() or live_eval()) and ply == shown_ply():
 		_update_eval_bar()
 
 # --- The result screen ----------------------------------------------------------
@@ -771,6 +799,7 @@ func _update_game_over() -> void:
 		_start_analysis()
 	elif not over and _was_over:
 		plusfish.stop()
+		_live_moves = -1
 	_was_over = over
 
 func show_game_over() -> void:
@@ -1005,7 +1034,7 @@ func _rematch_with(army: Variant, side := OnlineSession.SIDE_RANDOM) -> void:
 		return
 	game_over_panel.set_note("Setting up the rematch...")
 	var next := _new_session()
-	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)))
+	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)), bool(online.row.get("eval_bar", false)))
 	if not created.ok:
 		_rematch_failed(next, "Couldn't set up a rematch: " + created.error)
 		return

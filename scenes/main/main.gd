@@ -159,12 +159,14 @@ func show_match_setup() -> void:
 	var setup := MATCH_SETUP.instantiate()
 	setup.library = library
 	setup.closed.connect(show_main_menu)
-	setup.start_requested.connect(start_game)
+	setup.start_requested.connect(func(white: Army, black: Army, bot_team: int, bot_level: int) -> void:
+		start_game(white, black, bot_team, bot_level, setup.eval_bar_wanted()))
 	_show(setup)
 
 ## `bot_team` is the practice bot's side (Piece.Team), or -1 for two players.
-func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeBot.Level.MEDIUM) -> void:
+func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeBot.Level.MEDIUM, eval_bar := false) -> void:
 	var game := GAME.instantiate()
+	game.eval_bar_on = eval_bar
 	game.white_army = white
 	game.black_army = black
 	game.bot_team = bot_team
@@ -183,6 +185,7 @@ func continue_game() -> void:
 	game.black_army = saved.black_army
 	game.bot_team = saved.bot_team
 	game.bot_level = saved.bot_level
+	game.eval_bar_on = saved.eval_bar
 	game.resume = saved
 	game.menu_requested.connect(show_main_menu)
 	_show(game)
