@@ -159,3 +159,13 @@ func test_no_castling_with_rook_off_the_corner() -> void:
 
 func test_no_castling_when_too_close() -> void:
 	check_eq(_castles(_army([[KING, Vector2i(6, 0)], [ROOK, Vector2i(7, 0)]])), [], "King next to the rook")
+
+func test_king_attacked_from_the_start_loses() -> void:
+	# Mac's temporary rule: a White rook on an open file straight at Black's king.
+	var white := _army([[KING, Vector2i(4, 0)], [ROOK, Vector2i(3, 0)]])
+	var black := _army([[KING, Vector2i(4, 0)]])
+	var game := ArmySetup.create_game(white, black, rules)
+	check_eq(game.outcome(), GameState.Outcome.KING_EXPOSED, "Black's king is attacked before White's first move")
+	check_eq(game.result_text(), "1-0", "Black loses")
+	var normal := ArmySetup.create_game(StandardSetup.army(), StandardSetup.army(), rules)
+	check_eq(normal.outcome(), GameState.Outcome.NONE, "A normal start isn't affected")

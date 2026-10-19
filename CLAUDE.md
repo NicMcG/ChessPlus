@@ -128,6 +128,11 @@ Steps 1–4 DONE: army data and rules, army builder screen, saving up to 10 armi
 * Piece card: "Special Rule" (`PieceDef.special_rule`, text in the .tres; the cannon's moved there) and "Special Ability" (`PieceDef.ability_name` / `ability_text`) sections. Pieces without art show their letters (`board_view_test.ART_TO_COME` lists them).
 * Attack detection: `MoveGenerator.attack_table` returns [lines, unusual]; leaping/path rules (`MoveRule.is_unusual()`) are checked from each such piece (`_rule_reaches`). `movement_pieces_test.test_attack_detection_matches_captures` cross-checks attacks against generated captures.
 
+## Open questions for Mac (noted, to decide later)
+
+* **King attacked from the start** (found by Plusfish: about 5.5% of legal army pairings): an army can leave the other king attacked before the first move, so White could capture Black's king on move 1. Temporary rule (Mac, Oct 2026): that side loses at once (`GameState.Outcome.KING_EXPOSED`, checked only before any move; result screen "King exposed"). Online games end on both screens but the server row isn't marked finished. Plusfish doesn't know this rule yet. Mac will design a real fix later.
+* **Piece costs:** balancing data (my rounds 1-2 in `balance/results/`, and Plusfish's `engine/plusfish/reports/FINDINGS.md`) agree the Lance and Necromancer are underpriced and the Ram overpriced; Plusfish also says the Queen and Archer are underpriced and the Cannon slightly overpriced. Mac: hold off on price changes for now. Raising the Queen would push the Standard army over the 39 budget.
+
 ## Previous milestone: playable board (pass and play)
 
 Done: tap- and drag-to-move board, undo, promotion picker, results, move list, Cburnett pieces. Possible later: move animation (Tweens), menus, sounds.
