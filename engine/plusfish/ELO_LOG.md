@@ -17,3 +17,4 @@ should be worth about as much.
 | 1 | Bad captures (rough exchange estimate; Ram counts as lost): ordered after killers, skipped in quiescence | nodes 6k | 982 | +33.4 ±13.8 | kept |
 | 2 | History: penalties for quiet moves that didn't cut off, bounded updates; LMR reduces less for good history | nodes 6k | 8000 | +4.5 ±4.6 | kept (marginal) |
 | 3 | Transposition table in quiescence (probe, cutoffs, store, hash move first) | nodes 6k | 1290 | +21.3 ±10.8 | kept |
+| 4 | Internal iterative reduction (depth-1 when no hash move, depth >= 4) | nodes 6k | 8000 | +2.1 ±4.0 | reverted (no gain shown; retry deep) |
