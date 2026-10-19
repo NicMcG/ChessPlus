@@ -69,10 +69,13 @@ const KNOWN_ABILITIES := PieceDef.Ability.FULL_MOON
 
 ## True if Plusfish knows every rule of the pieces in `state`. A piece with a
 ## newer special ability gets no eval bar until Plusfish is updated for it.
+## Parapets too, for now: Plusfish still has the first Parapet rule (nothing
+## leaps over it), but Mac changed it (Oct 2026) so only the opponent's pieces
+## are stopped, and a wrong evaluation is worse than none.
 static func supports(state: GameState) -> bool:
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		for piece: Piece in state.board.pieces_of(team).values():
-			if piece.def.ability > KNOWN_ABILITIES:
+			if piece.def.ability > KNOWN_ABILITIES or piece.def.blocks_jumps:
 				return false
 	return true
 
