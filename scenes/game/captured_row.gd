@@ -10,6 +10,14 @@ extends Control
 ## Pieces shown, and this player's material lead in points (0 or less = none shown).
 var pieces: Array[Piece] = []
 var advantage := 0.0
+## A captured Ghost whose player is choosing where it comes back (Haunt): it's
+## drawn with a ghostly aura rising off it. Null the rest of the time.
+var haunting: Piece:
+	set(value):
+		haunting = value
+		set_process(value != null)
+		queue_redraw()
+
 ## How far in from the left to start, so the row lines up with the board's edge.
 var inset := 0.0:
 	set(value):
@@ -22,6 +30,26 @@ const OVERLAP := 0.45      # How far the next copy of the same type sits along.
 func _init() -> void:
 	custom_minimum_size.y = 38
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	set_process(false)
+
+func _process(_delta: float) -> void:
+	queue_redraw()
+
+## The haunting Ghost's aura: pale blue light pulsing round it, with wisps
+## drifting up off it and fading.
+func _draw_aura(rect: Rect2) -> void:
+	var seconds := Time.get_ticks_msec() / 1000.0
+	var center := rect.get_center()
+	var r := rect.size.x * 0.5
+	var pulse := 0.5 + 0.5 * sin(seconds * 3.0)
+	for ring in 4:
+		var k := 1.0 + ring * 0.28 + pulse * 0.12
+		draw_circle(center, r * k, Color(0.65, 0.85, 1.0, 0.16 - ring * 0.03))
+	for wisp in 5:
+		var t := fmod(seconds * 0.6 + wisp * 0.2, 1.0)
+		var x := center.x + r * 0.9 * sin(wisp * 2.3 + t * 4.0)
+		var y := center.y - r * 0.3 - t * r * 2.2
+		draw_circle(Vector2(x, y), r * (0.22 - 0.12 * t), Color(0.8, 0.92, 1.0, 0.5 * sin(PI * t)))
 
 ## Show what `team` has captured in `state`.
 func show_for(state: GameState, team: Piece.Team) -> void:
@@ -70,6 +98,8 @@ func _draw() -> void:
 			x += icon * (OVERLAP if piece.def.id == last_id else 0.85)
 		last_id = piece.def.id
 		var texture := PieceArt.texture_for(piece.def, piece.team)
+		if piece == haunting:
+			_draw_aura(Rect2(x, top, icon, icon))
 		if texture:
 			draw_texture_rect(texture, Rect2(x, top, icon, icon), false)
 		else:

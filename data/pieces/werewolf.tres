@@ -25,4 +25,4 @@ ability = 5
 transforms_into = ExtResource("3_form")
 ability_colors = PackedColorArray(0.961, 0.949, 0.89, 1, 0.557, 0.584, 0.62, 1)
 ability_name = "Full Moon"
-ability_text = "Once per game: the Werewolf turns into a wolf for the rest of the game. The wolf moves 1 square sideways or straight back, or up to 2 squares straight forward or diagonally forward (it can be blocked). Uses your turn."
+ability_text = "Once per game: the Werewolf turns into a wolf for the rest of the game (press After Full Moon to see how the wolf moves). Uses your turn."

@@ -51,9 +51,9 @@ func test_ghost_haunts_after_capture() -> void:
 	var state := _game("3rk3/8/8/8/3G4/8/8/4K3 b - - 0 1")
 	_play(state, "d8xd4")
 	var haunts := _abilities(state, PieceDef.Ability.HAUNT)
-	# Ranks 1-4 have 32 squares; the white King and the black Rook stand on two.
-	check_eq(haunts.size(), 30, "Any empty square in White's half")
-	check(state.find_move("@a1") != null and state.find_move("@a5") == null, "Not in Black's half")
+	# 64 squares; the two Kings and the black Rook stand on three.
+	check_eq(haunts.size(), 61, "Any empty square of the board")
+	check(state.find_move("@a1") != null and state.find_move("@a8") != null, "Either side's half")
 	check(state.find_move("@d4") == null and state.find_move("@e1") == null, "Not on an occupied square")
 	var ghost := haunts[0].piece
 	var haunt := _play(state, "@c3")
@@ -75,10 +75,10 @@ func test_ghost_haunts_once() -> void:
 	_play(state, "d4xd3")
 	check(_abilities(state, PieceDef.Ability.HAUNT).is_empty(), "Captured a second time, it stays lost")
 
-func test_black_ghost_haunts_its_own_half_and_can_give_check() -> void:
+func test_black_ghost_haunts_and_can_give_check() -> void:
 	var state := _game("3g4/7k/8/4K3/8/8/8/3R4 w - - 0 1")
 	_play(state, "d1xd8")
-	check(state.find_move("@a5") != null and state.find_move("@a4") == null, "Black's half is ranks 5-8")
+	check(state.find_move("@a1") != null, "Anywhere, even White's back rank")
 	var haunt := state.find_move("@d6")
 	check_eq(Notation.san(state, haunt), "G@d6+", "Coming back can give check (it attacks e5)")
 	check_eq(Notation.find_move(state, "G@d6").to_text(), "@d6", "Found by its text")
@@ -124,6 +124,18 @@ func test_song_of_slumber_freezes_one_turn() -> void:
 func test_song_of_slumber_never_targets_a_king_or_own_piece() -> void:
 	var state := _game("8/8/8/8/8/1k6/2N5/1(BD)5K w - - 0 1")
 	check(_abilities(state, PieceDef.Ability.SONG_OF_SLUMBER).is_empty(), "Its own Knight and the enemy King aren't targets")
+
+func test_song_of_slumber_answers_a_check() -> void:
+	# The Knight on f3 checks the King on e1; asleep, it can't take the King next
+	# turn, so singing to it is a way out of check (Mac's rule).
+	var state := _game("4k3/8/8/8/8/5n2/8/3(BD)K3 w - - 0 1")
+	check(state.is_in_check(), "White is in check")
+	var song := state.find_move("d1~f3")
+	check(song != null, "Song of Slumber on the checking Knight is legal")
+	check(state.find_move("d1-c2") == null, "An ordinary Bard move still isn't")
+	state.make_move(song)
+	_play(state, "e8-d8")
+	check(state.is_in_check(), "Awake again on White's next turn, it checks again")
 
 func test_putting_the_last_free_piece_to_sleep_is_stalemate() -> void:
 	# Black's King on h8 can't move and its pawn is blocked: only the Knight can.
@@ -194,12 +206,14 @@ func test_haunt_button_appears_when_the_ghost_is_lost() -> void:
 	check_eq(game.ability_button.text, "HAUNT", "Named after the ability")
 	game.use_ability()
 	check(game.board_view.aiming, "Choosing a square")
-	check_eq(game.status_label.text, "Haunt: choose a square", "Status asks for a square")
-	game.board_view.tap(Board.parse_square("a5"))
-	check_eq(game.state.history.size(), 1, "Black's half isn't offered")
+	check_eq(game.status_label.text, "Haunt: tap any empty square", "Status asks for a square")
+	check(game.captured_top.haunting != null or game.captured_bottom.haunting != null, "The captured Ghost glows in the captures row")
+	game.board_view.tap(Board.parse_square("d4"))
+	check_eq(game.state.history.size(), 1, "Not onto a piece")
 	game.use_ability()
 	game.board_view.tap(Board.parse_square("c3"))
 	check_eq(game.state.history.size(), 2, "The Ghost came back")
+	check(game.captured_top.haunting == null and game.captured_bottom.haunting == null, "Its glow is gone")
 	check_eq(game.state.board.get_piece(Board.parse_square("c3")).def.id, "ghost", "On c3")
 	check(not game.ability_button.visible, "Button gone: Haunt is used up")
 	game.free()
@@ -233,6 +247,23 @@ func test_full_moon_on_screen() -> void:
 	game.use_ability()
 	check_eq(game.state.board.get_piece(Board.parse_square("d4")).def.id, "werewolf_wolf", "Turned at once, no target needed")
 	game.free()
+
+func test_werewolf_card_turns_over_to_the_wolf() -> void:
+	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
+	(Engine.get_main_loop() as SceneTree).root.add_child(card)
+	card.show_piece(_def("werewolf"))
+	check(card._form_button and card._form_button.visible, "The Werewolf's card has a button for the wolf")
+	check_eq(card._form_button.text, "After Full Moon", "Named after the ability")
+	card._form_button.pressed.emit()
+	check_eq(card.def, _def("werewolf").transforms_into, "Now showing the wolf's moves")
+	check_eq(card._form_button.text, "Before Full Moon", "And a way back")
+	card.turn_over()
+	check_eq(card.def, _def("werewolf"), "Back to the human")
+	card.show_piece(_def("werewolf").transforms_into)
+	check_eq(card._form_button.text, "Before Full Moon", "A wolf's own card (in a game) can turn back too")
+	card.show_piece(_def("knight"))
+	check(not card._form_button.visible, "Other pieces have no such button")
+	card.free()
 
 func test_animations() -> void:
 	var state := _game("4k3/8/8/6n1/8/8/8/2(BD)1K3 w - - 0 1")
