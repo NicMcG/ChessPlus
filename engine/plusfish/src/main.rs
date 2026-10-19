@@ -296,7 +296,8 @@ fn main() {
             let white_pov = g.pos.side == WHITE;
             println!("\nScores are from White's point of view, in pawns (+ = White better).");
             println!("{:>5} {:>8} {:>10} {:>7}  line", "depth", "score", "nodes", "time");
-            let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], limits, multipv, |rep| {
+            let search_threads: usize = args.num("threads", 1);
+            let rep = s.search_threads(&g.pos, &g.keys[..g.keys.len() - 1], limits, multipv, search_threads, |rep| {
                 for (i, l) in rep.lines.iter().enumerate() {
                     let sc = if white_pov { l.score } else { -l.score };
                     println!(
