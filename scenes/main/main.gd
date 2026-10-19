@@ -186,6 +186,7 @@ func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeB
 	game.bot_team = bot_team
 	game.bot_level = bot_level
 	game.menu_requested.connect(show_main_menu)
+	game.armies_requested.connect(show_match_setup)
 	_show(game)
 
 ## Testing mode: set up a position (`position` to carry on editing one, or
