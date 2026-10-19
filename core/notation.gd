@@ -20,6 +20,14 @@ static func san(state: GameState, move: Move) -> String:
 	if move.ability == PieceDef.Ability.RAISE_DEAD:
 		# Text only (for tests and saving): NC!=Q
 		return move.piece.def.symbol.to_upper() + "!=" + move.raised.def.symbol.to_upper() + _check_suffix(state, move)
+	# Text only too: G@e3 (Haunt), BDc1~g5 (Song of Slumber), WWe4! (Full Moon).
+	var letters := move.piece.def.symbol.to_upper()
+	if move.ability == PieceDef.Ability.HAUNT:
+		return letters + "@" + Board.square_name(move.to) + _check_suffix(state, move)
+	if move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		return letters + Board.square_name(move.from) + "~" + Board.square_name(move.to) + _check_suffix(state, move)
+	if move.ability == PieceDef.Ability.FULL_MOON:
+		return letters + Board.square_name(move.from) + "!" + _check_suffix(state, move)
 	if move.is_castling():
 		text = "O-O" if move.to.x > move.from.x else "O-O-O"
 	else:
@@ -67,6 +75,14 @@ static func _picture(state: GameState, move: Move, check_suffix: String) -> Arra
 		parts.append({"icon": ABILITY_ICON})
 		if move.ability == PieceDef.Ability.RAISE_DEAD:
 			parts.append({"piece": move.raised.def, "team": move.raised.team})
+		elif move.ability == PieceDef.Ability.HAUNT:
+			# [ghost] [lightning bolt] e3: where it came back.
+			parts.append({"text": Board.square_name(move.to)})
+		elif move.ability == PieceDef.Ability.FULL_MOON:
+			# [werewolf] [lightning bolt] [wolf].
+			parts.append({"piece": move.piece.def.transforms_into, "team": move.piece.team})
+		elif move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
+			parts.append({"piece": move.frozen.def, "team": move.frozen.team})
 		else:
 			var target := move.captured if move.captured else move.shield_target
 			parts.append({"piece": target.def, "team": target.team})

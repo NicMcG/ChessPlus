@@ -49,7 +49,36 @@ PIECES = {
         (ALL8, 1, 2, {}),
     ], extra={"decoy": "true"},
         special_rule="When an enemy would capture one of your pieces (not a pawn) on a square the Jester could move or capture to, they swap places and the Jester is captured instead."),
+    # Batch 3: abilities (PieceDef.Ability HAUNT = 3, SONG_OF_SLUMBER = 4,
+    # FULL_MOON = 5). Colours are the ability's gradient, left to right.
+    "ghost": dict(name="Ghost", symbol="G", value=3, rules=[
+        (DIAG, 1, 0, {}),
+        ([(0, 1)], 1, 0, {}),
+    ], ability=3, ability_name="Haunt", colors=["#A8D4F5", "#F0F8FF"],
+        ability_text="Once per game, after the Ghost has been captured: on a later turn, put it back on any empty square in your half of the board. Uses your turn."),
+    "bard": dict(name="Bard", symbol="BD", value=3.5, rules=[
+        (DIAG, 4, 0, {}),
+    ], ability=4, ability_name="Song of Slumber", colors=["#F5C542", "#C46A12"],
+        ability_text="Once per game: choose an enemy piece (not the King) that the Bard could capture. It can't move on your opponent's next turn. Uses your turn."),
+    "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
+        (DIAG, 1, 0, {}),
+        ([(0, 1)], 1, 0, {}),
+    ], ability=5, ability_name="Full Moon", colors=["#F5F2E3", "#8E959E"], transforms_into="forms/werewolf_wolf",
+        ability_text="Once per game: the Werewolf turns into a wolf for the rest of the game. The wolf moves 1 square sideways or straight back, or up to 2 squares straight forward or diagonally forward (it can be blocked). Uses your turn."),
+    # The Werewolf after Full Moon. Kept in forms/ so the army builder doesn't offer it.
+    "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3, path="forms/werewolf_wolf", rules=[
+        ([(1, 0), (-1, 0), (0, -1)], 1, 0, {}),
+        ([(1, 1), (-1, 1), (0, 1)], 2, 0, {}),
+    ], special_rule="A Werewolf that has used its Full Moon: a wolf for the rest of the game."),
 }
+
+
+def color_list(colors):
+    values = []
+    for c in colors:
+        c = c.lstrip("#")
+        values += ["%.3g" % (int(c[i:i + 2], 16) / 255) for i in (0, 2, 4)] + ["1"]
+    return "PackedColorArray(%s)" % ", ".join(values)
 
 
 def vec_list(dirs):
@@ -59,7 +88,10 @@ def vec_list(dirs):
 def write(piece_id, spec):
     lines = ['[gd_resource type="Resource" script_class="PieceDef" format=3]', "",
              '[ext_resource type="Script" path="res://core/move_rule.gd" id="1_rule"]',
-             '[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]', ""]
+             '[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]']
+    if spec.get("transforms_into"):
+        lines.append('[ext_resource type="Resource" path="res://data/pieces/%s.tres" id="3_form"]' % spec["transforms_into"])
+    lines.append("")
     names = []
     for i, (dirs, steps, mode, extra) in enumerate(spec["rules"]):
         name = "Resource_rule%d" % (i + 1)
@@ -83,10 +115,17 @@ def write(piece_id, spec):
         lines.append("keywords = %d" % spec["keywords"])
     for key, value in spec.get("extra", {}).items():
         lines.append("%s = %s" % (key, value))
+    if spec.get("ability"):
+        lines.append("ability = %d" % spec["ability"])
+    if spec.get("transforms_into"):
+        lines.append('transforms_into = ExtResource("3_form")')
+    if spec.get("colors"):
+        lines.append("ability_colors = " + color_list(spec["colors"]))
     for key in ("special_rule", "ability_name", "ability_text"):
         if spec.get(key):
             lines.append('%s = "%s"' % (key, spec[key].replace('"', '\\"')))
-    io.open("data/pieces/%s.tres" % piece_id, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")
+    path = "data/pieces/%s.tres" % spec.get("path", piece_id)
+    io.open(path, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")
 
 
 if __name__ == "__main__":

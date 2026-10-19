@@ -71,8 +71,13 @@ static func write(state: GameState) -> String:
 ## Reads the piece-placement field. The board's size comes from the text itself.
 static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 	var by_symbol := {}
+	# What each changed form started as (a wolf was a Werewolf).
+	var started_as := {}
 	for def in defs:
 		by_symbol[def.symbol.to_upper()] = def
+		if def.transforms_into:
+			by_symbol[def.transforms_into.symbol.to_upper()] = def.transforms_into
+			started_as[def.transforms_into] = def
 	var rows := text.split("/")
 	var height := rows.size()
 	var width := _row_width(rows[0])
@@ -110,6 +115,7 @@ static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 				return null
 			var team := Piece.Team.WHITE if letters == letters.to_upper() else Piece.Team.BLACK
 			last = Piece.new(def, team)
+			last.base_def = started_as.get(def)
 			board.set_piece(Vector2i(file, rank), last)
 			file += 1
 		if file != width:

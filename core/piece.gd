@@ -14,6 +14,9 @@ var shield_broken: bool = false
 var gained_shield: bool = false
 ## For pieces with a special ability: true once it has been used (once per game).
 var ability_used: bool = false
+## For a piece that has changed into another type (a Werewolf after Full Moon):
+## the type it started the game as. Null if it hasn't changed.
+var base_def: PieceDef
 
 func _init(p_def: PieceDef, p_team: Team) -> void:
 	def = p_def
@@ -27,6 +30,10 @@ func has_active_shield() -> bool:
 ## True if this piece has a special ability it hasn't used yet.
 func can_use_ability() -> bool:
 	return def.ability != PieceDef.Ability.NONE and not ability_used
+
+## The type this piece started the game as (what Raise Dead brings back).
+func starting_def() -> PieceDef:
+	return base_def if base_def else def
 
 ## The other team: WHITE gives BLACK, BLACK gives WHITE.
 static func other_team(p_team: Team) -> Team:

@@ -51,12 +51,25 @@ func attack_table(team: Piece.Team) -> Array:
 		for def in rules.promotion_options:
 			if not defs.has(def):
 				defs.append(def)
-		# Lost pieces could come back (Raise Dead).
+		# Lost pieces could come back (Raise Dead, Haunt), as what they started as.
 		for piece: Piece in lost[team]:
-			if not defs.has(piece.def):
-				defs.append(piece.def)
+			for def: PieceDef in [piece.def, piece.starting_def()]:
+				if not defs.has(def):
+					defs.append(def)
+		# A piece that can change (Full Moon) attacks as its new form afterwards.
+		for i in range(defs.size()):
+			var form := defs[i].transforms_into
+			if form and not defs.has(form):
+				defs.append(form)
 		_attack_tables[team] = MoveGenerator.attack_table(team, defs)
 	return _attack_tables[team]
+
+## The piece the opponent's Song of Slumber put to sleep: it can't move this
+## turn. Null if the last move wasn't a Song of Slumber.
+func frozen_piece() -> Piece:
+	if history.is_empty():
+		return null
+	return history.back().frozen
 
 ## True if the side to move has a royal piece under attack.
 func is_in_check() -> bool:
@@ -107,6 +120,27 @@ func make_move(move: Move) -> void:
 		move.raised_lost_index = lost[move.piece.team].find(move.raised_from_lost)
 		lost[move.piece.team].remove_at(move.raised_lost_index)
 		board.set_piece(move.from, move.raised)
+		_clear_en_passant()
+		_next_turn()
+		return
+	if move.ability == PieceDef.Ability.HAUNT:
+		# The lost Ghost comes back onto the board.
+		move.raised_lost_index = lost[move.piece.team].find(move.piece)
+		lost[move.piece.team].remove_at(move.raised_lost_index)
+		board.set_piece(move.to, move.piece)
+		move.piece.has_moved = true
+		_clear_en_passant()
+		_next_turn()
+		return
+	if move.ability == PieceDef.Ability.FULL_MOON:
+		# The Werewolf becomes the wolf, on the same square.
+		move.piece.base_def = move.piece.def
+		move.piece.def = move.piece.def.transforms_into
+		_clear_en_passant()
+		_next_turn()
+		return
+	if move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		# Nothing moves: frozen_piece() reads the target from this move.
 		_clear_en_passant()
 		_next_turn()
 		return
@@ -194,6 +228,16 @@ func undo_move(move: Move) -> void:
 		lost[move.piece.team].insert(move.raised_lost_index, move.raised_from_lost)
 		board.set_piece(move.from, move.piece)
 		return
+	if move.ability == PieceDef.Ability.HAUNT:
+		board.set_piece(move.to, null)
+		lost[move.piece.team].insert(move.raised_lost_index, move.piece)
+		return
+	if move.ability == PieceDef.Ability.FULL_MOON:
+		move.piece.def = move.piece.base_def
+		move.piece.base_def = null
+		return
+	if move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		return
 	if move.attacker_died:
 		lost[move.piece.team].pop_back()
 		move.attacker_died = false
@@ -268,8 +312,11 @@ func _position_key() -> String:
 ## pieces that stay on one square color (like bishops), all on the same color.
 ## Custom pieces will need more thought here later.
 func _checkmate_impossible() -> bool:
-	# A Necromancer that can still bring a piece back changes everything.
+	# A Necromancer that can still bring a piece back, or a Ghost that can still
+	# come back, changes everything.
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		if not MoveGenerator.haunting_ghosts(self, team).is_empty():
+			return false
 		if not MoveGenerator.raisable_defs(self, team).is_empty():
 			for piece: Piece in board.pieces_of(team).values():
 				if piece.can_use_ability() and piece.def.ability == PieceDef.Ability.RAISE_DEAD:

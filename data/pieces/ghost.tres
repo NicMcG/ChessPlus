@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3]
+
+[ext_resource type="Script" path="res://core/move_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]
+
+[sub_resource type="Resource" id="Resource_rule1"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+max_steps = 1
+
+[sub_resource type="Resource" id="Resource_rule2"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(0, 1)])
+max_steps = 1
+
+[resource]
+script = ExtResource("2_def")
+id = "ghost"
+display_name = "Ghost"
+symbol = "G"
+value = 3
+move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
+ability = 3
+ability_colors = PackedColorArray(0.659, 0.831, 0.961, 1, 0.941, 0.973, 1, 1)
+ability_name = "Haunt"
+ability_text = "Once per game, after the Ghost has been captured: on a later turn, put it back on any empty square in your half of the board. Uses your turn."
