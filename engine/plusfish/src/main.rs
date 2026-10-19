@@ -173,6 +173,45 @@ fn main() {
             let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));
             ematch::run(&cat, &args, &dir.to_string_lossy());
         }
+        "bench" => {
+            // Fixed positions (random armies, some moves in) searched to a fixed
+            // depth: the node total is a fingerprint of the search, nps its speed.
+            let depth: i32 = args.num("depth", 9);
+            let count: usize = args.num("count", 24);
+            let params = load_params(&cat, args.get("params"));
+            let mut total_nodes = 0u64;
+            let mut total_ms = 0u64;
+            for i in 0..count {
+                let mut rng = Rng::new(9000 + i as u64);
+                let (w, b) = random_pair(&cat, &mut rng, (BUDGET, BUDGET));
+                let mut g = army_game(&cat, &w, &b, 8, 8);
+                let r = g.rules.clone();
+                let et = EvalTables::new(&r);
+                {
+                    let mut s = Searcher::new(&r, &et, &params, 4);
+                    for _ in 0..(i * 3) % 40 {
+                        if g.outcome() != Outcome::None {
+                            break;
+                        }
+                        let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None }, 1, |_| {});
+                        g.play(rep.lines[0].pv.first().copied().unwrap_or_else(|| g.pos.legal_moves(&r)[0]));
+                    }
+                }
+                if g.outcome() != Outcome::None {
+                    continue;
+                }
+                let mut s = Searcher::new(&r, &et, &params, 16);
+                let t = std::time::Instant::now();
+                let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: Some(depth), nodes: None, movetime_ms: None }, 1, |_| {});
+                let ms = t.elapsed().as_millis() as u64;
+                total_nodes += rep.nodes;
+                total_ms += ms;
+                if args.flag("verbose") {
+                    println!("{:>2} {:>9} nodes {:>6} ms  {}  {}", i, rep.nodes, ms, score_text(rep.lines[0].score), fen(&g.pos, &r, true));
+                }
+            }
+            println!("bench: {} nodes  {} ms  {} nps", total_nodes, total_ms, total_nodes * 1000 / total_ms.max(1));
+        }
         "perft-suite" => {
             if !verify::run_perft_suite(&cat) {
                 std::process::exit(1);
