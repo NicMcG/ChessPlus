@@ -143,6 +143,21 @@ mouse_filter = 2
 [node name="Panel" type="PanelContainer" parent="PromotionOverlay/Center"]
 layout_mode = 2
 
-[node name="PromotionChoices" type="HBoxContainer" parent="PromotionOverlay/Center/Panel"]
+[node name="Shimmer" type="ColorRect" parent="PromotionOverlay/Center/Panel"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="PromotionOverlay/Center/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="PromotionChoices" type="GridContainer" parent="PromotionOverlay/Center/Panel/Margin"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12

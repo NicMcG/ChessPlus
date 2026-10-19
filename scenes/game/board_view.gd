@@ -249,7 +249,8 @@ func pointer_up(pos: Vector2) -> void:
 func _process(delta: float) -> void:
 	check_long_press(Time.get_ticks_msec())
 	advance_animation(delta)
-	if not _check_squares.is_empty():
+	# Kings in check tremble and aiming rings close in: keep redrawing.
+	if not _check_squares.is_empty() or aiming:
 		queue_redraw()
 
 ## The kings in check now (empty when nobody is), which tremble on the board.
@@ -750,7 +751,14 @@ func _draw_target(move: Move) -> void:
 	var rect := _square_rect(move.to)
 	var center := rect.get_center()
 	if aiming:
-		draw_arc(center, rect.size.x * 0.45, 0, TAU, 32, ABILITY_MARK, rect.size.x * 0.1, true)
+		# Gold rings that close in on the target (Mac's design): each fades in
+		# large, then shrinks and fades away as the next one fades in.
+		var seconds := Time.get_ticks_msec() / 1000.0
+		for ring in 2:
+			var t := fmod(seconds * 0.8 + ring * 0.5, 1.0)
+			var alpha := smoothstep(0.0, 0.2, t) * (1.0 - t)
+			var radius := rect.size.x * lerpf(0.62, 0.12, t)
+			draw_arc(center, radius, 0, TAU, 40, Color(ABILITY_MARK, ABILITY_MARK.a * alpha), rect.size.x * 0.08, true)
 		return
 	if move.is_capture() and not state.board.is_empty(move.to):
 		draw_arc(center, rect.size.x * 0.45, 0, TAU, 32, TARGET_MARK, rect.size.x * 0.08, true)
