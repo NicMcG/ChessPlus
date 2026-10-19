@@ -212,6 +212,92 @@ fn main() {
             }
             println!("bench: {} nodes  {} ms  {} nps", total_nodes, total_ms, total_nodes * 1000 / total_ms.max(1));
         }
+        "speed" => {
+            // Times the basic operations on positions from the bench games.
+            let params = load_params(&cat, args.get("params"));
+            let mut sets: Vec<(Arc<Rules>, Vec<Position>)> = Vec::new();
+            for i in 0..24usize {
+                let mut rng = Rng::new(9000 + i as u64);
+                let (w, b) = random_pair(&cat, &mut rng, (BUDGET, BUDGET));
+                let mut g = army_game(&cat, &w, &b, 8, 8);
+                let r = g.rules.clone();
+                let et = EvalTables::new(&r);
+                let mut s = Searcher::new(&r, &et, &params, 4);
+                let mut list = Vec::new();
+                for _ in 0..40 {
+                    if g.outcome() != Outcome::None {
+                        break;
+                    }
+                    for m in g.pos.legal_moves(&r) {
+                        let mut c = g.pos.clone();
+                        c.make(&r, m);
+                        list.push(c);
+                    }
+                    let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(1500), movetime_ms: None }, 1, |_| {});
+                    g.play(rep.lines[0].pv.first().copied().unwrap_or_else(|| g.pos.legal_moves(&r)[0]));
+                }
+                sets.push((r.clone(), list));
+            }
+            let n: usize = sets.iter().map(|s| s.1.len()).sum();
+            let time = |name: &str, f: &mut dyn FnMut(&Rules, &EvalTables, &Position) -> u64| {
+                let mut sink = 0u64;
+                let t = std::time::Instant::now();
+                for (r, list) in &sets {
+                    let et = EvalTables::new(r);
+                    for p in list {
+                        sink = sink.wrapping_add(f(r, &et, p));
+                    }
+                }
+                let ns = t.elapsed().as_nanos() as f64 / n as f64;
+                println!("{:<28} {:>8.0} ns  ({})", name, ns, sink % 7);
+            };
+            println!("{} positions", n);
+            time("evaluate", &mut |r, et, p| evaluate(p, r, et, &params) as u64);
+            time("gen_pseudo (all)", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                v.len() as u64
+            });
+            time("gen_pseudo (tactical)", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_TACTICAL);
+                v.len() as u64
+            });
+            time("in_check", &mut |r, _, p| p.in_check(r, p.side) as u64);
+            time("all moves: clone+make", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                let mut k = 0;
+                for &m in &v {
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    k ^= c.key;
+                }
+                k
+            });
+            time("all moves: +legality", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                let mut k = 0;
+                for &m in &v {
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    k += c.leaves_king_attacked(p, r, m) as u64;
+                }
+                k
+            });
+            time("all moves: +gives check", &mut |r, _, p| {
+                let mut v = Vec::with_capacity(128);
+                p.gen_pseudo(r, &mut v, GEN_ALL);
+                let mut k = 0;
+                for &m in &v {
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    k += c.leaves_king_attacked(p, r, m) as u64 + c.in_check(r, c.side) as u64;
+                }
+                k
+            });
+        }
         "perft-suite" => {
             if !verify::run_perft_suite(&cat) {
                 std::process::exit(1);
