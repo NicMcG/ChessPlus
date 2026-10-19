@@ -266,23 +266,35 @@ func _fit_tray() -> void:
 	for button: Button in _tray_buttons.values():
 		button.custom_minimum_size = Vector2(width, height)
 		button.add_theme_font_size_override("font_size", roundi(width * 0.14))
-		var cost: Label = button.get_node("Cost")
+		var cost: Label = button.get_node_or_null("Cost")
+		if cost == null:
+			continue
 		cost.add_theme_font_size_override("font_size", roundi(width * 0.18))
 
 func _build_tray() -> void:
 	var defs := PieceCatalog.all_defs()
 	# Alphabetical (Mac's choice).
 	defs.sort_custom(func(a: PieceDef, b: PieceDef) -> bool: return a.display_name < b.display_name)
-	# The chosen piece type gets a gold border, so it's obvious what you're placing.
-	var chosen_style := StyleBoxFlat.new()
-	chosen_style.bg_color = Color(0.25, 0.25, 0.27)
-	chosen_style.set_border_width_all(4)
-	chosen_style.border_color = Color(0.95, 0.75, 0.2)
 	for def in defs:
 		var button := Button.new()
 		button.toggle_mode = true
-		button.add_theme_stylebox_override("pressed", chosen_style)
-		button.add_theme_stylebox_override("hover_pressed", chosen_style)
+		# Kings on gold, royal pieces on royal purple, pawn types on green (Mac's
+		# design); the chosen type gets a bright border, so it's obvious what
+		# you're placing.
+		var background := type_color(def)
+		var normal := StyleBoxFlat.new()
+		normal.bg_color = background
+		normal.set_corner_radius_all(4)
+		var hover := normal.duplicate()
+		hover.bg_color = background.lightened(0.12)
+		var chosen := normal.duplicate()
+		chosen.bg_color = background.lightened(0.08)
+		chosen.set_border_width_all(4)
+		chosen.border_color = Color.WHITE if def.is_king_type() else Color(0.95, 0.75, 0.2)
+		button.add_theme_stylebox_override("normal", normal)
+		button.add_theme_stylebox_override("hover", hover)
+		button.add_theme_stylebox_override("pressed", chosen)
+		button.add_theme_stylebox_override("hover_pressed", chosen)
 		button.icon = PieceArt.texture_for(def, team)
 		button.expand_icon = true
 		# The text never makes the button wider than the size it's given.
@@ -323,8 +335,22 @@ func _refresh() -> void:
 	army_board.highlighted = _allowed_squares()
 	army_board.queue_redraw()
 
-## The cost in the button's bottom-right corner, e.g. "3".
+## A tray button's background: gold for king types, royal purple for royal
+## types, green for pawn types, otherwise the usual dark grey.
+static func type_color(def: PieceDef) -> Color:
+	if def.is_king_type():
+		return Color("#b8860b")
+	if def.is_royal_type():
+		return Color("#5a2d82")
+	if def.is_pawn_type():
+		return Color("#2f6b34")
+	return Color(0.17, 0.17, 0.18)
+
+## The cost in the button's bottom-right corner, e.g. "3" (not for kings: every
+## army has exactly one, and it's free).
 func _add_cost_label(button: Button, def: PieceDef) -> void:
+	if def.is_king_type():
+		return
 	var cost := Label.new()
 	cost.name = "Cost"
 	cost.text = Army.format_points(def.value)
