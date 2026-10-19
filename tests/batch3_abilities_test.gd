@@ -176,3 +176,87 @@ func test_eval_bar_steps_aside() -> void:
 	for id in ["ghost", "bard", "werewolf"]:
 		var state := _game("4k3/8/8/8/3%s4/8/8/4K3 w - - 0 1" % ("(%s)" % _def(id).symbol if _def(id).symbol.length() > 1 else _def(id).symbol))
 		check(not PlusfishLink.supports(state), "Plusfish doesn't know the %s's ability yet" % id)
+
+# --- On the game screen ------------------------------------------------------------------
+
+func _open_fen(fen: String) -> Node:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.start_fen = fen
+	(Engine.get_main_loop() as SceneTree).root.add_child(game)
+	return game
+
+func test_haunt_button_appears_when_the_ghost_is_lost() -> void:
+	var game := _open_fen("3rk3/8/8/8/3G4/8/8/4K3 b - - 0 1")
+	check(not game.ability_button.visible, "Nothing to show yet")
+	game.board_view.tap(Board.parse_square("d8"))
+	game.board_view.tap(Board.parse_square("d4"))
+	check(game.ability_button.visible, "With the Ghost captured, HAUNT shows with nothing selected")
+	check_eq(game.ability_button.text, "HAUNT", "Named after the ability")
+	game.use_ability()
+	check(game.board_view.aiming, "Choosing a square")
+	check_eq(game.status_label.text, "Haunt: choose a square", "Status asks for a square")
+	game.board_view.tap(Board.parse_square("a5"))
+	check_eq(game.state.history.size(), 1, "Black's half isn't offered")
+	game.use_ability()
+	game.board_view.tap(Board.parse_square("c3"))
+	check_eq(game.state.history.size(), 2, "The Ghost came back")
+	check_eq(game.state.board.get_piece(Board.parse_square("c3")).def.id, "ghost", "On c3")
+	check(not game.ability_button.visible, "Button gone: Haunt is used up")
+	game.free()
+
+func test_ghost_on_the_board_explains_haunt() -> void:
+	var game := _open_fen("4k3/8/8/8/3G4/8/8/4K3 w - - 0 1")
+	game.board_view.tap(Board.parse_square("d4"))
+	check(game.ability_button.visible, "Its button shows")
+	game.use_ability()
+	check_eq(game.last_notice, "The Ghost can use Haunt after it has been captured.", "Says when it works")
+	game.free()
+
+func test_song_of_slumber_on_screen() -> void:
+	var game := _open_fen("4k3/8/8/6n1/8/8/8/2(BD)1K3 w - - 0 1")
+	game.board_view.tap(Board.parse_square("c1"))
+	check_eq(game.ability_button.text, "SONG OF SLUMBER", "Button")
+	game.use_ability()
+	check_eq(game.status_label.text, "Song of Slumber: choose a target", "Asks for a target")
+	game.board_view.tap(Board.parse_square("g5"))
+	check_eq(game.state.history.back().ability, PieceDef.Ability.SONG_OF_SLUMBER, "Sung")
+	check_eq(game.state.board.get_piece(Board.parse_square("c1")).def.id, "bard", "Bard stayed")
+	game.board_view.tap(Board.parse_square("g5"))
+	check(not game.board_view.tap(Board.parse_square("f3")), "The sleeping Knight can't move")
+	game.free()
+
+func test_full_moon_on_screen() -> void:
+	var game := _open_fen("4k3/8/8/8/3(WW)4/8/8/4K3 w - - 0 1")
+	game.board_view.tap(Board.parse_square("d4"))
+	check_eq(game.ability_button.text, "FULL MOON", "Button")
+	check_eq(_def("werewolf").ability_label_color(), Color("#262626"), "Dark writing on its pale gradient")
+	game.use_ability()
+	check_eq(game.state.board.get_piece(Board.parse_square("d4")).def.id, "werewolf_wolf", "Turned at once, no target needed")
+	game.free()
+
+func test_animations() -> void:
+	var state := _game("4k3/8/8/6n1/8/8/8/2(BD)1K3 w - - 0 1")
+	var song := state.find_move("c1~g5")
+	state.make_move(song)
+	var a := MoveAnimation.for_move(song, state, false)
+	check(a.extras.any(func(e: Dictionary) -> bool: return e.kind == "notes"), "Song: music notes fly")
+	check(a.tracks.has(song.frozen), "...and the target nods off")
+	check(GameSounds.Sound.LULLABY in a.all_sounds(), "...to a lullaby")
+	state = _game("4k3/8/8/8/3(WW)4/8/8/4K3 w - - 0 1")
+	var change := state.find_move("d4!")
+	state.make_move(change)
+	a = MoveAnimation.for_move(change, state, false)
+	a.time = 0.1
+	check_eq(a.pose(change.piece).get("as_def"), _def("werewolf"), "Full Moon: still drawn as the Werewolf while it builds up")
+	a.time = a.length - 0.01
+	check(a.pose(change.piece).get("as_def") == null, "...and as the wolf at the end")
+	state = _game("3rk3/8/8/8/3G4/8/8/4K3 b - - 0 1")
+	_play(state, "d8xd4")
+	var haunt := state.find_move("@c3")
+	state.make_move(haunt)
+	a = MoveAnimation.for_move(haunt, state, false)
+	a.time = 0.0
+	check(not a.pose(haunt.piece).visible, "Haunt: the Ghost isn't there at first")
+	check(GameSounds.Sound.HAUNT in a.all_sounds(), "...with its eerie note")
+	for sound in [GameSounds.Sound.LULLABY, GameSounds.Sound.HAUNT]:
+		check(GameSounds.make_stream(sound).data.size() > 0, "Sound %d is made" % sound)

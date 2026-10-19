@@ -34,6 +34,10 @@ enum Sound {
 	SPARKLE,
 	## The quick swipe of an en passant capture.
 	SWIPE,
+	## Song of Slumber: a few soft music-box notes, falling.
+	LULLABY,
+	## Haunt: an eerie, wavering note.
+	HAUNT,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
@@ -70,6 +74,8 @@ const LAYERS := {
 	# A deep bell: the recorded strike, slowed right down, over a long made hum.
 	Sound.CHECKMATE: [[["impactBell_heavy_002"], 0.45, 6.0], ["made", 3.0]],
 	Sound.DUST: [["made", -12.0]],
+	Sound.LULLABY: [["made", -3.0]],
+	Sound.HAUNT: [["made", -5.0]],
 }
 
 ## Samples per second for the sounds made by code.
@@ -147,7 +153,8 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 	var noise := RandomNumberGenerator.new()
 	noise.seed = 7  # The same "random" sound every time.
 	var length: float = {Sound.CANNON_FIRE: 0.9, Sound.ARROW_WHOOSH: 0.3, Sound.SWIPE: 0.2,
-			Sound.RAISE_DEAD: 1.3, Sound.CHECKMATE: 6.0, Sound.DUST: 2.0}.get(sound, 0.2)
+			Sound.RAISE_DEAD: 1.3, Sound.CHECKMATE: 6.0, Sound.DUST: 2.0,
+			Sound.LULLABY: 1.4, Sound.HAUNT: 1.3}.get(sound, 0.2)
 	var count := int(length * RATE)
 	var data := PackedByteArray()
 	data.resize(count * 2)
@@ -183,6 +190,18 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 				for partial: Array in [[0.5, 0.5, 0.35], [1.0, 0.45, 0.45], [1.19, 0.3, 0.7], [1.56, 0.22, 0.9], [2.0, 0.2, 1.1], [2.51, 0.12, 1.5]]:
 					ring += partial[1] * sin(TAU * base * partial[0] * t) * exp(-t * partial[2])
 				value = ring * minf(1.0, t * 40) * (1.0 + 0.08 * sin(TAU * 1.3 * t))
+			Sound.LULLABY:  # Music-box notes G, E, C: each a soft ping that rings away.
+				for note: Array in [[0.0, 784.0], [0.32, 659.3], [0.64, 523.3]]:
+					var since: float = t - note[0]
+					if since >= 0.0:
+						var ping := exp(-since * 4.0) * minf(1.0, since * 200)
+						value += 0.3 * ping * (sin(TAU * note[1] * since) + 0.25 * sin(TAU * note[1] * 2.0 * since))
+			Sound.HAUNT:  # A thin, wavering "oooo" that slides up and back down.
+				var glide := 1.0 + 0.25 * sin(PI * t / length)
+				var waver := 1.0 + 0.012 * sin(TAU * 5.5 * t)
+				band += (white - band) * 0.05
+				value = sin(PI * t / length) * (0.45 * sin(TAU * 440.0 * glide * waver * t) \
+						+ 0.12 * sin(TAU * 880.0 * glide * waver * t) + 0.25 * band)
 			Sound.DUST:  # A soft sandy hiss that drifts away.
 				band += (white - band) * 0.3
 				value = 0.5 * (white - band) * minf(1.0, t * 6) * exp(-t * 1.6)

@@ -86,6 +86,15 @@ func ability_gradient() -> PackedColorArray:
 		return ability_colors
 	return PackedColorArray([Color("#4a4a4a"), Color("#9a9a9a")])
 
+## The colour for writing the ability's name on its gradient: white, or dark
+## grey on a pale gradient (the Ghost's and Werewolf's).
+func ability_label_color() -> Color:
+	var colors := ability_gradient()
+	var light := 0.0
+	for color in colors:
+		light += color.get_luminance()
+	return Color("#262626") if light / colors.size() > 0.62 else Color.WHITE
+
 func is_king_type() -> bool:
 	return types & Type.KING != 0
 

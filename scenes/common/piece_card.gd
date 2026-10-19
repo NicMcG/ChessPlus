@@ -228,6 +228,7 @@ func _refresh() -> void:
 	%Ability.visible = def.ability_name != ""
 	# The name in a box like the keywords', filled with the piece's gradient.
 	%AbilityName.text = def.ability_name.to_upper()
+	%AbilityName.add_theme_color_override("font_color", def.ability_label_color())
 	%AbilityChip.add_theme_stylebox_override("panel", GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4)))
 	%AbilityText.text = def.ability_text
 
