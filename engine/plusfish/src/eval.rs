@@ -28,7 +28,8 @@ pub const G_KCENTER: usize = G + 38;
 pub const G_RAISE: usize = G + 39;
 pub const G_TEMPO: usize = G + 40;
 pub const G_HANGING: usize = G + 41;
-pub const NFEAT: usize = G + 42;
+pub const G_THREAT: usize = G + 42;
+pub const NFEAT: usize = G + 43;
 
 pub fn feature_name(cat: &Catalog, i: usize) -> String {
     if i < G {
@@ -50,6 +51,7 @@ pub fn feature_name(cat: &Catalog, i: usize) -> String {
         G_RAISE => "raise_potential".into(),
         G_TEMPO => "tempo".into(),
         G_HANGING => "hanging".into(),
+        G_THREAT => "threatened".into(),
         _ => format!("f{}", i),
     }
 }
@@ -97,6 +99,7 @@ impl Params {
         w[G_RAISE] = [60.0, 60.0];
         w[G_TEMPO] = [15.0, 5.0];
         w[G_HANGING] = [-10.0, -10.0];
+        w[G_THREAT] = [-30.0, -25.0];
         Params { w, tuned: vec![false; NFEAT] }
     }
 
@@ -232,6 +235,9 @@ pub fn features<A: Acc>(p: &Position, r: &Rules, et: &EvalTables, acc: &mut A) {
     // pawn files.
     let mut mob = [[0u16; 64]; 2];
     let mut mob_n = [0usize; 2];
+    // Attack sets with the attacker's cost, to find pieces attacked by
+    // something cheaper.
+    let mut by_cost: [[(f32, u128); 64]; 2] = [[(0.0, 0); 64]; 2];
     for t in 0..2 {
         for s in p.squares(t) {
             let c = p.sq[s];
@@ -240,6 +246,7 @@ pub fn features<A: Acc>(p: &Position, r: &Rules, et: &EvalTables, acc: &mut A) {
             att[t] |= a;
             if mob_n[t] < 64 {
                 mob[t][mob_n[t]] = m;
+                by_cost[t][mob_n[t]] = (if r.info[k].is_king { 1000.0 } else { r.info[k].cost as f32 }, a);
                 mob_n[t] += 1;
             }
             if r.info[k].is_pawn {
@@ -330,8 +337,16 @@ pub fn features<A: Acc>(p: &Position, r: &Rules, et: &EvalTables, acc: &mut A) {
                 }
             }
             // Attacked by the enemy and not defended.
-            if att[them] & (1u128 << s) != 0 && att[t] & (1u128 << s) == 0 {
+            let bit = 1u128 << s;
+            if att[them] & bit != 0 && att[t] & bit == 0 {
                 acc.add(G_HANGING, sign);
+            }
+            // Attacked by a cheaper enemy piece.
+            if att[them] & bit != 0 {
+                let v = info.cost as f32 - 0.25;
+                if by_cost[them][..mob_n[them]].iter().any(|&(cv, a)| cv < v && a & bit != 0) {
+                    acc.add(G_THREAT, sign);
+                }
             }
         }
         for f in 0..r.w as usize {
