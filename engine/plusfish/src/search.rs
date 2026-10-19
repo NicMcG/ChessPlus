@@ -25,8 +25,9 @@ struct TTEntry {
     age: u8,
 }
 
-/// The transposition table. Entries are three 64-bit words: the key XOR the
-/// two data words, then the data. Threads can share it without locks: a
+/// The transposition table: buckets of two entries (a new result replaces
+/// the shallower or older one). Entries are three 64-bit words: the key XOR
+/// the two data words, then the data. Threads can share it without locks: a
 /// half-written entry fails the key check and is just a miss.
 pub struct TT {
     words: Vec<AtomicU64>,
@@ -37,7 +38,7 @@ impl TT {
     pub fn new(mb: usize) -> TT {
         let entries = (mb.max(1) * 1024 * 1024 / 24).next_power_of_two() / 2;
         let entries = entries.max(1024);
-        TT { words: (0..entries * 3).map(|_| AtomicU64::new(0)).collect(), mask: entries - 1 }
+        TT { words: (0..entries * 3).map(|_| AtomicU64::new(0)).collect(), mask: entries / 2 - 1 }
     }
 
     pub fn mb(&self) -> usize {
@@ -50,9 +51,25 @@ impl TT {
         }
     }
 
+    /// The entry for `key` (index, entry): the one holding it, or else the one
+    /// a new result would replace (whose key won't match).
     #[inline(always)]
-    fn slot(&self, key: u64) -> usize {
-        (key as usize) & self.mask
+    fn probe(&self, key: u64, age: u8) -> (usize, TTEntry) {
+        let b = ((key as usize) & self.mask) * 2;
+        let e0 = self.load(b);
+        if e0.key == key {
+            return (b, e0);
+        }
+        let e1 = self.load(b + 1);
+        if e1.key == key {
+            return (b + 1, e1);
+        }
+        let worth = |e: &TTEntry| if e.bound == 0 { -1000 } else { e.depth as i32 - if e.age != age { 8 } else { 0 } };
+        if worth(&e1) < worth(&e0) {
+            (b + 1, e1)
+        } else {
+            (b, e0)
+        }
     }
 
     #[inline(always)]
@@ -550,8 +567,7 @@ impl<'a> Searcher<'a> {
         }
         self.nodes += 1;
         // Transposition table.
-        let slot = self.tt.slot(p.key);
-        let e = self.tt.load(slot);
+        let (_, e) = self.tt.probe(p.key, self.age);
         let mut tt_move = Move::NONE;
         if e.key == p.key && e.bound != 0 {
             tt_move = e.mv;
@@ -737,7 +753,7 @@ impl<'a> Searcher<'a> {
         } else {
             B_UPPER
         };
-        let e = self.tt.load(slot);
+        let (slot, e) = self.tt.probe(p.key, self.age);
         if e.key != p.key || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
             self.tt.store(
                 slot,
@@ -779,8 +795,7 @@ impl<'a> Searcher<'a> {
             return self.eval(p);
         }
         // Transposition table: any stored result is deep enough here.
-        let slot = self.tt.slot(p.key);
-        let e = self.tt.load(slot);
+        let (_, e) = self.tt.probe(p.key, self.age);
         let hit = e.key == p.key && e.bound != 0;
         let mut tt_move = Move::NONE;
         if hit {
@@ -866,7 +881,7 @@ impl<'a> Searcher<'a> {
         if in_check && legal == 0 {
             return -MATE + ply as i32;
         }
-        let e = self.tt.load(slot);
+        let (slot, e) = self.tt.probe(p.key, self.age);
         if e.key != p.key || e.depth <= 0 || e.age != self.age {
             let bound = if best >= beta {
                 B_LOWER
