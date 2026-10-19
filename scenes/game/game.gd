@@ -256,6 +256,7 @@ func play_from_here() -> void:
 ## and (online) it's this player's turn.
 func _update_input() -> void:
 	board_view.input_enabled = viewing < 0 and not bot_thinking and _my_online_turn()
+	_refresh_ability_button()
 
 ## The side-by-side layout for wide screens, unused (hidden) until needed.
 func _build_wide_layout() -> void:
@@ -538,10 +539,24 @@ func _ask_which_move(moves: Array[Move]) -> void:
 ## A piece was selected (or the selection cleared): a piece with a special
 ## ability shows its button (Mac's design): in its colours when it can be used
 ## now, darkened when it can't be used in this position, grey once used up.
-func _on_selection_changed(square: Vector2i) -> void:
-	var piece: Piece = state.board.get_piece(square) if square != Board.NO_SQUARE else null
-	ability_button.visible = piece != null and piece.def.ability != PieceDef.Ability.NONE
+func _on_selection_changed(_square: Vector2i) -> void:
 	_update_text()
+
+## Shows or hides the ability button for what's selected now. With nothing
+## selected, it shows HAUNT while one of the player's captured Ghosts can come
+## back (it isn't on the board to be selected).
+func _refresh_ability_button() -> void:
+	var square := board_view.selected_square()
+	var piece: Piece = state.board.get_piece(square) if state and square != Board.NO_SQUARE else null
+	if piece == null:
+		var haunts := _haunt_moves()
+		ability_button.visible = not haunts.is_empty()
+		if ability_button.visible:
+			var ghost := haunts[0].piece
+			ability_button.text = ghost.def.ability_name.to_upper()
+			_style_ability_button(ghost.def.ability_gradient(), ghost.def.ability_label_color(), true)
+		return
+	ability_button.visible = piece.def.ability != PieceDef.Ability.NONE
 	if not ability_button.visible:
 		return
 	ability_button.text = piece.def.ability_name.to_upper()
@@ -551,7 +566,18 @@ func _on_selection_changed(square: Vector2i) -> void:
 		var dark := GradientStyleBox.new(piece.def.ability_gradient()).shaded(-0.55).colors
 		_style_ability_button(dark, Color("#9a9a9a"), false)
 	else:
-		_style_ability_button(piece.def.ability_gradient(), Color.WHITE, true)
+		_style_ability_button(piece.def.ability_gradient(), piece.def.ability_label_color(), true)
+
+## The ways a captured Ghost of the side to move can come back (Haunt), when the
+## player can move now; empty otherwise.
+func _haunt_moves() -> Array[Move]:
+	var found: Array[Move] = []
+	if state == null or not board_view.input_enabled or is_over():
+		return found
+	if MoveGenerator.haunting_ghosts(state, state.side_to_move).is_empty():
+		return found
+	found.assign(state.moves().filter(func(m: Move) -> bool: return m.ability == PieceDef.Ability.HAUNT))
+	return found
 
 ## The ability button gets the piece's gradient (lighter under the mouse,
 ## darker while pressed when it can be used).
@@ -564,21 +590,32 @@ func _style_ability_button(colors: PackedColorArray, text_color: Color, usable: 
 	for color in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		ability_button.add_theme_color_override(color, text_color)
 
-## The ability button: Crack Shot asks which piece to shoot (on the board);
-## Raise Dead asks which lost piece to bring back (a picker, like promotion).
-## If it can't be used, a short message says why.
+## The ability button: Crack Shot and Song of Slumber ask which piece to target
+## (on the board); Raise Dead asks which lost piece to bring back (a picker, like
+## promotion); Full Moon happens at once; Haunt (nothing selected) asks which
+## square the Ghost comes back on. If it can't be used, a short message says why.
 func use_ability() -> void:
+	if board_view.selected_square() == Board.NO_SQUARE:
+		var haunts := _haunt_moves()
+		if not haunts.is_empty():
+			board_view.aim_moves(haunts)
+			status_label.text = "%s: choose a square" % haunts[0].piece.def.ability_name
+		return
 	var moves := board_view.selected_ability_moves()
 	if moves.is_empty():
-		var piece: Piece = state.board.get_piece(board_view.selected_square()) if board_view.selected_square() != Board.NO_SQUARE else null
+		var piece: Piece = state.board.get_piece(board_view.selected_square())
 		if piece and piece.ability_used:
 			show_notice("%s has already been used." % piece.def.ability_name)
+		elif piece and piece.def.ability == PieceDef.Ability.HAUNT:
+			show_notice("The Ghost can use Haunt after it has been captured.")
 		else:
 			show_notice("This ability can't be used right now.")
 		return
 	var piece := moves[0].piece
 	if piece.def.ability == PieceDef.Ability.RAISE_DEAD:
 		_ask_which_move(moves)
+	elif piece.def.ability == PieceDef.Ability.FULL_MOON:
+		play(moves[0])
 	else:
 		board_view.aim_ability()
 		status_label.text = "%s: choose a target" % piece.def.ability_name
@@ -626,6 +663,7 @@ func _on_overlay_input(event: InputEvent) -> void:
 		promotion_overlay.hide()
 
 func _update_text() -> void:
+	_refresh_ability_button()
 	var mover := "White" if state.side_to_move == Piece.Team.WHITE else "Black"
 	var other := "Black" if state.side_to_move == Piece.Team.WHITE else "White"
 	if online:

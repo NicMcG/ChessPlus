@@ -58,6 +58,14 @@ static func for_move(move: Move, state: GameState, dragged: bool, p_speed := 1.0
 	elif move.ability == PieceDef.Ability.CRACK_SHOT:
 		a._crack_shot(move)
 		a._activation(move)
+	elif move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		a._song_of_slumber(move)
+		a._activation(move)
+	elif move.ability == PieceDef.Ability.FULL_MOON:
+		a._full_moon(move)
+		a._activation(move)
+	elif move.ability == PieceDef.Ability.HAUNT:
+		a._haunt(move)
 	elif move.captured and is_cannon_shot(move) and move.decoy_piece == null:
 		a._cannon(move, dragged)
 	elif move.breaks_shield():
@@ -239,7 +247,14 @@ func _activation(move: Move) -> void:
 			extra.until = extra.until * SLOWER + WAIT
 	for cue: Array in cues:
 		cue[0] = cue[0] * SLOWER + WAIT
-	_add(move.piece, {"kind": "charge", "at": Vector2(move.from), "start": 0.0, "end": WAIT})
+	var charge := {"kind": "charge", "at": Vector2(move.from), "start": 0.0, "end": WAIT}
+	if move.ability == PieceDef.Ability.FULL_MOON:
+		# Still a Werewolf while it builds up (the game already has it as a wolf).
+		charge.as_def = move.piece.base_def
+	# Before the ability's own segments, so it plays first.
+	if not tracks.has(move.piece):
+		tracks[move.piece] = []
+	tracks[move.piece].push_front(charge)
 	_cue(0.0, GameSounds.Sound.ABILITY)
 	var glow: Color = move.piece.def.ability_gradient()[1].lerp(Color.WHITE, 0.3)
 	extras.append({"kind": "light", "at": Vector2(move.from), "start": 0.0, "end": WAIT + 0.15, "color": glow})
@@ -264,6 +279,40 @@ func _jester_swap(move: Move) -> void:
 	_add(move.captured, {"kind": "hop", "from": jester_from, "to": target_at, "start": 0.0, "end": SWAP})
 	_add(move.decoy_piece, {"kind": "slide", "from": target_at, "to": jester_from, "start": 0.0, "end": SWAP})
 	_cue(0.0, GameSounds.Sound.SWIPE)
+
+## Song of Slumber: golden music notes drift from the Bard to its target, which
+## sways drowsily as a soft lullaby plays (and then shows "Zz" while asleep).
+func _song_of_slumber(move: Move) -> void:
+	extras.append({"kind": "notes", "from": Vector2(move.from), "to": Vector2(move.to), "start": 0.0, "end": 1.0})
+	extras.append({"kind": "light", "at": Vector2(move.to), "start": 0.7, "end": 1.3, "color": Color(1.0, 0.8, 0.35), "size": 0.9})
+	_add(move.frozen, {"kind": "drowse", "at": Vector2(move.to), "start": 0.7, "end": 1.5})
+	_cue(0.0, GameSounds.Sound.LULLABY)
+
+## Full Moon: like a promotion, the Werewolf rises spinning in a silvery
+## moonlit glow and comes back down as the wolf.
+func _full_moon(move: Move) -> void:
+	const RISE := 0.6
+	const AFTER := 0.75
+	var at := Vector2(move.from)
+	_add(move.piece, {"kind": "promote_rise", "at": at, "start": 0.0, "end": RISE, "as_def": move.piece.base_def, "glow": MOON_GLOW})
+	_add(move.piece, {"kind": "promote_reveal", "at": at, "start": RISE, "end": RISE + AFTER, "glow": MOON_GLOW})
+	extras.append({"kind": "light", "at": at, "start": RISE, "end": RISE + 0.6, "size": 2.0, "lift": 0.55, "color": MOON_GLOW})
+	_cue(0.0, GameSounds.Sound.PROMOTE)
+	_cue(RISE, GameSounds.Sound.SPARKLE)
+	_cue(RISE + AFTER, GameSounds.Sound.LAND)
+
+## The Werewolf's moonlight.
+const MOON_GLOW := Color(0.85, 0.9, 1.0)
+
+## Haunt: a pale blue mist gathers on the square and the Ghost fades up out of it
+## to an eerie wavering note.
+func _haunt(move: Move) -> void:
+	var at := Vector2(move.to)
+	extras.append({"kind": "smoke", "at": at, "start": 0.0, "end": 1.4, "color": Color(0.65, 0.85, 1.0), "size": 0.55})
+	extras.append({"kind": "light", "at": at, "start": 0.0, "end": 0.9, "color": Color(0.75, 0.9, 1.0)})
+	_add(move.piece, {"kind": "rise", "at": at, "start": 0.35, "end": 1.2})
+	hidden_before[move.piece] = true
+	_cue(0.0, GameSounds.Sound.HAUNT)
 
 ## Raise Dead: the Necromancer sinks into purple smoke and the raised piece
 ## rises up out of it.
@@ -405,6 +454,8 @@ func pose(piece: Piece) -> Variant:
 static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 	var pose := {"visible": true, "pos": segment.get("at", Vector2.ZERO), "lift": 0.0,
 			"scale": Vector2.ONE, "angle": 0.0, "alpha": 1.0, "sunk": 0.0, "flash": 0.0, "shadow": 0.0}
+	if segment.has("as_def"):
+		pose.as_def = segment.as_def
 	match segment.kind:
 		"slide":
 			pose.pos = (segment.from as Vector2).lerp(segment.to, ease_out(t))
@@ -453,7 +504,7 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			pose.scale = Vector2(cos(turn), 1.0) * (1.0 + 0.8 * up)
 			pose.lift = 0.55 * up
 			pose.flash = smoothstep(0.55, 1.0, t)
-			pose.flash_color = PROMOTION_GLOW
+			pose.flash_color = segment.get("glow", PROMOTION_GLOW)
 			pose.shadow = up
 		"promote_reveal":
 			# The new piece: finishes the turn, glow fading, then drops back down.
@@ -462,7 +513,7 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			pose.scale = Vector2(cos(turn), 1.0) * (1.0 + 0.8 * up)
 			pose.lift = 0.55 * up
 			pose.flash = 1.0 - smoothstep(0.0, 0.35, t)
-			pose.flash_color = PROMOTION_GLOW
+			pose.flash_color = segment.get("glow", PROMOTION_GLOW)
 			pose.shadow = up
 		"impact":
 			# Squashed by the hit, then springs back, pushed back a touch.
@@ -481,6 +532,10 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 		"rise":
 			pose.sunk = 1.0 - ease_out(t)
 			pose.alpha = minf(1.0, t * 1.5)
+		"drowse":
+			# Nodding off: a slow sway that dies away, sinking a touch.
+			pose.angle = 0.18 * sin(t * TAU * 1.5) * (1.0 - t)
+			pose.scale = Vector2(1.0, 1.0 - 0.06 * sin(PI * t))
 	return pose
 
 ## The squares whose pieces are shaking now (shields cracking), with how far
