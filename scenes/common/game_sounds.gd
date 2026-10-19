@@ -125,8 +125,10 @@ const LAYERS := {
 	Sound.ARROW_WHOOSH: [[["arrow_whistle"], 0.75, -2.0]],
 	# A bowstring plucked as the arrow is loosed.
 	Sound.BOW: [[["bow_shot"], 1.0, 2.0]],
-	# The arrow striking home: just a quick stab (Mac: no explosion, no wood).
-	Sound.ARROW_HIT: [[["chop"], 1.15, 6.0], [["knifeSlice2"], 1.6, -2.0]],
+	# The arrow striking home: just a quick stab (Mac: no explosion, no wood;
+	# the axe "chop" knocked like wood): a blade's sharp thrust, a short slice
+	# and a dull punch for weight.
+	Sound.ARROW_HIT: [[["blade_stab"], 1.1, 4.0], [["knifeSlice2"], 1.6, -2.0], [["impactPunch_medium_000", "impactPunch_medium_001"], 1.2, -2.0]],
 	# A laser bolt fired along with the bow, echoing a little (Mac).
 	Sound.LASER: [[["laser_echo_1", "laser_echo_2"], 1.15, -3.0]],
 	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0]],
