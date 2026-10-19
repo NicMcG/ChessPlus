@@ -10,15 +10,20 @@ extends SceneTree
 ## "wait:2" lets 2 seconds pass (animations, the checkmate effect, Plusfish).
 ## "board" presses View board on the result screen (and skips the checkmate effect).
 ## "view:5" looks at the position after 5 moves, as tapping the move list does.
+## "testing" (anywhere) opens it as a testing-mode game from the standard position.
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out_path: String = args[0] if args.size() > 0 else "user://screenshot.png"
 	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	if args.has("testing"):
+		game.testing_position = TestingPosition.standard()
 	root.add_child(game)
 	await process_frame
 	for arg in args.slice(1):
-		if arg.begins_with("fen:"):
+		if arg == "testing":
+			continue
+		elif arg.begins_with("fen:"):
 			game.state = Fen.parse(arg.substr(4).replace("_", " "), PieceCatalog.all_defs(), StandardSetup.create_rules())
 			game.board_view.show_game(game.state)
 			game._update_text()
