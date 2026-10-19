@@ -15,3 +15,4 @@ should be worth about as much.
 | # | Change | Regime | Games | Elo ±95% | Kept? |
 |---|--------|--------|-------|----------|-------|
 | 1 | Bad captures (rough exchange estimate; Ram counts as lost): ordered after killers, skipped in quiescence | nodes 6k | 982 | +33.4 ±13.8 | kept |
+| 2 | History: penalties for quiet moves that didn't cut off, bounded updates; LMR reduces less for good history | nodes 6k | 8000 | +4.5 ±4.6 | kept (marginal) |
