@@ -19,3 +19,4 @@ should be worth about as much.
 | 3 | Transposition table in quiescence (probe, cutoffs, store, hash move first) | nodes 6k | 1290 | +21.3 ±10.8 | kept |
 | 4 | Internal iterative reduction (depth-1 when no hash move, depth >= 4) | nodes 6k | 8000 | +2.1 ±4.0 | reverted (no gain shown; retry deep) |
 | 5 | Lazy SMP (shared hash table, helpers own history; odd helpers one ply deeper). UCI option Threads, analyse --threads | time 5+0.05, 4 threads vs 1 | 300 | +102.5 ±24.1 | kept |
+| 6 | Counter-move ordering (quiet reply that last refuted the previous move) | nodes 6k | 7394 | +5.9 ±4.5 | kept |
