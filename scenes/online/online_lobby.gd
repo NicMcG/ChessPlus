@@ -27,15 +27,12 @@ var player_id := ""
 ## The game being created or joined.
 var session: OnlineSession
 var rules := StandardSetup.create_rules()
-## The armies in the order they appear in the list.
-var choices: Array[Army] = []
+## What the army list offers (see ArmyChoices).
+var choices: ArmyChoices
 
 func _ready() -> void:
-	choices = [StandardSetup.army()]
-	if library:
-		choices.append_array(library.armies().filter(func(a: Army) -> bool: return a.is_valid(rules, 8)))
-	for army in choices:
-		army_pick.add_item("%s  (%s pts)" % [army.army_name, Army.format_points(army.cost())])
+	choices = ArmyChoices.new(library, rules)
+	choices.fill(army_pick)
 	for side in ["White", "Black", "Random"]:
 		side_pick.add_item(side)
 	for time_control in OnlineSession.TIME_CONTROLS:
@@ -58,8 +55,10 @@ func _ready() -> void:
 		create_button.disabled = true
 		join_button.disabled = true
 
-func chosen_army() -> Army:
-	return choices[army_pick.selected]
+## The army choice, as a Callable(team) -> Army: the side isn't known yet when
+## it's Random, or when joining.
+func chosen_army() -> Callable:
+	return choices.resolver(army_pick.selected)
 
 ## Create a game and wait for a friend to join it.
 func create() -> void:

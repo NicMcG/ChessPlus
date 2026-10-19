@@ -1,7 +1,9 @@
 extends Control
 
 ## "My armies": every saved army with its cost. Tap one to edit it, "Delete" to
-## remove it (after asking), or "New army" to build one (up to the limit).
+## remove it (after asking), or "New army" to build one (up to the limit). The
+## White / Black buttons mark an army as the default for that side (Mac's
+## design): used when a player leaves the army choice on "Default".
 
 signal closed
 ## `army` is null for a brand-new army.
@@ -40,6 +42,9 @@ func ask_delete(army: Army) -> void:
 
 func _delete_pending() -> void:
 	if _pending_delete:
+		for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+			if UserSettings.default_army(team) == _pending_delete.library_path:
+				UserSettings.set_default_army(team, "")
 		library.delete(_pending_delete)
 		_pending_delete = null
 		refresh()
@@ -59,5 +64,35 @@ func _row_for(army: Army) -> Control:
 	delete.custom_minimum_size = Vector2(150, 90)
 	delete.pressed.connect(func() -> void: ask_delete(army))
 	row.add_child(open)
+	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		row.add_child(_default_button(army, team))
 	row.add_child(delete)
 	return row
+
+## A toggle marking `army` as the default for `team`; gold while it is.
+func _default_button(army: Army, team: Piece.Team) -> Button:
+	var button := Button.new()
+	button.toggle_mode = true
+	button.text = "White" if team == Piece.Team.WHITE else "Black"
+	button.tooltip_text = "Use this army by default when playing %s" % button.text
+	button.custom_minimum_size = Vector2(110, 90)
+	button.add_theme_font_size_override("font_size", 24)
+	button.button_pressed = UserSettings.default_army(team) == army.library_path
+	var on := StyleBoxFlat.new()
+	on.bg_color = Color("#8a6d1f")
+	on.border_color = Color("#FFD75E")
+	on.set_border_width_all(3)
+	on.set_corner_radius_all(6)
+	button.add_theme_stylebox_override("pressed", on)
+	button.add_theme_stylebox_override("hover_pressed", on)
+	button.toggled.connect(func(pressed: bool) -> void:
+		set_default(army, team, pressed))
+	return button
+
+## Make `army` the default for `team` (or stop it being, if `on` is false).
+func set_default(army: Army, team: Piece.Team, on: bool) -> void:
+	if on:
+		UserSettings.set_default_army(team, army.library_path)
+	elif UserSettings.default_army(team) == army.library_path:
+		UserSettings.set_default_army(team, "")
+	refresh()
