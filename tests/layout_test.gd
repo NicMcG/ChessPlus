@@ -31,7 +31,7 @@ func test_builder_puts_the_card_beside_the_board_when_wide() -> void:
 	check(builder.card.is_visible_in_tree() and builder.army_board.is_visible_in_tree(), "Card and board shown")
 	builder.size = Vector2(720, 1280)
 	check(not builder.wide, "Tall")
-	check(builder.card.get_parent().get_index() < builder.save_button.get_index(), "Card above the Save button")
+	check(builder.card.get_parent().get_index() < builder.save_button.get_parent().get_index(), "Card above the Save row")
 	check(builder.card.is_visible_in_tree(), "Card shown")
 	builder.free()
 

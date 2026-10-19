@@ -26,6 +26,12 @@ func update(code: String, changes: Dictionary, conditions: Dictionary = {}) -> D
 		path += "&%s=eq.%s" % [column, str(conditions[column]).uri_encode()]
 	return await _request(HTTPClient.METHOD_PATCH, path, changes)
 
+func insert_shared_army(row: Dictionary) -> Dictionary:
+	return await _request(HTTPClient.METHOD_POST, "/rest/v1/shared_armies", [row])
+
+func fetch_shared_army(code: String) -> Dictionary:
+	return await _request(HTTPClient.METHOD_GET, "/rest/v1/shared_armies?select=*&code=eq." + code.uri_encode(), null)
+
 func call_function(name: String, args: Dictionary) -> Dictionary:
 	return await _request(HTTPClient.METHOD_POST, "/rest/v1/rpc/" + name, args)
 

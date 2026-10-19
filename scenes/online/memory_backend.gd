@@ -6,6 +6,8 @@ extends OnlineBackend
 
 ## code -> row. Shared by every MemoryBackend, like one server.
 static var games := {}
+## code -> shared army row.
+static var shared_armies := {}
 ## Set to true to make every call fail, as if the internet were down.
 var offline := false
 
@@ -56,6 +58,20 @@ func call_function(name: String, args: Dictionary) -> Dictionary:
 	row["updated_at"] = Time.get_ticks_msec()
 	return succeeded([row.duplicate(true)])
 
-## Forget every game (tests start fresh).
+func insert_shared_army(row: Dictionary) -> Dictionary:
+	if offline:
+		return failed("offline")
+	if shared_armies.has(row.code):
+		return failed("a shared army with this code already exists")
+	shared_armies[row.code] = row.duplicate(true)
+	return succeeded([row.duplicate(true)])
+
+func fetch_shared_army(code: String) -> Dictionary:
+	if offline:
+		return failed("offline")
+	return succeeded([shared_armies[code].duplicate(true)] if shared_armies.has(code) else [])
+
+## Forget every game and shared army (tests start fresh).
 static func clear() -> void:
 	games.clear()
+	shared_armies.clear()

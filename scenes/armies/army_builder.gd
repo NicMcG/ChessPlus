@@ -52,6 +52,12 @@ var team := Piece.Team.WHITE
 var _tray_buttons := {}  # PieceDef -> Button
 
 ## Call before adding the screen to the tree. `existing` is null for a new army.
+## Where shared armies go (null = the real server; tests use a MemoryBackend).
+var backend: OnlineBackend
+var share_button: Button
+## The pop-up showing a shared army's code (null when not showing).
+var share_panel: ModalPanel
+
 func setup(p_library: ArmyLibrary, existing: Army = null) -> void:
 	library = p_library
 	army = existing.copy() if existing else Army.new()
@@ -71,6 +77,18 @@ func _ready() -> void:
 	army_board.square_tapped.connect(tap_square)
 	team_button.pressed.connect(toggle_team)
 	save_button.pressed.connect(save)
+	# Share sits beside Save (Mac's choice).
+	var save_row := HBoxContainer.new()
+	save_row.add_theme_constant_override("separation", 12)
+	save_button.get_parent().add_child(save_row)
+	save_button.get_parent().move_child(save_row, save_button.get_index())
+	save_button.reparent(save_row, false)
+	save_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	share_button = Button.new()
+	share_button.text = "Share"
+	share_button.custom_minimum_size = Vector2(170, save_button.custom_minimum_size.y)
+	share_button.pressed.connect(share)
+	save_row.add_child(share_button)
 	back_button.pressed.connect(func() -> void: closed.emit())
 	_build_tray()
 	_wide_box = HBoxContainer.new()
@@ -140,6 +158,35 @@ func save() -> void:
 	if library.save(army) == OK:
 		saved.emit(army)
 
+## Upload the army as it is now and show its code, for a friend to import.
+func share() -> void:
+	if share_button.disabled:
+		return
+	share_panel = ModalPanel.new("Share army")
+	var message := share_panel.add_text("Uploading...")
+	add_child(share_panel)
+	var copy := army.copy()
+	copy.army_name = army.army_name.strip_edges()
+	var server := backend if backend else _real_server()
+	var result: Dictionary = await ArmyShare.share(server, copy)
+	if not is_instance_valid(share_panel):
+		return
+	if not result.ok:
+		message.text = "Couldn't share the army: " + result.error
+		share_panel.add_button("Close", share_panel.close)
+		return
+	message.text = "Your friend taps Import army in My armies and types this code:"
+	var code := share_panel.add_text(result.code, 64)
+	code.name = "Code"
+	var copy_button := share_panel.add_button("Copy code", func() -> void: DisplayServer.clipboard_set(result.code))
+	copy_button.pressed.connect(func() -> void: copy_button.text = "Copied!")
+	share_panel.add_button("Done", share_panel.close)
+
+func _real_server() -> OnlineBackend:
+	var server := SupabaseBackend.new()
+	add_child(server)
+	return server
+
 ## The card beside the builder on a wide screen, below it on a tall one.
 func fit_layout() -> void:
 	var now_wide := ScreenShape.is_wide(size)
@@ -152,7 +199,7 @@ func fit_layout() -> void:
 		else:
 			ScreenShape.move_to([_layout], _wide_box.get_parent())
 			ScreenShape.move_to([_card_scroll], _layout)
-			_layout.move_child(_card_scroll, save_button.get_index())
+			_layout.move_child(_card_scroll, save_button.get_parent().get_index())
 		_wide_box.visible = wide
 	_fit_card()
 	# The piece card: bigger beside the board (there's room), a little bigger below it.
@@ -263,6 +310,9 @@ func _refresh() -> void:
 	problems_label.text = "\n".join(found)
 	problems_label.visible = not found.is_empty()
 	save_button.disabled = not found.is_empty()
+	if share_button:
+		# Only legal, named armies can be shared (being full doesn't matter here).
+		share_button.disabled = not army.problems(rules, BOARD_WIDTH).is_empty() or army.army_name.strip_edges().is_empty()
 	for def in _tray_buttons:
 		var button: Button = _tray_buttons[def]
 		# No picture yet: show the piece's name too.
