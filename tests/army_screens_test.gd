@@ -320,9 +320,14 @@ func test_builder_drag_and_right_click() -> void:
 	check(knight_button.get_node("Cost").color.a > 0.5, "Cost badge drawn")
 	builder.free()
 
-func test_king_badge_says_k() -> void:
+func test_king_has_a_swirled_frame_instead_of_a_badge() -> void:
 	var builder := _builder(_fresh_library())
-	var badge: CostBadge = builder._tray_buttons[KING].get_node("Cost")
-	check_eq(badge.text, "K", "The king's badge says K")
-	check_eq(badge.color, builder.type_color(KING), "On gold")
+	var king_button: Button = builder._tray_buttons[KING]
+	check(king_button.get_node_or_null("Cost") == null, "No cost badge on the king")
+	var frame: KingFrame = king_button.get_node_or_null("KingFrame")
+	check(frame != null, "A frame instead")
+	check_eq(frame.team, Piece.Team.WHITE, "White to start")
+	builder.toggle_team()
+	check_eq(frame.team, Piece.Team.BLACK, "Follows the White/Black button")
+	check(builder._tray_buttons[KNIGHT].get_node_or_null("KingFrame") == null, "Only the king has one")
 	builder.free()

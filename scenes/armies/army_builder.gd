@@ -128,6 +128,9 @@ func toggle_team() -> void:
 	team_button.text = "White" if team == Piece.Team.WHITE else "Black"
 	for def in _tray_buttons:
 		_tray_buttons[def].icon = PieceArt.texture_for(def, team)
+		var frame: KingFrame = _tray_buttons[def].get_node_or_null("KingFrame")
+		if frame:
+			frame.team = team
 	army_board.team = team
 	if card.def:
 		card.show_piece(card.def, team)
@@ -371,24 +374,19 @@ func _refresh() -> void:
 	army_board.highlighted = _allowed_squares()
 	army_board.queue_redraw()
 
-## A cost badge's colour, showing the piece's type (Mac's design): gold for
-## kings, royal purple for royal types, green for pawn types, otherwise dark.
-static func type_color(def: PieceDef) -> Color:
-	if def.is_king_type():
-		return Color("#b8860b")
-	if def.is_royal_type():
-		return Color("#6a35a0")
-	if def.is_pawn_type():
-		return Color("#2f7a36")
-	return Color(0.08, 0.08, 0.09, 0.85)
-
-## The cost in the button's bottom-right corner, e.g. "3", on a badge coloured
-## by type; kings (free, exactly one per army) get a gold badge saying "K".
+## The cost in the button's bottom-right corner, e.g. "3", on a small dark
+## badge. Kings (free, exactly one per army) have no badge: their box gets a
+## swirled border instead (KingFrame, Mac's design).
 func _add_cost_label(button: Button, def: PieceDef) -> void:
+	if def.is_king_type():
+		var frame := KingFrame.new()
+		frame.name = "KingFrame"
+		frame.team = team
+		button.add_child(frame)
+		return
 	var cost := CostBadge.new()
 	cost.name = "Cost"
-	cost.text = "K" if def.is_king_type() else Army.format_points(def.value)
-	cost.color = type_color(def)
+	cost.text = Army.format_points(def.value)
 	button.add_child(cost)
 	_place_cost(cost)
 
