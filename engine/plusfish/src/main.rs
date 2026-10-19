@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex};
 use plusfish_core::util::{Args, Rng};
 
 mod ematch;
+mod meta;
+mod startcheck;
 
 const HELP: &str = "\
 Plusfish - an analysis and balancing engine for Chess Plus
@@ -38,6 +40,10 @@ Balancing
               --out games.jsonl        save the games
   enginematch Two engine programs play each other (to test engine changes);
               see plusfish enginematch --help
+  start-check How well starting-position scores predict which army wins;
+              see plusfish start-check --help
+  meta      Grow a pool of armies that look strongest at turn 0 against each
+              other (eval bar); see plusfish meta --help
   tournament  Round robin between armies, with Elo ratings.
               --armies \"<a>;<b>;<c>\"  or a folder of saved .tres armies
               --games N per pairing (default 20)  --nodes N
@@ -48,6 +54,8 @@ Balancing
   values    Balance report from saved games: plusfish values games.jsonl
               --html report.html       also write a web page
   tune      Fit the evaluation to saved games: plusfish tune games.jsonl --out params.txt
+              --only mat,mob   tune just these features   --freeze open   all but these
+              --skip N         ignore the first N plies (default 8)
 
 Checking the rules against the game
   perft         --fen \"<fen>\" --depth N [--divide]
@@ -139,6 +147,14 @@ fn main() {
         print!("{}", ematch::HELP);
         return;
     }
+    if cmd == "meta" && args.flag("help") {
+        print!("{}", meta::HELP);
+        return;
+    }
+    if cmd == "start-check" && args.flag("help") {
+        print!("{}", startcheck::HELP);
+        return;
+    }
     if cmd == "help" || args.flag("help") {
         print!("{}", HELP);
         return;
@@ -173,6 +189,13 @@ fn main() {
         "enginematch" => {
             let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));
             ematch::run(&cat, &args, &dir.to_string_lossy());
+        }
+        "meta" => {
+            meta::run(&cat, &load_params(&cat, args.get("params")), &args);
+        }
+        "start-check" => {
+            let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));
+            startcheck::run(&cat, &args, &dir.to_string_lossy());
         }
         "bench" => {
             // Fixed positions (random armies, some moves in) searched to a fixed
@@ -716,7 +739,7 @@ fn main() {
             let path = args.words.get(1).unwrap_or_else(|| die("usage: plusfish tune games.jsonl --out params.txt"));
             let text = std::fs::read_to_string(path).unwrap_or_else(|e| die(&e.to_string()));
             let games = report::read_games(&cat, &text);
-            let samples = report::samples_from_games(&cat, &games, 8, 1, threads(&args));
+            let samples = report::samples_from_games(&cat, &games, args.num("skip", 8), 1, threads(&args));
             eprintln!("{} games, {} quiet positions", games.len(), samples.len());
             let start = load_params(&cat, args.get("params"));
             let mut frozen = vec![false; NFEAT];
@@ -742,6 +765,15 @@ fn main() {
                 for i in 0..NFEAT {
                     let name = feature_name(&cat, i);
                     if !prefixes.iter().any(|p| name.starts_with(p)) {
+                        frozen[i] = true;
+                    }
+                }
+            }
+            // --freeze open: keep the features whose names start so as they are.
+            if let Some(fz) = args.get("freeze") {
+                let prefixes: Vec<&str> = fz.split(',').collect();
+                for i in 0..NFEAT {
+                    if prefixes.iter().any(|p| feature_name(&cat, i).starts_with(p)) {
                         frozen[i] = true;
                     }
                 }
