@@ -70,7 +70,7 @@ func test_no_taps_after_game_over() -> void:
 
 ## Pieces whose art hasn't been drawn yet (they show their letters meanwhile).
 ## Take each one off this list when its pictures are added.
-const ART_TO_COME: Array[String] = ["vampire", "squire"]
+const ART_TO_COME: Array[String] = []
 
 func test_every_piece_has_a_picture() -> void:
 	var view := BoardView.new()
