@@ -34,8 +34,12 @@ static func pseudo_legal_moves(state: GameState, captures_only := false) -> Arra
 	var board := state.board
 	var moves: Array[Move] = []
 	var pieces := board.pieces_of(state.side_to_move)
+	# A piece put to sleep by the opponent's Song of Slumber can't move this turn.
+	var frozen := state.frozen_piece()
 	for from: Vector2i in pieces:
 		var piece: Piece = pieces[from]
+		if piece == frozen:
+			continue
 		var first_new := moves.size()
 		for rule in piece.def.move_rules:
 			_add_rule_moves(state, from, piece, rule, moves, captures_only)
@@ -43,7 +47,36 @@ static func pseudo_legal_moves(state: GameState, captures_only := false) -> Arra
 			_add_castling_moves(board, state.rules, from, piece, moves)
 		if piece.can_use_ability():
 			_add_ability_moves(state, from, piece, moves, first_new, captures_only)
+	if not captures_only:
+		_add_haunt_moves(state, moves)
 	return _apply_guards(state, moves)
+
+## Haunt: a lost Ghost whose ability is unused can come back onto any empty
+## square in its side's half of the board (one Ghost's moves if there are several:
+## they'd all be the same).
+static func _add_haunt_moves(state: GameState, moves: Array[Move]) -> void:
+	var ghosts := haunting_ghosts(state, state.side_to_move)
+	if ghosts.is_empty():
+		return
+	var ghost: Piece = ghosts[0]
+	var board := state.board
+	var half := board.height / 2
+	var first_rank := 0 if ghost.team == Piece.Team.WHITE else board.height - half
+	for rank in range(first_rank, first_rank + half):
+		for file in range(board.width):
+			var square := Vector2i(file, rank)
+			if board.is_empty(square):
+				var haunt := Move.new(square, square, ghost)
+				haunt.ability = PieceDef.Ability.HAUNT
+				moves.append(haunt)
+
+## `team`'s lost pieces that can still use Haunt to come back.
+static func haunting_ghosts(state: GameState, team: Piece.Team) -> Array[Piece]:
+	var ghosts: Array[Piece] = []
+	for piece: Piece in state.lost[team]:
+		if piece.def.ability == PieceDef.Ability.HAUNT and not piece.ability_used:
+			ghosts.append(piece)
+	return ghosts
 
 ## The enemy's Squires and Jesters change the side to move's captures: a
 ## protected piece (a Knight on a square a Squire could reach) can't be
@@ -153,7 +186,9 @@ static func _leap_blocked(board: Board, from: Vector2i, step: Vector2i) -> bool:
 
 ## A piece's special-ability moves. Crack Shot: a copy of each of its captures
 ## (from `first_new` on in `moves`) in which it doesn't move. Raise Dead: one move
-## per type of lost piece that can come back.
+## per type of lost piece that can come back. Song of Slumber: one per enemy
+## piece (not a king) it could reach. Full Moon: one (it changes where it stands).
+## (Haunt is used from the lost pieces: see _add_haunt_moves.)
 static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, moves: Array[Move], first_new: int, captures_only: bool) -> void:
 	match piece.def.ability:
 		PieceDef.Ability.CRACK_SHOT:
@@ -166,6 +201,22 @@ static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, m
 				shot.shield_target = capture.shield_target
 				shot.ability = PieceDef.Ability.CRACK_SHOT
 				moves.append(shot)
+		PieceDef.Ability.SONG_OF_SLUMBER:
+			if captures_only:
+				return
+			for square: Vector2i in reach_squares(state.board, from, piece):
+				var target := state.board.get_piece(square)
+				if target and target.team != piece.team and not target.def.is_king_type():
+					var song := Move.new(from, square, piece)
+					song.ability = PieceDef.Ability.SONG_OF_SLUMBER
+					song.frozen = target
+					moves.append(song)
+		PieceDef.Ability.FULL_MOON:
+			if captures_only or piece.def.transforms_into == null:
+				return
+			var change := Move.new(from, from, piece)
+			change.ability = PieceDef.Ability.FULL_MOON
+			moves.append(change)
 		PieceDef.Ability.RAISE_DEAD:
 			if captures_only:
 				return
@@ -173,7 +224,7 @@ static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, m
 				var raise := Move.new(from, from, piece)
 				raise.ability = PieceDef.Ability.RAISE_DEAD
 				for lost_piece: Piece in state.lost[piece.team]:
-					if lost_piece.def == def:
+					if lost_piece.starting_def() == def:
 						raise.raised_from_lost = lost_piece
 						break
 				# Comes back as if the game had just started (shield, ability and all),
@@ -183,11 +234,12 @@ static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, m
 				moves.append(raise)
 
 ## The kinds of `team`'s lost pieces that Raise Dead could bring back: not pawn
-## types and not Necromancers (Raise Dead pieces). Each listed once.
+## types and not Necromancers (Raise Dead pieces). Each listed once, as the type
+## it started the game as (a wolf comes back as a Werewolf).
 static func raisable_defs(state: GameState, team: Piece.Team) -> Array[PieceDef]:
 	var defs: Array[PieceDef] = []
 	for piece: Piece in state.lost[team]:
-		var def := piece.def
+		var def := piece.starting_def()
 		if def.is_pawn_type() or def.ability == PieceDef.Ability.RAISE_DEAD or defs.has(def):
 			continue
 		defs.append(def)

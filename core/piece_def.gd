@@ -34,8 +34,17 @@ enum Keyword { JUMP = 1, CASTLE = 2, PROMOTE = 4, SHIELD = 8 }
 ## CRACK_SHOT (Archer): capture something it could capture, without moving.
 ## RAISE_DEAD (Necromancer): it leaves the board and one of its side's lost
 ##   pieces (not a pawn type, not a Necromancer) comes back on its square, fresh.
-enum Ability { NONE, CRACK_SHOT, RAISE_DEAD }
+## HAUNT (Ghost): used after it has been captured: it comes back onto any empty
+##   square in its side's half of the board.
+## SONG_OF_SLUMBER (Bard): one enemy piece it could capture (not a king) can't
+##   move on the opponent's next turn.
+## FULL_MOON (Werewolf): it turns into `transforms_into` for the rest of the game.
+enum Ability { NONE, CRACK_SHOT, RAISE_DEAD, HAUNT, SONG_OF_SLUMBER, FULL_MOON }
 @export var ability: Ability = Ability.NONE
+
+## For FULL_MOON: the piece type it becomes (the Werewolf's wolf form, kept in
+## res://data/pieces/forms/ so it isn't offered in the army builder).
+@export var transforms_into: PieceDef
 
 ## The Ram's rule: after capturing (or breaking a shield) it is removed from the
 ## board too, and counts as lost.

@@ -46,14 +46,19 @@ func _init(p_from: Vector2i, p_to: Vector2i, p_piece: Piece, p_captured: Piece =
 
 ## The special ability this move uses (PieceDef.Ability), NONE for ordinary moves.
 ## A Crack Shot is a capture (or shield break) where the Archer stays put; a Raise
-## Dead has from == to (the Necromancer's square) and `raised` set.
+## Dead has from == to (the Necromancer's square) and `raised` set; a Haunt has
+## from == to (where the Ghost comes back; `piece` is the lost Ghost); Song of
+## Slumber goes from the Bard to the piece it puts to sleep (`frozen`), and
+## nothing moves; Full Moon has from == to (the Werewolf's square).
 var ability: PieceDef.Ability = PieceDef.Ability.NONE
 ## Raise Dead: the piece that comes back (a fresh piece of a lost piece's type),
 ## and the lost piece it stands for (taken off the lost list while it's back).
 var raised: Piece
 var raised_from_lost: Piece
-## Filled in by make_move: where raised_from_lost was in the lost list, and
-## whether the moving piece died (a Ram capturing).
+## Song of Slumber: the enemy piece that can't move on its side's next turn.
+var frozen: Piece
+## Filled in by make_move: where raised_from_lost (or a haunting Ghost) was in
+## the lost list, and whether the moving piece died (a Ram capturing).
 var raised_lost_index := -1
 var attacker_died := false
 
@@ -75,16 +80,26 @@ func breaks_shield() -> bool:
 	return shield_target != null
 
 ## Where the moving piece ends up: `to`, or `from` if it only broke a shield or
-## used Crack Shot (it shoots from where it stands).
+## used Crack Shot (it shoots from where it stands) or Song of Slumber.
 func lands_on() -> Vector2i:
-	return from if breaks_shield() or ability == PieceDef.Ability.CRACK_SHOT else to
+	if breaks_shield() or ability == PieceDef.Ability.CRACK_SHOT or ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		return from
+	return to
 
 func is_castling() -> bool:
 	return partner != null
 
 ## Simple text like "e2-e4", "e4xd5" or "e7-e8=Q". Used for testing, not real notation.
 func to_text() -> String:
-	# Abilities: "c1!g5" (Crack Shot on g5), "d1!=Q" (Raise Dead bringing back a queen).
+	# Abilities: "c1!g5" (Crack Shot on g5), "d1!=Q" (Raise Dead bringing back a
+	# queen), "@e3" (a Ghost haunting e3), "c1~g5" (Song of Slumber on g5),
+	# "e4!" (Full Moon).
+	if ability == PieceDef.Ability.HAUNT:
+		return "@" + Board.square_name(to)
+	if ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		return Board.square_name(from) + "~" + Board.square_name(to)
+	if ability == PieceDef.Ability.FULL_MOON:
+		return Board.square_name(from) + "!"
 	if ability == PieceDef.Ability.RAISE_DEAD:
 		return Board.square_name(from) + "!=" + raised.def.symbol.to_upper()
 	if ability == PieceDef.Ability.CRACK_SHOT:
