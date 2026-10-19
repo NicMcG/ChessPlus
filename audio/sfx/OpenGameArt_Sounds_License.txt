@@ -15,7 +15,8 @@ lullaby.wav         "4 Music Box Tracks" (musicbox3_sad_tune.ogg, 2.2-3.8 s: the
 bow_shot.wav        "Battle Sound Effects" by artisticdude (Bow.wav; CC0 is one of its licences)
                     https://opengameart.org/content/battle-sound-effects
 arrow_whistle.wav   "Fantasy Sound Effects (Tinysized SFX)" (tin-whistle-whoosh-01.wav)
-electric_charge.wav  the same pack (paralyzer-discharge-01.wav, first 0.72 s)
+electric_charge.wav  the same pack (paralyzer-discharge-01.wav, first 0.5 s, pitched down),
+                    mixed with Kenney Sci-Fi spaceEngineLow_000 (see Kenney_SciFi_License.txt)
                     https://opengameart.org/content/fantasy-sound-effects-tinysized-sfx
 stone_scrape_*.wav  see OpenGameArt_Scrapes_License.txt
-laserLarge_*.ogg    Kenney Sci-Fi Sounds, see Kenney_SciFi_License.txt
+laser_echo_*.wav    Kenney Sci-Fi laserLarge_001/002 with a short echo, see Kenney_SciFi_License.txt
