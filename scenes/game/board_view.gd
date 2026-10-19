@@ -403,13 +403,17 @@ func selected_ability_moves() -> Array[Move]:
 	return _ability_moves
 
 ## Choose where an ability is used when no piece on the board is selected (a
-## lost Ghost's Haunt): only `moves`' squares are offered, ringed in gold, until
-## another square is tapped.
-func aim_moves(moves: Array[Move]) -> void:
+## lost Ghost's Haunt): only `moves`' squares can be tapped, until another square
+## is. `marked`: ring them in gold (Haunt doesn't: any empty square will do).
+func aim_moves(moves: Array[Move], marked := true) -> void:
 	_clear_selection()
 	aiming = true
+	_aim_unmarked = not marked
 	_selected_moves.assign(moves)
 	queue_redraw()
+
+## Aiming without gold rings on the targets (see aim_moves).
+var _aim_unmarked := false
 
 ## Choose a target for the selected piece's ability: from now on only the
 ## ability's targets are shown and can be tapped (until the selection changes).
@@ -417,6 +421,7 @@ func aim_ability() -> void:
 	if _selected == Board.NO_SQUARE or _ability_moves.is_empty():
 		return
 	aiming = true
+	_aim_unmarked = false
 	_selected_moves.assign(_ability_moves)
 	queue_redraw()
 
@@ -477,8 +482,9 @@ func _draw() -> void:
 	_draw_extras(extras, false)
 	# On top of the pieces, so a piece on an edge square doesn't hide its label.
 	_draw_coordinates()
-	for move in _selected_moves:
-		_draw_target(move)
+	if not (aiming and _aim_unmarked):
+		for move in _selected_moves:
+			_draw_target(move)
 	if hint_arrow.size() == 2 and hint_arrow[0] != hint_arrow[1]:
 		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
 	for arrow: Array in arrows:

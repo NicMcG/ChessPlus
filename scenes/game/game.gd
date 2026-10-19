@@ -548,8 +548,17 @@ func _on_selection_changed(_square: Vector2i) -> void:
 func _refresh_ability_button() -> void:
 	var square := board_view.selected_square()
 	var piece: Piece = state.board.get_piece(square) if state and square != Board.NO_SQUARE else null
+	# The captured Ghost glows in the row of captures while its square is chosen.
+	var choosing_haunt := piece == null and board_view.aiming
+	for row: CapturedRow in [captured_top, captured_bottom]:
+		if row:
+			row.haunting = null
 	if piece == null:
 		var haunts := _haunt_moves()
+		if choosing_haunt and not haunts.is_empty():
+			for row: CapturedRow in [captured_top, captured_bottom]:
+				if row and row.pieces.has(haunts[0].piece):
+					row.haunting = haunts[0].piece
 		ability_button.visible = not haunts.is_empty()
 		if ability_button.visible:
 			var ghost := haunts[0].piece
@@ -598,8 +607,9 @@ func use_ability() -> void:
 	if board_view.selected_square() == Board.NO_SQUARE:
 		var haunts := _haunt_moves()
 		if not haunts.is_empty():
-			board_view.aim_moves(haunts)
-			status_label.text = "%s: choose a square" % haunts[0].piece.def.ability_name
+			board_view.aim_moves(haunts, false)
+			_refresh_ability_button()
+			status_label.text = "%s: tap any empty square" % haunts[0].piece.def.ability_name
 		return
 	var moves := board_view.selected_ability_moves()
 	if moves.is_empty():

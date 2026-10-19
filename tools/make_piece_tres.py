@@ -55,16 +55,16 @@ PIECES = {
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
     ], ability=3, ability_name="Haunt", colors=["#A8D4F5", "#F0F8FF"],
-        ability_text="Once per game, after the Ghost has been captured: on a later turn, put it back on any empty square in your half of the board. Uses your turn."),
+        ability_text="Once per game, after the Ghost has been captured: on a later turn, put it back on any empty square of the board. Uses your turn."),
     "bard": dict(name="Bard", symbol="BD", value=3.5, rules=[
         (DIAG, 4, 0, {}),
     ], ability=4, ability_name="Song of Slumber", colors=["#F5C542", "#C46A12"],
-        ability_text="Once per game: choose an enemy piece (not the King) that the Bard could capture. It can't move on your opponent's next turn. Uses your turn."),
+        ability_text="Once per game: choose an enemy piece (not the King) that the Bard could capture. It can't move on your opponent's next turn, so it doesn't give check either. Uses your turn."),
     "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
     ], ability=5, ability_name="Full Moon", colors=["#F5F2E3", "#8E959E"], transforms_into="forms/werewolf_wolf",
-        ability_text="Once per game: the Werewolf turns into a wolf for the rest of the game. The wolf moves 1 square sideways or straight back, or up to 2 squares straight forward or diagonally forward (it can be blocked). Uses your turn."),
+        ability_text="Once per game: the Werewolf turns into a wolf for the rest of the game (press After Full Moon to see how the wolf moves). Uses your turn."),
     # The Werewolf after Full Moon. Kept in forms/ so the army builder doesn't offer it.
     "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3, path="forms/werewolf_wolf", rules=[
         ([(1, 0), (-1, 0), (0, -1)], 1, 0, {}),

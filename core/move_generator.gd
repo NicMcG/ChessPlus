@@ -15,12 +15,18 @@ static func legal_moves(state: GameState) -> Array[Move]:
 	var legal: Array[Move] = []
 	for move in pseudo_legal_moves(state):
 		state.make_move(move)
+		# A piece put to sleep can't capture next turn, so its attacks don't count
+		# (Mac): it's lifted off the board while looking.
+		if move.frozen:
+			board.set_piece(move.to, null)
 		var safe := true
 		for square in royals:
 			var now_at := move.lands_on() if square == move.from else square
 			if attacked_with(board, now_at, enemy, table):
 				safe = false
 				break
+		if move.frozen:
+			board.set_piece(move.to, move.frozen)
 		state.undo_move(move)
 		if safe:
 			legal.append(move)
@@ -52,17 +58,15 @@ static func pseudo_legal_moves(state: GameState, captures_only := false) -> Arra
 	return _apply_guards(state, moves)
 
 ## Haunt: a lost Ghost whose ability is unused can come back onto any empty
-## square in its side's half of the board (one Ghost's moves if there are several:
-## they'd all be the same).
+## square of the board (Mac). One Ghost's moves if there are several: they'd all
+## be the same.
 static func _add_haunt_moves(state: GameState, moves: Array[Move]) -> void:
 	var ghosts := haunting_ghosts(state, state.side_to_move)
 	if ghosts.is_empty():
 		return
 	var ghost: Piece = ghosts[0]
 	var board := state.board
-	var half := board.height / 2
-	var first_rank := 0 if ghost.team == Piece.Team.WHITE else board.height - half
-	for rank in range(first_rank, first_rank + half):
+	for rank in range(board.height):
 		for file in range(board.width):
 			var square := Vector2i(file, rank)
 			if board.is_empty(square):
