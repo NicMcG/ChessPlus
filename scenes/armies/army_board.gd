@@ -7,6 +7,10 @@ extends Control
 ## drawn at the bottom like White's side of the real board.
 
 signal square_tapped(square: Vector2i)
+## Right-clicked (PC): the builder removes the piece there.
+signal square_right_clicked(square: Vector2i)
+## A piece type was dragged from the tray and dropped on a square.
+signal piece_dropped(def: PieceDef, square: Vector2i)
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
@@ -38,6 +42,18 @@ func _gui_input(event: InputEvent) -> void:
 		if square != Board.NO_SQUARE:
 			square_tapped.emit(square)
 		accept_event()
+	elif click and click.pressed and click.button_index == MOUSE_BUTTON_RIGHT:
+		var square := _square_at(click.position)
+		if square != Board.NO_SQUARE:
+			square_right_clicked.emit(square)
+		accept_event()
+
+## Pieces dragged from the tray ({"tray_piece": PieceDef}) can be dropped on any square.
+func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	return data is Dictionary and data.has("tray_piece") and _square_at(at_position) != Board.NO_SQUARE
+
+func _drop_data(at_position: Vector2, data: Variant) -> void:
+	piece_dropped.emit(data["tray_piece"], _square_at(at_position))
 
 func _draw() -> void:
 	for row in range(rows):

@@ -75,6 +75,8 @@ func _ready() -> void:
 	army_board.rows = rules.army_start_rows
 	army_board.show_army(army)
 	army_board.square_tapped.connect(tap_square)
+	army_board.square_right_clicked.connect(remove_at)
+	army_board.piece_dropped.connect(drop_piece)
 	team_button.pressed.connect(toggle_team)
 	save_button.pressed.connect(save)
 	# Share sits beside Save (Mac's choice).
@@ -134,6 +136,43 @@ func toggle_team() -> void:
 ## Tapping a square: an empty square gets the selected piece; a square holding
 ## the selected type (or any piece, when nothing is selected) is cleared; a
 ## square holding a different type gets swapped to the selected type.
+## Right-clicking a placed piece (PC) takes it out of the army.
+func remove_at(square: Vector2i) -> void:
+	army.remove_at(square)
+	_refresh()
+
+## A piece type dragged from the tray onto a square: it becomes the chosen type
+## and goes there (replacing whatever was there).
+func drop_piece(def: PieceDef, square: Vector2i) -> void:
+	select(def)
+	army.place(def, square)
+	_refresh()
+
+## On touch screens a drag that starts on a tray button scrolls the tray, so
+## dragging a piece out needs a short hold first (milliseconds).
+const DRAG_HOLD_MS := 250
+## When the current press on a tray button started.
+var _press_ms := 0
+
+## What dragging a tray button carries (null = don't drag; scroll instead).
+func _tray_drag(def: PieceDef, button: Button) -> Variant:
+	if DisplayServer.is_touchscreen_available() and Time.get_ticks_msec() - _press_ms < DRAG_HOLD_MS:
+		return null
+	if absi(_tray_scroll.scroll_vertical - _scroll_at_press) > 4:
+		return null
+	# The piece's picture follows the pointer, centred on it.
+	var holder := Control.new()
+	var picture := TextureRect.new()
+	picture.texture = PieceArt.texture_for(def, team)
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var side := army_board.size.y / army_board.rows
+	picture.size = Vector2(side, side)
+	picture.position = -picture.size / 2
+	holder.add_child(picture)
+	button.set_drag_preview(holder)
+	return {"tray_piece": def}
+
 func tap_square(square: Vector2i) -> void:
 	var current := army.def_at(square)
 	if current != null and (selected == null or current == selected):
@@ -282,23 +321,14 @@ func _build_tray() -> void:
 		# Kings on gold, royal pieces on royal purple, pawn types on green (Mac's
 		# design); the chosen type gets a bright border, so it's obvious what
 		# you're placing.
-		var background := type_color(def)
-		var normal := StyleBoxFlat.new()
-		normal.bg_color = background
-		normal.set_corner_radius_all(4)
-		# Every box outlined (Mac's design), in a lighter shade of its colour.
-		normal.set_border_width_all(2)
-		normal.border_color = background.lightened(0.35)
-		var hover := normal.duplicate()
-		hover.bg_color = background.lightened(0.12)
-		var chosen := normal.duplicate()
-		chosen.bg_color = background.lightened(0.08)
+		# The chosen type gets a gold border, so it's obvious what you're placing.
+		var chosen := StyleBoxFlat.new()
+		chosen.bg_color = Color(0.25, 0.25, 0.27)
 		chosen.set_border_width_all(4)
-		chosen.border_color = Color.WHITE if def.is_king_type() else Color(0.95, 0.75, 0.2)
-		button.add_theme_stylebox_override("normal", normal)
-		button.add_theme_stylebox_override("hover", hover)
+		chosen.border_color = Color(0.95, 0.75, 0.2)
 		button.add_theme_stylebox_override("pressed", chosen)
 		button.add_theme_stylebox_override("hover_pressed", chosen)
+		button.set_drag_forwarding(func(_at: Vector2) -> Variant: return _tray_drag(def, button), Callable(), Callable())
 		button.icon = PieceArt.texture_for(def, team)
 		button.expand_icon = true
 		# The text never makes the button wider than the size it's given.
@@ -310,7 +340,9 @@ func _build_tray() -> void:
 		# Drags that start on a button scroll the tray (the button passes them on);
 		# a press that turned into a scroll doesn't select the piece.
 		button.mouse_filter = Control.MOUSE_FILTER_PASS
-		button.button_down.connect(func() -> void: _scroll_at_press = _tray_scroll.scroll_vertical)
+		button.button_down.connect(func() -> void:
+			_scroll_at_press = _tray_scroll.scroll_vertical
+			_press_ms = Time.get_ticks_msec())
 		button.toggled.connect(func(on: bool) -> void:
 			if absi(_tray_scroll.scroll_vertical - _scroll_at_press) > 4:
 				button.set_pressed_no_signal(not on)
@@ -339,16 +371,16 @@ func _refresh() -> void:
 	army_board.highlighted = _allowed_squares()
 	army_board.queue_redraw()
 
-## A tray button's background: gold for king types, royal purple for royal
-## types, green for pawn types, otherwise the usual dark grey.
+## A cost badge's colour, showing the piece's type (Mac's design): royal purple
+## for royal types, green for pawn types, otherwise dark. (Kings have no badge.)
 static func type_color(def: PieceDef) -> Color:
 	if def.is_king_type():
 		return Color("#b8860b")
 	if def.is_royal_type():
-		return Color("#5a2d82")
+		return Color("#6a35a0")
 	if def.is_pawn_type():
-		return Color("#2f6b34")
-	return Color(0.3, 0.3, 0.32)
+		return Color("#2f7a36")
+	return Color(0.08, 0.08, 0.09, 0.85)
 
 ## The cost in the button's bottom-right corner, e.g. "3" (not for kings: every
 ## army has exactly one, and it's free).
@@ -359,6 +391,7 @@ func _add_cost_label(button: Button, def: PieceDef) -> void:
 	var cost := CostBadge.new()
 	cost.name = "Cost"
 	cost.text = Army.format_points(def.value)
+	cost.color = type_color(def)
 	button.add_child(cost)
 	_place_cost(cost)
 
