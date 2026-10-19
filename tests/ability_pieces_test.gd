@@ -17,9 +17,9 @@ func _ids(pieces: Array) -> Array:
 	return pieces.map(func(p: Piece) -> String: return p.def.id)
 
 func test_costs_symbols_and_tags() -> void:
-	check_eq([_def("ram").symbol, _def("ram").value], ["RM", 3.5], "Ram")
-	check_eq([_def("archer").symbol, _def("archer").value], ["A", 4.0], "Archer")
-	check_eq([_def("necromancer").symbol, _def("necromancer").value], ["NC", 3.0], "Necromancer")
+	check_eq([_def("ram").symbol, _def("ram").value], ["RM", 3.0], "Ram")
+	check_eq([_def("archer").symbol, _def("archer").value], ["A", 4.5], "Archer")
+	check_eq([_def("necromancer").symbol, _def("necromancer").value], ["NC", 3.5], "Necromancer")
 	check(_def("ram").dies_on_capture and _def("ram").special_rule != "", "Ram: special rule")
 	check_eq(_def("archer").ability_name, "Crack Shot", "Archer's ability")
 	check_eq(_def("necromancer").ability_name, "Raise Dead", "Necromancer's ability")
