@@ -89,3 +89,15 @@ func test_old_saves_start_their_clock() -> void:
 func test_date_text() -> void:
 	var text := SavedGame.date_text(1_800_000_000.0)
 	check(text.length() >= 5 and text.split(" ").size() == 2, "Like 'Jan 15': " + text)
+
+func test_bot_reply_notifies_in_the_background() -> void:
+	var game := _open(Piece.Team.BLACK)
+	TurnNotifier.sent.clear()
+	TurnNotifier.force_background = true
+	_play(game, "e4")
+	TurnNotifier.force_background = false
+	check_eq(TurnNotifier.sent.size(), 1, "Told when the bot has replied")
+	check(TurnNotifier.sent[0].begins_with("Chess Plus: your move: The bot played "), TurnNotifier.sent[0] if not TurnNotifier.sent.is_empty() else "")
+	TurnNotifier.sent.clear()
+	game.free()
+	SavedGame.delete_saved()

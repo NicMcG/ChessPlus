@@ -231,6 +231,23 @@ func test_online_game_between_two_screens() -> void:
 	host_screen.free()
 	guest_screen.free()
 
+func test_your_move_notification() -> void:
+	var pair: Array = await _started_game()
+	var host_screen := _game_screen(pair[0])
+	var guest_screen := _game_screen(pair[1])
+	TurnNotifier.sent.clear()
+	host_screen.play(Notation.find_move(host_screen.state, "e4"))
+	await guest_screen.online.poll()
+	check(TurnNotifier.sent.is_empty(), "No notification while the game is in front of you")
+	guest_screen.play(Notation.find_move(guest_screen.state, "e5"))
+	TurnNotifier.force_background = true
+	await host_screen.online.poll()
+	TurnNotifier.force_background = false
+	check_eq(TurnNotifier.sent, PackedStringArray(["Chess Plus: your move: Your opponent played e5."]), "In the background: told it's your move")
+	TurnNotifier.sent.clear()
+	host_screen.free()
+	guest_screen.free()
+
 func test_resign_from_the_game_screen() -> void:
 	var pair: Array = await _started_game()
 	var host_screen := _game_screen(pair[0])

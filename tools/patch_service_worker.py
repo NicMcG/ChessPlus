@@ -19,5 +19,17 @@ for old, new in replacements:
 	if text.count(old) != 1:
 		sys.exit("patch_service_worker: couldn't find " + old)
 	text = text.replace(old, new)
+# Tapping a "your move" notification (TurnNotifier) brings the game to the front.
+text += '''
+self.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+	event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+		if (windows.length > 0) {
+			return windows[0].focus();
+		}
+		return self.clients.openWindow('./');
+	}));
+});
+'''
 io.open(path, "w", encoding="utf-8", newline="").write(text)
 print("Service worker patched.")
