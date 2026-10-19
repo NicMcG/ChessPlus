@@ -6,6 +6,11 @@ extends Resource
 
 @export var army_name := ""
 @export var pieces: Array[ArmyPiece] = []
+## Played as Black, the army is turned round as a whole (files mirrored too), so
+## from Black's side of the board it looks exactly as it was built (Mac's fix).
+## The standard chess set turns this off: in real chess Black's queen is on the
+## d-file like White's, which from Black's side is the other side of the king.
+@export var mirror_for_black := true
 
 ## The file this army was saved in by ArmyLibrary ("" if never saved). Not saved
 ## inside the file itself.
@@ -17,6 +22,7 @@ func copy() -> Army:
 	var result := Army.new()
 	result.army_name = army_name
 	result.library_path = library_path
+	result.mirror_for_black = mirror_for_black
 	for piece in pieces:
 		result.place(piece.def, piece.square)
 	return result

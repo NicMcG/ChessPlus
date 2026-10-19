@@ -130,9 +130,20 @@ func test_placing_replaces_what_was_there() -> void:
 func test_black_is_placed_on_its_own_side() -> void:
 	var black := _army([[KING, Vector2i(4, 0)], [QUEEN, Vector2i(3, 0)], [PAWN, Vector2i(0, 1)]])
 	var game := ArmySetup.create_game(_just_a_king(), black, rules)
-	check_eq(game.board.get_piece(Board.parse_square("d8")).def, QUEEN, "Queen on d8")
-	check_eq(game.board.get_piece(Board.parse_square("a7")).team, Piece.Team.BLACK, "Black pawn on a7")
+	# Turned round as a whole (Mac): from Black's side it looks as it was built.
+	check_eq(game.board.get_piece(Board.parse_square("e8")).def, QUEEN, "Queen on e8")
+	check_eq(game.board.get_piece(Board.parse_square("h7")).team, Piece.Team.BLACK, "Black pawn on h7")
+	check_eq(game.board.get_piece(Board.parse_square("d8")).def, KING, "King on d8")
+
+func test_standard_army_is_not_turned_round() -> void:
+	var game := ArmySetup.create_game(StandardSetup.army(), StandardSetup.army(), rules)
+	check_eq(game.board.get_piece(Board.parse_square("d8")).def, QUEEN, "Queen on d8, as in chess")
 	check_eq(game.board.get_piece(Board.parse_square("e8")).def, KING, "King on e8")
+
+func test_turning_round_survives_saving() -> void:
+	var mine := _army([[KING, Vector2i(4, 0)], [QUEEN, Vector2i(3, 0)]])
+	check(SavedGame.army_from_dict(SavedGame.army_to_dict(mine)).mirror_for_black, "Built army: turned round")
+	check(not SavedGame.army_from_dict(SavedGame.army_to_dict(StandardSetup.army())).mirror_for_black, "Standard: not")
 
 # --- Castling needs the rook in a back-rank corner. ----------------------------
 

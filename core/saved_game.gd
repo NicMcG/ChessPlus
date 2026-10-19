@@ -85,12 +85,13 @@ static func from_dict(data: Dictionary) -> SavedGame:
 		saved.moves.append(str(text))
 	return saved
 
-## An army as plain data: its name and [piece id, file, row] for each piece.
+## An army as plain data: its name, [piece id, file, row] for each piece, and
+## whether it's turned round when played as Black (Army.mirror_for_black).
 static func army_to_dict(army: Army) -> Dictionary:
 	var pieces := []
 	for piece in army.pieces:
 		pieces.append([piece.def.id, piece.square.x, piece.square.y])
-	return {"name": army.army_name, "pieces": pieces}
+	return {"name": army.army_name, "pieces": pieces, "mirror": army.mirror_for_black}
 
 ## Back from plain data. Null if a piece type no longer exists.
 static func army_from_dict(data: Dictionary) -> Army:
@@ -99,6 +100,9 @@ static func army_from_dict(data: Dictionary) -> Army:
 		by_id[def.id] = def
 	var army := Army.new()
 	army.army_name = str(data.get("name", ""))
+	# Saved before armies were turned round for Black: keep them as they were, so
+	# a game in progress carries on the same.
+	army.mirror_for_black = bool(data.get("mirror", false))
 	for entry in data.get("pieces", []):
 		var def: PieceDef = by_id.get(str(entry[0]))
 		if def == null:

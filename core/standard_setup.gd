@@ -32,6 +32,7 @@ static func from_fen(fen: String) -> GameState:
 static func army() -> Army:
 	var result := Army.new()
 	result.army_name = "Standard"
+	result.mirror_for_black = false
 	var back_rank := [ROOK, KNIGHT, BISHOP, QUEEN, KING, BISHOP, KNIGHT, ROOK]
 	for file in range(8):
 		result.place(back_rank[file], Vector2i(file, 0))
