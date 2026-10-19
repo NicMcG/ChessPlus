@@ -1,13 +1,12 @@
-"""Final Ghost (round 23 ghost_sheet with sad eyes), Bard (round 23 lyre_even),
-Werewolf (round 23 human_fur_ears_plain with three evenly spaced fur tufts a
-side) and its wolf form (round 23 wolf_big_head: three evenly spaced spikes down
-its back, no lines in its ears, no bottom tooth, a slightly thicker neck).
+"""Final Ghost (round 23 ghost_sheet with sad jellybean eyes), Bard (round 23
+lyre_even), Werewolf (round 23 human_fur_ears_plain with three evenly spaced fur
+tufts a side) and its wolf form (round 22 wolf_mane with three of its six
+spikes, same shape, evenly spaced; no lines in its ears, no bottom tooth).
 White and black, written to ../pieces/ (the wolf as <team>_werewolf_wolf.svg).
 
 Run from this folder:  python make_final_ghost_bard_werewolf.py
 """
 import io
-import math
 import os
 import sys
 
@@ -31,11 +30,14 @@ def ghost(team):
     out += detail("M 16.6,25 C 16.2,29 15.4,32.6 13.6,35.6 M 28.4,25 C 28.8,29 29.6,32.6 31.4,35.6 "
                   "M 22.5,27.5 L 22.5,34.6", inner(team), 1.0)
     eye = inner(team)
-    # Sad eyes: drooping at the outer corners, under brows raised in the middle.
-    out += shape("M 20.3,14.8 C 20.6,17.4 19.6,18.6 18.3,18.6 C 17,18.6 16.4,17.4 16.5,16 Z", eye, "none")
-    out += shape("M 24.7,14.8 C 24.4,17.4 25.4,18.6 26.7,18.6 C 28,18.6 28.6,17.4 28.5,16 Z", eye, "none")
-    out += detail("M 16,13.4 L 20,11.9 M 29,13.4 L 25,11.9", eye, 1.2)
+    # Sad eyes (Mac): tall jellybeans, dented on the inside, their tops leaning in.
+    for cx, lean, flip in ((18.4, 20, 1), (26.6, -20, -1)):
+        out += '<g transform="translate(%s 16.2) rotate(%s) scale(%s 1)">%s</g>' % (cx, lean, flip, shape(JELLYBEAN, eye, "none"))
     return out
+
+
+# A jellybean eye, centred on (0, 0), the dent on its right.
+JELLYBEAN = "M 0,-3 C 1.7,-3 2.1,-1.4 1.6,0 C 1.2,1.2 1.9,2.6 0.4,3.05 C -1.5,3.5 -2.1,1.8 -2.1,0 C -2.1,-1.8 -1.4,-3 0,-3 Z"
 
 
 # --- Werewolf: the coif with ears and three tufts of fur a side --------------------------
@@ -46,64 +48,22 @@ def werewolf(team):
     return r23.plain_coif(team, fur + r23.ears(team))
 
 
-# --- The wolf ----------------------------------------------------------------------------
-BACK = ((22, 10), (32.5, 11), (38.5, 18), (38, 39))  # The knight's back (a curve).
-
-
-def _bez(t):
-    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = BACK
-    u = 1 - t
-    return (u ** 3 * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t ** 3 * x3,
-            u ** 3 * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t ** 3 * y3)
-
-
-# The curve sampled finely, with the distance along it to each sample.
-_SAMPLES = [_bez(i / 400) for i in range(401)]
-_DIST = [0.0]
-for _i in range(1, len(_SAMPLES)):
-    _DIST.append(_DIST[-1] + math.dist(_SAMPLES[_i - 1], _SAMPLES[_i]))
-
-
-def _at(fraction):
-    """The point `fraction` of the way along the back, and the unit tangent and
-    outward normal there."""
-    target = fraction * _DIST[-1]
-    i = next(k for k, d in enumerate(_DIST) if d >= target)
-    i = min(max(i, 1), len(_SAMPLES) - 2)
-    p = _SAMPLES[i]
-    tx, ty = _SAMPLES[i + 1][0] - _SAMPLES[i - 1][0], _SAMPLES[i + 1][1] - _SAMPLES[i - 1][1]
-    n = math.hypot(tx, ty)
-    tx, ty = tx / n, ty / n
-    return p, (tx, ty), (ty, -tx)
-
-
-SPIKES = (0.27, 0.48, 0.69)  # Where each spike starts, as a share of the back's length.
-SPIKE_SPAN = 0.09
+# --- The wolf: round 22's maned wolf, with three of its six spikes ------------------------
+# Round 22's mane, spike by spike: (tip, where it rejoins the back). Spikes 2, 4
+# and 6 are kept exactly as they were (Mac: same fur shape, three instead of
+# six); where 1, 3 and 5 were, the back runs straight on between the spikes.
+MANE = [((26.4, 10.4), (25.2, 12.2)), ((30, 12.8), (28.6, 14.6)), ((33.2, 16.4), (31.6, 18)),
+        ((35.6, 21), (33.8, 22.6)), ((37, 26.6), (35.2, 28)), ((37.8, 32.4), (36.4, 33.8))]
+KEPT = (1, 3, 5)
 
 
 def wolf_body():
-    """The knight's back with three spikes of fur evenly spaced down it, and its
-    front (neck) line a little further left than the knight's."""
-    points = []
-    marks = sorted([0.0, 1.0] + [s for s in SPIKES] + [s + SPIKE_SPAN for s in SPIKES])
     d = "M 22,10"
-    position = 0.0
-    for start in SPIKES:
-        # Along the back to the spike.
-        for k in range(1, 13):
-            f = position + (start - position) * k / 12
-            (x, y), _, _ = _at(f)
-            d += " L %.2f,%.2f" % (x, y)
-        (bx, by), (tx, ty), (nx, ny) = _at(start + SPIKE_SPAN * 0.45)
-        d += " L %.2f,%.2f" % (bx + nx * 4.0 + tx * 2.6, by + ny * 4.0 + ty * 2.6)
-        (ex, ey), _, (nx, ny) = _at(start + SPIKE_SPAN)
-        d += " L %.2f,%.2f" % (ex - nx * 0.9, ey - ny * 0.9)
-        position = start + SPIKE_SPAN
-    for k in range(1, 13):
-        f = position + (1.0 - position) * k / 12
-        (x, y), _, _ = _at(f)
-        d += " L %.2f,%.2f" % (x, y)
-    return d + " L 13.8,39 C 13.8,30 24.2,32.5 23,18"
+    for i, (tip, rejoin) in enumerate(MANE):
+        if i in KEPT:
+            d += " L %s,%s" % tip
+        d += " L %s,%s" % rejoin
+    return d + " L 38,39 L 15,39 C 15,30 25,32.5 23,18"
 
 
 def wolf_head(team):
@@ -120,17 +80,9 @@ def wolf_head(team):
 def wolf(team):
     fill, line = colours(team)
     out = shape(wolf_body(), fill)
-    # A line of fur under each gap between the spikes.
-    lines = ""
-    for i in range(len(SPIKES) - 1):
-        middle = (SPIKES[i] + SPIKE_SPAN + SPIKES[i + 1]) / 2
-        (x, y), (tx, ty), (nx, ny) = _at(middle)
-        x0, y0 = x - nx * 2.4, y - ny * 2.4
-        lines += "M %.2f,%.2f L %.2f,%.2f " % (x0, y0, x0 - nx * 1.6 + tx * 2.2, y0 - ny * 1.6 + ty * 2.2)
-    out += detail(lines, inner(team), 0.9)
-    k, cx, cy = 1.12, 24, 17  # The head 12% bigger, grown about the back of the neck.
-    head = wolf_head(team).replace('stroke-width="1.5"', 'stroke-width="%.2f"' % (1.5 / k))
-    return out + '<g transform="translate(%.2f %.2f) scale(%s)">%s</g>' % (cx * (1 - k), cy * (1 - k), k, head)
+    # Round 22's strokes of fur, one under each spike.
+    out += detail("M 27.6,17.2 L 25.8,19.6 M 31,22 L 29,24.4 M 33.4,27.6 L 31.6,30", inner(team), 0.9)
+    return out + wolf_head(team)
 
 
 PIECES = {"ghost": ghost, "bard": r23.lyre_even, "werewolf": werewolf, "werewolf_wolf": wolf}
