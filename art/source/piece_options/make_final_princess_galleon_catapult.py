@@ -1,7 +1,7 @@
 """Final Princess (round 16 crown_five_on_base without the dots on the crown;
 the black one gets white lines like the white one's black lines; the crown made
-taller, Mac Oct 2026), Galleon (round 15 galleon_square without the gun ports;
-the black one's mast black over the sails and white between them) and Catapult
+taller, Mac Oct 2026), Galleon (round 15 galleon_square; the black one's mast
+all black) and Catapult
 (round 16 catapult_low, wheels without the inner circles), white and black,
 written to ../pieces/.
 
@@ -46,13 +46,11 @@ def princess(team):
 
 
 def galleon(team):
-    """Round 15's square-sailed galleon without the four gun ports (Mac); on the
-    black one the mast is black over the sails and white between them."""
+    """Round 15's square-sailed galleon with its gun ports; on the black one the
+    mast is all black, with no white lines on it (Mac, Oct 2026)."""
     out = r15.galleon_square(team)
-    out = re.sub(r'<rect x="[0-9.]+" y="30.8"[^>]*/>', "", out)
     if team == "black":
         out = out.replace(r15.detail("M 22.5,10.5 L 22.5,14 M 22.5,19.5 L 22.5,24.8", "#fff", 1), "")
-        out += r15.detail("M 22.5,15.6 L 22.5,18.4", "#fff", 1)
     return out
 
 
