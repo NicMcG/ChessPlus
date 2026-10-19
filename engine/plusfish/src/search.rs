@@ -465,6 +465,8 @@ impl<'a> Searcher<'a> {
         let mut best_move = Move::NONE;
         let mut legal = 0;
         let orig_alpha = alpha;
+        let mut quiets_tried = [Move::NONE; 32];
+        let mut n_quiets = 0;
         self.keys.push(p.key);
         for i in 0..moves.len() {
             // Selection sort: the next best-ordered move.
@@ -501,6 +503,7 @@ impl<'a> Searcher<'a> {
                     if is_pv {
                         red -= 1;
                     }
+                    red -= self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize] / 6000;
                     red = red.clamp(0, new_depth - 1);
                 }
                 let mut s = -self.negamax(&child, new_depth - red, -alpha - 1, -alpha, ply + 1, false, false);
@@ -514,6 +517,10 @@ impl<'a> Searcher<'a> {
             }
             if self.stopped {
                 break;
+            }
+            if quiet && n_quiets < quiets_tried.len() {
+                quiets_tried[n_quiets] = m;
+                n_quiets += 1;
             }
             if score > best {
                 best = score;
@@ -532,10 +539,13 @@ impl<'a> Searcher<'a> {
                                 self.killers[ply][1] = self.killers[ply][0];
                                 self.killers[ply][0] = m;
                             }
-                            let h = &mut self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize];
-                            *h += depth * depth;
-                            if *h > 400_000 {
-                                *h /= 2;
+                            // The move that cut off gains; the quiet moves tried
+                            // before it lose (bounded "gravity" updates).
+                            let bonus = (depth * depth * 16).min(1600);
+                            for (j, q) in quiets_tried[..n_quiets].iter().enumerate() {
+                                let b = if j + 1 == n_quiets { bonus } else { -bonus };
+                                let h = &mut self.history[(us * MAX_SQ + q.from as usize) * MAX_SQ + q.to as usize];
+                                *h += b - *h * b.abs() / 16384;
                             }
                         }
                         break;
