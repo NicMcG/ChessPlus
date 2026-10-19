@@ -452,7 +452,10 @@ func _play_bot_move(move: Move) -> void:
 	bot_thinking = false
 	_update_input()
 	if move:
+		var san := Notation.san(state, move)
 		play(move)
+		if not is_over():
+			TurnNotifier.your_turn("The bot played %s." % san)
 	else:
 		_update_text()
 
@@ -1225,6 +1228,8 @@ func _start_online() -> void:
 	if online.get_parent() != self:
 		add_child(online)
 	resign_button.hide()
+	# So "your move" notifications can be shown (web: asked on the next tap).
+	TurnNotifier.ask_permission_on_next_tap()
 	white_army = online.army(Piece.Team.WHITE)
 	black_army = online.army(Piece.Team.BLACK)
 	state = online.create_state(StandardSetup.create_rules())
@@ -1273,13 +1278,18 @@ func _send_online_moves() -> void:
 ## Something changed on the server: play any new moves from the opponent.
 func _on_online_changed(_row: Dictionary) -> void:
 	var server_moves := online.moves()
+	var last_san := ""
 	for i in range(state.history.size(), server_moves.size()):
 		var move := state.find_move(str(server_moves[i]))
 		if move == null:
 			status_label.text = "This game is out of step with the server."
 			return
+		last_san = Notation.san(state, move)
 		play(move, true)
 	_after_online_change()
+	# The opponent moved: tell the player if they're not looking (Mac).
+	if last_san != "" and state.side_to_move == online.my_team and not is_over():
+		TurnNotifier.your_turn("Your opponent played %s." % last_san)
 
 func _after_online_change() -> void:
 	# Keep checking the server after the game ends too, for rematch offers.
