@@ -65,26 +65,33 @@ func _has_move(state: GameState, text: String) -> bool:
 func test_parapet_stops_knights_two_straight_then_one() -> void:
 	var state := _game("k7/8/8/8/8/8/8/1N5K w - - 0 1")
 	check_eq(_targets(state, "b1"), ["a3", "c3", "d2"], "A free knight")
+	state = _game("k7/8/8/8/8/8/1(pa)6/1N5K w - - 0 1")
+	check_eq(_targets(state, "b1"), ["d2"], "An enemy Parapet on b2: a3 and c3 pass over it (b2, b3 first)")
 	state = _game("k7/8/8/8/8/8/1(PA)6/1N5K w - - 0 1")
-	check_eq(_targets(state, "b1"), ["d2"], "Parapet on b2: a3 and c3 pass over it (b2, b3 first)")
+	check_eq(_targets(state, "b1"), ["a3", "c3", "d2"], "Your own Parapet doesn't stop your Knight (Mac)")
 	state = _game("k7/8/8/8/8/8/8/1N(pa)4K w - - 0 1")
 	check(not "d2" in _targets(state, "b1"), "An enemy Parapet on c1 stops b1-d2 (c1, d1 first)")
 
 func test_parapet_stops_leaps() -> void:
-	var state := _game("k7/8/8/8/8/8/3(PA)4/2E4K w - - 0 1")
-	check(not "e3" in _targets(state, "c1"), "Elephant can't jump over it")
-	state = _game("k7/8/8/8/8/3(PA)4/8/3W3K w - - 0 1")
+	var state := _game("k7/8/8/8/8/8/3(pa)4/2E4K w - - 0 1")
+	check(not "e3" in _targets(state, "c1"), "Elephant can't jump over an enemy Parapet")
+	state = _game("k7/8/8/8/8/3(pa)4/8/3W3K w - - 0 1")
 	check(not "d4" in _targets(state, "d1"), "Wizard can't leap it")
+	state = _game("k7/8/8/8/8/8/3(PA)4/2E4K w - - 0 1")
+	check("e3" in _targets(state, "c1"), "But it can jump its own side's")
 
 func test_parapet_is_no_screen() -> void:
 	var state := _game("r6k/8/8/8/P7/8/8/C6K w - - 0 1")
 	check("a8x" in _targets(state, "a1"), "A pawn is a screen")
+	state = _game("r6k/8/8/8/(pa)7/8/8/C6K w - - 0 1")
+	check(not "a8x" in _targets(state, "a1"), "An enemy Parapet isn't")
 	state = _game("r6k/8/8/8/(PA)7/8/8/C6K w - - 0 1")
-	check(not "a8x" in _targets(state, "a1"), "A Parapet isn't")
+	check("a8x" in _targets(state, "a1"), "Your own Parapet is")
 
 func test_parapet_blocks_check() -> void:
 	check(_game("4k3/8/8/8/8/3n4/8/4K3 w - - 0 1").is_in_check(), "The knight on d3 checks e1")
-	check(not _game("4k3/8/8/8/8/3n4/3(PA)4/4K3 w - - 0 1").is_in_check(), "Not over a Parapet on d2 (even your own)")
+	check(not _game("4k3/8/8/8/8/3n4/3(PA)4/4K3 w - - 0 1").is_in_check(), "Not over White's Parapet on d2")
+	check(_game("4k3/8/8/8/8/3n4/3(pa)4/4K3 w - - 0 1").is_in_check(), "But Black's own Parapet doesn't stop its Knight")
 
 func test_vampire_gains_a_shield_by_capturing() -> void:
 	var state := _game("k7/8/8/8/4p3/3V4/8/7K w - - 0 1")
@@ -153,8 +160,10 @@ func test_blocker_finds_the_parapet_or_squire() -> void:
 	var state := _game("4k3/8/8/8/R2(pa)4/8/8/4K3 w - - 0 1")
 	check_eq(MoveGenerator.blocker(state, Board.parse_square("a4"), Board.parse_square("h4")), Board.parse_square("d4"), "A Parapet in the Rook's way")
 	check_eq(MoveGenerator.blocker(state, Board.parse_square("a4"), Board.parse_square("b5")), Board.NO_SQUARE, "Rooks can't go diagonally anyway")
-	state = _game("4k3/8/8/8/8/8/1(PA)6/1N2K3 w - - 0 1")
-	check_eq(MoveGenerator.blocker(state, Board.parse_square("b1"), Board.parse_square("c3")), Board.parse_square("b2"), "A Knight can't leap a Parapet")
+	state = _game("4k3/8/8/8/8/8/1(pa)6/1N2K3 w - - 0 1")
+	check_eq(MoveGenerator.blocker(state, Board.parse_square("b1"), Board.parse_square("c3")), Board.parse_square("b2"), "A Knight can't leap an enemy Parapet")
+	state = _game("r6k/8/8/8/(pa)7/8/8/C6K w - - 0 1")
+	check_eq(MoveGenerator.blocker(state, Board.parse_square("a1"), Board.parse_square("a8")), Board.parse_square("a4"), "Nor can a Cannon fire over one (Mac)")
 	state = _game("k7/4(sq)3/8/4n3/8/8/8/K3R3 w - - 0 1")
 	check_eq(MoveGenerator.blocker(state, Board.parse_square("e1"), Board.parse_square("e5")), Board.parse_square("e7"), "The Squire protecting the Knight")
 

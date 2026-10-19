@@ -87,7 +87,9 @@ func test_promotion_flashes_into_the_new_piece() -> void:
 	check(animation.has_segment(queen, "promote_reveal"), "The queen appears and settles")
 	check(animation.has_extra("light"), "Burst of light")
 	check(animation.has_extra("sparkles"), "Sparkles")
-	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.MOVE, Sound.PROMOTE, Sound.SPARKLE, Sound.LAND], "Scrape, swell, sparkle, thud")
+	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.MOVE, Sound.PROMOTE, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPARKLE, Sound.LAND], "Scrape, whoosh, a whoosh per turn of the spin, sparkle, thud")
+	for kind in ["swirl", "energy", "shockwave"]:
+		check(animation.has_extra(kind), "Power-up effect: " + kind)
 	animation.time = MoveAnimation.SLIDE + 0.45
 	var pose: Dictionary = animation.pose(pawn)
 	check(pose.lift > 0.3 and absf(pose.scale.y) > 1.5, "Up close to the player")
@@ -244,3 +246,20 @@ func test_every_sound_loads() -> void:
 	for sound: int in GameSounds.LAYERS:
 		for stream in GameSounds.streams_for(sound):
 			check(stream != null, "Sound %s loads" % GameSounds.Sound.keys()[sound])
+
+func test_sounds_are_mixed_by_godot() -> void:
+	# Handing sounds to the browser to play made them come later and later over
+	# a session on the web (Mac's report); Godot mixes them itself instead.
+	var sounds := GameSounds.new()
+	(Engine.get_main_loop() as SceneTree).root.add_child(sounds)
+	for child in sounds.get_children():
+		check_eq((child as AudioStreamPlayer).playback_type, AudioServer.PLAYBACK_TYPE_STREAM, "Mixed by Godot")
+	sounds.free()
+
+func test_only_two_sounds_are_made_by_code() -> void:
+	var made := []
+	for sound: int in GameSounds.LAYERS:
+		for layer: Array in GameSounds.LAYERS[sound]:
+			if layer[0] is String:
+				made.append(sound)
+	check_eq(made, [Sound.CANNON_FIRE, Sound.POP], "Only the cannon's boom and the pop (Mac liked both)")

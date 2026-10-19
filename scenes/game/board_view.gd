@@ -514,7 +514,7 @@ func _draw() -> void:
 			# Choosing a target for its ability: a flickering aura of fire in its
 			# ability's colours (Mac).
 			if aiming and square == _selected:
-				_draw_fire_aura(rect, piece.def.ability_gradient())
+				_draw_power_aura(rect, piece.def.ability_gradient())
 			if piece.gained_shield:
 				_draw_vampire_aura(piece, rect)
 			_draw_piece(piece, rect)
@@ -672,74 +672,31 @@ func _draw_vampire_aura(piece: Piece, rect: Rect2) -> void:
 	_draw_ability_glow(texture, rect.grow(s * 0.06), dark_red, pulse_amount)
 	_draw_ability_glow(texture, rect.grow(s * 0.02), dark_red, pulse_amount)
 
-## Fire licking up round a piece (in `colors`) while its ability is aimed
-## (Mac): rounded tongues of flame that sway and curl at their tips, rising up
-## past it from behind, a brighter core, a glow, and embers drifting up.
-func _draw_fire_aura(rect: Rect2, colors: PackedColorArray) -> void:
+## While a piece's ability is being aimed (Mac): an anime power aura round it,
+## smoke in the ability's colours streaming up off it and drifting away, with a
+## sparkle twinkling now and then.
+func _draw_power_aura(rect: Rect2, colors: PackedColorArray) -> void:
 	var s := rect.size.x
 	var seconds := Time.get_ticks_msec() / 1000.0
-	var base_y := rect.position.y + s * 0.92
+	var center := rect.get_center()
 	var bright: Color = colors[colors.size() - 1]
-	draw_circle(rect.get_center() + Vector2(0, s * 0.1), s * 0.6, Color(bright, 0.16 + 0.06 * sin(seconds * 7.0)))
-	for layer in 3:
-		var color: Color = colors[0].lerp(bright, 0.3) if layer == 0 else (bright if layer == 1 else bright.lerp(Color.WHITE, 0.7))
-		var count := 5 if layer == 0 else (4 if layer == 1 else 3)
-		var size := 1.0 if layer == 0 else (0.75 if layer == 1 else 0.5)
-		# A glowing bed the flames rise from, so they merge at the bottom.
-		_draw_ellipse(Vector2(rect.get_center().x, base_y - s * 0.06 * size), Vector2(s * 0.62 * size, s * 0.16 * size), Color(color, 0.55 if layer == 0 else 0.8))
-		for i in count:
-			var k := (i + 0.5) / count
-			var x := rect.get_center().x + s * (k - 0.5) * (1.0 if layer == 0 else 0.75)
-			var flicker := 0.5 + 0.5 * sin(seconds * (10.0 + i * 1.7) + i * 2.3 + layer)
-			var height := s * (0.5 + 0.5 * sin(PI * k)) * (0.8 + 0.35 * flicker) * size
-			var width := s * 0.48 * size
-			_draw_flame(Vector2(x, base_y), width, height, seconds * 6.0 + i * 1.9 + layer, Color(color, 0.55 if layer == 0 else 0.8))
-	# Embers rising and fading.
-	for i in 8:
-		var k := fposmod(seconds * 0.9 + i * 0.37, 1.0)
-		var x := rect.position.x + s * (0.15 + 0.7 * fposmod(i * 0.618, 1.0)) + sin(seconds * 3.0 + i) * s * 0.05
-		draw_circle(Vector2(x, base_y - s * 1.2 * k), s * 0.025 * (1.0 - k), Color(bright.lerp(Color.WHITE, 0.5), 1.0 - k))
-
-func _draw_ellipse(center: Vector2, radii: Vector2, color: Color) -> void:
-	var points := PackedVector2Array()
-	for i in 20:
-		points.append(center + Vector2(cos(TAU * i / 20.0) * radii.x, sin(TAU * i / 20.0) * radii.y))
-	draw_colored_polygon(points, color)
-
-## One tongue of flame standing on `base`: wide and round at the bottom,
-## narrowing to a tip that sways and curls (`phase` sets where in its sway it is).
-func _draw_flame(base: Vector2, width: float, height: float, phase: float, color: Color) -> void:
-	var left := PackedVector2Array()
-	var right := PackedVector2Array()
-	var steps := 10
-	for j in steps:
-		var u := float(j) / steps
-		# Round at the bottom, tapering towards the tip.
-		# A fat round body narrowing quickly to a curling tip.
-		var half := width * 0.5 * sqrt(maxf(0.0, 1.0 - u)) * (1.0 - 0.55 * u)
-		var sway := sin(phase + u * 2.5) * width * 0.6 * u * u
-		var y := base.y - height * u
-		left.append(Vector2(base.x - half + sway, y))
-		right.append(Vector2(base.x + half + sway, y))
-	var tip := Vector2(base.x + sin(phase + 2.5) * width * 0.6, base.y - height)
-	var points := PackedVector2Array()
-	points.append_array(left)
-	points.append(tip)
-	right.reverse()
-	points.append_array(right)
-	draw_colored_polygon(points, color)
-
-## (The Vampire's shield used to be a small blue shield in the corner.)
-func _draw_gained_shield(rect: Rect2) -> void:
-	var s := rect.size.x
-	var top_right := rect.position + Vector2(s * 0.7, s * 0.06)
-	var w := s * 0.24
-	var points := PackedVector2Array([
-		top_right, top_right + Vector2(w, 0), top_right + Vector2(w, w * 0.55),
-		top_right + Vector2(w / 2, w * 1.1), top_right + Vector2(0, w * 0.55)])
-	draw_colored_polygon(points, Color(0.55, 0.78, 1.0))
-	points.append(top_right)
-	draw_polyline(points, Color(0.1, 0.2, 0.4), maxf(1.0, s * 0.025), true)
+	draw_circle(center, s * 0.55, Color(bright, 0.12 + 0.05 * sin(seconds * 4.0)))
+	# Wisps rise from round the piece, swell and fade as they float up.
+	for i in 16:
+		var k := fposmod(seconds * 0.55 + i / 16.0, 1.0)
+		var side := (fposmod(i * 0.618, 1.0) - 0.5) * 0.9
+		var drift := sin(seconds * 1.7 + i * 2.3) * s * 0.08 * k
+		var pos := Vector2(center.x + side * s + drift, rect.position.y + s * (0.85 - 1.15 * k))
+		var color: Color = colors[0].lerp(bright, fposmod(i * 0.37, 1.0))
+		draw_circle(pos, s * (0.1 + 0.14 * k), Color(color, 0.32 * sin(PI * k)))
+	# Now and then, a sparkle.
+	for i in 4:
+		var phase := fposmod(seconds * 0.7 + i * 0.29, 1.0)
+		if phase > 0.25:
+			continue
+		var twinkle := sin(PI * phase / 0.25)
+		var spot := Vector2(fposmod(i * 0.73 + floorf(seconds * 0.7 + i * 0.29) * 0.37, 1.0) - 0.5, fposmod(i * 0.41 + floorf(seconds * 0.7 + i * 0.29) * 0.53, 1.0) - 0.6)
+		_draw_star(center + spot * s * 1.2, s * 0.11 * twinkle, Color(bright.lerp(Color.WHITE, 0.7), twinkle))
 
 ## A music note (a quaver): a filled oval head with a stem and a flag.
 func _draw_note(at: Vector2, height: float, color: Color) -> void:
@@ -921,6 +878,30 @@ func _draw_extras(extras: Array, layer: int) -> void:
 					var pos := _point((extra.from as Vector2).lerp(extra.to, k)) \
 							+ Vector2(0, -s * (0.25 + 0.12 * sin(k * TAU * 1.5 + i)))
 					_draw_note(pos, s * 0.34, Color(1.0, 0.82, 0.3, sin(PI * k)))
+			"swirl":
+				# Streaks of light whirling round the rising piece, faster and faster.
+				var center := _point(extra.at) - Vector2(0, s * extra.get("lift", 0.5) * smoothstep(0.0, 0.6, t))
+				var spin := 10.0 * t * t
+				var fade := sin(PI * t)
+				for i in 3:
+					var start_angle := spin + TAU * i / 3.0
+					draw_arc(center, s * (0.6 - 0.08 * i), start_angle, start_angle + 1.6, 16, Color(1, 0.95, 0.7, 0.8 * fade), maxf(2, s * 0.05))
+					draw_arc(center, s * (0.6 - 0.08 * i), start_angle + 1.6, start_angle + 2.2, 8, Color(1, 1, 1, 0.5 * fade), maxf(1, s * 0.025))
+			"energy":
+				# Specks of light streaming up into the piece from round its square.
+				var target := _point(extra.at) - Vector2(0, s * 0.5)
+				for i in 14:
+					var k := fposmod(t * 2.2 + i / 14.0, 1.0)
+					var angle := TAU * i / 14.0 + i * 0.9
+					var from := target + Vector2.from_angle(angle) * s * 1.1 + Vector2(0, s * 0.4)
+					var pos := from.lerp(target, k * k)
+					draw_circle(pos, s * 0.03 * (1.0 - k * 0.5), Color(1, 0.95, 0.75, sin(PI * k) * (1.0 - smoothstep(0.85, 1.0, t))))
+			"shockwave":
+				# A ring of light bursting outwards.
+				var center := _point(extra.at) - Vector2(0, s * extra.get("lift", 0.0))
+				var radius := s * (0.3 + 1.6 * MoveAnimation.ease_out(t))
+				draw_arc(center, radius, 0, TAU, 48, Color(1, 0.97, 0.8, 0.85 * (1.0 - t)), maxf(2, s * 0.12 * (1.0 - t)))
+				draw_arc(center, radius * 0.8, 0, TAU, 40, Color(1, 1, 1, 0.5 * (1.0 - t)), maxf(1, s * 0.04 * (1.0 - t)))
 			"sparkles":
 				# Little four-pointed stars twinkling round a rising piece.
 				var center := _point(extra.at) - Vector2(0, s * 0.45 * smoothstep(0.0, 0.4, t))
