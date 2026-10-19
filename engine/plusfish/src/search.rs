@@ -606,8 +606,22 @@ impl<'a> Searcher<'a> {
         if ply >= MAX_PLY {
             return self.eval(p);
         }
+        // Transposition table: any stored result is deep enough here.
+        let slot = (p.key as usize) & self.tt_mask;
+        let e = self.tt[slot];
+        let hit = e.key == p.key && e.bound != 0;
+        let mut tt_move = Move::NONE;
+        if hit {
+            let s = from_tt(e.score as i32, ply);
+            if e.bound == B_EXACT || (e.bound == B_LOWER && s >= beta) || (e.bound == B_UPPER && s <= alpha) {
+                return s;
+            }
+            tt_move = e.mv;
+        }
+        let orig_alpha = alpha;
         let in_check = p.in_check(r, p.side);
-        let stand = if in_check { -MATE + ply as i32 } else { self.eval(p) };
+        let raw_eval = if in_check { -INF } else if hit { e.eval as i32 } else { self.eval(p) };
+        let stand = if in_check { -MATE + ply as i32 } else { raw_eval };
         if !in_check {
             if stand >= beta {
                 return stand;
@@ -617,8 +631,9 @@ impl<'a> Searcher<'a> {
         let mut moves = std::mem::take(&mut self.buffers[ply]);
         moves.clear();
         p.gen_pseudo(r, &mut moves, if in_check { GEN_ALL } else { GEN_TACTICAL });
-        let mut scores = self.order(p, &mut moves, Move::NONE, ply.min(MAX_PLY));
+        let mut scores = self.order(p, &mut moves, tt_move, ply.min(MAX_PLY));
         let mut best = stand;
+        let mut best_move = Move::NONE;
         let mut legal = 0;
         for i in 0..moves.len() {
             let mut bi = i;
@@ -657,6 +672,7 @@ impl<'a> Searcher<'a> {
             }
             if s > best {
                 best = s;
+                best_move = m;
                 if s > alpha {
                     alpha = s;
                     self.pv[ply][0] = m;
@@ -672,8 +688,30 @@ impl<'a> Searcher<'a> {
             }
         }
         self.buffers[ply] = moves;
+        if self.stopped {
+            return 0;
+        }
         if in_check && legal == 0 {
             return -MATE + ply as i32;
+        }
+        let e = &mut self.tt[slot];
+        if e.key != p.key || e.depth <= 0 || e.age != self.age {
+            let bound = if best >= beta {
+                B_LOWER
+            } else if best > orig_alpha {
+                B_EXACT
+            } else {
+                B_UPPER
+            };
+            *e = TTEntry {
+                key: p.key,
+                mv: best_move,
+                score: to_tt(best, ply).clamp(-INF, INF) as i16,
+                eval: raw_eval.clamp(-INF, INF) as i16,
+                depth: 0,
+                bound,
+                age: self.age,
+            };
         }
         best
     }
