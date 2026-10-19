@@ -371,8 +371,8 @@ func _refresh() -> void:
 	army_board.highlighted = _allowed_squares()
 	army_board.queue_redraw()
 
-## A cost badge's colour, showing the piece's type (Mac's design): royal purple
-## for royal types, green for pawn types, otherwise dark. (Kings have no badge.)
+## A cost badge's colour, showing the piece's type (Mac's design): gold for
+## kings, royal purple for royal types, green for pawn types, otherwise dark.
 static func type_color(def: PieceDef) -> Color:
 	if def.is_king_type():
 		return Color("#b8860b")
@@ -382,15 +382,12 @@ static func type_color(def: PieceDef) -> Color:
 		return Color("#2f7a36")
 	return Color(0.08, 0.08, 0.09, 0.85)
 
-## The cost in the button's bottom-right corner, e.g. "3" (not for kings: every
-## army has exactly one, and it's free).
+## The cost in the button's bottom-right corner, e.g. "3", on a badge coloured
+## by type; kings (free, exactly one per army) get a gold badge saying "K".
 func _add_cost_label(button: Button, def: PieceDef) -> void:
-	if def.is_king_type():
-		return
-	# On a small dark badge, so it reads on top of the picture.
 	var cost := CostBadge.new()
 	cost.name = "Cost"
-	cost.text = Army.format_points(def.value)
+	cost.text = "K" if def.is_king_type() else Army.format_points(def.value)
 	cost.color = type_color(def)
 	button.add_child(cost)
 	_place_cost(cost)
