@@ -23,3 +23,4 @@ should be worth about as much.
 | 7 | Null move reduction grows with (eval - beta)/200, up to +3 | nodes 6k | 6608 | +0.7 ±3.4 | reverted (SPRT H0) |
 | 8 | Mobility with ray bit masks instead of square-by-square walks (same eval) | speed (bench nps) | - | 0.94x with default target, 1.05x with x86-64-v2 | reverted for now |
 | 9 | "Improving" (static eval vs two plies ago): reverse futility and late-move pruning adapt | nodes 6k | 3998 | +9.0 ±6.5 | kept |
+| 10 | Futility pruning of quiet moves (static eval + 100 + 120*depth <= alpha, depth <= 3) | nodes 6k | 1266 | +22.0 ±11.5 | kept |
