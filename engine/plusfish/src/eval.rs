@@ -79,6 +79,11 @@ impl Params {
             w[k * PER_KIND + FE_ABIL] = match d.ability {
                 Ability::CrackShot => [v * 0.4, v * 0.4],
                 Ability::RaiseDead => [30.0, 30.0],
+                // On the board with Haunt unused: being captured only sends it
+                // away for a move (a lost one counts most of its material).
+                Ability::Haunt => [v * 0.4, v * 0.4],
+                Ability::SongOfSlumber => [25.0, 25.0],
+                Ability::FullMoon => [20.0, 20.0],
                 Ability::None => [0.0, 0.0],
             };
         }
@@ -269,7 +274,7 @@ pub fn features<A: Acc>(p: &Position, r: &Rules, et: &EvalTables, acc: &mut A) {
             let m = if i < 64 { mob[t][i] } else { 0 } as f32;
             i += 1;
             acc.add(base + FE_MOB, sign * (m - et.reach_avg[k] * 0.5));
-            if info.shield && c & BROKEN == 0 {
+            if r.shielded(c) {
                 acc.add(base + FE_SHIELD, sign);
             }
             if info.ability != Ability::None && c & USED == 0 {
@@ -353,6 +358,11 @@ pub fn features<A: Acc>(p: &Position, r: &Rules, et: &EvalTables, acc: &mut A) {
             if pawn_files[t][f] > 1 {
                 acc.add(G_DOUBLED, sign * (pawn_files[t][f] - 1) as f32);
             }
+        }
+        if p.ghosts[t] != 0 {
+            // Lost Ghosts that can still Haunt come back onto any empty square.
+            let g = r.haunt_kind as usize * PER_KIND + FE_MAT;
+            acc.add(g, sign * 0.8 * p.ghosts[t].count_ones() as f32);
         }
         if has_necro {
             for k in 0..r.info.len() {

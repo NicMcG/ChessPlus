@@ -163,7 +163,7 @@ fn play(cat: &Arc<Catalog>, w: &Army, b: &Army, opening: &[Move], a: &mut Engine
     for ply in opening.len()..400 {
         let out = g.outcome();
         if out != Outcome::None {
-            let res = if out == Outcome::Checkmate { if g.pos.side == WHITE { 0.0 } else { 1.0 } } else { 0.5 };
+            let res = out.white_score(g.pos.side).unwrap_or(0.5) as f32;
             return (white_score_of(res), outcome_name(out).to_string());
         }
         let side = g.pos.side;

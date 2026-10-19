@@ -64,18 +64,16 @@ static func program_path() -> String:
 			return path
 	return ""
 
-## True if Plusfish knows every rule of the pieces in `state` (it doesn't yet know
-## the Parapet's, Vampire's, Squire's or Jester's rules, or the Ghost's, Bard's
-## or Werewolf's abilities, so their games get no
-## eval bar until it's updated).
+## The last special ability Plusfish knows (it knows every piece rule up to
+## the Ghost, Bard and Werewolf, Oct 2026).
+const KNOWN_ABILITIES := PieceDef.Ability.FULL_MOON
+
+## True if Plusfish knows every rule of the pieces in `state`. A piece with a
+## newer special ability gets no eval bar until Plusfish is updated for it.
 static func supports(state: GameState) -> bool:
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		for piece: Piece in state.board.pieces_of(team).values():
-			var def := piece.def
-			if def.blocks_jumps or def.shield_on_capture or def.decoy or not def.protects.is_empty():
-				return false
-			# Nor the Ghost's, Bard's or Werewolf's abilities.
-			if def.ability > PieceDef.Ability.RAISE_DEAD:
+			if piece.def.ability > KNOWN_ABILITIES:
 				return false
 	return true
 
@@ -168,16 +166,22 @@ static func request_for(start: GameState, moves: Array) -> Dictionary:
 			if piece == null:
 				continue
 			defs[piece.def.id] = piece.def
-			board.append([piece.def.id, piece.team, file, rank, piece.has_moved, piece.shield_broken, piece.ability_used])
+			board.append([piece.def.id, piece.team, file, rank, piece.has_moved, piece.shield_broken,
+					piece.ability_used, piece.gained_shield])
 	var promo := []
 	for def in start.rules.promotion_options:
 		defs[def.id] = def
 		promo.append(def.id)
+	# Lost pieces in the order they were lost (a lost Ghost's Haunt may be used).
 	var lost := []
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		for piece: Piece in start.lost[team]:
 			defs[piece.def.id] = piece.def
-			lost.append([piece.def.id, team])
+			lost.append([piece.def.id, team, piece.ability_used])
+	# The forms pieces change into (the Werewolf's wolf).
+	for def: PieceDef in defs.values():
+		if def.transforms_into:
+			defs[def.transforms_into.id] = def.transforms_into
 	var ep := []
 	for square in start.en_passant_squares:
 		ep.append([square.x, square.y])
@@ -208,7 +212,9 @@ static func _def_to_dict(def: PieceDef) -> Dictionary:
 	return {
 		"id": def.id, "name": def.display_name, "symbol": def.symbol, "value": def.value,
 		"types": def.types, "keywords": def.keywords, "ability": def.ability,
-		"dies_on_capture": def.dies_on_capture, "rules": rules,
+		"dies_on_capture": def.dies_on_capture, "blocks_jumps": def.blocks_jumps,
+		"shield_on_capture": def.shield_on_capture, "protects": def.protects, "decoy": def.decoy,
+		"transforms_into": def.transforms_into.id if def.transforms_into else null, "rules": rules,
 	}
 
 func _run() -> void:

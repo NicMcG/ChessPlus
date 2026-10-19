@@ -266,8 +266,8 @@ pub fn random_army_budget(cat: &Catalog, rng: &mut Rng, total: f64) -> Army {
     loop {
         let mut picks: Vec<usize> = Vec::new();
         let mut budget = total;
-        let pawn_kinds: Vec<usize> = (0..cat.len()).filter(|&k| cat.defs[k].is_pawn() && cat.defs[k].value > 0.0).collect();
-        let others: Vec<usize> = (0..cat.len()).filter(|&k| !cat.defs[k].is_king() && !cat.defs[k].is_pawn() && cat.defs[k].value > 0.0).collect();
+        let pawn_kinds: Vec<usize> = (0..cat.len()).filter(|&k| cat.defs[k].is_pawn() && cat.defs[k].value > 0.0 && !cat.defs[k].is_form).collect();
+        let others: Vec<usize> = (0..cat.len()).filter(|&k| !cat.defs[k].is_king() && !cat.defs[k].is_pawn() && cat.defs[k].value > 0.0 && !cat.defs[k].is_form).collect();
         let pawns = if pawn_kinds.is_empty() { 0 } else { rng.range(0, 9) as usize };
         for _ in 0..pawns {
             let k = pawn_kinds[rng.below(pawn_kinds.len())];

@@ -92,7 +92,7 @@ pub fn play_game(cat: &Arc<Catalog>, white: &Army, black: &Army, pa: &Params, pb
         let out = g.outcome();
         if out != Outcome::None {
             reason = outcome_name(out).to_string();
-            result = if out == Outcome::Checkmate { if g.pos.side == WHITE { 0.0 } else { 1.0 } } else { 0.5 };
+            result = out.white_score(g.pos.side).unwrap_or(0.5) as f32;
             break;
         }
         let s = if g.pos.side == WHITE { &mut sw } else { &mut sb };
