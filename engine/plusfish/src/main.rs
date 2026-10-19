@@ -11,6 +11,8 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 use plusfish_core::util::{Args, Rng};
 
+mod ematch;
+
 const HELP: &str = "\
 Plusfish - an analysis and balancing engine for Chess Plus
 
@@ -33,6 +35,8 @@ Balancing
               --params-b <file>        give side B a different evaluation
               --armies random          A/B test: random army pairs, played both ways
               --out games.jsonl        save the games
+  enginematch Two engine programs play each other (to test engine changes);
+              see plusfish enginematch --help
   tournament  Round robin between armies, with Elo ratings.
               --armies \"<a>;<b>;<c>\"  or a folder of saved .tres armies
               --games N per pairing (default 20)  --nodes N
@@ -130,6 +134,10 @@ fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect();
     let args = Args::parse(&raw);
     let cmd = args.words.first().map(|s| s.as_str()).unwrap_or("help");
+    if cmd == "enginematch" && args.flag("help") {
+        print!("{}", ematch::HELP);
+        return;
+    }
     if cmd == "help" || args.flag("help") {
         print!("{}", HELP);
         return;
@@ -160,6 +168,10 @@ fn main() {
                 let s = t.elapsed().as_secs_f64();
                 println!("perft {} = {}  ({:.2}s, {:.1}M nodes/s)", depth, n, s, n as f64 / s / 1e6);
             }
+        }
+        "enginematch" => {
+            let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));
+            ematch::run(&cat, &args, &dir.to_string_lossy());
         }
         "perft-suite" => {
             if !verify::run_perft_suite(&cat) {

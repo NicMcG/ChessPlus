@@ -61,7 +61,7 @@ pub fn start_is_broken(g: &Game) -> bool {
     g.pos.in_check(r, WHITE) || g.pos.in_check(r, BLACK)
 }
 
-fn pick_opening_move(s: &mut Searcher, g: &Game, rng: &mut Rng) -> Move {
+pub fn pick_opening_move(s: &mut Searcher, g: &Game, rng: &mut Rng) -> Move {
     let legal = g.pos.legal_moves(&g.rules);
     let k = legal.len().min(8);
     let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: Some(3), nodes: Some(200_000), movetime_ms: None }, k, |_| {});

@@ -51,6 +51,15 @@ pub struct Report {
     pub lines: Vec<Line>,
 }
 
+/// The tables a search learns from (hash table, history), kept between moves
+/// of one game: `Searcher::into_tables` / `Searcher::with_tables`.
+pub struct SearchTables {
+    tt: Vec<TTEntry>,
+    tt_mask: usize,
+    age: u8,
+    history: Vec<i32>,
+}
+
 pub struct Searcher<'a> {
     pub r: &'a Rules,
     pub et: &'a EvalTables,
@@ -127,6 +136,24 @@ impl<'a> Searcher<'a> {
             must_finish: false,
             root_excluded: Vec::new(),
         }
+    }
+
+    /// A searcher that carries on with tables from an earlier one.
+    pub fn with_tables(r: &'a Rules, et: &'a EvalTables, params: &'a Params, t: SearchTables) -> Searcher<'a> {
+        let mut s = Searcher::new(r, et, params, 1);
+        s.tt = t.tt;
+        s.tt_mask = t.tt_mask;
+        s.age = t.age;
+        s.history = t.history;
+        s
+    }
+
+    pub fn into_tables(self) -> SearchTables {
+        SearchTables { tt: self.tt, tt_mask: self.tt_mask, age: self.age, history: self.history }
+    }
+
+    pub fn tt_mb(t: &SearchTables) -> usize {
+        t.tt.len() * std::mem::size_of::<TTEntry>() / (1024 * 1024)
     }
 
     pub fn clear(&mut self) {
