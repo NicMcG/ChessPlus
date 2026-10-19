@@ -145,6 +145,7 @@ func _ready() -> void:
 	_bot_timer = Timer.new()
 	_bot_timer.one_shot = true
 	add_child(_bot_timer)
+	_build_capture_rows()
 	_build_eval_bar()
 	_build_wide_layout()
 	resized.connect(fit_layout)
@@ -268,6 +269,48 @@ func _build_wide_layout() -> void:
 	_wide_box.add_child(_side)
 	_board_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
+## What each player has captured, above and below the board (see CapturedRow).
+var captured_top: CapturedRow
+var captured_bottom: CapturedRow
+## The board area with a captures row above and below it.
+var _board_column: VBoxContainer
+
+func _build_capture_rows() -> void:
+	_board_column = VBoxContainer.new()
+	_board_column.add_theme_constant_override("separation", 4)
+	_board_column.size_flags_vertical = _board_area.size_flags_vertical
+	_board_column.size_flags_stretch_ratio = _board_area.size_flags_stretch_ratio
+	_board_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var parent := _board_area.get_parent()
+	var index := _board_area.get_index()
+	parent.add_child(_board_column)
+	parent.move_child(_board_column, index)
+	captured_top = CapturedRow.new()
+	_board_column.add_child(captured_top)
+	_board_area.reparent(_board_column, false)
+	_board_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	captured_bottom = CapturedRow.new()
+	_board_column.add_child(captured_bottom)
+	board_view.resized.connect(_line_up_captures)
+	board_view.item_rect_changed.connect(_line_up_captures)
+
+## Start the captures rows at the board's left edge (the board is centred).
+func _line_up_captures() -> void:
+	var left := board_view.get_global_rect().position.x + board_view.board_origin().x
+	captured_top.inset = maxf(0.0, left - captured_top.get_global_rect().position.x)
+	captured_bottom.inset = maxf(0.0, left - captured_bottom.get_global_rect().position.x)
+
+## Fill the captures rows for the position on the board: the row nearest each
+## player's side of the board shows what that player has captured.
+func _update_captures() -> void:
+	var shown := board_view.state
+	if shown == null:
+		return
+	var bottom_team := Piece.Team.BLACK if board_view.flipped else Piece.Team.WHITE
+	captured_bottom.show_for(shown, bottom_team)
+	captured_top.show_for(shown, Piece.other_team(bottom_team))
+	_line_up_captures()
+
 ## Put the board beside the rest on a wide screen, above it on a tall one.
 func fit_layout() -> void:
 	var now_wide := ScreenShape.is_wide(size)
@@ -275,11 +318,11 @@ func fit_layout() -> void:
 		return
 	wide = now_wide
 	if wide:
-		ScreenShape.move_to([_board_area], _wide_box)
-		_wide_box.move_child(_board_area, 0)
+		ScreenShape.move_to([_board_column], _wide_box)
+		_wide_box.move_child(_board_column, 0)
 		ScreenShape.move_to([status_label, clock_label, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _board_area, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _board_column, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -630,6 +673,7 @@ func _update_text() -> void:
 		_update_online_controls()
 	_update_game_over()
 	_update_eval_bar()
+	_update_captures()
 
 # --- Looking over a finished game with Plusfish ----------------------------------
 

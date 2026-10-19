@@ -780,6 +780,10 @@ func _draw_target(move: Move) -> void:
 func _square_size() -> float:
 	return minf(size.x / state.board.width, size.y / state.board.height)
 
+## Where the board's top-left corner is inside this control.
+func board_origin() -> Vector2:
+	return _origin() if state else Vector2.ZERO
+
 ## Top-left corner of the board, so it's centred in this control.
 func _origin() -> Vector2:
 	var board_size := Vector2(state.board.width, state.board.height) * _square_size()
