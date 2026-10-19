@@ -6,7 +6,11 @@ extends RefCounted
 ## happen in reverse order (last move made is the first one undone).
 
 ## How the game has ended, if it has. See outcome().
-enum Outcome { NONE, CHECKMATE, STALEMATE, FIFTY_MOVES, REPETITION, INSUFFICIENT_MATERIAL }
+## KING_EXPOSED: the side NOT to move has its king attacked, which can only
+## happen in the starting position (some army pairings leave Black's king
+## attacked before White's first move). For now that side loses at once (Mac's
+## temporary rule, Oct 2026; he'll design a real fix later).
+enum Outcome { NONE, CHECKMATE, STALEMATE, FIFTY_MOVES, REPETITION, INSUFFICIENT_MATERIAL, KING_EXPOSED }
 
 var board: Board
 var rules: GameRules
@@ -59,9 +63,12 @@ func is_in_check() -> bool:
 	return MoveGenerator.is_in_check(board, side_to_move)
 
 ## How the game has ended, or Outcome.NONE if it's still going. For CHECKMATE,
-## the side to move is the one that lost; every other outcome is a draw.
-## Checkmate counts even if the mating move was also the 50th move.
+## the side to move is the one that lost; for KING_EXPOSED, the other side lost;
+## every other outcome is a draw. Checkmate counts even if the mating move was
+## also the 50th move.
 func outcome() -> Outcome:
+	if history.is_empty() and MoveGenerator.is_in_check(board, Piece.other_team(side_to_move)):
+		return Outcome.KING_EXPOSED
 	if moves().is_empty():
 		return Outcome.CHECKMATE if is_in_check() else Outcome.STALEMATE
 	if _checkmate_impossible():
@@ -79,6 +86,8 @@ func result_text() -> String:
 			return "*"
 		Outcome.CHECKMATE:
 			return "0-1" if side_to_move == Piece.Team.WHITE else "1-0"
+		Outcome.KING_EXPOSED:
+			return "1-0" if side_to_move == Piece.Team.WHITE else "0-1"
 	return "1/2-1/2"
 
 func make_move(move: Move) -> void:

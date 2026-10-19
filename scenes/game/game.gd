@@ -655,6 +655,9 @@ func _update_text() -> void:
 			status_label.text = "Draw by repetition"
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			status_label.text = "Draw: checkmate is impossible"
+		GameState.Outcome.KING_EXPOSED:
+			var exposed := "Black" if state.side_to_move == Piece.Team.WHITE else "White"
+			status_label.text = "%s's king was under attack from the start: %s loses" % [exposed, exposed]
 	if online and _online_ending() != "":
 		status_label.text = _online_ending()
 	if viewing >= 0:
@@ -901,6 +904,13 @@ func result_texts() -> Array:
 			return ["Draw", "The same position three times"]
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			return ["Draw", "Checkmate is impossible"]
+		GameState.Outcome.KING_EXPOSED:
+			# The armies left the other side's king attacked before the first move.
+			var winner := state.side_to_move
+			var how := "%s's king was under attack from the start" % ("Black" if winner == Piece.Team.WHITE else "White")
+			if me == -1:
+				return ["King exposed", "%s. %s wins" % [how, "White" if winner == Piece.Team.WHITE else "Black"]]
+			return ["King exposed", how + (". You win!" if winner == me else ". You lose")]
 	return ["Game over", ""]
 
 ## This player's side: online or against the bot. -1 for two players on one device.
