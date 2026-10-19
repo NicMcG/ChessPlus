@@ -9,6 +9,7 @@ const ARMY_BUILDER := preload("res://scenes/armies/army_builder.tscn")
 const MATCH_SETUP := preload("res://scenes/menu/match_setup.tscn")
 const GAME := preload("res://scenes/game/game.tscn")
 const ONLINE_LOBBY := preload("res://scenes/online/online_lobby.tscn")
+const POSITION_SETUP := preload("res://scenes/testing/position_setup.tscn")
 
 var library := ArmyLibrary.new()
 ## The screen currently showing.
@@ -17,10 +18,22 @@ var screen: Node
 func _ready() -> void:
 	SystemFonts.install()
 	fit_window_to_screen()
+	# A local game left 2 days without a move ends; say so once (Mac).
+	var note := SavedGame.end_if_abandoned()
 	show_main_menu()
+	if note != "":
+		show_note("Game ended", note)
 	_watch_for_updates()
 	if OS.has_feature("web") and "selftest=1" in str(JavaScriptBridge.eval("location.search")):
 		_online_self_test()
+
+## A pop-up message with an OK button, over whatever is showing.
+func show_note(title: String, text: String) -> ModalPanel:
+	var panel := ModalPanel.new(title)
+	panel.add_text(text)
+	panel.add_button("OK", panel.close)
+	add_child(panel)
+	return panel
 
 ## Opened with ?selftest=1 (web only): check the online server can be reached
 ## from this browser, and print the answer to the browser's console.
@@ -97,6 +110,7 @@ func show_main_menu() -> void:
 	menu.online_pressed.connect(show_online_lobby)
 	menu.continue_online_pressed.connect(continue_online_game)
 	menu.armies_pressed.connect(show_army_list)
+	menu.testing_pressed.connect(show_testing_setup)
 	_show(menu)
 	_update_if_ready()
 
@@ -159,17 +173,37 @@ func show_match_setup() -> void:
 	var setup := MATCH_SETUP.instantiate()
 	setup.library = library
 	setup.closed.connect(show_main_menu)
-	setup.start_requested.connect(start_game)
+	setup.start_requested.connect(func(white: Army, black: Army, bot_team: int, bot_level: int) -> void:
+		start_game(white, black, bot_team, bot_level, setup.eval_bar_wanted()))
 	_show(setup)
 
 ## `bot_team` is the practice bot's side (Piece.Team), or -1 for two players.
-func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeBot.Level.MEDIUM) -> void:
+func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeBot.Level.MEDIUM, eval_bar := false) -> void:
 	var game := GAME.instantiate()
+	game.eval_bar_on = eval_bar
 	game.white_army = white
 	game.black_army = black
 	game.bot_team = bot_team
 	game.bot_level = bot_level
 	game.menu_requested.connect(show_main_menu)
+	_show(game)
+
+## Testing mode: set up a position (`position` to carry on editing one, or
+## null for the standard start).
+func show_testing_setup(position: TestingPosition = null) -> void:
+	var setup := POSITION_SETUP.instantiate()
+	if position:
+		setup.setup = position
+	setup.back_pressed.connect(show_main_menu)
+	setup.start_pressed.connect(start_testing_game)
+	_show(setup)
+
+## A two-player game from a Testing mode position. Its Setup button goes back to
+## editing that position.
+func start_testing_game(position: TestingPosition) -> void:
+	var game := GAME.instantiate()
+	game.testing_position = position
+	game.menu_requested.connect(func() -> void: show_testing_setup(position.copy()))
 	_show(game)
 
 ## Pick up the saved game, if there is one.
@@ -183,6 +217,7 @@ func continue_game() -> void:
 	game.black_army = saved.black_army
 	game.bot_team = saved.bot_team
 	game.bot_level = saved.bot_level
+	game.eval_bar_on = saved.eval_bar
 	game.resume = saved
 	game.menu_requested.connect(show_main_menu)
 	_show(game)

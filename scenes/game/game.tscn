@@ -112,6 +112,14 @@ size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 30
 text = "Menu"
 
+[node name="Resign" type="Button" parent="Margin/Layout/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 30
+text = "Resign"
+
 [node name="NewGame" type="Button" parent="Margin/Layout/Buttons"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 80)

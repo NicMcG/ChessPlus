@@ -6,7 +6,11 @@ extends RefCounted
 ## happen in reverse order (last move made is the first one undone).
 
 ## How the game has ended, if it has. See outcome().
-enum Outcome { NONE, CHECKMATE, STALEMATE, FIFTY_MOVES, REPETITION, INSUFFICIENT_MATERIAL }
+## KING_EXPOSED: the side NOT to move has its king attacked, which can only
+## happen in the starting position (some army pairings leave Black's king
+## attacked before White's first move). For now that side loses at once (Mac's
+## temporary rule, Oct 2026; he'll design a real fix later).
+enum Outcome { NONE, CHECKMATE, STALEMATE, FIFTY_MOVES, REPETITION, INSUFFICIENT_MATERIAL, KING_EXPOSED }
 
 var board: Board
 var rules: GameRules
@@ -47,21 +51,37 @@ func attack_table(team: Piece.Team) -> Array:
 		for def in rules.promotion_options:
 			if not defs.has(def):
 				defs.append(def)
-		# Lost pieces could come back (Raise Dead).
+		# Lost pieces could come back (Raise Dead, Haunt), as what they started as.
 		for piece: Piece in lost[team]:
-			if not defs.has(piece.def):
-				defs.append(piece.def)
+			for def: PieceDef in [piece.def, piece.starting_def()]:
+				if not defs.has(def):
+					defs.append(def)
+		# A piece that can change (Full Moon) attacks as its new form afterwards.
+		for i in range(defs.size()):
+			var form := defs[i].transforms_into
+			if form and not defs.has(form):
+				defs.append(form)
 		_attack_tables[team] = MoveGenerator.attack_table(team, defs)
 	return _attack_tables[team]
+
+## The piece the opponent's Song of Slumber put to sleep: it can't move this
+## turn. Null if the last move wasn't a Song of Slumber.
+func frozen_piece() -> Piece:
+	if history.is_empty():
+		return null
+	return history.back().frozen
 
 ## True if the side to move has a royal piece under attack.
 func is_in_check() -> bool:
 	return MoveGenerator.is_in_check(board, side_to_move)
 
 ## How the game has ended, or Outcome.NONE if it's still going. For CHECKMATE,
-## the side to move is the one that lost; every other outcome is a draw.
-## Checkmate counts even if the mating move was also the 50th move.
+## the side to move is the one that lost; for KING_EXPOSED, the other side lost;
+## every other outcome is a draw. Checkmate counts even if the mating move was
+## also the 50th move.
 func outcome() -> Outcome:
+	if history.is_empty() and MoveGenerator.is_in_check(board, Piece.other_team(side_to_move)):
+		return Outcome.KING_EXPOSED
 	if moves().is_empty():
 		return Outcome.CHECKMATE if is_in_check() else Outcome.STALEMATE
 	if _checkmate_impossible():
@@ -79,6 +99,8 @@ func result_text() -> String:
 			return "*"
 		Outcome.CHECKMATE:
 			return "0-1" if side_to_move == Piece.Team.WHITE else "1-0"
+		Outcome.KING_EXPOSED:
+			return "1-0" if side_to_move == Piece.Team.WHITE else "0-1"
 	return "1/2-1/2"
 
 func make_move(move: Move) -> void:
@@ -101,14 +123,45 @@ func make_move(move: Move) -> void:
 		_clear_en_passant()
 		_next_turn()
 		return
+	if move.ability == PieceDef.Ability.HAUNT:
+		# The lost Ghost comes back onto the board.
+		move.raised_lost_index = lost[move.piece.team].find(move.piece)
+		lost[move.piece.team].remove_at(move.raised_lost_index)
+		board.set_piece(move.to, move.piece)
+		move.piece.has_moved = true
+		_clear_en_passant()
+		_next_turn()
+		return
+	if move.ability == PieceDef.Ability.FULL_MOON:
+		# The Werewolf becomes the wolf, on the same square.
+		move.piece.base_def = move.piece.def
+		move.piece.def = move.piece.def.transforms_into
+		_clear_en_passant()
+		_next_turn()
+		return
+	if move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		# Nothing moves: frozen_piece() reads the target from this move.
+		_clear_en_passant()
+		_next_turn()
+		return
 	if move.breaks_shield():
 		# Nothing moves: the shielded piece just loses its shield. (A Ram dies doing it.)
-		move.shield_target.shield_broken = true
+		if move.shield_target.gained_shield:
+			move.shield_target.gained_shield = false
+			move.broke_gained_shield = true
+		else:
+			move.shield_target.shield_broken = true
 		if move.piece.def.dies_on_capture:
 			_remove_dead_attacker(move, move.from)
 		_clear_en_passant()
 		_next_turn()
 		return
+	if move.decoy_piece:
+		# A Jester takes the hit: the target moves to the Jester's square, and the
+		# Jester (move.captured) is taken off where the target stood.
+		move.decoy_piece_had_moved = move.decoy_piece.has_moved
+		board.set_piece(move.decoy_square, move.decoy_piece)
+		move.decoy_piece.has_moved = true
 	if move.ability == PieceDef.Ability.CRACK_SHOT:
 		# The Archer shoots from where it stands.
 		board.set_piece(move.capture_square, null)
@@ -116,6 +169,10 @@ func make_move(move: Move) -> void:
 		_clear_en_passant()
 		_next_turn()
 		return
+	# A Vampire gains a shield by capturing (if it hasn't one already).
+	if move.captured and move.piece.def.shield_on_capture and not move.piece.has_active_shield():
+		move.piece.gained_shield = true
+		move.gained_shield = true
 	if move.captured:
 		lost[move.captured.team].append(move.captured)
 	board.set_piece(move.from, null)
@@ -171,17 +228,35 @@ func undo_move(move: Move) -> void:
 		lost[move.piece.team].insert(move.raised_lost_index, move.raised_from_lost)
 		board.set_piece(move.from, move.piece)
 		return
+	if move.ability == PieceDef.Ability.HAUNT:
+		board.set_piece(move.to, null)
+		lost[move.piece.team].insert(move.raised_lost_index, move.piece)
+		return
+	if move.ability == PieceDef.Ability.FULL_MOON:
+		move.piece.def = move.piece.base_def
+		move.piece.base_def = null
+		return
+	if move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
+		return
 	if move.attacker_died:
 		lost[move.piece.team].pop_back()
 		move.attacker_died = false
 	if move.breaks_shield():
-		move.shield_target.shield_broken = false
+		if move.broke_gained_shield:
+			move.shield_target.gained_shield = true
+			move.broke_gained_shield = false
+		else:
+			move.shield_target.shield_broken = false
 		board.set_piece(move.from, move.piece)  # Back, if it was a Ram that died.
 		return
+	if move.gained_shield:
+		move.piece.gained_shield = false
+		move.gained_shield = false
 	if move.captured:
 		lost[move.captured.team].pop_back()
 	if move.ability == PieceDef.Ability.CRACK_SHOT:
 		board.set_piece(move.capture_square, move.captured)
+		_undo_decoy(move)
 		return
 	if move.is_castling():
 		move.partner.has_moved = move.partner_had_moved
@@ -190,6 +265,15 @@ func undo_move(move: Move) -> void:
 	board.set_piece(move.to, null)
 	board.set_piece(move.capture_square, move.captured)  # null if nothing was captured.
 	board.set_piece(move.from, move.piece)
+	_undo_decoy(move)
+
+## Undo a Jester swap: the Jester back on its square, the target back on its own.
+func _undo_decoy(move: Move) -> void:
+	if move.decoy_piece == null:
+		return
+	board.set_piece(move.decoy_square, move.captured)
+	board.set_piece(move.capture_square, move.decoy_piece)
+	move.decoy_piece.has_moved = move.decoy_piece_had_moved
 
 ## How many times the current position has occurred, counting now. "Same position"
 ## means the same pieces on the same squares, same side to move, same castling
@@ -228,8 +312,11 @@ func _position_key() -> String:
 ## pieces that stay on one square color (like bishops), all on the same color.
 ## Custom pieces will need more thought here later.
 func _checkmate_impossible() -> bool:
-	# A Necromancer that can still bring a piece back changes everything.
+	# A Necromancer that can still bring a piece back, or a Ghost that can still
+	# come back, changes everything.
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		if not MoveGenerator.haunting_ghosts(self, team).is_empty():
+			return false
 		if not MoveGenerator.raisable_defs(self, team).is_empty():
 			for piece: Piece in board.pieces_of(team).values():
 				if piece.can_use_ability() and piece.def.ability == PieceDef.Ability.RAISE_DEAD:

@@ -4,7 +4,8 @@ extends Node
 ## Plays the game's sound effects. Most are recordings from Kenney's free (CC0)
 ## "Impact Sounds" and "Interface Sounds" packs, in res://audio/sfx/; the rest
 ## are made by code (the cannon's boom, the arrow's whoosh, Raise Dead's swell,
-## the checkmate bell's long hum and the dust). A sound can be several layers played together
+## the checkmate bell's long hum and the dust), and the Werewolf's howl is a
+## public-domain recording of real wolves. A sound can be several layers played together
 ## (e.g. a capture is a heavy punch and a wooden crack at once). Recordings with
 ## several takes pick one at random each time, so repeats don't sound mechanical.
 ## Nothing plays while sound is switched off in the menu.
@@ -34,6 +35,13 @@ enum Sound {
 	SPARKLE,
 	## The quick swipe of an en passant capture.
 	SWIPE,
+	## Song of Slumber: a few soft music-box notes, falling.
+	LULLABY,
+	## Haunt: an eerie, wavering note.
+	HAUNT,
+	## Full Moon: a wolf's howl (a public-domain recording; see
+	## res://audio/sfx/Wolf_Howl_License.txt).
+	HOWL,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
@@ -70,6 +78,9 @@ const LAYERS := {
 	# A deep bell: the recorded strike, slowed right down, over a long made hum.
 	Sound.CHECKMATE: [[["impactBell_heavy_002"], 0.45, 6.0], ["made", 3.0]],
 	Sound.DUST: [["made", -12.0]],
+	Sound.LULLABY: [["made", -3.0]],
+	Sound.HAUNT: [["made", -5.0]],
+	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
 }
 
 ## Samples per second for the sounds made by code.
@@ -119,7 +130,7 @@ func _set_up(player: AudioStreamPlayer, sound: Sound, layer: Array) -> void:
 		player.volume_db = layer[1]
 	else:
 		var names: Array = layer[0]
-		player.stream = load("res://audio/sfx/%s.ogg" % names.pick_random())
+		player.stream = recording(names.pick_random())
 		player.pitch_scale = layer[1]
 		player.volume_db = layer[2]
 
@@ -131,8 +142,16 @@ static func streams_for(sound: Sound) -> Array[AudioStream]:
 			streams.append(made_stream(sound))
 		else:
 			for file_name: String in layer[0]:
-				streams.append(load("res://audio/sfx/%s.ogg" % file_name))
+				streams.append(recording(file_name))
 	return streams
+
+## A recording in res://audio/sfx/ by name: the .ogg file, or the .wav if
+## there's no .ogg (the wolf's howl).
+static func recording(file_name: String) -> AudioStream:
+	var path := "res://audio/sfx/%s.ogg" % file_name
+	if not ResourceLoader.exists(path):
+		path = "res://audio/sfx/%s.wav" % file_name
+	return load(path)
 
 static func made_stream(sound: Sound) -> AudioStreamWAV:
 	if not _made.has(sound):
@@ -147,7 +166,8 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 	var noise := RandomNumberGenerator.new()
 	noise.seed = 7  # The same "random" sound every time.
 	var length: float = {Sound.CANNON_FIRE: 0.9, Sound.ARROW_WHOOSH: 0.3, Sound.SWIPE: 0.2,
-			Sound.RAISE_DEAD: 1.3, Sound.CHECKMATE: 6.0, Sound.DUST: 2.0}.get(sound, 0.2)
+			Sound.RAISE_DEAD: 1.3, Sound.CHECKMATE: 6.0, Sound.DUST: 2.0,
+			Sound.LULLABY: 1.4, Sound.HAUNT: 1.3}.get(sound, 0.2)
 	var count := int(length * RATE)
 	var data := PackedByteArray()
 	data.resize(count * 2)
@@ -183,6 +203,18 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 				for partial: Array in [[0.5, 0.5, 0.35], [1.0, 0.45, 0.45], [1.19, 0.3, 0.7], [1.56, 0.22, 0.9], [2.0, 0.2, 1.1], [2.51, 0.12, 1.5]]:
 					ring += partial[1] * sin(TAU * base * partial[0] * t) * exp(-t * partial[2])
 				value = ring * minf(1.0, t * 40) * (1.0 + 0.08 * sin(TAU * 1.3 * t))
+			Sound.LULLABY:  # Music-box notes G, E, C: each a soft ping that rings away.
+				for note: Array in [[0.0, 784.0], [0.32, 659.3], [0.64, 523.3]]:
+					var since: float = t - note[0]
+					if since >= 0.0:
+						var ping := exp(-since * 4.0) * minf(1.0, since * 200)
+						value += 0.3 * ping * (sin(TAU * note[1] * since) + 0.25 * sin(TAU * note[1] * 2.0 * since))
+			Sound.HAUNT:  # A thin, wavering "oooo" that slides up and back down.
+				var glide := 1.0 + 0.25 * sin(PI * t / length)
+				var waver := 1.0 + 0.012 * sin(TAU * 5.5 * t)
+				band += (white - band) * 0.05
+				value = sin(PI * t / length) * (0.45 * sin(TAU * 440.0 * glide * waver * t) \
+						+ 0.12 * sin(TAU * 880.0 * glide * waver * t) + 0.25 * band)
 			Sound.DUST:  # A soft sandy hiss that drifts away.
 				band += (white - band) * 0.3
 				value = 0.5 * (white - band) * minf(1.0, t * 6) * exp(-t * 1.6)

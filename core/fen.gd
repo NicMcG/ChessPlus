@@ -54,6 +54,8 @@ static func write(state: GameState) -> String:
 			row += piece.letter() if piece.def.symbol.length() == 1 else "(%s)" % piece.letter()
 			if piece.shield_broken:
 				row += "'"
+			if piece.gained_shield:
+				row += "+"
 			if piece.ability_used:
 				row += "^"
 		if empty > 0:
@@ -69,8 +71,13 @@ static func write(state: GameState) -> String:
 ## Reads the piece-placement field. The board's size comes from the text itself.
 static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 	var by_symbol := {}
+	# What each changed form started as (a wolf was a Werewolf).
+	var started_as := {}
 	for def in defs:
 		by_symbol[def.symbol.to_upper()] = def
+		if def.transforms_into:
+			by_symbol[def.transforms_into.symbol.to_upper()] = def.transforms_into
+			started_as[def.transforms_into] = def
 	var rows := text.split("/")
 	var height := rows.size()
 	var width := _row_width(rows[0])
@@ -88,6 +95,11 @@ static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 				if last:
 					last.shield_broken = true
 				continue
+			if token == "+":
+				# The piece just before this mark has gained a shield (a Vampire).
+				if last:
+					last.gained_shield = true
+				continue
 			if token == "^":
 				# The piece just before this mark has used its special ability.
 				if last:
@@ -103,6 +115,7 @@ static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 				return null
 			var team := Piece.Team.WHITE if letters == letters.to_upper() else Piece.Team.BLACK
 			last = Piece.new(def, team)
+			last.base_def = started_as.get(def)
 			board.set_piece(Vector2i(file, rank), last)
 			file += 1
 		if file != width:
@@ -115,7 +128,7 @@ static func _row_width(row: String) -> int:
 	for token in _tokens(row):
 		if token.is_valid_int():
 			width += token.to_int()
-		elif token != "'" and token != "^":
+		elif token != "'" and token != "^" and token != "+":
 			width += 1
 	return width
 

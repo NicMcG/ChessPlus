@@ -305,3 +305,29 @@ func test_share_needs_a_legal_named_army() -> void:
 	_open(builder)
 	check(builder.share_button.disabled, "An empty army can't be shared")
 	builder.free()
+
+func test_builder_drag_and_right_click() -> void:
+	var builder := _builder(_fresh_library())
+	builder.drop_piece(KNIGHT, Vector2i(1, 0))
+	check_eq(builder.army.def_at(Vector2i(1, 0)), KNIGHT, "Dropped from the tray onto b1")
+	check_eq(builder.selected, KNIGHT, "And that type is now chosen")
+	builder.army_board.size = Vector2(400, 100)
+	check(builder.army_board._can_drop_data(builder.army_board.square_center(Vector2i(2, 1)), {"tray_piece": KNIGHT}), "The board takes tray pieces")
+	check(not builder.army_board._can_drop_data(Vector2.ZERO - Vector2(50, 50), {"tray_piece": KNIGHT}), "But not off the board")
+	builder.remove_at(Vector2i(1, 0))
+	check(builder.army.def_at(Vector2i(1, 0)) == null, "Right-click removes it")
+	var knight_button: Button = builder._tray_buttons[KNIGHT]
+	check(knight_button.get_node("Cost").color.a > 0.5, "Cost badge drawn")
+	builder.free()
+
+func test_king_has_a_swirled_frame_instead_of_a_badge() -> void:
+	var builder := _builder(_fresh_library())
+	var king_button: Button = builder._tray_buttons[KING]
+	check(king_button.get_node_or_null("Cost") == null, "No cost badge on the king")
+	var frame: KingFrame = king_button.get_node_or_null("KingFrame")
+	check(frame != null, "A frame instead")
+	check_eq(frame.team, Piece.Team.WHITE, "White to start")
+	builder.toggle_team()
+	check_eq(frame.team, Piece.Team.BLACK, "Follows the White/Black button")
+	check(builder._tray_buttons[KNIGHT].get_node_or_null("KingFrame") == null, "Only the king has one")
+	builder.free()

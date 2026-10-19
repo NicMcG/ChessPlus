@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3]
+
+[ext_resource type="Script" path="res://core/move_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]
+
+[sub_resource type="Resource" id="Resource_rule1"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+max_steps = 4
+
+[resource]
+script = ExtResource("2_def")
+id = "bard"
+display_name = "Bard"
+symbol = "BD"
+value = 3.5
+move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1")])
+ability = 4
+ability_colors = PackedColorArray(0.961, 0.773, 0.259, 1, 0.769, 0.416, 0.0706, 1)
+ability_name = "Song of Slumber"
+ability_text = "Once per game: choose an enemy piece (not the King) that the Bard could capture. It can't move on your opponent's next turn, so it doesn't give check either. Uses your turn."

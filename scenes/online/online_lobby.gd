@@ -29,6 +29,8 @@ var session: OnlineSession
 var rules := StandardSetup.create_rules()
 ## What the army list offers (see ArmyChoices).
 var choices: ArmyChoices
+## The creator's choice: show the eval bar to both players during the game.
+var eval_check: CheckButton
 
 func _ready() -> void:
 	choices = ArmyChoices.new(library, rules)
@@ -37,6 +39,11 @@ func _ready() -> void:
 		side_pick.add_item(side)
 	for time_control in OnlineSession.TIME_CONTROLS:
 		time_pick.add_item(time_control[0])
+	eval_check = CheckButton.new()
+	eval_check.text = "Eval bar for both players"
+	eval_check.custom_minimum_size.y = 70
+	time_pick.get_parent().add_child(eval_check)
+	time_pick.get_parent().move_child(eval_check, time_pick.get_index() + 1)
 	PhoneTextInput.attach(code_edit, "Game code")
 	code_edit.text_changed.connect(func(text: String) -> void:
 		# Codes are in capitals; keep the cursor where it was.
@@ -65,7 +72,7 @@ func create() -> void:
 	_set_busy(true, "Creating a game...")
 	session = _new_session()
 	var time_ms: int = OnlineSession.TIME_CONTROLS[time_pick.selected][1]
-	var result := await session.create_game(chosen_army(), side_pick.selected, time_ms)
+	var result := await session.create_game(chosen_army(), side_pick.selected, time_ms, eval_check.button_pressed)
 	_set_busy(false)
 	if not result.ok:
 		_drop_session()
