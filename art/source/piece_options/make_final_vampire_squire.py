@@ -7,6 +7,7 @@ strap and a stirrup). White and black, written to ../pieces/.
 Run from this folder:  python make_final_vampire_squire.py
 """
 import io
+import math
 import os
 import re
 import sys
@@ -58,13 +59,16 @@ def bat_path():
 def vampire(team):
     fill, line = colours(team)
     out = shape(bat_path(), fill)
-    # The wing bones: from each shoulder out to the wing's points.
+    # The wing bones: from near each shoulder out to the middle two of the
+    # wing's four points (Mac). Each starts a little way along its own line, so
+    # the two lines on a wing don't meet.
     bones = ""
-    # Just the middle two of each wing's four points (Mac).
     for tip in ((6.4, 21.4), (10.6, 26.4)):
         for x, y in (tip, _mirror(tip)):
             sx = 15.2 if x < 22.5 else 29.8
-            bones += "M %s,20.2 L %.2f,%.2f " % (sx, x, y)
+            dx, dy = x - sx, y - 20.2
+            k = 2.4 / math.hypot(dx, dy)
+            bones += "M %.2f,%.2f L %.2f,%.2f " % (sx + dx * k, 20.2 + dy * k, x, y)
     out += detail(bones, inner(team), 0.9)
     eyes = "#000" if team == "white" else "#fff"
     out += circle(20.9, 20.6, 0.9, eyes, "none") + circle(24.1, 20.6, 0.9, eyes, "none")
@@ -86,9 +90,10 @@ def squire(team):
     out += '<path d="%s" fill="%s" fill-rule="evenodd" stroke="#000" stroke-width="1.5"/>' % (STIRRUP, fill)
     out += shape(SADDLE, fill)
     # The line between the seat and the flap below it.
-    # Kept clear of the outline at both ends.
-    out += detail("M 11.4,17.9 C 14.2,18.6 16.2,20.4 17.4,22.9 C 18.6,25.4 20.5,26.6 23.4,26.6 L 32.6,26.6 "
-                  "C 35.6,26.6 37.4,24.8 37.4,21.6 L 37.4,13.6", inner(team), 1.1)
+    # It runs 3.2 inside the outline all the way along (Mac), stopping on the
+    # left where the seat gets too narrow to keep that gap.
+    out += detail("M 37.4,13.6 L 37.4,22.4 C 37.4,25 35.4,26.6 33,26.6 L 24.6,26.6 "
+                  "C 22.4,26.6 21.1,25.6 20.3,23.9 C 19.6,22.5 18.9,21.3 18.05,20.44", inner(team), 1.1)
     return out
 
 
@@ -101,8 +106,8 @@ def shrink(body, k, centre=(22.5, 24)):
 
 
 PIECES = {"vampire": vampire, "squire": squire}
-# Both drawn a touch smaller than first made (Mac).
-SHRINK = 0.92
+# Drawn at 97%: Mac found the full size a bit big, then 92% a bit small.
+SHRINK = 0.97
 
 if __name__ == "__main__":
     for name, draw in PIECES.items():

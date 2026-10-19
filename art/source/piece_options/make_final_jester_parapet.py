@@ -34,8 +34,8 @@ def parapet(team):
 
 
 PIECES = {"jester": jester, "parapet": parapet}
-# The jester's cap drawn a touch smaller than first made (Mac).
-SHRINK = {"jester": 0.92}
+# The jester's cap drawn at 97% (Mac: full size a bit big, 92% a bit small).
+SHRINK = {"jester": 0.97}
 
 if __name__ == "__main__":
     sys.path.insert(0, HERE)
