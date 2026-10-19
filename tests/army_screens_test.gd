@@ -254,3 +254,54 @@ func test_army_list_marks_defaults() -> void:
 	check_eq(UserSettings.default_army(Piece.Team.WHITE), "", "Deleting it clears the default")
 	army_list.free()
 	_fresh_library()
+
+# --- Sharing armies ---------------------------------------------------------------
+
+func test_share_and_import_an_army() -> void:
+	MemoryBackend.clear()
+	var library := _fresh_library()
+	var backend := MemoryBackend.new()
+	(Engine.get_main_loop() as SceneTree).root.add_child(backend)
+	# Share the standard set under a new name from the builder.
+	var mine := StandardSetup.army()
+	mine.army_name = "Sharer"
+	mine.mirror_for_black = true
+	var builder: Node = load("res://scenes/armies/army_builder.tscn").instantiate()
+	builder.setup(library, mine)
+	builder.backend = backend
+	_open(builder)
+	check(not builder.share_button.disabled, "A legal army can be shared")
+	await builder.share()
+	var code_label: Label = builder.share_panel.find_child("Code", true, false)
+	check(code_label != null and code_label.text.length() == OnlineSession.CODE_LENGTH, "Shows a 5-letter code")
+	var code: String = code_label.text if code_label else ""
+	builder.free()
+	# A friend imports it.
+	library.save(_small_army("Sharer"))
+	var army_list: Node = load("res://scenes/armies/army_list.tscn").instantiate()
+	army_list.library = library
+	army_list.backend = backend
+	_open(army_list)
+	army_list.ask_import()
+	await army_list.import_code(code.to_lower())
+	var names := library.armies().map(func(a: Army) -> String: return a.army_name)
+	check("Sharer (2)" in names, "Imported, renamed so names don't clash")
+	var imported: Army = library.armies().filter(func(a: Army) -> bool: return a.army_name == "Sharer (2)")[0]
+	check_eq(imported.pieces.size(), 16, "All 16 pieces")
+	check(imported.mirror_for_black, "Still turned round for Black like a built army")
+	# A wrong code says so.
+	army_list.ask_import()
+	await army_list.import_code("ZZZZZ")
+	var message: Label = army_list.import_panel.find_child("Message", true, false)
+	check(message.text.contains("no army"), "Unknown code: " + message.text)
+	army_list.free()
+	backend.free()
+	MemoryBackend.clear()
+	_fresh_library()
+
+func test_share_needs_a_legal_named_army() -> void:
+	var builder: Node = load("res://scenes/armies/army_builder.tscn").instantiate()
+	builder.setup(_fresh_library(), null)
+	_open(builder)
+	check(builder.share_button.disabled, "An empty army can't be shared")
+	builder.free()

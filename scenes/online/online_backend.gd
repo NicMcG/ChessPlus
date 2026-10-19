@@ -29,6 +29,14 @@ func update(_code: String, _changes: Dictionary, _conditions: Dictionary = {}) -
 func call_function(_name: String, _args: Dictionary) -> Dictionary:
 	return failed("not implemented")
 
+## Store a shared army ({"code", "army"}, see ArmyShare). Fails if the code is taken.
+func insert_shared_army(_row: Dictionary) -> Dictionary:
+	return failed("not implemented")
+
+## The shared army with this code (rows is empty if there isn't one).
+func fetch_shared_army(_code: String) -> Dictionary:
+	return failed("not implemented")
+
 static func succeeded(rows: Array) -> Dictionary:
 	return {"ok": true, "rows": rows, "error": ""}
 

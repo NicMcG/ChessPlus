@@ -17,9 +17,27 @@ signal edit_requested(army: Army)
 
 var library: ArmyLibrary
 var _pending_delete: Army
+## Where shared armies come from (null = the real server; tests use a MemoryBackend).
+var backend: OnlineBackend
+var import_button: Button
+## The Import army pop-up (null when not showing).
+var import_panel: ModalPanel
 
 func _ready() -> void:
 	new_button.pressed.connect(func() -> void: edit_requested.emit(null))
+	# Import army sits beside New army.
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 12)
+	new_button.get_parent().add_child(bottom)
+	new_button.get_parent().move_child(bottom, new_button.get_index())
+	new_button.reparent(bottom, false)
+	new_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	import_button = Button.new()
+	import_button.text = "Import army"
+	import_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	import_button.custom_minimum_size.y = new_button.custom_minimum_size.y
+	import_button.pressed.connect(ask_import)
+	bottom.add_child(import_button)
 	back_button.pressed.connect(func() -> void: closed.emit())
 	confirm_delete.confirmed.connect(_delete_pending)
 	refresh()
@@ -33,7 +51,56 @@ func refresh() -> void:
 		list.add_child(_row_for(army))
 	count_label.text = "%d of %d saved" % [armies.size(), ArmyLibrary.MAX_ARMIES]
 	new_button.disabled = armies.size() >= ArmyLibrary.MAX_ARMIES
-	new_button.text = "New army" if not new_button.disabled else "Full: delete one to make another"
+	new_button.text = "New army" if not new_button.disabled else "Full: delete one"
+	if import_button:
+		import_button.disabled = new_button.disabled
+
+## The Import army pop-up: type a friend's army code.
+func ask_import() -> void:
+	import_panel = ModalPanel.new("Import army")
+	import_panel.add_text("Type the code your friend got from Share:")
+	var code_edit := LineEdit.new()
+	code_edit.name = "CodeEdit"
+	code_edit.placeholder_text = "Code"
+	code_edit.max_length = OnlineSession.CODE_LENGTH
+	code_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	code_edit.custom_minimum_size.y = 80
+	code_edit.add_theme_font_size_override("font_size", 40)
+	import_panel.column.add_child(code_edit)
+	var message := import_panel.add_text("")
+	message.name = "Message"
+	message.add_theme_color_override("font_color", Color("#ff8a80"))
+	var go := import_panel.add_button("Import", func() -> void: pass)
+	go.pressed.connect(func() -> void: import_code(code_edit.text))
+	import_panel.add_button("Cancel", import_panel.close)
+	add_child(import_panel)
+	PhoneTextInput.attach(code_edit, "Army code")
+	code_edit.text_changed.connect(func(text: String) -> void:
+		var caret := code_edit.caret_column
+		code_edit.text = text.to_upper()
+		code_edit.caret_column = caret)
+
+## Fetch the army shared under `code` and add it to the saved armies.
+func import_code(code: String) -> void:
+	var message: Label = import_panel.find_child("Message", true, false) if import_panel else null
+	if message:
+		message.add_theme_color_override("font_color", Color("#e6e6e6"))
+		message.text = "Importing..."
+	var server := backend if backend else _real_server()
+	var error: String = await ArmyShare.import_army(server, library, code)
+	if not is_instance_valid(import_panel):
+		return
+	if error != "":
+		message.add_theme_color_override("font_color", Color("#ff8a80"))
+		message.text = error
+		return
+	import_panel.close()
+	refresh()
+
+func _real_server() -> OnlineBackend:
+	var server := SupabaseBackend.new()
+	add_child(server)
+	return server
 
 func ask_delete(army: Army) -> void:
 	_pending_delete = army
