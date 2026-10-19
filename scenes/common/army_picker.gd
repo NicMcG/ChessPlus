@@ -1,16 +1,18 @@
 class_name ArmyPicker
 extends ColorRect
 
-## A pop-up list of armies to choose from: "Standard" plus every saved army
-## that's legal, and (if asked for) which side to play: White, Black or
-## Random. Emits `chosen` with the army and side (an OnlineSession.SIDE_*
-## value; SIDE_RANDOM when no side was asked for), or `cancelled`.
+## A pop-up list of armies to choose from (see ArmyChoices: Default, Random,
+## Standard and every saved army that's legal), and (if asked for) which side to
+## play: White, Black or Random. Emits `chosen` with the army (an Army, or a
+## Callable(team) -> Army for Default/Random, as the side may not be known yet)
+## and side (an OnlineSession.SIDE_* value; SIDE_RANDOM when no side was asked
+## for), or `cancelled`.
 
-signal chosen(army: Army, side: int)
+signal chosen(army: Variant, side: int)
 signal cancelled
 
-## The armies offered, in order.
-var armies: Array[Army] = []
+## What's offered, in order.
+var choices: ArmyChoices
 
 ## The side choice (only when `ask_side`).
 var side_pick: OptionButton
@@ -21,10 +23,7 @@ func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side :=
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 20
-	var rules := StandardSetup.create_rules()
-	armies = [StandardSetup.army()]
-	if library:
-		armies.append_array(library.armies().filter(func(a: Army) -> bool: return a.is_valid(rules, 8)))
+	choices = ArmyChoices.new(library)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
@@ -56,11 +55,14 @@ func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side :=
 		var army_label := Label.new()
 		army_label.text = "With"
 		column.add_child(army_label)
-	for army in armies:
+	for index in choices.entries.size():
+		var entry: Dictionary = choices.entries[index]
 		var button := Button.new()
-		button.text = "%s  (%s pts)" % [army.army_name, Army.format_points(army.cost())]
+		button.text = entry.label
+		button.clip_text = true
 		button.custom_minimum_size.y = 80
 		button.pressed.connect(func() -> void:
+			var army: Variant = entry.army if entry.kind == ArmyChoices.ARMY else choices.resolver(index)
 			chosen.emit(army, side_pick.selected if side_pick else OnlineSession.SIDE_RANDOM)
 			queue_free())
 		column.add_child(button)

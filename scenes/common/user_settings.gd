@@ -43,6 +43,19 @@ static func set_online_game(code: String, player_id := "") -> void:
 	file.set_value("online", "game_player_id", player_id if code != "" else "")
 	file.save(save_path)
 
+## The saved army (its file, Army.library_path) the player chose as their
+## default for `team`, or "" for none (then Standard is used). See ArmyChoices.
+static func default_army(team: Piece.Team) -> String:
+	return _settings().get_value("armies", _default_key(team), "")
+
+static func set_default_army(team: Piece.Team, path: String) -> void:
+	var file := _settings()
+	file.set_value("armies", _default_key(team), path)
+	file.save(save_path)
+
+static func _default_key(team: Piece.Team) -> String:
+	return "default_white" if team == Piece.Team.WHITE else "default_black"
+
 ## The settings file, read fresh each time (it's tiny).
 static func _settings() -> ConfigFile:
 	var file := ConfigFile.new()

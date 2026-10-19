@@ -829,7 +829,8 @@ func start_rematch() -> void:
 	picker.chosen.connect(_rematch_with)
 	add_child(picker)
 
-func _rematch_with(army: Army, side := OnlineSession.SIDE_RANDOM) -> void:
+## `army`: an Army, or a Callable(team) -> Army (Default / Random, see ArmyChoices).
+func _rematch_with(army: Variant, side := OnlineSession.SIDE_RANDOM) -> void:
 	var button := game_over_panel.button("rematch")
 	if button:
 		button.disabled = true
@@ -860,7 +861,7 @@ func _rematch_with(army: Army, side := OnlineSession.SIDE_RANDOM) -> void:
 	else:
 		_rematch_failed(null, "Couldn't set up a rematch.")
 
-func _join_rematch(rematch_code: String, army: Army) -> void:
+func _join_rematch(rematch_code: String, army: Variant) -> void:
 	game_over_panel.set_note("Joining the rematch...")
 	var next := _new_session()
 	var joined := await next.join_game(rematch_code, army)

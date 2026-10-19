@@ -2,7 +2,8 @@ extends Control
 
 ## Before a match. Choose the opponent: another player on this device, or the
 ## practice bot (with its difficulty and which side you play: White, Black or
-## Random). Then each side picks an army ("Standard" or a saved one), and Start.
+## Random). Then each side picks an army (see ArmyChoices: their default for
+## that side, a random one of their own, Standard or a saved one), and Start.
 
 signal closed
 ## `bot_team` is the bot's Piece.Team, or -1 for a two-player game.
@@ -27,8 +28,8 @@ const SIDE_RANDOM := 2
 
 var library: ArmyLibrary
 var rules := StandardSetup.create_rules()
-## The armies in the order they appear in both army lists.
-var choices: Array[Army] = []
+## What both army lists offer (see ArmyChoices).
+var choices: ArmyChoices
 ## Decides "Random" sides. Tests give it a seed.
 var rng := RandomNumberGenerator.new()
 
@@ -41,13 +42,10 @@ func _ready() -> void:
 	level_pick.select(PracticeBot.Level.MEDIUM)
 	for side in ["White", "Black", "Random"]:
 		side_pick.add_item(side)
-	choices = [StandardSetup.army()]
-	# Only legal armies (one could have become illegal if the rules changed).
-	choices.append_array(library.armies().filter(func(a: Army) -> bool: return a.is_valid(rules, 8)))
+	choices = ArmyChoices.new(library, rules)
+	choices.rng = rng
 	for pick in [first_pick, second_pick]:
-		for army in choices:
-			pick.add_item("%s  (%s pts)" % [army.army_name, Army.format_points(army.cost())])
-		pick.select(0)
+		choices.fill(pick)
 	opponent_pick.item_selected.connect(func(_index: int) -> void: _update_labels())
 	start_button.pressed.connect(start)
 	back_button.pressed.connect(func() -> void: closed.emit())
@@ -57,19 +55,21 @@ func is_bot_game() -> bool:
 	return opponent_pick.selected == PRACTICE_BOT
 
 func start() -> void:
-	var first := choices[first_pick.selected]
-	var second := choices[second_pick.selected]
 	if not is_bot_game():
-		start_requested.emit(first, second, -1, 0)
+		start_requested.emit(choices.army_for(first_pick.selected, Piece.Team.WHITE),
+				choices.army_for(second_pick.selected, Piece.Team.BLACK), -1, 0)
 		return
 	# In a bot game the first list is your army and the second is the bot's.
 	var you_play_white := side_pick.selected == SIDE_WHITE
 	if side_pick.selected == SIDE_RANDOM:
 		you_play_white = rng.randi_range(0, 1) == 0
+	var you := Piece.Team.WHITE if you_play_white else Piece.Team.BLACK
+	var yours := choices.army_for(first_pick.selected, you)
+	var bots := choices.army_for(second_pick.selected, Piece.other_team(you))
 	if you_play_white:
-		start_requested.emit(first, second, Piece.Team.BLACK, level_pick.selected)
+		start_requested.emit(yours, bots, Piece.Team.BLACK, level_pick.selected)
 	else:
-		start_requested.emit(second, first, Piece.Team.WHITE, level_pick.selected)
+		start_requested.emit(bots, yours, Piece.Team.WHITE, level_pick.selected)
 
 func _update_labels() -> void:
 	bot_options.visible = is_bot_game()

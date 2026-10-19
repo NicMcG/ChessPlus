@@ -77,7 +77,9 @@ func _init(p_backend: OnlineBackend = null, p_player_id := "") -> void:
 
 ## Create a new game with `army` on `side` (SIDE_WHITE/BLACK/RANDOM) and a time
 ## limit (milliseconds each, 0 = none). Afterwards `code` is the code to share.
-func create_game(army: Army, side: int, time_ms: int) -> Dictionary:
+## `army` is an Army, or a Callable(team) -> Army (ArmyChoices.resolver) when it
+## depends on the side.
+func create_game(army: Variant, side: int, time_ms: int) -> Dictionary:
 	my_team = Piece.Team.WHITE if side == SIDE_WHITE else Piece.Team.BLACK
 	if side == SIDE_RANDOM:
 		my_team = Piece.Team.WHITE if rng.randi_range(0, 1) == 0 else Piece.Team.BLACK
@@ -91,7 +93,7 @@ func create_game(army: Army, side: int, time_ms: int) -> Dictionary:
 			"moves": [], "move_count": 0,
 		}
 		new_row[me + "_id"] = player_id
-		new_row[me + "_army"] = SavedGame.army_to_dict(army)
+		new_row[me + "_army"] = SavedGame.army_to_dict(ArmyChoices.resolve(army, my_team))
 		result = await backend.insert(new_row)
 		if result.ok and not result.rows.is_empty():
 			_set_row(result.rows[0])
@@ -101,8 +103,9 @@ func create_game(army: Army, side: int, time_ms: int) -> Dictionary:
 			return result
 	return result
 
-## Join a friend's game by its code, playing with `army`.
-func join_game(p_code: String, army: Army) -> Dictionary:
+## Join a friend's game by its code, playing with `army` (an Army, or a
+## Callable(team) -> Army: we get whichever side is free).
+func join_game(p_code: String, army: Variant) -> Dictionary:
 	var wanted := p_code.strip_edges().to_upper()
 	var found := await backend.fetch(wanted)
 	if not found.ok:
@@ -119,7 +122,7 @@ func join_game(p_code: String, army: Army) -> Dictionary:
 	var me := team_key(team)
 	var changes := {"status": PLAYING}
 	changes[me + "_id"] = player_id
-	changes[me + "_army"] = SavedGame.army_to_dict(army)
+	changes[me + "_army"] = SavedGame.army_to_dict(ArmyChoices.resolve(army, team))
 	var joined := await backend.update(wanted, changes, {"status": WAITING})
 	if not joined.ok:
 		return joined

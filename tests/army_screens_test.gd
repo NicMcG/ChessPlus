@@ -14,6 +14,9 @@ func _fresh_library() -> ArmyLibrary:
 	if DirAccess.dir_exists_absolute(TEST_DIR):
 		for file in DirAccess.get_files_at(TEST_DIR):
 			DirAccess.remove_absolute(TEST_DIR + file)
+	# No default armies left over from another test.
+	UserSettings.set_default_army(Piece.Team.WHITE, "")
+	UserSettings.set_default_army(Piece.Team.BLACK, "")
 	return ArmyLibrary.new(TEST_DIR)
 
 func _small_army(army_name: String) -> Army:
@@ -178,10 +181,12 @@ func test_match_setup_offers_standard_and_saved() -> void:
 	var setup: Node = load("res://scenes/menu/match_setup.tscn").instantiate()
 	setup.library = library
 	_open(setup)
-	check_eq(setup.first_pick.item_count, 2, "Standard + Mine")
+	check_eq(setup.first_pick.item_count, 4, "Default, Random, Standard, Mine")
+	check(setup.first_pick.get_item_text(0).begins_with("Default"), "Default first")
+	check_eq(setup.first_pick.selected, 0, "Default chosen to start with")
 	var started := []
 	setup.start_requested.connect(func(w: Army, b: Army, _bot: int, _level: int) -> void: started.append([w, b]))
-	setup.second_pick.select(1)
+	setup.second_pick.select(3)
 	setup.start()
 	check_eq(started.size(), 1, "Start pressed")
 	if started.size() == 1:
@@ -203,3 +208,49 @@ func test_main_starts_a_game_with_two_armies() -> void:
 	check(game.state.board.pieces_of(Piece.Team.BLACK).values().all(func(p: Piece) -> bool: return p.def != QUEEN), "Black has no queen")
 	check(game.menu_button.visible, "Menu button shown")
 	main.free()
+
+# --- Default and Random armies ----------------------------------------------------
+
+func test_default_army_per_side() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("Knights"))
+	library.save(_small_army("Other"))
+	var knights: Army = library.armies().filter(func(a: Army) -> bool: return a.army_name == "Knights")[0]
+	var choices := ArmyChoices.new(library)
+	check_eq(choices.army_for(0, Piece.Team.WHITE).army_name, "Standard", "No default set: Standard")
+	UserSettings.set_default_army(Piece.Team.BLACK, knights.library_path)
+	choices = ArmyChoices.new(library)
+	check_eq(choices.army_for(0, Piece.Team.BLACK).army_name, "Knights", "Black's default")
+	check_eq(choices.army_for(0, Piece.Team.WHITE).army_name, "Standard", "White still Standard")
+	check_eq(choices.entries[0].label, "Default (Standard / Knights)", "Says what Default means")
+	check_eq(ArmyChoices.resolve(choices.resolver(0), Piece.Team.BLACK).army_name, "Knights", "Decided later, by side")
+	_fresh_library()
+
+func test_random_army_is_one_of_mine() -> void:
+	var library := _fresh_library()
+	check_eq(ArmyChoices.new(library).entries.size(), 2, "No saved armies: no Random (Default, Standard)")
+	library.save(_small_army("A"))
+	library.save(_small_army("B"))
+	var choices := ArmyChoices.new(library)
+	check_eq(choices.entries[1].kind, ArmyChoices.RANDOM, "Random second")
+	var seen := {}
+	for i in 40:
+		seen[choices.army_for(1, Piece.Team.WHITE).army_name] = true
+	check_eq(seen.keys().size(), 2, "Picks among my armies")
+	check(not seen.has("Standard"), "Never Standard")
+	_fresh_library()
+
+func test_army_list_marks_defaults() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("Mine"))
+	var army_list: Node = load("res://scenes/armies/army_list.tscn").instantiate()
+	army_list.library = library
+	_open(army_list)
+	var mine: Army = library.armies()[0]
+	army_list.set_default(mine, Piece.Team.WHITE, true)
+	check_eq(UserSettings.default_army(Piece.Team.WHITE), mine.library_path, "White default set")
+	army_list.ask_delete(mine)
+	army_list.confirm_delete.confirmed.emit()
+	check_eq(UserSettings.default_army(Piece.Team.WHITE), "", "Deleting it clears the default")
+	army_list.free()
+	_fresh_library()
