@@ -158,8 +158,9 @@ re-run after changing costs.
 ### Tuning the engine
 
 ```
-plusfish tune games.jsonl --out params.txt
-plusfish match --armies random --params params.txt --params-b none --games 1000
+plusfish selfplay --games 20000 --nodes 6000 --out games.jsonl --threads 19
+plusfish tune games.jsonl --out params.txt --only mat,mob,shield,ability
+plusfish enginematch --engine-a plusfish.exe@params.txt --engine-b plusfish.exe --nodes 6000 --pairs 1000
 ```
 
 The evaluation is a weighted sum of features: material, mobility, shield and
@@ -168,7 +169,58 @@ shelter, king-zone attacks, Raise Dead potential and so on. `tune` fits the
 weights to self-play results (Texel tuning). The tuned weights in
 `params/tuned.txt` are built into the program; `--params none` falls back to
 weights derived from army costs, which is also what any new piece type gets
-until you re-tune.
+until you re-tune. Re-tune whenever pieces are added or costs change: the
+October 2026 re-tune (all 30 pieces) was worth +75 Elo, mostly from valuing
+the new pieces. `--only` limits tuning to some features (the per-piece ones
+are well determined; a full re-tune made pawn-advance weights jagged and
+judged the pool armies worse), `--freeze` keeps some fixed, `--skip N`
+ignores each game's first N plies. An engine given as `<exe>@<weights.txt>`
+(enginematch, start-check) plays with those weights instead of its own.
+
+### Judging the starting position
+
+```
+plusfish start-check --engines old.exe,new.exe --pairs 150 --games 20 --pool pool.txt --truth truth.txt
+```
+
+How well each engine's score of the starting position predicts which army
+wins: every army pair is played 20 times with each colour to find the truth
+(kept in `--truth` and reused), then each engine scores both starts. It
+reports the correlation with the real results (and the best possible with
+that many games), how often it picks the right side, and White's edge.
+
+### Growing an army pool from the eval bar (`meta`)
+
+```
+plusfish meta --pool old_pool.txt --out meta_pool.txt --max 10 --threads 16
+```
+
+A way to find the strongest builds by Plusfish's own judgement, to re-run
+whenever the engine improves (better evaluation, new pieces, new costs):
+
+1. Start from a pool (`--pool`, armies that now break the army rules are left
+   out; Standard is always added).
+2. Odd rounds start from a random legal army, even rounds from a pool member
+   (climbing against the others, so it competes to replace itself). Hill-climb it: try one small
+   change per thread (swap a piece's type, move one, swap two, add, remove,
+   trade), keep the best if it raises the army's mean turn-0 eval-bar score
+   against every pool member, and stop after `--patience` batches without a
+   gain. Scores average both colours so White's first move cancels, and an
+   army that leaves a king attacked before the first move against any member
+   is rejected (that rule is temporary).
+3. Score the result at the eval bar's budget (`--nodes`, 20,000 as on the web).
+   If its piece list differs from every member's by at least `--min-diff`
+   pieces (default 3; layout is ignored), it joins; past `--max` armies the
+   member with the lowest mean score against the others is dropped. If it's
+   close to a member and does better against the rest of the pool, it replaces
+   that member; otherwise it's thrown away.
+4. Stop after `--stable` rounds without a change (or `--rounds`).
+
+The pool is written after every round (`army | name | cost | score | pieces`,
+readable by `enginematch --pool` and `start-check --pool`), with a log beside
+it. It finds what *Plusfish thinks* is strong; `start-check --pool` then plays
+the pool out to see how far games agree, which is also a good place to look
+for evaluation mistakes to fix.
 
 ### Testing engine changes
 

@@ -47,3 +47,31 @@ should be worth about as much.
 
 Lazy SMP adds to the clock result on top: 4 threads vs 1 = +102.5 ±24.1 (#5).
 | 22 | Hash table in buckets of two entries (replace the shallower/older one) | time 10+0.1 | 800 | +14.8 ±12.5 | kept (SPRT undecided at the game limit; range excludes 0) |
+| 23 | Re-tune the per-piece weights (material, mobility per piece type, shield, ability) on 20,680 self-play games with all 30 pieces (`tune --only mat,mob,shield,ability`); the 11 new pieces had only cost-based values and every mobility weight was the same 3.1 | nodes 6k / nodes 20k | 2000 / 500 | +74.6 ±11.0 / +100.7 ±23.2 | kept |
+| 24 | Eval: per-piece "worth while the armies are whole" term (fades out over the first 8 captures), tuned with the rest | start-check (below) | - | no better than #23 | reverted |
+| 25 | Full re-tune (every feature) instead of #23 | start-check (below) | - | same on random armies, worse on the pool; pawn-advance weights came out jagged | not used |
+
+## Judging the starting position (`start-check`)
+
+186 army pairings played 40 times each (20 per colour, 6,000 nodes) for the
+truth: 150 random pairs drawn from all 30 pieces, plus the old 8-army pool
+with Standard. Correlation of each engine's start score (both colours
+averaged) with the real result; the noise ceiling is 0.98.
+
+| Weights | random pairs @1 node | @20,000 | right army when clear (@20k) | pool + Standard @20,000 |
+|---|---|---|---|---|
+| before #23 | 0.55 | 0.62 | 78% | 0.59 |
+| #23 (kept) | 0.77 | 0.84 | 97% | 0.61 |
+| #24 (+ opening term) | 0.76 | 0.84 | 97% | 0.52 |
+| #25 (full re-tune) | 0.77 | 0.83 | 97% | 0.50 |
+
+With only the 19 old pieces, the starting engine (base1) and the build after
+#22 judged random pairs the same (0.84 vs 0.85 at 20,000 nodes): the search
+work didn't change opening judgement; valuing the new pieces did.
+
+## The eval-bar meta pool (`meta`, reports/META_POOL.md)
+
+10 armies grown by `plusfish meta` with the #23 weights. #23 against the
+build before it, on that pool: **+107.5 ±19.0** (6,000 nodes, 1000 games).
+start-check on the pool + Standard (55 pairings, 40 games each): correlation
+0.79 at 20,000 nodes with #23, 0.41 before it.
