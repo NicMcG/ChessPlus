@@ -126,21 +126,16 @@ const LAYERS := {
 		[["explosionCrunch_000"], 1.4, -2.0],
 	],
 	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0]],
-	# A special ability firing up (Mac: heavy, explosive, hype): a deep boom, a
-	# crunch and a rush of energy.
-	Sound.ABILITY: [[["lowFrequency_explosion_001"], 1.0, 4.0], [["explosionCrunch_000"], 0.9, -2.0], [["forceField_002"], 0.75, -2.0]],
+	# A special ability powering up (Mac).
+	Sound.ABILITY: [[["power_up"], 1.0, 0.0]],
 	# A rushing whoosh (it loops; see start_loop).
 	Sound.AIMING: [[["thrusterFire_003"], 1.3, -15.0]],
 	Sound.RAISE_DEAD: [[["forceField_000"], 0.55, -2.0]],
 	# Snappy and crisp: a glass-sharp crack on top of the thunder, louder.
 	Sound.THUNDER: [[["thunder_crack"], 1.05, 5.0], [["impactGlass_heavy_001", "impactGlass_heavy_002"], 1.4, 2.0], [["explosionCrunch_000"], 1.6, 0.0]],
 	Sound.GROAN: [[["zombie_groan"], 1.0, -1.0]],
-	# Metal and stone breaking: glass and metal crashes over a stone smash.
-	Sound.SHIELD_BREAK: [
-		[["impactGlass_heavy_001", "impactGlass_heavy_002", "impactGlass_heavy_004"], 0.8, 2.0],
-		[["impactMetal_heavy_000", "impactMetal_heavy_001", "impactMetal_heavy_002"], 0.85, 2.0],
-		[["explosionCrunch_001"], 1.4, -6.0],
-	],
+	# A shield shattering like glass.
+	Sound.SHIELD_BREAK: [[["glass_shatter"], 1.0, 0.0]],
 	# A deep bell: the recorded strike, slowed right down, over a long low rumble.
 	Sound.CHECKMATE: [[["impactBell_heavy_002"], 0.45, 6.0], [["lowFrequency_explosion_000"], 0.5, 0.0]],
 	Sound.DUST: [[["cloth1"], 0.5, -8.0]],
@@ -156,8 +151,8 @@ const LAYERS := {
 	Sound.POP: [["made", 0.0]],
 	Sound.SHEEP: [[["sheep_baa"], 1.0, -2.0]],
 	# A bite: a chomp and a crunch.
-	# A cartoon chomp.
-	Sound.BITE: [[["cartoon_bite"], 1.0, 4.0]],
+	# A sharp bite.
+	Sound.BITE: [[["bite"], 1.0, 2.0]],
 }
 
 ## Samples per second for the sounds made by code.
