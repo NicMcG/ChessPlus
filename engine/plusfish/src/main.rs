@@ -148,7 +148,12 @@ fn main() {
         return;
     }
     if cmd == "meta" && args.flag("help") {
-        print!("{}", meta::HELP);
+        print!("{}
+{}", meta::HELP, meta::WIDE_HELP);
+        return;
+    }
+    if cmd == "climb-fixed" && args.flag("help") {
+        print!("{}", meta::FIXED_HELP);
         return;
     }
     if cmd == "start-check" && args.flag("help") {
@@ -192,6 +197,9 @@ fn main() {
         }
         "meta" => {
             meta::run(&cat, &load_params(&cat, args.get("params")), &args);
+        }
+        "climb-fixed" => {
+            meta::run_fixed(&cat, &load_params(&cat, args.get("params")), &args);
         }
         "start-check" => {
             let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));

@@ -14,7 +14,7 @@ use plusfish_core::army::*;
 use plusfish_core::defs::*;
 use plusfish_core::eval::*;
 use plusfish_core::search::*;
-use plusfish_core::selfplay::start_is_broken;
+use plusfish_core::selfplay::{play_game, start_is_broken, PlayConfig};
 use plusfish_core::util::{Args, Rng};
 use std::collections::HashMap;
 use std::io::Write;
@@ -59,6 +59,9 @@ struct Scorer<'a> {
     cat: &'a Arc<Catalog>,
     params: &'a Params,
     cache: Mutex<HashMap<(String, String, u64), Option<i32>>>,
+    /// A start with Black's king attacked counts as White's win (+1500), as
+    /// the game's temporary rule says, instead of an unusable pairing (None).
+    exposed_wins: bool,
 }
 
 impl<'a> Scorer<'a> {
@@ -68,7 +71,9 @@ impl<'a> Scorer<'a> {
             return v;
         }
         let g = army_game(self.cat, w, b, 8, 8);
-        let v = if start_is_broken(&g) {
+        let v = if self.exposed_wins && g.pos.in_check(&g.rules, plusfish_core::position::BLACK) {
+            Some(1500)
+        } else if start_is_broken(&g) && !self.exposed_wins {
             None
         } else {
             let et = EvalTables::new(&g.rules);
@@ -380,6 +385,9 @@ fn write_pool(cat: &Catalog, path: &str, pool: &[Member], score: &[f64], round: 
 }
 
 pub fn run(cat: &Arc<Catalog>, params: &Params, args: &Args) {
+    if args.get("wide").is_some() {
+        return run_wide(cat, params, args);
+    }
     let cfg = Cfg {
         nodes: args.num("nodes", 20_000),
         climb_nodes: args.num("climb-nodes", 8_000),
@@ -400,7 +408,7 @@ pub fn run(cat: &Arc<Catalog>, params: &Params, args: &Args) {
             writeln!(f, "{}", s).ok();
         }
     };
-    let sc = Scorer { cat, params, cache: Mutex::new(HashMap::new()) };
+    let sc = Scorer { cat, params, cache: Mutex::new(HashMap::new()), exposed_wins: false };
 
     let mut pool: Vec<Member> = vec![Member { army: standard(cat), name: "Standard".into(), born: 0 }];
     if let Some(p) = args.get("pool") {
@@ -502,6 +510,721 @@ pub fn run(cat: &Arc<Catalog>, params: &Params, args: &Args) {
             pool.iter().zip(&score).map(|(m, s)| format!("{} {:+.0}", m.name, s)).collect::<Vec<_>>().join(", ")
         ));
         if quiet >= stable && pool.len() >= max.min(3) {
+            log(format!("stable: no change for {} rounds", quiet));
+            break;
+        }
+    }
+    log(format!("wrote {}", out));
+}
+
+// --- climb-fixed: hill-climb one army with some squares pinned ----------------
+
+pub const FIXED_HELP: &str = "\
+climb-fixed: hill-climb one army against a pool, with some squares pinned.
+  --pool <file>      the armies to beat (pool.txt format; Standard is added)
+  --keep <list>      pieces that must stay, as SYMBOL@square on the builder's
+                     rows 1-2 (e.g. C@e1,K@d1)
+  --empty <list>     squares that must stay empty (e.g. e2)
+  --restarts N       climbs from random armies (default 4); every pool member
+                     is also used as a start, with the pinned squares forced
+  --nodes N          nodes for the final scores (default 20000)
+  --climb-nodes N    nodes while climbing (default 8000)
+  --patience N       batches without a gain before a climb stops (default 6)
+  --threads N        default 16   --seed N   --out <file> (fixed_climb.txt)
+Scores follow the game's rules, including Mac's temporary one: if Black's king
+is attacked before White's first move, White wins at once (scored +1500, the
+cap). Each result is reported with and without those instant wins.
+";
+
+/// The pinned squares: pieces that must stay put and squares that must stay empty.
+struct Pins {
+    keep: Vec<(usize, i32, i32)>,
+    empty: Vec<(i32, i32)>,
+}
+
+fn builder_square(t: &str) -> (i32, i32) {
+    let b = t.trim().as_bytes();
+    assert!(b.len() == 2 && (b'a'..=b'h').contains(&b[0]) && (b'1'..=b'2').contains(&b[1]), "bad square {}", t);
+    ((b[0] - b'a') as i32, (b[1] - b'1') as i32)
+}
+
+impl Pins {
+    fn parse(cat: &Catalog, keep: &str, empty: &str) -> Pins {
+        let keep = keep
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| {
+                let (sym, sq) = s.split_once('@').unwrap_or_else(|| panic!("bad --keep entry {}", s));
+                let k = cat.kind_by_symbol(sym.trim()).unwrap_or_else(|| panic!("unknown piece {}", sym));
+                let (f, r) = builder_square(sq);
+                (k, f, r)
+            })
+            .collect();
+        let empty = empty.split(',').filter(|s| !s.trim().is_empty()).map(builder_square).collect();
+        Pins { keep, empty }
+    }
+
+    fn obeyed_by(&self, a: &Army) -> bool {
+        self.keep.iter().all(|&(k, f, r)| a.at(f, r) == Some(k)) && self.empty.iter().all(|&(f, r)| a.at(f, r).is_none())
+    }
+
+    /// `a` with the pins forced on it (anything in the way, and any other king,
+    /// removed), then random pieces removed until it's legal. None if that fails.
+    fn force(&self, cat: &Catalog, a: &Army, rng: &mut Rng) -> Option<Army> {
+        let mut a = a.clone();
+        let pins_king = self.keep.iter().any(|p| cat.defs[p.0].is_king());
+        a.pieces.retain(|p| {
+            !self.keep.iter().any(|q| (q.1, q.2) == (p.1, p.2)) && !self.empty.contains(&(p.1, p.2)) && !(pins_king && cat.defs[p.0].is_king())
+        });
+        for &(k, f, r) in &self.keep {
+            a.pieces.push((k, f, r));
+        }
+        for _ in 0..40 {
+            if a.problems(cat, 8).is_empty() {
+                a.pieces.sort_by_key(|p| (p.2, p.1));
+                a.mirror = true;
+                a.name = a.to_text(cat, 8);
+                return Some(a);
+            }
+            let free: Vec<usize> = (0..a.pieces.len()).filter(|&i| !self.keep.iter().any(|q| (q.1, q.2) == (a.pieces[i].1, a.pieces[i].2))).collect();
+            if free.is_empty() {
+                return None;
+            }
+            a.pieces.remove(free[rng.below(free.len())]);
+        }
+        None
+    }
+
+    fn mutate(&self, cat: &Catalog, parent: &Army, rng: &mut Rng) -> Option<Army> {
+        for _ in 0..300 {
+            if let Some(m) = mutate(cat, parent, rng) {
+                if self.obeyed_by(&m) {
+                    return Some(m);
+                }
+            }
+        }
+        None
+    }
+}
+
+impl<'a> Scorer<'a> {
+    /// White's score of the start under the game's rules: an instant win (+1500)
+    /// if Black's king is attacked before White moves; otherwise a search (White
+    /// may start in check, which is just a check).
+    fn rule_score(&self, w: &Army, b: &Army, nodes: u64) -> i32 {
+        let key = (format!("rule:{}", w.to_text(self.cat, 8)), b.to_text(self.cat, 8), nodes);
+        if let Some(&v) = self.cache.lock().unwrap().get(&key) {
+            return v.unwrap();
+        }
+        let g = army_game(self.cat, w, b, 8, 8);
+        let v = if g.pos.in_check(&g.rules, plusfish_core::position::BLACK) {
+            1500
+        } else {
+            let et = EvalTables::new(&g.rules);
+            let mut s = Searcher::new(&g.rules, &et, self.params, 4);
+            let lim = Limits { nodes: Some(nodes), ..Default::default() };
+            let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], lim, 1, |_| {});
+            rep.lines.first().map(|l| l.score).unwrap_or(0).clamp(-1500, 1500)
+        };
+        self.cache.lock().unwrap().insert(key, Some(v));
+        v
+    }
+
+    /// rule_score for many (white, black) starts at once.
+    fn many_rule(&self, starts: &[(&Army, &Army)], nodes: u64, threads: usize) -> Vec<i32> {
+        let next = AtomicUsize::new(0);
+        std::thread::scope(|scope| {
+            for _ in 0..threads.max(1) {
+                scope.spawn(|| loop {
+                    let j = next.fetch_add(1, Ordering::SeqCst);
+                    if j >= starts.len() {
+                        break;
+                    }
+                    self.rule_score(starts[j].0, starts[j].1, nodes);
+                });
+            }
+        });
+        starts.iter().map(|&(w, b)| self.rule_score(w, b, nodes)).collect()
+    }
+}
+
+/// For each army in `armies`: the score of each start against each pool member,
+/// [as White, as Black (White's view)] per member.
+fn fixed_scores(sc: &Scorer, armies: &[Army], pool: &[Army], nodes: u64, threads: usize) -> Vec<Vec<[i32; 2]>> {
+    let mut starts = Vec::new();
+    for a in armies {
+        for p in pool {
+            starts.push((a, p));
+            starts.push((p, a));
+        }
+    }
+    let v = sc.many_rule(&starts, nodes, threads);
+    (0..armies.len())
+        .map(|i| (0..pool.len()).map(|j| [v[(i * pool.len() + j) * 2], v[(i * pool.len() + j) * 2 + 1]]).collect())
+        .collect()
+}
+
+/// Mean advantage over the pool (both colours averaged), counting instant wins.
+fn fixed_mean(s: &[[i32; 2]]) -> f64 {
+    s.iter().map(|x| (x[0] - x[1]) as f64 / 2.0).sum::<f64>() / s.len().max(1) as f64
+}
+
+pub fn run_fixed(cat: &Arc<Catalog>, params: &Params, args: &Args) {
+    let threads: usize = args.num("threads", 16);
+    let nodes: u64 = args.num("nodes", 20_000);
+    let climb_nodes: u64 = args.num("climb-nodes", 8_000);
+    let patience: usize = args.num("patience", 6);
+    let restarts: usize = args.num("restarts", 4);
+    let out = args.get("out").unwrap_or("fixed_climb.txt").to_string();
+    let mut rng = Rng::new(args.num("seed", 1u64));
+    let pins = Pins::parse(cat, args.get("keep").unwrap_or(""), args.get("empty").unwrap_or(""));
+    let logf = Mutex::new(std::fs::File::create(format!("{}.log", out.trim_end_matches(".txt"))).ok());
+    let log = |s: String| {
+        println!("{}", s);
+        if let Some(f) = logf.lock().unwrap().as_mut() {
+            writeln!(f, "{}", s).ok();
+        }
+    };
+    let sc = Scorer { cat, params, cache: Mutex::new(HashMap::new()), exposed_wins: false };
+    let mut pool: Vec<(Army, String)> = vec![(standard(cat), "Standard".into())];
+    if let Some(p) = args.get("pool") {
+        let mut l = |s: String| log(s);
+        pool.extend(read_pool(cat, p, &mut l));
+    }
+    let pool_armies: Vec<Army> = pool.iter().map(|p| p.0.clone()).collect();
+
+    // Starts: every pool member with the pins forced, plus random armies.
+    let mut starts: Vec<(Army, String)> = Vec::new();
+    for (a, n) in &pool {
+        if let Some(f) = pins.force(cat, a, &mut rng) {
+            starts.push((f, format!("from {}", n)));
+        }
+    }
+    let mut tries = 0;
+    while starts.len() < pool.len() + restarts && tries < 1000 {
+        tries += 1;
+        if let Some(f) = pins.force(cat, &random_army(cat, &mut rng), &mut rng) {
+            starts.push((f, "from random".into()));
+        }
+    }
+    log(format!("{} climbs; pinned: {} kept, {} empty; pool of {}", starts.len(), pins.keep.len(), pins.empty.len(), pool.len()));
+
+    let mut results: Vec<(Army, String)> = Vec::new();
+    for (si, (start, label)) in starts.iter().enumerate() {
+        let mut cur = start.clone();
+        let mut cur_score = fixed_mean(&fixed_scores(&sc, &[cur.clone()], &pool_armies, climb_nodes, threads)[0]);
+        let (mut fails, mut batch) = (0, 0);
+        while fails < patience && batch < 200 {
+            batch += 1;
+            let mutants: Vec<Army> = (0..threads.max(4)).filter_map(|_| pins.mutate(cat, &cur, &mut rng)).collect();
+            let scores = fixed_scores(&sc, &mutants, &pool_armies, climb_nodes, threads);
+            let best = scores.iter().map(|s| fixed_mean(s)).enumerate().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+            match best {
+                Some((i, s)) if s > cur_score + 0.5 => {
+                    cur = mutants[i].clone();
+                    cur_score = s;
+                    fails = 0;
+                }
+                _ => fails += 1,
+            }
+        }
+        log(format!("climb {}/{} ({}): {} batches -> {:+.0} cp at {} nodes: {}", si + 1, starts.len(), label, batch, cur_score, climb_nodes, cur.to_text(cat, 8)));
+        results.push((cur, label.clone()));
+    }
+
+    // Final scores at the eval bar's budget, best first.
+    let armies: Vec<Army> = results.iter().map(|r| r.0.clone()).collect();
+    let finals = fixed_scores(&sc, &armies, &pool_armies, nodes, threads);
+    let mut order: Vec<usize> = (0..armies.len()).collect();
+    order.sort_by(|&a, &b| fixed_mean(&finals[b]).partial_cmp(&fixed_mean(&finals[a])).unwrap());
+    let mut s = String::new();
+    s += &format!("# climb-fixed against {} armies, {} nodes. Score = mean advantage (cp, both colours averaged); \"instant\" = Black's king attacked at the start (White wins at once).\n", pool.len(), nodes);
+    s += "# army | start | cost | score | score without instant-win pairings | instant wins as White | pieces\n";
+    for &i in &order {
+        let f = &finals[i];
+        let instant = f.iter().filter(|x| x[0] == 1500).count();
+        let fair: Vec<[i32; 2]> = f.iter().filter(|x| x[0] != 1500 && x[1] != 1500).cloned().collect();
+        s += &format!("{} | {} | {} | {:+.0} | {:+.0} ({} pairings) | {}/{} | {}\n", armies[i].to_text(cat, 8), results[i].1, armies[i].cost(cat), fixed_mean(f), fixed_mean(&fair), fair.len(), instant, pool.len(), pieces_text(cat, &armies[i]));
+    }
+    let best = order[0];
+    s += "\n# Best army against each pool member (White's view, cp):\n# member | best as White | best as Black\n";
+    for (j, (_, n)) in pool.iter().enumerate() {
+        let f = finals[best][j];
+        let w = if f[0] == 1500 { "instant win".to_string() } else { format!("{:+}", f[0]) };
+        s += &format!("{} | {} | {:+}\n", n, w, f[1]);
+    }
+    std::fs::write(&out, &s).unwrap_or_else(|e| panic!("{}: {}", out, e));
+    log(s);
+}
+
+// --- meta --wide: many cheap eval climbs, then games decide --------------------
+
+pub const WIDE_HELP: &str = "\
+meta --wide N: grow the pool by searching wide and deciding with games.
+Each round:
+  1. N climbers (--wide, default 38) hill-climb at once, each from a random
+     army (--refine of them start from pool members instead, default 4), using
+     Plusfish's turn-0 eval as a quick guide: --mutants tries per step (default
+     6), --climb-nodes per score (default 3000), --patience steps without a
+     gain before stopping (default 4).
+  2. The finishers are re-scored at --nodes (default 20000, as the eval bar)
+     and the best --shortlist (default 3) different ones go on.
+  3. With --game-climb, the best of them is polished with games: each step
+     takes the --gc-mutants (default 4) best of 12 tweaks by eval and plays
+     each, and the current army, --gc-games games per colour (default 4)
+     against every member on the same openings; the best is kept if it scores
+     at least --gc-margin (default 0.03) more. Stops after --gc-patience steps
+     without a gain (default 3) or --gc-steps (default 10).
+  4. Games decide: each shortlisted army plays --games games (default 40, half
+     with each colour) against every member at --game-nodes per move (default
+     6000). If its piece list is at least --min-diff pieces (default 3) from
+     every member's, it joins and, past --max members (default 10), the member
+     with the lowest game score against the others is dropped (it can be the
+     newcomer). If it's close to a member, it replaces that member when its
+     game score against the rest beats the member's by --replace-margin
+     (default 0.02).
+Stops after --stable rounds without a change (default 3) or --rounds (default 8).
+Every member pair plays --games games once (kept for later rounds).
+  --king-exposed win|reject   a start with Black's king attacked: an instant
+                     win for White, as in the game now (default), or reject
+                     such armies (the old meta behaviour)
+  --pool <file> --out <file> --threads N (default 16) --seed N --name X
+";
+
+struct WideCfg {
+    threads: usize,
+    nodes: u64,
+    climb_nodes: u64,
+    mutants: usize,
+    patience: usize,
+    wide: usize,
+    refine: usize,
+    shortlist: usize,
+    min_diff: usize,
+    games: usize,
+    play: PlayConfig,
+    game_climb: bool,
+    gc_games: usize,
+    gc_mutants: usize,
+    gc_margin: f64,
+    gc_patience: usize,
+    gc_steps: usize,
+    replace_margin: f64,
+    max: usize,
+}
+
+/// A hill climb on one thread: each step tries `mutants` tweaks and keeps the
+/// best if it beats the current army's mean advantage over `pool`.
+fn climb_one(cat: &Catalog, sc: &Scorer, start: Army, pool: &[Army], nodes: u64, mutants: usize, patience: usize, rng: &mut Rng) -> (Army, f64) {
+    let score = |a: &Army| -> Option<f64> {
+        let mut sum = 0.0;
+        for p in pool {
+            sum += sc.advantage(a, p, nodes)?;
+        }
+        Some(sum / pool.len().max(1) as f64)
+    };
+    let mut cur = start;
+    let mut cur_score = score(&cur).unwrap_or(-1e9);
+    let (mut fails, mut steps) = (0, 0);
+    while fails < patience && steps < 100 {
+        steps += 1;
+        let mut best: Option<(Army, f64)> = None;
+        for _ in 0..mutants {
+            if let Some(m) = mutate(cat, &cur, rng) {
+                if let Some(s) = score(&m) {
+                    if best.as_ref().map(|b| s > b.1).unwrap_or(true) {
+                        best = Some((m, s));
+                    }
+                }
+            }
+        }
+        match best {
+            Some((m, s)) if s > cur_score + 0.5 => {
+                cur = m;
+                cur_score = s;
+                fails = 0;
+            }
+            _ => fails += 1,
+        }
+    }
+    (cur, cur_score)
+}
+
+/// Game results between armies, kept by army text: (a, b) -> a's points and
+/// games played, stored once per pair.
+struct GameBook<'a> {
+    cat: &'a Arc<Catalog>,
+    params: &'a Params,
+    play: PlayConfig,
+    threads: usize,
+    table: HashMap<(String, String), (f64, usize)>,
+}
+
+impl<'a> GameBook<'a> {
+    /// Plays `n` games (alternating colours, A White first) for each pair, all
+    /// in parallel; pair i's game k uses seed `seed + i * 1000 + k`, so equal
+    /// `seed`s give the same openings. Returns A's points per pair.
+    fn play(&self, pairs: &[(&Army, &Army)], n: usize, seed: u64) -> Vec<f64> {
+        let jobs: Vec<(usize, usize)> = (0..pairs.len()).flat_map(|i| (0..n).map(move |k| (i, k))).collect();
+        let points: Vec<Mutex<f64>> = pairs.iter().map(|_| Mutex::new(0.0)).collect();
+        let next = AtomicUsize::new(0);
+        std::thread::scope(|scope| {
+            for _ in 0..self.threads.max(1) {
+                scope.spawn(|| loop {
+                    let j = next.fetch_add(1, Ordering::SeqCst);
+                    if j >= jobs.len() {
+                        break;
+                    }
+                    let (i, k) = jobs[j];
+                    let (a, b) = pairs[i];
+                    let a_white = k % 2 == 0;
+                    let (w, bl) = if a_white { (a, b) } else { (b, a) };
+                    let rec = play_game(self.cat, w, bl, self.params, self.params, true, &self.play, seed + i as u64 * 1000 + k as u64);
+                    let a_points = if a_white { rec.result as f64 } else { 1.0 - rec.result as f64 };
+                    *points[i].lock().unwrap() += a_points;
+                });
+            }
+        });
+        points.into_iter().map(|m| m.into_inner().unwrap()).collect()
+    }
+
+    fn key(&self, a: &Army, b: &Army) -> ((String, String), bool) {
+        let (x, y) = (a.to_text(self.cat, 8), b.to_text(self.cat, 8));
+        if x <= y { ((x, y), false) } else { ((y, x), true) }
+    }
+
+    fn record(&mut self, a: &Army, b: &Army, a_points: f64, n: usize) {
+        let (k, flipped) = self.key(a, b);
+        let e = self.table.entry(k).or_insert((0.0, 0));
+        e.0 += if flipped { n as f64 - a_points } else { a_points };
+        e.1 += n;
+    }
+
+    /// a's mean score against b (None if they haven't played).
+    fn score(&self, a: &Army, b: &Army) -> Option<f64> {
+        let (k, flipped) = self.key(a, b);
+        self.table.get(&k).filter(|e| e.1 > 0).map(|e| if flipped { 1.0 - e.0 / e.1 as f64 } else { e.0 / e.1 as f64 })
+    }
+
+    /// Plays whatever games are missing so every pair in `armies` has `n`.
+    fn fill(&mut self, armies: &[&Army], n: usize, seed: u64) {
+        let mut todo: Vec<(&Army, &Army, usize)> = Vec::new();
+        for i in 0..armies.len() {
+            for j in i + 1..armies.len() {
+                let (k, _) = self.key(armies[i], armies[j]);
+                let have = self.table.get(&k).map(|e| e.1).unwrap_or(0);
+                if have < n {
+                    todo.push((armies[i], armies[j], n - have));
+                }
+            }
+        }
+        if todo.is_empty() {
+            return;
+        }
+        // Pairs needing the same number of games are played together.
+        let mut counts: Vec<usize> = todo.iter().map(|t| t.2).collect();
+        counts.sort();
+        counts.dedup();
+        for c in counts {
+            let pairs: Vec<(&Army, &Army)> = todo.iter().filter(|t| t.2 == c).map(|t| (t.0, t.1)).collect();
+            let pts = self.play(&pairs, c, seed);
+            for (p, x) in pairs.iter().zip(pts) {
+                self.record(p.0, p.1, x, c);
+            }
+        }
+    }
+
+    /// Mean score of `a` against `others` (pairs not played count as 0.5).
+    fn mean(&self, a: &Army, others: &[&Army]) -> f64 {
+        if others.is_empty() {
+            return 0.5;
+        }
+        others.iter().map(|o| self.score(a, o).unwrap_or(0.5)).sum::<f64>() / others.len() as f64
+    }
+}
+
+fn elo_of(s: f64) -> f64 {
+    let s = s.clamp(0.001, 0.999);
+    400.0 * (s / (1.0 - s)).log10()
+}
+
+/// Polishes `start` with games against `pool` (see WIDE_HELP step 3).
+fn game_climb(cat: &Arc<Catalog>, sc: &Scorer, book: &GameBook, start: Army, pool: &[&Army], cfg: &WideCfg, rng: &mut Rng, seed: u64, log: &dyn Fn(String)) -> Army {
+    let pool_owned: Vec<Army> = pool.iter().map(|a| (*a).clone()).collect();
+    let mut cur = start;
+    let mut fails = 0;
+    for step in 0..cfg.gc_steps {
+        if fails >= cfg.gc_patience {
+            break;
+        }
+        // The eval picks which tweaks are worth playing.
+        let mut tweaks: Vec<(Army, f64)> = (0..12)
+            .filter_map(|_| mutate(cat, &cur, rng))
+            .filter_map(|m| {
+                let s = pool_owned.iter().map(|p| sc.advantage(&m, p, cfg.climb_nodes)).collect::<Option<Vec<f64>>>()?;
+                Some((m, s.iter().sum::<f64>()))
+            })
+            .collect();
+        tweaks.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        tweaks.dedup_by(|a, b| a.0.pieces == b.0.pieces);
+        let mut armies = vec![cur.clone()];
+        armies.extend(tweaks.into_iter().take(cfg.gc_mutants).map(|t| t.0));
+        // Everyone plays the same openings against each member.
+        let n = cfg.gc_games * 2;
+        let mut pairs = Vec::new();
+        for a in &armies {
+            for p in pool {
+                pairs.push((a, *p));
+            }
+        }
+        let mut pts = vec![0.0; armies.len()];
+        // Same seed per member slot for every army: play army by army.
+        for (ai, chunk) in pairs.chunks(pool.len()).enumerate() {
+            let v = book.play(chunk, n, seed + step as u64 * 100_000);
+            pts[ai] = v.iter().sum::<f64>() / (n * pool.len()) as f64;
+        }
+        let best = (1..armies.len()).max_by(|&a, &b| pts[a].partial_cmp(&pts[b]).unwrap());
+        match best {
+            Some(i) if pts[i] >= pts[0] + cfg.gc_margin => {
+                log(format!("    game climb step {}: {:.1}% -> {:.1}% with {}", step + 1, 100.0 * pts[0], 100.0 * pts[i], armies[i].to_text(cat, 8)));
+                cur = armies[i].clone();
+                fails = 0;
+            }
+            _ => {
+                log(format!("    game climb step {}: no tweak beat {:.1}% (best {:.1}%)", step + 1, 100.0 * pts[0], best.map(|i| 100.0 * pts[i]).unwrap_or(0.0)));
+                fails += 1;
+            }
+        }
+    }
+    cur
+}
+
+pub fn run_wide(cat: &Arc<Catalog>, params: &Params, args: &Args) {
+    let mut play = PlayConfig::default();
+    play.nodes = args.num("game-nodes", 6_000);
+    play.random_plies = args.num("random-plies", 6);
+    let cfg = WideCfg {
+        threads: args.num("threads", 16),
+        nodes: args.num("nodes", 20_000),
+        climb_nodes: args.num("climb-nodes", 3_000),
+        mutants: args.num("mutants", 6),
+        patience: args.num("patience", 4),
+        wide: args.num("wide", 38),
+        refine: args.num("refine", 4),
+        shortlist: args.num("shortlist", 3),
+        min_diff: args.num("min-diff", 3),
+        games: args.num("games", 40),
+        play,
+        game_climb: args.flag("game-climb"),
+        gc_games: args.num("gc-games", 4),
+        gc_mutants: args.num("gc-mutants", 4),
+        gc_margin: args.get("gc-margin").map(|s| s.parse().unwrap()).unwrap_or(0.03),
+        gc_patience: args.num("gc-patience", 3),
+        gc_steps: args.num("gc-steps", 10),
+        replace_margin: args.get("replace-margin").map(|s| s.parse().unwrap()).unwrap_or(0.02),
+        max: args.num("max", 10),
+    };
+    let rounds: usize = args.num("rounds", 8);
+    let stable: usize = args.num("stable", 3);
+    let exposed_wins = args.get("king-exposed").unwrap_or("win") != "reject";
+    let out = args.get("out").unwrap_or("meta_pool.txt").to_string();
+    let prefix = args.get("name").unwrap_or("Wide").to_string();
+    let seed: u64 = args.num("seed", 1u64);
+    let mut rng = Rng::new(seed);
+    let logf = Mutex::new(std::fs::File::create(format!("{}.log", out.trim_end_matches(".txt"))).ok());
+    let log = |s: String| {
+        println!("{}", s);
+        if let Some(f) = logf.lock().unwrap().as_mut() {
+            writeln!(f, "{}", s).ok();
+            f.flush().ok();
+        }
+    };
+    let sc = Scorer { cat, params, cache: Mutex::new(HashMap::new()), exposed_wins };
+    let mut book = GameBook { cat, params, play: cfg.play.clone(), threads: cfg.threads, table: HashMap::new() };
+
+    let mut pool: Vec<Member> = vec![Member { army: standard(cat), name: "Standard".into(), born: 0 }];
+    if let Some(p) = args.get("pool") {
+        let mut l = |s: String| log(s);
+        for (a, n) in read_pool(cat, p, &mut l) {
+            pool.push(Member { army: a, name: n, born: 0 });
+        }
+    }
+    if !exposed_wins {
+        let mut i = 1;
+        while i < pool.len() {
+            if (0..i).any(|j| start_is_broken(&army_game(cat, &pool[i].army, &pool[j].army, 8, 8)) || start_is_broken(&army_game(cat, &pool[j].army, &pool[i].army, 8, 8))) {
+                log(format!("left out {}: a king is attacked at the start against another member", pool[i].name));
+                pool.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
+    log(format!(
+        "wide meta: {} climbers a round ({} from members), {} tries a step at {} nodes; shortlist {}; games {} per pair at {} nodes; game climb {}; king exposed at the start = {}",
+        cfg.wide, cfg.refine, cfg.mutants, cfg.climb_nodes, cfg.shortlist, cfg.games, cfg.play.nodes, if cfg.game_climb { "on" } else { "off" }, if exposed_wins { "instant win" } else { "rejected" }
+    ));
+    let t0 = std::time::Instant::now();
+    {
+        let members: Vec<&Army> = pool.iter().map(|m| &m.army).collect();
+        book.fill(&members, cfg.games, seed * 7_919);
+    }
+    let standings = |pool: &[Member], book: &GameBook| -> Vec<f64> {
+        (0..pool.len())
+            .map(|i| {
+                let others: Vec<&Army> = (0..pool.len()).filter(|&j| j != i).map(|j| &pool[j].army).collect();
+                book.mean(&pool[i].army, &others)
+            })
+            .collect()
+    };
+    let eval_scores = |pool: &[Member]| -> Vec<f64> {
+        let armies: Vec<Army> = pool.iter().map(|m| m.army.clone()).collect();
+        (0..armies.len())
+            .map(|i| {
+                let others: Vec<Army> = (0..armies.len()).filter(|&j| j != i).map(|j| armies[j].clone()).collect();
+                sc.mean_vs(&armies[i], &others, cfg.nodes, cfg.threads).unwrap_or(f64::NAN)
+            })
+            .collect()
+    };
+    let write = |pool: &[Member], book: &GameBook, round: usize| {
+        let g = standings(pool, book);
+        let e = eval_scores(pool);
+        let mut s = String::new();
+        s += "# Chess Plus army pool grown by `plusfish meta --wide` (wide eval-guided climbs; games decide who stays).\n";
+        s += &format!("# After round {}. Games = mean score against the rest of the pool ({} games per pair, {} nodes per move); eval = mean turn-0 advantage at {} nodes (cp).\n", round, cfg.games, cfg.play.nodes, cfg.nodes);
+        s += "# army | name | cost | games (Elo) | eval | pieces\n";
+        let mut order: Vec<usize> = (0..pool.len()).collect();
+        order.sort_by(|&a, &b| g[b].partial_cmp(&g[a]).unwrap());
+        for i in order {
+            let m = &pool[i];
+            s += &format!("{} | {} | {} | {:.1}% ({:+.0}) | {:+.0} | {}\n", m.army.to_text(cat, 8), m.name, m.army.cost(cat), 100.0 * g[i], elo_of(g[i]), e[i], pieces_text(cat, &m.army));
+        }
+        std::fs::write(&out, s).unwrap_or_else(|e| panic!("{}: {}", out, e));
+        let parts: Vec<String> = pool.iter().zip(&g).map(|(m, x)| format!("{} {:+.0}", m.name, elo_of(*x))).collect();
+        log(format!("  pool (game Elo): {}", parts.join(", ")));
+    };
+    log(format!("starting pool played out ({:.0}s)", t0.elapsed().as_secs_f64()));
+    write(&pool, &book, 0);
+
+    let mut quiet = 0;
+    for round in 1..=rounds {
+        let t0 = std::time::Instant::now();
+        let members: Vec<Army> = pool.iter().map(|m| m.army.clone()).collect();
+        // 1. Climb wide.
+        let mut starts: Vec<Army> = Vec::new();
+        for _ in 0..cfg.refine.min(pool.len()) {
+            starts.push(pool[rng.below(pool.len())].army.clone());
+        }
+        while starts.len() < cfg.wide {
+            let a = random_army(cat, &mut rng);
+            if a.cost(cat) >= 36.0 {
+                starts.push(a);
+            }
+        }
+        let finished: Vec<Mutex<Option<(Army, f64)>>> = starts.iter().map(|_| Mutex::new(None)).collect();
+        let next = AtomicUsize::new(0);
+        let round_seed = rng.below(1 << 30) as u64;
+        std::thread::scope(|scope| {
+            for _ in 0..cfg.threads.max(1) {
+                scope.spawn(|| loop {
+                    let i = next.fetch_add(1, Ordering::SeqCst);
+                    if i >= starts.len() {
+                        break;
+                    }
+                    let mut r = Rng::new(round_seed * 1_000 + i as u64 + 1);
+                    let res = climb_one(cat, &sc, starts[i].clone(), &members, cfg.climb_nodes, cfg.mutants, cfg.patience, &mut r);
+                    *finished[i].lock().unwrap() = Some(res);
+                });
+            }
+        });
+        let mut climbed: Vec<Army> = finished.into_iter().filter_map(|m| m.into_inner().unwrap()).map(|r| r.0).collect();
+        climbed.sort_by_key(|a| a.to_text(cat, 8));
+        climbed.dedup_by(|a, b| a.pieces == b.pieces);
+        // 2. Shortlist at the eval bar's budget.
+        let mut pairs = Vec::new();
+        for c in &climbed {
+            for m in &members {
+                pairs.push((c, m));
+            }
+        }
+        let adv = sc.many(&pairs, cfg.nodes, cfg.threads);
+        let mut ranked: Vec<(usize, f64)> = (0..climbed.len())
+            .filter_map(|i| {
+                let part = &adv[i * members.len()..(i + 1) * members.len()];
+                let v: Option<Vec<f64>> = part.iter().cloned().collect();
+                v.map(|v| (i, v.iter().sum::<f64>() / members.len() as f64))
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let mut shortlist: Vec<Army> = Vec::new();
+        for &(i, _) in &ranked {
+            if shortlist.len() >= cfg.shortlist {
+                break;
+            }
+            if shortlist.iter().all(|s| pieces_apart(s, &climbed[i]) > 0 || squares_apart(s, &climbed[i]) > 0) {
+                shortlist.push(climbed[i].clone());
+            }
+        }
+        log(format!(
+            "round {}: {} climbs ({:.0}s); best by eval: {}",
+            round,
+            climbed.len(),
+            t0.elapsed().as_secs_f64(),
+            ranked.iter().take(cfg.shortlist).map(|&(i, s)| format!("{:+.0} {}", s, climbed[i].to_text(cat, 8))).collect::<Vec<_>>().join(", ")
+        ));
+        // 3. Game climb on the best.
+        if cfg.game_climb && !shortlist.is_empty() {
+            let refs: Vec<&Army> = members.iter().collect();
+            let polished = game_climb(cat, &sc, &book, shortlist[0].clone(), &refs, &cfg, &mut rng, round_seed * 31 + 7, &log);
+            if polished.pieces != shortlist[0].pieces {
+                shortlist.insert(0, polished);
+                shortlist.truncate(cfg.shortlist);
+            }
+        }
+        // 4. Games decide.
+        let mut changed = false;
+        for (ci, cand) in shortlist.iter().enumerate() {
+            {
+                let refs: Vec<&Army> = pool.iter().map(|m| &m.army).collect();
+                let mut all = refs.clone();
+                all.push(cand);
+                book.fill(&all, cfg.games, round_seed * 7 + ci as u64 * 13 + 3);
+            }
+            let refs: Vec<&Army> = pool.iter().map(|m| &m.army).collect();
+            let cand_score = book.mean(cand, &refs);
+            let (near, apart) = (0..pool.len()).map(|i| (i, pieces_apart(cand, &pool[i].army))).min_by_key(|&(i, d)| (d, squares_apart(cand, &pool[i].army))).unwrap();
+            let name = format!("{} {}{}", prefix, round, ["a", "b", "c", "d", "e", "f"].get(ci).unwrap_or(&""));
+            if apart >= cfg.min_diff {
+                pool.push(Member { army: cand.clone(), name: name.clone(), born: round });
+                log(format!("  {} scores {:.1}% ({:+.0} Elo) against the pool in games, {} pieces from the nearest ({}): joins as {}", cand.to_text(cat, 8), 100.0 * cand_score, elo_of(cand_score), apart, pool[near].name, name));
+                let mut joined = true;
+                while pool.len() > cfg.max {
+                    let g = standings(&pool, &book);
+                    let worst = (0..pool.len()).min_by(|&a, &b| g[a].partial_cmp(&g[b]).unwrap()).unwrap();
+                    log(format!("  pool over {}: drops {} ({:.1}%)", cfg.max, pool[worst].name, 100.0 * g[worst]));
+                    if pool[worst].name == name {
+                        joined = false;
+                    }
+                    pool.remove(worst);
+                }
+                changed |= joined;
+            } else {
+                let rest: Vec<&Army> = (0..pool.len()).filter(|&i| i != near).map(|i| &pool[i].army).collect();
+                let c = book.mean(cand, &rest);
+                let m = book.mean(&pool[near].army, &rest);
+                if c > m + cfg.replace_margin {
+                    log(format!("  {} is only {} pieces from {} and scores better against the rest in games ({:.1}% vs {:.1}%): replaces it as {}", cand.to_text(cat, 8), apart, pool[near].name, 100.0 * c, 100.0 * m, name));
+                    pool[near] = Member { army: cand.clone(), name, born: round };
+                    changed = true;
+                } else {
+                    log(format!("  {} is only {} pieces from {} and doesn't score better against the rest in games ({:.1}% vs {:.1}%): thrown away", cand.to_text(cat, 8), apart, pool[near].name, 100.0 * c, 100.0 * m));
+                }
+            }
+        }
+        log(format!("  round {} took {:.0}s", round, t0.elapsed().as_secs_f64()));
+        write(&pool, &book, round);
+        quiet = if changed { 0 } else { quiet + 1 };
+        if quiet >= stable {
             log(format!("stable: no change for {} rounds", quiet));
             break;
         }
