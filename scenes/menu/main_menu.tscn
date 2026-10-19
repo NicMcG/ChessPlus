@@ -64,7 +64,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
-text = "Play"
+text = "Play local"
 
 [node name="ContinueOnline" type="Button" parent="Scroll/Center/Layout"]
 unique_name_in_owner = true
