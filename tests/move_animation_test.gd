@@ -87,7 +87,7 @@ func test_promotion_flashes_into_the_new_piece() -> void:
 	check(animation.has_segment(queen, "promote_reveal"), "The queen appears and settles")
 	check(animation.has_extra("light"), "Burst of light")
 	check(animation.has_extra("sparkles"), "Sparkles")
-	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.MOVE, Sound.PROMOTE, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPARKLE, Sound.LAND], "Scrape, whoosh, a whoosh per turn of the spin, sparkle, thud")
+	check_eq(_sounds(animation), [Sound.SCRAPE, Sound.MOVE, Sound.PROMOTE, Sound.CHOIR, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPIN, Sound.SPARKLE, Sound.LAND], "Scrape, whoosh and a holy choir, a whoosh per turn of the spin, sparkle, thud")
 	for kind in ["swirl", "energy", "shockwave"]:
 		check(animation.has_extra(kind), "Power-up effect: " + kind)
 	animation.time = MoveAnimation.SLIDE + 0.45
@@ -127,7 +127,7 @@ func test_raise_dead_sinks_and_rises() -> void:
 	check(animation.has_segment(necromancer, "sink"), "Necromancer sinks")
 	check(animation.has_segment(move.raised, "rise"), "The raised piece rises")
 	check(animation.has_extra("smoke"), "Purple smoke")
-	check_eq(_sounds(animation), [Sound.ABILITY, Sound.THUNDER, Sound.RAISE_DEAD, Sound.CREAK, Sound.CREAK], "Activation, thunder, the swell, creaking")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.THUNDER, Sound.RAISE_DEAD, Sound.GROAN], "Activation, thunder, the swell, a zombie's groan")
 	check(animation.has_extra("lightning"), "Lightning strikes")
 
 func test_check_shakes_the_king_last() -> void:

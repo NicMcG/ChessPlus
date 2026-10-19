@@ -4,8 +4,10 @@ extends Node
 ## Plays the game's sound effects. Most are recordings in res://audio/sfx/ (their
 ## licences are there): Kenney's free (CC0) Impact, Interface, RPG Audio, Sci-Fi
 ## and Music Jingles packs, OpenGameArt's CC0 "Scrapes" (the move sound), a
-## public-domain wolf howl and sheep, and a giggle, a thunder crack and a church
-## bell from Wikimedia Commons (credited on the main menu). Only two are made by
+## public-domain wolf howl, sheep and angelic choir, OpenGameArt CC0 sounds (a
+## cartoon bite, a zombie groan, a guitar strum, a music-box lullaby, a bow and
+## an arrow's whistle), and a giggle, a thunder crack and a church bell from
+## Wikimedia Commons (credited on the main menu). Only two are made by
 ## code, both ones Mac liked: the cannon's boom and the balloon pop (Mac: every
 ## other made sound replaced by recordings). A sound can be several layers played together (e.g. a capture is a
 ## punch, a slap and a wooden thwack at once). Recordings with several takes pick
@@ -60,8 +62,9 @@ enum Sound {
 	BOW, MAGIC_HUM,
 	## The Jester's giggle as it jumps in, and the balloon pop as it bursts.
 	GIGGLE, POP,
-	## Raise Dead: a crack of thunder, and wood creaking as the dead rise.
-	THUNDER, CREAK,
+	## Raise Dead: a sharp crack and a clap of thunder, and a zombie's groan as
+	## the dead rise.
+	THUNDER, GROAN,
 	## A Ram that dies from its own charge.
 	SHEEP,
 	## A Vampire biting (gaining its shield).
@@ -72,6 +75,10 @@ enum Sound {
 	FALL,
 	## A promoting piece's spin: one whoosh per turn, coming faster and faster.
 	SPIN,
+	## Promotion: a holy choir behind it all.
+	CHOIR,
+	## Song of Slumber: a strum just before the lullaby.
+	STRUM,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
@@ -99,6 +106,8 @@ const LAYERS := {
 	Sound.CASTLE_SLAM: [[["impactMining_000", "impactMining_001"], 0.75, 3.0], [WOOD_HEAVY, 0.7, 2.0], [PUNCH_HEAVY, 0.8, 0.0]],
 	# Rushing whooshes as it spins up (Mac: whooshing, not whirring).
 	Sound.PROMOTE: [[["cloth1", "cloth2"], 1.2, 2.0], [["forceField_002"], 1.5, -10.0]],
+	Sound.CHOIR: [[["holy_choir"], 1.0, -6.0]],
+	Sound.STRUM: [[["strum"], 1.0, -4.0]],
 	Sound.SPIN: [[["cloth2", "knifeSlice"], 1.7, -3.0]],
 	Sound.SPARKLE: [[["glass_002", "glass_004"], 1.5, 0.0], [["impactBell_heavy_000"], 2.0, -10.0]],
 	# A sword's schwing.
@@ -106,36 +115,39 @@ const LAYERS := {
 	Sound.FALL: [[WOOD_HEAVY, 0.7, 2.0], [SLAP, 0.8, 0.0]],
 	Sound.CANNON_FIRE: [["made", 0.0]],
 	Sound.CANNON_HIT: [[["impactMining_000", "impactMining_001"], 0.8, 2.0]],
-	Sound.ARROW_WHOOSH: [[["cloth2"], 1.9, 0.0]],
-	# The bowstring released: a sharp thwip and a wooden thrum.
-	Sound.BOW: [[["drawKnife3"], 2.0, 0.0], [WOOD_KNOCK, 1.7, -6.0]],
+	# The arrow whistling all the way to its target.
+	Sound.ARROW_WHOOSH: [[["arrow_whistle"], 0.75, -2.0]],
+	# A bowstring plucked as the arrow is loosed.
+	Sound.BOW: [[["bow_shot"], 1.0, 2.0]],
 	# The arrow striking home: thwack and crunch.
 	Sound.ARROW_HIT: [
-		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.1, 4.0],
-		[PUNCH_MEDIUM, 1.2, 0.0],
-		[["explosionCrunch_000"], 1.5, -8.0],
+		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.1, 6.0],
+		[PUNCH_HEAVY, 1.1, 4.0],
+		[["explosionCrunch_000"], 1.4, -2.0],
 	],
 	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0]],
-	# A rising magical swell with a glassy sparkle.
-	Sound.ABILITY: [[["maximize_008"], 0.85, 0.0], [["glass_002", "glass_004"], 1.3, -6.0]],
+	# A special ability firing up (Mac: heavy, explosive, hype): a deep boom, a
+	# crunch and a rush of energy.
+	Sound.ABILITY: [[["lowFrequency_explosion_001"], 1.0, 4.0], [["explosionCrunch_000"], 0.9, -2.0], [["forceField_002"], 0.75, -2.0]],
 	# A rushing whoosh (it loops; see start_loop).
 	Sound.AIMING: [[["thrusterFire_003"], 1.3, -15.0]],
 	Sound.RAISE_DEAD: [[["forceField_000"], 0.55, -2.0]],
-	Sound.THUNDER: [[["thunder_crack"], 1.0, 0.0]],
-	Sound.CREAK: [[["creak1", "creak2"], 0.8, -2.0]],
+	# Snappy and crisp: a glass-sharp crack on top of the thunder, louder.
+	Sound.THUNDER: [[["thunder_crack"], 1.05, 5.0], [["impactGlass_heavy_001", "impactGlass_heavy_002"], 1.4, 2.0], [["explosionCrunch_000"], 1.6, 0.0]],
+	Sound.GROAN: [[["zombie_groan"], 1.0, -1.0]],
 	# Metal and stone breaking: glass and metal crashes over a stone smash.
 	Sound.SHIELD_BREAK: [
 		[["impactGlass_heavy_001", "impactGlass_heavy_002", "impactGlass_heavy_004"], 0.8, 2.0],
-		[["impactMetal_heavy_000", "impactMetal_heavy_001", "impactMetal_heavy_002"], 0.85, 1.0],
-		[["impactMining_000", "impactMining_001"], 0.9, 1.0],
+		[["impactMetal_heavy_000", "impactMetal_heavy_001", "impactMetal_heavy_002"], 0.85, 2.0],
 		[["explosionCrunch_001"], 1.4, -6.0],
 	],
 	# A deep bell: the recorded strike, slowed right down, over a long low rumble.
 	Sound.CHECKMATE: [[["impactBell_heavy_002"], 0.45, 6.0], [["lowFrequency_explosion_000"], 0.5, 0.0]],
 	Sound.DUST: [[["cloth1"], 0.5, -8.0]],
-	Sound.LULLABY: [[["jingles_PIZZI01"], 0.75, 0.0]],
+	# A soft music-box lullaby, slowed a little to sound sleepy.
+	Sound.LULLABY: [[["lullaby"], 0.9, -4.0]],
 	# Gothic: a big church bell's toll over a low boom.
-	Sound.HAUNT: [[["church_bell"], 0.85, 3.0], [["lowFrequency_explosion_001"], 0.7, -8.0]],
+	Sound.HAUNT: [[["church_bell"], 0.85, 0.0], [["lowFrequency_explosion_001"], 0.7, -9.0]],
 	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
 	Sound.ILLEGAL: [[["error_005", "error_006"], 1.0, -6.0]],
 	Sound.BLOCKED: [[WOOD_HEAVY, 0.55, 3.0], [PLANK, 0.6, -2.0]],
@@ -144,7 +156,8 @@ const LAYERS := {
 	Sound.POP: [["made", 0.0]],
 	Sound.SHEEP: [[["sheep_baa"], 1.0, -2.0]],
 	# A bite: a chomp and a crunch.
-	Sound.BITE: [[["chop"], 0.9, 4.0], [["explosionCrunch_002"], 1.9, -1.0], [SLAP, 1.4, -6.0]],
+	# A cartoon chomp.
+	Sound.BITE: [[["cartoon_bite"], 1.0, 4.0]],
 }
 
 ## Samples per second for the sounds made by code.

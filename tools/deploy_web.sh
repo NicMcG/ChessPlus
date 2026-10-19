@@ -25,7 +25,7 @@ mkdir -p build/web
 test -f build/web/index.html || { echo "Export failed: no build/web/index.html"; exit 1; }
 python tools/patch_service_worker.py build/web/index.service.worker.js
 # Plusfish (the eval bar's engine): the page loads plusfish.js, which loads plusfish.wasm.
-cp web/plusfish.js web/plusfish.wasm build/web/
+cp web/plusfish.js web/plusfish.wasm web/audio_fix.js build/web/
 
 cp build/web/* "$TMP/"
 : > "$TMP/.nojekyll"

@@ -22,6 +22,11 @@ church_bell.wav
   (needs a credit, and changed versions of this sound must be shared under the
   same licence: shown on the main menu)
 
+holy_choir.wav
+  From "Johann Georg Ebeling - Ich steh an deiner Krippen hier (Tubular bells
+  and Angelic choir).ogg", public domain - no credit needed (first 4.8 s).
+  https://commons.wikimedia.org/wiki/File:Johann_Georg_Ebeling_-_Ich_steh_an_deiner_Krippen_hier_(Tubular_bells_and_Angelic_choir).ogg
+
 sheep_baa.wav
   From "Sheep bleating.ogg" (PDSounds), public domain - no credit needed.
   https://commons.wikimedia.org/wiki/File:Sheep_bleating.ogg
