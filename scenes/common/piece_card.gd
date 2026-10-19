@@ -49,6 +49,51 @@ func show_piece(p_def: PieceDef, p_team := Piece.Team.WHITE) -> void:
 	if is_node_ready():
 		_refresh()
 
+## A piece that changes form (the Werewolf) has a second card for its other form
+## (Mac): a button turns the card over. Returns [the piece it starts as, the form
+## it changes into], or [] for an ordinary piece. Works from either form.
+static func forms_of(p_def: PieceDef) -> Array:
+	if p_def.transforms_into:
+		return [p_def, p_def.transforms_into]
+	for other: PieceDef in PieceCatalog.all_defs():
+		if other.transforms_into == p_def:
+			return [other, p_def]
+	return []
+
+## Show the other form's card (the button under the name).
+func turn_over() -> void:
+	var forms := forms_of(def)
+	if forms.is_empty():
+		return
+	def = forms[1] if def == forms[0] else forms[0]
+	_refresh()
+
+var _form_button: Button
+
+## The "After Full Moon" / "Before Full Moon" button, in the ability's colours.
+func _update_form_button() -> void:
+	var forms := forms_of(def)
+	if forms.is_empty():
+		if _form_button:
+			_form_button.hide()
+		return
+	if _form_button == null:
+		_form_button = Button.new()
+		_form_button.focus_mode = Control.FOCUS_NONE
+		_form_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		_form_button.pressed.connect(turn_over)
+		%Name.get_parent().add_child(_form_button)
+	var base: PieceDef = forms[0]
+	_form_button.text = ("After " if def == base else "Before ") + base.ability_name
+	_form_button.add_theme_font_size_override("font_size", _z(20))
+	var style := GradientStyleBox.new(base.ability_gradient(), 8, _z(12), _z(4))
+	_form_button.add_theme_stylebox_override("normal", style)
+	_form_button.add_theme_stylebox_override("hover", style.shaded(0.15))
+	_form_button.add_theme_stylebox_override("pressed", style.shaded(-0.2))
+	for color in ["font_color", "font_hover_color", "font_pressed_color"]:
+		_form_button.add_theme_color_override(color, base.ability_label_color())
+	_form_button.show()
+
 func _ready() -> void:
 	_make_tooltip()
 	_apply_zoom()
@@ -218,6 +263,7 @@ func _refresh() -> void:
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		%Pictures.add_child(picture)
 	%Name.text = def.display_name
+	_update_form_button()
 	_fill_details()
 	%GuideBoard.show_piece(def, team)
 	_fill_legend()
@@ -228,6 +274,7 @@ func _refresh() -> void:
 	%Ability.visible = def.ability_name != ""
 	# The name in a box like the keywords', filled with the piece's gradient.
 	%AbilityName.text = def.ability_name.to_upper()
+	%AbilityName.add_theme_color_override("font_color", def.ability_label_color())
 	%AbilityChip.add_theme_stylebox_override("panel", GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4)))
 	%AbilityText.text = def.ability_text
 

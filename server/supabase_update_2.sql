@@ -1,4 +1,4 @@
--- Chess Plus online update 2: sharing armies by code.
+-- Chess Plus online update 2: sharing armies by code, and the eval bar option.
 -- Run once in the Supabase SQL Editor (after supabase_setup.sql and supabase_update_1.sql).
 --
 -- One row per shared army: a 5-letter code and the army as plain data (see
@@ -20,3 +20,6 @@ drop policy if exists "share armies" on public.shared_armies;
 create policy "share armies" on public.shared_armies for insert to anon with check (true);
 
 grant select, insert on public.shared_armies to anon;
+
+-- The game creator's choice to show the eval bar to both players.
+alter table public.games add column if not exists eval_bar boolean not null default false;

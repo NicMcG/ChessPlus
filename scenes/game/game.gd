@@ -84,6 +84,8 @@ var sounds: GameSounds
 @onready var undo_button: Button = %Undo
 @onready var redo_button: Button = %Redo
 @onready var menu_button: Button = %Menu
+## Resign, in local games (online games use the New game button's place).
+@onready var resign_button: Button = %Resign
 @onready var promotion_overlay: ColorRect = %PromotionOverlay
 @onready var promotion_choices: GridContainer = %PromotionChoices
 ## The shimmering purple behind Raise Dead's choices.
@@ -145,6 +147,7 @@ func _ready() -> void:
 	_bot_timer = Timer.new()
 	_bot_timer.one_shot = true
 	add_child(_bot_timer)
+	_build_capture_rows()
 	_build_eval_bar()
 	_build_wide_layout()
 	resized.connect(fit_layout)
@@ -154,6 +157,7 @@ func _ready() -> void:
 	board_view.info_requested.connect(func(piece: Piece) -> void:
 		PieceInfo.open(self, piece.def, piece.team))
 	new_game_button.pressed.connect(ask_new_game)
+	resign_button.pressed.connect(resign_local)
 	undo_button.pressed.connect(undo)
 	redo_button.pressed.connect(redo)
 	play_from_here_button.pressed.connect(play_from_here)
@@ -163,6 +167,8 @@ func _ready() -> void:
 	move_list.move_tapped.connect(view_move)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
+	if testing_position:
+		menu_button.text = "Setup"
 	promotion_overlay.gui_input.connect(_on_overlay_input)
 	if is_bot_game():
 		bot = PracticeBot.new(bot_level)
@@ -176,7 +182,47 @@ func _ready() -> void:
 
 func new_game() -> void:
 	state = _create_start_state()
+	resigned = -1
+	_started_time = Time.get_unix_time_from_system()
 	_show_new_state()
+
+## Testing mode (Mac's design): the game starts from this position, set up by
+## hand; two players, the eval bar always on, and Menu goes back to the setup.
+var testing_position: TestingPosition
+
+## When this game started (seconds since 1970), kept with the saved game.
+var _started_time := Time.get_unix_time_from_system()
+
+## In a local game, the side that resigned (Piece.Team), or -1. Against the bot
+## that's you; with two players on one device, whoever's turn it was.
+var resigned := -1
+
+## The Resign button (local games): the first tap asks for a second one. After
+## resigning, Undo takes the resignation back.
+func resign_local() -> void:
+	if online or is_over() or bot_thinking or viewing >= 0:
+		return
+	var now := Time.get_ticks_msec()
+	if _resign_tapped_ms < 0 or now - _resign_tapped_ms > 3000:
+		_resign_tapped_ms = now
+		resign_button.text = "Tap again"
+		get_tree().create_timer(3.0).timeout.connect(func() -> void:
+			if is_instance_valid(resign_button):
+				resign_button.text = "Resign")
+		return
+	_resign_tapped_ms = -1
+	resign_button.text = "Resign"
+	resigned = _my_team() if is_bot_game() else state.side_to_move
+	board_view.refresh()
+	_update_input()
+	_update_text()
+	_save_progress()
+
+## "1-0" / "0-1" after a local resignation, else "*".
+func _resigned_result() -> String:
+	if resigned < 0:
+		return "*"
+	return "0-1" if resigned == Piece.Team.WHITE else "1-0"
 
 ## The New game button: once moves have been played, check first (Mac's request).
 func ask_new_game() -> void:
@@ -200,6 +246,8 @@ var new_game_confirm: ConfirmationDialog
 
 ## The game's starting position: from the armies, start_fen, or standard chess.
 func _create_start_state() -> GameState:
+	if testing_position:
+		return testing_position.create_state()
 	if white_army and black_army:
 		return ArmySetup.create_game(white_army, black_army, StandardSetup.create_rules())
 	if start_fen.is_empty():
@@ -254,7 +302,8 @@ func play_from_here() -> void:
 ## The board takes moves only when showing the game now, it's not the bot's turn,
 ## and (online) it's this player's turn.
 func _update_input() -> void:
-	board_view.input_enabled = viewing < 0 and not bot_thinking and _my_online_turn()
+	board_view.input_enabled = viewing < 0 and not bot_thinking and _my_online_turn() and resigned < 0
+	_refresh_ability_button()
 
 ## The side-by-side layout for wide screens, unused (hidden) until needed.
 func _build_wide_layout() -> void:
@@ -268,6 +317,48 @@ func _build_wide_layout() -> void:
 	_wide_box.add_child(_side)
 	_board_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
+## What each player has captured, above and below the board (see CapturedRow).
+var captured_top: CapturedRow
+var captured_bottom: CapturedRow
+## The board area with a captures row above and below it.
+var _board_column: VBoxContainer
+
+func _build_capture_rows() -> void:
+	_board_column = VBoxContainer.new()
+	_board_column.add_theme_constant_override("separation", 4)
+	_board_column.size_flags_vertical = _board_area.size_flags_vertical
+	_board_column.size_flags_stretch_ratio = _board_area.size_flags_stretch_ratio
+	_board_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var parent := _board_area.get_parent()
+	var index := _board_area.get_index()
+	parent.add_child(_board_column)
+	parent.move_child(_board_column, index)
+	captured_top = CapturedRow.new()
+	_board_column.add_child(captured_top)
+	_board_area.reparent(_board_column, false)
+	_board_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	captured_bottom = CapturedRow.new()
+	_board_column.add_child(captured_bottom)
+	board_view.resized.connect(_line_up_captures)
+	board_view.item_rect_changed.connect(_line_up_captures)
+
+## Start the captures rows at the board's left edge (the board is centred).
+func _line_up_captures() -> void:
+	var left := board_view.get_global_rect().position.x + board_view.board_origin().x
+	captured_top.inset = maxf(0.0, left - captured_top.get_global_rect().position.x)
+	captured_bottom.inset = maxf(0.0, left - captured_bottom.get_global_rect().position.x)
+
+## Fill the captures rows for the position on the board: the row nearest each
+## player's side of the board shows what that player has captured.
+func _update_captures() -> void:
+	var shown := board_view.state
+	if shown == null:
+		return
+	var bottom_team := Piece.Team.BLACK if board_view.flipped else Piece.Team.WHITE
+	captured_bottom.show_for(shown, bottom_team)
+	captured_top.show_for(shown, Piece.other_team(bottom_team))
+	_line_up_captures()
+
 ## Put the board beside the rest on a wide screen, above it on a tall one.
 func fit_layout() -> void:
 	var now_wide := ScreenShape.is_wide(size)
@@ -275,11 +366,11 @@ func fit_layout() -> void:
 		return
 	wide = now_wide
 	if wide:
-		ScreenShape.move_to([_board_area], _wide_box)
-		_wide_box.move_child(_board_area, 0)
+		ScreenShape.move_to([_board_column], _wide_box)
+		_wide_box.move_child(_board_column, 0)
 		ScreenShape.move_to([status_label, clock_label, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _board_area, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _board_column, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -310,6 +401,13 @@ func play(move: Move, from_server := false) -> void:
 ## takes back the bot's reply too, so it's your turn again.
 func undo() -> void:
 	if not _can_undo():
+		return
+	# After resigning, Undo takes the resignation back first.
+	if resigned >= 0:
+		resigned = -1
+		_update_input()
+		_update_text()
+		_save_progress()
 		return
 	back_to_game()
 	var undone: Array[Move] = [state.history.back()]
@@ -351,7 +449,7 @@ func redo() -> void:
 	_start_bot_turn_if_needed()
 
 func _can_redo() -> bool:
-	return not redo_moves.is_empty() and not bot_thinking and online == null
+	return not redo_moves.is_empty() and not bot_thinking and online == null and resigned < 0
 
 ## The bot plays its move now. Normally called by _start_bot_turn_if_needed
 ## (after a short wait); tests call it directly.
@@ -362,13 +460,18 @@ func _play_bot_move(move: Move) -> void:
 	bot_thinking = false
 	_update_input()
 	if move:
+		var san := Notation.san(state, move)
 		play(move)
+		if not is_over():
+			TurnNotifier.your_turn("The bot played %s." % san)
 	else:
 		_update_text()
 
 ## Pick up a saved game where it left off. If it can't be rebuilt (for example
 ## the rules changed since), start a new game with the same armies instead.
 func _continue_saved_game(saved: SavedGame) -> void:
+	if saved.started_time > 0:
+		_started_time = saved.started_time
 	var rebuilt := saved.create_state(StandardSetup.create_rules())
 	if rebuilt == null:
 		new_game()
@@ -399,16 +502,19 @@ func _save_progress() -> void:
 	# Online games are kept on the server instead.
 	if online or white_army == null or black_army == null:
 		return
-	if state.outcome() != GameState.Outcome.NONE:
+	if state.outcome() != GameState.Outcome.NONE or resigned >= 0:
 		SavedGame.delete_saved()
 	else:
-		SavedGame.from_state(state, white_army, black_army, bot_team, bot_level).save()
+		var saved := SavedGame.from_state(state, white_army, black_army, bot_team, bot_level)
+		saved.started_time = _started_time
+		saved.eval_bar = eval_bar_on
+		saved.save()
 
 ## If it's the bot's turn: block the board, say it's thinking, then let it move.
 func _start_bot_turn_if_needed() -> void:
 	if _redoing:
 		return
-	if not is_bot_game() or state.side_to_move != bot_team or state.outcome() != GameState.Outcome.NONE:
+	if not is_bot_game() or state.side_to_move != bot_team or state.outcome() != GameState.Outcome.NONE or resigned >= 0:
 		_update_input()
 		return
 	bot_thinking = true
@@ -439,6 +545,8 @@ func _start_bot_turn_if_needed() -> void:
 func _can_undo() -> bool:
 	if bot_thinking:
 		return false
+	if resigned >= 0:
+		return true
 	if is_bot_game():
 		return state.history.any(func(m: Move) -> bool: return m.piece.team != bot_team)
 	return not state.history.is_empty()
@@ -493,10 +601,33 @@ func _ask_which_move(moves: Array[Move]) -> void:
 ## A piece was selected (or the selection cleared): a piece with a special
 ## ability shows its button (Mac's design): in its colours when it can be used
 ## now, darkened when it can't be used in this position, grey once used up.
-func _on_selection_changed(square: Vector2i) -> void:
-	var piece: Piece = state.board.get_piece(square) if square != Board.NO_SQUARE else null
-	ability_button.visible = piece != null and piece.def.ability != PieceDef.Ability.NONE
+func _on_selection_changed(_square: Vector2i) -> void:
 	_update_text()
+
+## Shows or hides the ability button for what's selected now. With nothing
+## selected, it shows HAUNT while one of the player's captured Ghosts can come
+## back (it isn't on the board to be selected).
+func _refresh_ability_button() -> void:
+	var square := board_view.selected_square()
+	var piece: Piece = state.board.get_piece(square) if state and square != Board.NO_SQUARE else null
+	# The captured Ghost glows in the row of captures while its square is chosen.
+	var choosing_haunt := piece == null and board_view.aiming
+	for row: CapturedRow in [captured_top, captured_bottom]:
+		if row:
+			row.haunting = null
+	if piece == null:
+		var haunts := _haunt_moves()
+		if choosing_haunt and not haunts.is_empty():
+			for row: CapturedRow in [captured_top, captured_bottom]:
+				if row and row.pieces.has(haunts[0].piece):
+					row.haunting = haunts[0].piece
+		ability_button.visible = not haunts.is_empty()
+		if ability_button.visible:
+			var ghost := haunts[0].piece
+			ability_button.text = ghost.def.ability_name.to_upper()
+			_style_ability_button(ghost.def.ability_gradient(), ghost.def.ability_label_color(), true)
+		return
+	ability_button.visible = piece.def.ability != PieceDef.Ability.NONE
 	if not ability_button.visible:
 		return
 	ability_button.text = piece.def.ability_name.to_upper()
@@ -506,7 +637,18 @@ func _on_selection_changed(square: Vector2i) -> void:
 		var dark := GradientStyleBox.new(piece.def.ability_gradient()).shaded(-0.55).colors
 		_style_ability_button(dark, Color("#9a9a9a"), false)
 	else:
-		_style_ability_button(piece.def.ability_gradient(), Color.WHITE, true)
+		_style_ability_button(piece.def.ability_gradient(), piece.def.ability_label_color(), true)
+
+## The ways a captured Ghost of the side to move can come back (Haunt), when the
+## player can move now; empty otherwise.
+func _haunt_moves() -> Array[Move]:
+	var found: Array[Move] = []
+	if state == null or not board_view.input_enabled or is_over():
+		return found
+	if MoveGenerator.haunting_ghosts(state, state.side_to_move).is_empty():
+		return found
+	found.assign(state.moves().filter(func(m: Move) -> bool: return m.ability == PieceDef.Ability.HAUNT))
+	return found
 
 ## The ability button gets the piece's gradient (lighter under the mouse,
 ## darker while pressed when it can be used).
@@ -519,21 +661,33 @@ func _style_ability_button(colors: PackedColorArray, text_color: Color, usable: 
 	for color in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		ability_button.add_theme_color_override(color, text_color)
 
-## The ability button: Crack Shot asks which piece to shoot (on the board);
-## Raise Dead asks which lost piece to bring back (a picker, like promotion).
-## If it can't be used, a short message says why.
+## The ability button: Crack Shot and Song of Slumber ask which piece to target
+## (on the board); Raise Dead asks which lost piece to bring back (a picker, like
+## promotion); Full Moon happens at once; Haunt (nothing selected) asks which
+## square the Ghost comes back on. If it can't be used, a short message says why.
 func use_ability() -> void:
+	if board_view.selected_square() == Board.NO_SQUARE:
+		var haunts := _haunt_moves()
+		if not haunts.is_empty():
+			board_view.aim_moves(haunts, false)
+			_refresh_ability_button()
+			status_label.text = "%s: tap any empty square" % haunts[0].piece.def.ability_name
+		return
 	var moves := board_view.selected_ability_moves()
 	if moves.is_empty():
-		var piece: Piece = state.board.get_piece(board_view.selected_square()) if board_view.selected_square() != Board.NO_SQUARE else null
+		var piece: Piece = state.board.get_piece(board_view.selected_square())
 		if piece and piece.ability_used:
 			show_notice("%s has already been used." % piece.def.ability_name)
+		elif piece and piece.def.ability == PieceDef.Ability.HAUNT:
+			show_notice("The Ghost can use Haunt after it has been captured.")
 		else:
 			show_notice("This ability can't be used right now.")
 		return
 	var piece := moves[0].piece
 	if piece.def.ability == PieceDef.Ability.RAISE_DEAD:
 		_ask_which_move(moves)
+	elif piece.def.ability == PieceDef.Ability.FULL_MOON:
+		play(moves[0])
 	else:
 		board_view.aim_ability()
 		status_label.text = "%s: choose a target" % piece.def.ability_name
@@ -581,6 +735,7 @@ func _on_overlay_input(event: InputEvent) -> void:
 		promotion_overlay.hide()
 
 func _update_text() -> void:
+	_refresh_ability_button()
 	var mover := "White" if state.side_to_move == Piece.Team.WHITE else "Black"
 	var other := "Black" if state.side_to_move == Piece.Team.WHITE else "White"
 	if online:
@@ -610,14 +765,24 @@ func _update_text() -> void:
 			status_label.text = "Draw by repetition"
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			status_label.text = "Draw: checkmate is impossible"
+		GameState.Outcome.KING_EXPOSED:
+			var exposed := "Black" if state.side_to_move == Piece.Team.WHITE else "White"
+			status_label.text = "%s's king was under attack from the start: %s loses" % [exposed, exposed]
 	if online and _online_ending() != "":
 		status_label.text = _online_ending()
+	if resigned >= 0 and state.outcome() == GameState.Outcome.NONE:
+		var texts := result_texts()
+		status_label.text = "%s - %s" % [texts[0], texts[1]]
 	if viewing >= 0:
 		status_label.text = "Viewing %s" % _move_name(viewing - 1)
 	_status_base = status_label.text
 	var result := state.result_text()
 	if online and result == "*":
 		result = _online_result_text()
+	if result == "*":
+		result = _resigned_result()
+	resign_button.visible = online == null
+	resign_button.disabled = is_over() or bot_thinking or viewing >= 0
 	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result, viewing, TIP)
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
@@ -630,6 +795,7 @@ func _update_text() -> void:
 		_update_online_controls()
 	_update_game_over()
 	_update_eval_bar()
+	_update_captures()
 
 # --- Looking over a finished game with Plusfish ----------------------------------
 
@@ -652,8 +818,18 @@ func _build_eval_bar() -> void:
 	board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 ## Once the game is over: evaluate all its positions (the one on screen first).
+## Whether Plusfish knows the rules of every piece in this game (worked out once).
+var _plusfish_checked := false
+var _plusfish_ok := true
+
+func _plusfish_knows_pieces() -> bool:
+	if not _plusfish_checked:
+		_plusfish_checked = true
+		_plusfish_ok = PlusfishLink.supports(_create_start_state())
+	return _plusfish_ok
+
 func _start_analysis() -> void:
-	if not PlusfishLink.available():
+	if not PlusfishLink.available() or not _plusfish_knows_pieces():
 		return
 	var moves := []
 	for move in state.history:
@@ -664,10 +840,36 @@ func _start_analysis() -> void:
 func shown_ply() -> int:
 	return viewing if viewing >= 0 else state.history.size()
 
+## Whether the eval bar shows while the game is on (Mac's design): always
+## against the bot; chosen when setting up a game on one device or an online one
+## (the creator chooses for both players). After any game it shows anyway.
+var eval_bar_on := false
+
+func live_eval() -> bool:
+	if is_bot_game() or eval_bar_on or testing_position:
+		return true
+	return online != null and bool(online.row.get("eval_bar", false))
+
+## While the game is on, ask Plusfish about the newest position (once per move).
+var _live_moves := -1
+
+func _start_live_analysis() -> void:
+	if _live_moves == state.history.size():
+		return
+	_live_moves = state.history.size()
+	var moves := []
+	for move in state.history:
+		moves.append(move.to_text())
+	plusfish.analyse_live(_create_start_state(), moves)
+
 ## Show (or hide) the bar, the best-move arrow and the eval in the status line
-## for the position on the board. Only after the game: never while it's on.
+## for the position on the board. The bar shows after the game, and during it
+## if live_eval(); the best-move hints only ever after the game, so the engine
+## never tells anyone what to play.
 func _update_eval_bar() -> void:
-	var on := is_over() and PlusfishLink.available()
+	var on := (is_over() or live_eval()) and PlusfishLink.available() and _plusfish_knows_pieces()
+	if on and not is_over():
+		_start_live_analysis()
 	eval_bar.visible = on
 	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if on else 1.0
 	status_label.text = _status_base
@@ -686,12 +888,14 @@ func _update_eval_bar() -> void:
 	var result := ""
 	if ply == state.history.size() and state.result_text() != "*":
 		result = state.result_text()
+	elif ply == state.history.size() and resigned >= 0:
+		result = _resigned_result()
 	elif found.get("outcome", "none") == "checkmate":
 		result = "1-0" if int(found["cp"]) > 0 else "0-1"
 	elif found.get("outcome", "none") != "none":
 		result = "1/2-1/2"
 	eval_bar.set_score(int(found["cp"]), found.get("mate"), result)
-	var best: String = found.get("best", "")
+	var best: String = found.get("best", "") if is_over() else ""
 	board_view.hint_arrow = _arrow_for(best)
 	if best != "" and result == "":
 		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
@@ -704,13 +908,13 @@ func _arrow_for(move_text: String) -> Array:
 	return [Board.parse_square(found.get_string(1)), Board.parse_square(found.get_string(2))]
 
 func _on_evaluated(ply: int, _result: Dictionary) -> void:
-	if is_over() and ply == shown_ply():
+	if (is_over() or live_eval()) and ply == shown_ply():
 		_update_eval_bar()
 
 # --- The result screen ----------------------------------------------------------
 
 func is_over() -> bool:
-	if state.outcome() != GameState.Outcome.NONE:
+	if state.outcome() != GameState.Outcome.NONE or resigned >= 0:
 		return true
 	return online != null and online.status() in [OnlineSession.FINISHED, OnlineSession.CANCELLED]
 
@@ -727,6 +931,7 @@ func _update_game_over() -> void:
 		_start_analysis()
 	elif not over and _was_over:
 		plusfish.stop()
+		_live_moves = -1
 	_was_over = over
 
 func show_game_over() -> void:
@@ -740,7 +945,7 @@ func show_game_over() -> void:
 		buttons.append(["again", "New game"])
 	buttons.append(["board", "View board"])
 	if menu_button.visible:
-		buttons.append(["menu", "Menu"])
+		buttons.append(["menu", menu_button.text])
 	game_over_panel.show_result(texts[0], texts[1], buttons)
 	if _mate_just_played:
 		_mate_just_played = false
@@ -799,6 +1004,12 @@ func _stop_checkmate_effect() -> void:
 ## The headline and the line under it, e.g. ["Checkmate!", "You win!"].
 func result_texts() -> Array:
 	var me := _my_team()
+	if resigned >= 0 and state.outcome() == GameState.Outcome.NONE:
+		if is_bot_game():
+			return ["You resigned", "The bot wins"]
+		var loser := "White" if resigned == Piece.Team.WHITE else "Black"
+		var winner := "Black" if resigned == Piece.Team.WHITE else "White"
+		return ["%s resigned" % loser, "%s wins" % winner]
 	if online:
 		var code := online.result_code()
 		if online.status() == OnlineSession.CANCELLED:
@@ -828,6 +1039,13 @@ func result_texts() -> Array:
 			return ["Draw", "The same position three times"]
 		GameState.Outcome.INSUFFICIENT_MATERIAL:
 			return ["Draw", "Checkmate is impossible"]
+		GameState.Outcome.KING_EXPOSED:
+			# The armies left the other side's king attacked before the first move.
+			var winner := state.side_to_move
+			var how := "%s's king was under attack from the start" % ("Black" if winner == Piece.Team.WHITE else "White")
+			if me == -1:
+				return ["King exposed", "%s. %s wins" % [how, "White" if winner == Piece.Team.WHITE else "Black"]]
+			return ["King exposed", how + (". You win!" if winner == me else ". You lose")]
 	return ["Game over", ""]
 
 ## This player's side: online or against the bot. -1 for two players on one device.
@@ -961,7 +1179,7 @@ func _rematch_with(army: Variant, side := OnlineSession.SIDE_RANDOM) -> void:
 		return
 	game_over_panel.set_note("Setting up the rematch...")
 	var next := _new_session()
-	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)))
+	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)), bool(online.row.get("eval_bar", false)))
 	if not created.ok:
 		_rematch_failed(next, "Couldn't set up a rematch: " + created.error)
 		return
@@ -1017,6 +1235,9 @@ func _go_to_rematch(next: OnlineSession) -> void:
 func _start_online() -> void:
 	if online.get_parent() != self:
 		add_child(online)
+	resign_button.hide()
+	# So "your move" notifications can be shown (web: asked on the next tap).
+	TurnNotifier.ask_permission_on_next_tap()
 	white_army = online.army(Piece.Team.WHITE)
 	black_army = online.army(Piece.Team.BLACK)
 	state = online.create_state(StandardSetup.create_rules())
@@ -1065,13 +1286,18 @@ func _send_online_moves() -> void:
 ## Something changed on the server: play any new moves from the opponent.
 func _on_online_changed(_row: Dictionary) -> void:
 	var server_moves := online.moves()
+	var last_san := ""
 	for i in range(state.history.size(), server_moves.size()):
 		var move := state.find_move(str(server_moves[i]))
 		if move == null:
 			status_label.text = "This game is out of step with the server."
 			return
+		last_san = Notation.san(state, move)
 		play(move, true)
 	_after_online_change()
+	# The opponent moved: tell the player if they're not looking (Mac).
+	if last_san != "" and state.side_to_move == online.my_team and not is_over():
+		TurnNotifier.your_turn("Your opponent played %s." % last_san)
 
 func _after_online_change() -> void:
 	# Keep checking the server after the game ends too, for rematch offers.

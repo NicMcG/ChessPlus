@@ -7,6 +7,7 @@ signal play_pressed
 signal online_pressed
 signal continue_online_pressed
 signal armies_pressed
+signal testing_pressed
 
 func _ready() -> void:
 	# Only offer to continue when there's an unfinished game saved.
@@ -20,6 +21,7 @@ func _ready() -> void:
 	%ContinueOnline.text = "Continue online game (%s)" % online_code
 	%ContinueOnline.pressed.connect(func() -> void: continue_online_pressed.emit())
 	%Armies.pressed.connect(func() -> void: armies_pressed.emit())
+	%Testing.pressed.connect(func() -> void: testing_pressed.emit())
 	%Sound.pressed.connect(toggle_sound)
 	_show_sound()
 

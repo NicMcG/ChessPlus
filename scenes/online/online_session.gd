@@ -79,7 +79,8 @@ func _init(p_backend: OnlineBackend = null, p_player_id := "") -> void:
 ## limit (milliseconds each, 0 = none). Afterwards `code` is the code to share.
 ## `army` is an Army, or a Callable(team) -> Army (ArmyChoices.resolver) when it
 ## depends on the side.
-func create_game(army: Variant, side: int, time_ms: int) -> Dictionary:
+## `eval_bar`: show the eval bar to both players during the game.
+func create_game(army: Variant, side: int, time_ms: int, eval_bar := false) -> Dictionary:
 	my_team = Piece.Team.WHITE if side == SIDE_WHITE else Piece.Team.BLACK
 	if side == SIDE_RANDOM:
 		my_team = Piece.Team.WHITE if rng.randi_range(0, 1) == 0 else Piece.Team.BLACK
@@ -92,6 +93,9 @@ func create_game(army: Variant, side: int, time_ms: int) -> Dictionary:
 			"time_ms": time_ms, "white_ms": time_ms, "black_ms": time_ms,
 			"moves": [], "move_count": 0,
 		}
+		# Only sent when chosen, so games work on a server without the column yet.
+		if eval_bar:
+			new_row["eval_bar"] = true
 		new_row[me + "_id"] = player_id
 		new_row[me + "_army"] = SavedGame.army_to_dict(ArmyChoices.resolve(army, my_team))
 		result = await backend.insert(new_row)

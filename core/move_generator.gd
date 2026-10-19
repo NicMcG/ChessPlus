@@ -15,12 +15,18 @@ static func legal_moves(state: GameState) -> Array[Move]:
 	var legal: Array[Move] = []
 	for move in pseudo_legal_moves(state):
 		state.make_move(move)
+		# A piece put to sleep can't capture next turn, so its attacks don't count
+		# (Mac): it's lifted off the board while looking.
+		if move.frozen:
+			board.set_piece(move.to, null)
 		var safe := true
 		for square in royals:
 			var now_at := move.lands_on() if square == move.from else square
 			if attacked_with(board, now_at, enemy, table):
 				safe = false
 				break
+		if move.frozen:
+			board.set_piece(move.to, move.frozen)
 		state.undo_move(move)
 		if safe:
 			legal.append(move)
@@ -34,8 +40,12 @@ static func pseudo_legal_moves(state: GameState, captures_only := false) -> Arra
 	var board := state.board
 	var moves: Array[Move] = []
 	var pieces := board.pieces_of(state.side_to_move)
+	# A piece put to sleep by the opponent's Song of Slumber can't move this turn.
+	var frozen := state.frozen_piece()
 	for from: Vector2i in pieces:
 		var piece: Piece = pieces[from]
+		if piece == frozen:
+			continue
 		var first_new := moves.size()
 		for rule in piece.def.move_rules:
 			_add_rule_moves(state, from, piece, rule, moves, captures_only)
@@ -43,11 +53,146 @@ static func pseudo_legal_moves(state: GameState, captures_only := false) -> Arra
 			_add_castling_moves(board, state.rules, from, piece, moves)
 		if piece.can_use_ability():
 			_add_ability_moves(state, from, piece, moves, first_new, captures_only)
-	return moves
+	if not captures_only:
+		_add_haunt_moves(state, moves)
+	return _apply_guards(state, moves)
+
+## Haunt: a lost Ghost whose ability is unused can come back onto any empty
+## square of the board (Mac). One Ghost's moves if there are several: they'd all
+## be the same.
+static func _add_haunt_moves(state: GameState, moves: Array[Move]) -> void:
+	var ghosts := haunting_ghosts(state, state.side_to_move)
+	if ghosts.is_empty():
+		return
+	var ghost: Piece = ghosts[0]
+	var board := state.board
+	for rank in range(board.height):
+		for file in range(board.width):
+			var square := Vector2i(file, rank)
+			if board.is_empty(square):
+				var haunt := Move.new(square, square, ghost)
+				haunt.ability = PieceDef.Ability.HAUNT
+				moves.append(haunt)
+
+## `team`'s lost pieces that can still use Haunt to come back.
+static func haunting_ghosts(state: GameState, team: Piece.Team) -> Array[Piece]:
+	var ghosts: Array[Piece] = []
+	for piece: Piece in state.lost[team]:
+		if piece.def.ability == PieceDef.Ability.HAUNT and not piece.ability_used:
+			ghosts.append(piece)
+	return ghosts
+
+## The enemy's Squires and Jesters change the side to move's captures: a
+## protected piece (a Knight on a square a Squire could reach) can't be
+## captured, and a capture of a piece a Jester could reach becomes a swap in
+## which the Jester is captured instead. Pawn types and kings are never swapped.
+static func _apply_guards(state: GameState, moves: Array[Move]) -> Array[Move]:
+	var board := state.board
+	var defenders := board.pieces_of(Piece.other_team(state.side_to_move))
+	var protected := {}
+	var jesters := []
+	for square: Vector2i in defenders:
+		var guard: Piece = defenders[square]
+		if not guard.def.protects.is_empty():
+			for reached: Vector2i in reach_squares(board, square, guard):
+				var other := board.get_piece(reached)
+				if other and other.team == guard.team and other.def.id in guard.def.protects:
+					protected[reached] = true
+		if guard.def.decoy:
+			jesters.append([square, guard, reach_squares(board, square, guard)])
+	if protected.is_empty() and jesters.is_empty():
+		return moves
+	var kept: Array[Move] = []
+	for move in moves:
+		if move.captured == null:
+			kept.append(move)
+			continue
+		if protected.has(move.capture_square):
+			continue
+		var target := move.captured
+		if not target.def.is_pawn_type() and not target.def.is_king_type() and not target.def.decoy:
+			for jester: Array in jesters:
+				if (jester[2] as Dictionary).has(move.capture_square):
+					move.decoy_piece = target
+					move.decoy_square = jester[0]
+					move.captured = jester[1]
+					break
+		kept.append(move)
+	return kept
+
+## The squares `piece` (on `from`) could move or capture to by its rules, as the
+## board stands: each line up to and including the first piece it meets. Used
+## for the Squire's and Jester's ranges. Returns {square: true}.
+static func reach_squares(board: Board, from: Vector2i, piece: Piece) -> Dictionary:
+	var squares := {}
+	for rule in piece.def.move_rules:
+		if not rule.path.is_empty():
+			for steps: Array in rule.path_variants():
+				var end := _path_end(board, from, steps, piece.team)
+				if end != Board.NO_SQUARE:
+					squares[end] = true
+			continue
+		var limit := _step_limit(rule, piece, board)
+		for dir in rule.directions:
+			var step := _orient(dir, piece.team)
+			var to := from
+			for i in range(limit):
+				if _leap_blocked(board, to, step):
+					break
+				to += step
+				if not board.in_bounds(to):
+					break
+				if i >= rule.leap_steps:
+					squares[to] = true
+				if not board.is_empty(to) and (i >= rule.leap_steps or board.get_piece(to).def.blocks_jumps):
+					break
+	return squares
+
+## The squares a leap of `step` passes over on its way (not where it lands), as
+## offsets from where it starts: none for a one-square step; for a straight or
+## diagonal leap, the squares in between; for a Knight-like leap (Mac's rule),
+## the long leg first, then the short one: (1, 2) passes (0, 1) and (0, 2).
+static var _passed_cache := {}
+
+static func passed_offsets(step: Vector2i) -> Array:
+	if _passed_cache.has(step):
+		return _passed_cache[step]
+	var passed := []
+	var ax := absi(step.x)
+	var ay := absi(step.y)
+	var sx := signi(step.x)
+	var sy := signi(step.y)
+	if ax == ay or ax == 0 or ay == 0:
+		for k in range(1, maxi(ax, ay)):
+			passed.append(Vector2i(sx * k, sy * k))
+	elif ay > ax:
+		for k in range(1, ay + 1):
+			passed.append(Vector2i(0, sy * k))
+		for k in range(1, ax):
+			passed.append(Vector2i(sx * k, step.y))
+	else:
+		for k in range(1, ax + 1):
+			passed.append(Vector2i(sx * k, 0))
+		for k in range(1, ay):
+			passed.append(Vector2i(step.x, sy * k))
+	_passed_cache[step] = passed
+	return passed
+
+## True if a leap of `step` from `from` would pass over a Parapet (either side's).
+static func _leap_blocked(board: Board, from: Vector2i, step: Vector2i) -> bool:
+	if absi(step.x) <= 1 and absi(step.y) <= 1:
+		return false
+	for offset: Vector2i in passed_offsets(step):
+		var over := board.get_piece(from + offset)
+		if over and over.def.blocks_jumps:
+			return true
+	return false
 
 ## A piece's special-ability moves. Crack Shot: a copy of each of its captures
 ## (from `first_new` on in `moves`) in which it doesn't move. Raise Dead: one move
-## per type of lost piece that can come back.
+## per type of lost piece that can come back. Song of Slumber: one per enemy
+## piece (not a king) it could reach. Full Moon: one (it changes where it stands).
+## (Haunt is used from the lost pieces: see _add_haunt_moves.)
 static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, moves: Array[Move], first_new: int, captures_only: bool) -> void:
 	match piece.def.ability:
 		PieceDef.Ability.CRACK_SHOT:
@@ -60,6 +205,22 @@ static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, m
 				shot.shield_target = capture.shield_target
 				shot.ability = PieceDef.Ability.CRACK_SHOT
 				moves.append(shot)
+		PieceDef.Ability.SONG_OF_SLUMBER:
+			if captures_only:
+				return
+			for square: Vector2i in reach_squares(state.board, from, piece):
+				var target := state.board.get_piece(square)
+				if target and target.team != piece.team and not target.def.is_king_type():
+					var song := Move.new(from, square, piece)
+					song.ability = PieceDef.Ability.SONG_OF_SLUMBER
+					song.frozen = target
+					moves.append(song)
+		PieceDef.Ability.FULL_MOON:
+			if captures_only or piece.def.transforms_into == null:
+				return
+			var change := Move.new(from, from, piece)
+			change.ability = PieceDef.Ability.FULL_MOON
+			moves.append(change)
 		PieceDef.Ability.RAISE_DEAD:
 			if captures_only:
 				return
@@ -67,7 +228,7 @@ static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, m
 				var raise := Move.new(from, from, piece)
 				raise.ability = PieceDef.Ability.RAISE_DEAD
 				for lost_piece: Piece in state.lost[piece.team]:
-					if lost_piece.def == def:
+					if lost_piece.starting_def() == def:
 						raise.raised_from_lost = lost_piece
 						break
 				# Comes back as if the game had just started (shield, ability and all),
@@ -77,11 +238,12 @@ static func _add_ability_moves(state: GameState, from: Vector2i, piece: Piece, m
 				moves.append(raise)
 
 ## The kinds of `team`'s lost pieces that Raise Dead could bring back: not pawn
-## types and not Necromancers (Raise Dead pieces). Each listed once.
+## types and not Necromancers (Raise Dead pieces). Each listed once, as the type
+## it started the game as (a wolf comes back as a Werewolf).
 static func raisable_defs(state: GameState, team: Piece.Team) -> Array[PieceDef]:
 	var defs: Array[PieceDef] = []
 	for piece: Piece in state.lost[team]:
-		var def := piece.def
+		var def := piece.starting_def()
 		if def.is_pawn_type() or def.ability == PieceDef.Ability.RAISE_DEAD or defs.has(def):
 			continue
 		defs.append(def)
@@ -162,6 +324,10 @@ static func attacked_with(board: Board, square: Vector2i, by_team: Piece.Team, t
 			pos -= step
 			if not board.in_bounds(pos):
 				break
+			# A leap from here onwards would pass over a Parapet: nothing further
+			# along this line can attack.
+			if _leap_blocked(board, pos, step):
+				break
 			var piece := board.get_piece(pos)
 			if piece == null:
 				continue
@@ -172,7 +338,8 @@ static func attacked_with(board: Board, square: Vector2i, by_team: Piece.Team, t
 							and distance <= _step_limit(rule, piece, board):
 						return true
 			screens += 1
-			if screens > 1 or not has_hop:
+			# A Parapet can't be a Cannon's screen.
+			if screens > 1 or not has_hop or piece.def.blocks_jumps:
 				break
 	# Leaping and bent-path pieces: check each one directly.
 	var unusual: Array = table[1]
@@ -202,8 +369,13 @@ static func _rule_reaches(board: Board, from: Vector2i, piece: Piece, rule: Move
 		var count := delta.x / step.x if step.x != 0 else delta.y / step.y
 		if count <= rule.leap_steps or count > limit or step * count != delta:
 			continue
+		for i in range(1, count + 1):
+			if _leap_blocked(board, from + step * (i - 1), step):
+				return false
 		for i in range(1, count):
 			var between := board.get_piece(from + step * i)
+			if between and between.def.blocks_jumps and i <= rule.leap_steps:
+				return false
 			if i <= rule.leap_steps:
 				if rule.leap_over == MoveRule.LeapOver.OWN_PIECE and (between == null or between.team != piece.team):
 					return false
@@ -244,12 +416,17 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 		if pawn_like:
 			passed = []
 		for i in range(limit):
+			if _leap_blocked(board, to, step):
+				break
 			to += step
 			if not board.in_bounds(to):
 				break
 			# Leapt squares: can't stop there, and they don't block (but the Rogue
-			# can only leap one of its own pieces).
+			# can only leap one of its own pieces, and nothing leaps a Parapet).
 			if i < rule.leap_steps:
+				var leapt := board.get_piece(to)
+				if leapt and leapt.def.blocks_jumps:
+					break
 				if rule.leap_over == MoveRule.LeapOver.OWN_PIECE:
 					var over := board.get_piece(to)
 					if over == null or over.team != piece.team:
@@ -271,7 +448,8 @@ static func _add_rule_moves(state: GameState, from: Vector2i, piece: Piece, rule
 			# Something is in the way. A hopping rule jumps it to look for a capture;
 			# otherwise capture it if it's an enemy and the rule allows. Stop either way.
 			if rule.captures_by_hopping:
-				if rule.mode != MoveRule.Mode.MOVE_ONLY:
+				# A Parapet can't be a Cannon's screen.
+				if rule.mode != MoveRule.Mode.MOVE_ONLY and not target.def.blocks_jumps:
 					_add_hop_capture(state, from, to, step, limit - i - 1, piece, moves)
 			elif target.team != piece.team and rule.mode != MoveRule.Mode.MOVE_ONLY:
 				_append(state, _capture(from, to, piece, target), moves)

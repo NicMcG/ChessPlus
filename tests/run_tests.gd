@@ -34,6 +34,8 @@ func _ready() -> void:
 	PlusfishLink.enabled = false
 	# Silent: sounds still left playing when the tests quit count as leaks.
 	UserSettings.set_sound_on(false)
+	# "Your move" notifications are only recorded, never shown.
+	TurnNotifier.deliver = false
 	# Wait until the scene tree has finished starting up, so tests can add
 	# scenes to it.
 	_run_all.call_deferred()

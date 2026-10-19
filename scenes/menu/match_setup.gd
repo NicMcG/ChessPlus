@@ -46,10 +46,21 @@ func _ready() -> void:
 	choices.rng = rng
 	for pick in [first_pick, second_pick]:
 		choices.fill(pick)
+	eval_check = CheckButton.new()
+	eval_check.text = "Show the eval bar"
+	eval_check.custom_minimum_size.y = 70
+	second_pick.get_parent().add_child(eval_check)
+	second_pick.get_parent().move_child(eval_check, second_pick.get_index() + 1)
 	opponent_pick.item_selected.connect(func(_index: int) -> void: _update_labels())
 	start_button.pressed.connect(start)
 	back_button.pressed.connect(func() -> void: closed.emit())
 	_update_labels()
+
+## The eval bar option (two players on this device; against the bot it's always on).
+var eval_check: CheckButton
+
+func eval_bar_wanted() -> bool:
+	return is_bot_game() or (eval_check != null and eval_check.button_pressed)
 
 func is_bot_game() -> bool:
 	return opponent_pick.selected == PRACTICE_BOT
@@ -73,5 +84,7 @@ func start() -> void:
 
 func _update_labels() -> void:
 	bot_options.visible = is_bot_game()
+	if eval_check:
+		eval_check.visible = not is_bot_game()
 	first_label.text = "Your army" if is_bot_game() else "White plays with"
 	second_label.text = "Bot's army" if is_bot_game() else "Black plays with"

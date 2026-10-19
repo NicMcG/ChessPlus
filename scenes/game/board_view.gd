@@ -259,8 +259,9 @@ func pointer_up(pos: Vector2) -> void:
 func _process(delta: float) -> void:
 	check_long_press(Time.get_ticks_msec())
 	advance_animation(delta)
-	# Kings in check tremble and aiming rings close in: keep redrawing.
-	if not _check_squares.is_empty() or aiming:
+	# Kings in check tremble, aiming rings close in and sleeping pieces' "Zz"
+	# bobs: keep redrawing.
+	if not _check_squares.is_empty() or aiming or (state and state.frozen_piece()):
 		queue_redraw()
 
 ## The kings in check now (empty when nobody is), which tremble on the board.
@@ -368,7 +369,7 @@ func _gui_input(event: InputEvent) -> void:
 
 ## If the selected piece can move to `square`, choose that move and return true.
 func _try_move_to(square: Vector2i) -> bool:
-	if _selected == Board.NO_SQUARE or square == Board.NO_SQUARE or not _can_play():
+	if (_selected == Board.NO_SQUARE and not aiming) or square == Board.NO_SQUARE or not _can_play():
 		return false
 	var choices: Array[Move] = []
 	choices.assign(_selected_moves.filter(func(m: Move) -> bool: return m.to == square))
@@ -401,12 +402,26 @@ func selected_square() -> Vector2i:
 func selected_ability_moves() -> Array[Move]:
 	return _ability_moves
 
+## Choose where an ability is used when no piece on the board is selected (a
+## lost Ghost's Haunt): only `moves`' squares can be tapped, until another square
+## is. `marked`: ring them in gold (Haunt doesn't: any empty square will do).
+func aim_moves(moves: Array[Move], marked := true) -> void:
+	_clear_selection()
+	aiming = true
+	_aim_unmarked = not marked
+	_selected_moves.assign(moves)
+	queue_redraw()
+
+## Aiming without gold rings on the targets (see aim_moves).
+var _aim_unmarked := false
+
 ## Choose a target for the selected piece's ability: from now on only the
 ## ability's targets are shown and can be tapped (until the selection changes).
 func aim_ability() -> void:
 	if _selected == Board.NO_SQUARE or _ability_moves.is_empty():
 		return
 	aiming = true
+	_aim_unmarked = false
 	_selected_moves.assign(_ability_moves)
 	queue_redraw()
 
@@ -456,6 +471,10 @@ func _draw() -> void:
 			if square in _check_squares:
 				rect.position += tremble(Time.get_ticks_msec() / 1000.0) * rect.size.x
 			_draw_piece(piece, rect)
+			if piece.gained_shield:
+				_draw_gained_shield(rect)
+			if piece == state.frozen_piece():
+				_draw_asleep(rect)
 	# Moving pieces last, so they pass over the others.
 	for piece: Piece in poses:
 		if poses[piece].visible:
@@ -463,8 +482,9 @@ func _draw() -> void:
 	_draw_extras(extras, false)
 	# On top of the pieces, so a piece on an edge square doesn't hide its label.
 	_draw_coordinates()
-	for move in _selected_moves:
-		_draw_target(move)
+	if not (aiming and _aim_unmarked):
+		for move in _selected_moves:
+			_draw_target(move)
 	if hint_arrow.size() == 2 and hint_arrow[0] != hint_arrow[1]:
 		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
 	for arrow: Array in arrows:
@@ -539,7 +559,9 @@ func _shake_offset(square_size: float) -> float:
 	return sin(t * TAU * 3) * square_size * 0.08 * (1.0 - t)
 
 ## The picture for this piece now (a Paladin whose shield broke has its own).
-func _piece_texture(piece: Piece) -> Texture2D:
+func _piece_texture(piece: Piece, as_def: PieceDef = null) -> Texture2D:
+	if as_def:
+		return texture_for(as_def, piece.team)
 	var texture: Texture2D = null
 	if piece.def.has_shield() and piece.shield_broken:
 		texture = PieceArt.texture_for(piece.def, piece.team, piece_style, "wounded")
@@ -587,6 +609,44 @@ func _point(pos: Vector2) -> Vector2:
 	var row := pos.y if flipped else state.board.height - 1 - pos.y
 	return _origin() + Vector2(column + 0.5, row + 0.5) * s
 
+## A Vampire that has gained a shield: a small shield in the top-right corner of
+## its square (until it has its own art for it).
+func _draw_gained_shield(rect: Rect2) -> void:
+	var s := rect.size.x
+	var top_right := rect.position + Vector2(s * 0.7, s * 0.06)
+	var w := s * 0.24
+	var points := PackedVector2Array([
+		top_right, top_right + Vector2(w, 0), top_right + Vector2(w, w * 0.55),
+		top_right + Vector2(w / 2, w * 1.1), top_right + Vector2(0, w * 0.55)])
+	draw_colored_polygon(points, Color(0.55, 0.78, 1.0))
+	points.append(top_right)
+	draw_polyline(points, Color(0.1, 0.2, 0.4), maxf(1.0, s * 0.025), true)
+
+## A music note (a quaver): a filled oval head with a stem and a flag.
+func _draw_note(at: Vector2, height: float, color: Color) -> void:
+	var outline := Color(0.3, 0.15, 0.0, color.a)
+	var head := at + Vector2(-height * 0.2, height * 0.35)
+	var stem_top := head + Vector2(height * 0.2, -height * 0.8)
+	for pass_color: Color in [outline, color]:
+		var grow := height * 0.06 if pass_color == outline else 0.0
+		draw_set_transform(head, -0.4, Vector2(1.35, 1.0))
+		draw_circle(Vector2.ZERO, height * 0.17 + grow, pass_color)
+		draw_set_transform(Vector2.ZERO)
+		draw_line(head + Vector2(height * 0.2, 0), stem_top, pass_color, height * 0.09 + grow * 2)
+		draw_line(stem_top, stem_top + Vector2(height * 0.25, height * 0.25), pass_color, height * 0.09 + grow * 2)
+
+## A piece put to sleep by Song of Slumber (it can't move this turn): a "Zz" in
+## the top-right corner of its square, in the Bard's gold, gently bobbing.
+func _draw_asleep(rect: Rect2) -> void:
+	var s := rect.size.x
+	var font := ThemeDB.fallback_font
+	var bob := sin(Time.get_ticks_msec() / 1000.0 * 2.5) * s * 0.025
+	for i in 2:
+		var size_px := int(s * (0.34 if i == 0 else 0.25))
+		var at := rect.position + Vector2(s * (0.56 + 0.2 * i), s * (0.36 - 0.15 * i) + bob * (1 - 2 * i))
+		draw_string_outline(font, at, "Z", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, maxi(2, int(s * 0.035)), Color(0.25, 0.12, 0.0))
+		draw_string(font, at, "Z", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, Color(1.0, 0.82, 0.35))
+
 ## Draw a piece the animation is moving: `pose` is from MoveAnimation.pose.
 ## It's scaled and turned about the middle of its bottom edge, so a slam
 ## squashes it down onto the board and a knocked piece tips over.
@@ -594,7 +654,10 @@ func _draw_posed(piece: Piece, pose: Dictionary) -> void:
 	var s := _square_size()
 	var lift: float = pose.lift
 	var bottom := _point(pose.pos) + Vector2(0, s / 2 - lift * s)
-	var texture := _piece_texture(piece)
+	# A pose can show the piece as another type ("as_def": a Werewolf still a
+	# Werewolf while it turns into a wolf).
+	var as_def: PieceDef = pose.get("as_def")
+	var texture := _piece_texture(piece, as_def)
 	var shadow: float = pose.shadow
 	if shadow > 0 and texture:
 		# A soft shadow left on the board below a piece lifted towards the player.
@@ -611,7 +674,7 @@ func _draw_posed(piece: Piece, pose: Dictionary) -> void:
 		var flash: float = pose.flash
 		# White at first, turning red as it fades.
 		var flash_color: Color = pose.get("flash_color", Color.WHITE.lerp(Color(1, 0.15, 0.1), 1.0 - flash))
-		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha, flash_color * flash)
+		_draw_piece(piece, Rect2(-s / 2, -s, s, s), pose.alpha, flash_color * flash, as_def)
 	draw_set_transform(Vector2.ZERO)
 
 ## Draw the animation's extras: `under` = the ones that go below the pieces
@@ -654,6 +717,15 @@ func _draw_extras(extras: Array, under: bool) -> void:
 				for ray in 8:
 					var direction := Vector2.from_angle(TAU * ray / 8.0 + t)
 					draw_line(center + direction * r * 0.2, center + direction * r * (0.35 + 0.45 * t), Color(glow, 0.8 * fade), maxf(2, r * 0.04))
+			"notes":
+				# Golden music notes drifting from the Bard to its target, bobbing.
+				for i in 3:
+					var k := clampf(t * 1.4 - i * 0.2, 0.0, 1.0)
+					if k <= 0.0 or k >= 1.0:
+						continue
+					var pos := _point((extra.from as Vector2).lerp(extra.to, k)) \
+							+ Vector2(0, -s * (0.25 + 0.12 * sin(k * TAU * 1.5 + i)))
+					_draw_note(pos, s * 0.34, Color(1.0, 0.82, 0.3, sin(PI * k)))
 			"sparkles":
 				# Little four-pointed stars twinkling round a rising piece.
 				var center := _point(extra.at) - Vector2(0, s * 0.45 * smoothstep(0.0, 0.4, t))
@@ -732,10 +804,10 @@ func _draw_flying_arrow(extra: Dictionary) -> void:
 		draw_line(tail + direction * s * 0.15, tail + side * fletch * s * 0.08, Color(0.85, 0.2, 0.15, alpha), maxf(2, s * 0.04))
 
 ## `flash`: a colour the piece flashes (its strength is how bright it is).
-func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0)) -> void:
-	var texture := _piece_texture(piece)
+func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0), as_def: PieceDef = null) -> void:
+	var texture := _piece_texture(piece, as_def)
 	if texture:
-		if has_ability_ready(piece):
+		if has_ability_ready(piece) and as_def == null:
 			_draw_ability_glow(texture, rect, piece.def.ability_gradient(), alpha)
 		draw_texture_rect(texture, rect, false, Color(1, 1, 1, alpha))
 		var strength := maxf(flash.r, maxf(flash.g, flash.b))
@@ -746,7 +818,7 @@ func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0
 	# No image for this piece yet: draw its letter(s) instead, outlined so they
 	# show on both square colours.
 	var font := ThemeDB.fallback_font
-	var font_size := int(rect.size.y * (0.6 if piece.def.symbol.length() == 1 else 0.45))
+	var font_size := int(rect.size.y * (0.6 if (as_def if as_def else piece.def).symbol.length() == 1 else 0.45))
 	if font_size <= 0:
 		return  # The board has no size yet.
 	var color := Color.WHITE if piece.team == Piece.Team.WHITE else Color.BLACK
@@ -754,7 +826,7 @@ func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0
 	color.a = alpha
 	outline.a = alpha
 	var baseline := Vector2(rect.position.x, rect.position.y + rect.size.y * 0.5 + font_size * 0.36)
-	var symbol := piece.def.symbol.to_upper()
+	var symbol := (as_def if as_def else piece.def).symbol.to_upper()
 	draw_string_outline(font, baseline, symbol, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, font_size, maxi(2, int(rect.size.y * 0.04)), outline)
 	draw_string(font, baseline, symbol, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, font_size, color)
 
@@ -779,6 +851,10 @@ func _draw_target(move: Move) -> void:
 
 func _square_size() -> float:
 	return minf(size.x / state.board.width, size.y / state.board.height)
+
+## Where the board's top-left corner is inside this control.
+func board_origin() -> Vector2:
+	return _origin() if state else Vector2.ZERO
 
 ## Top-left corner of the board, so it's centred in this control.
 func _origin() -> Vector2:
@@ -811,7 +887,7 @@ func _royal_squares(team: Piece.Team) -> Array[Vector2i]:
 	return squares
 
 func _clear_selection() -> void:
-	var had_selection := _selected != Board.NO_SQUARE
+	var had_selection := _selected != Board.NO_SQUARE or aiming
 	_selected = Board.NO_SQUARE
 	_selected_moves.clear()
 	_ability_moves.clear()

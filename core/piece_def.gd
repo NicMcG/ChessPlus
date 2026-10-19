@@ -34,12 +34,40 @@ enum Keyword { JUMP = 1, CASTLE = 2, PROMOTE = 4, SHIELD = 8 }
 ## CRACK_SHOT (Archer): capture something it could capture, without moving.
 ## RAISE_DEAD (Necromancer): it leaves the board and one of its side's lost
 ##   pieces (not a pawn type, not a Necromancer) comes back on its square, fresh.
-enum Ability { NONE, CRACK_SHOT, RAISE_DEAD }
+## HAUNT (Ghost): used after it has been captured: it comes back onto any empty
+##   square in its side's half of the board.
+## SONG_OF_SLUMBER (Bard): one enemy piece it could capture (not a king) can't
+##   move on the opponent's next turn.
+## FULL_MOON (Werewolf): it turns into `transforms_into` for the rest of the game.
+enum Ability { NONE, CRACK_SHOT, RAISE_DEAD, HAUNT, SONG_OF_SLUMBER, FULL_MOON }
 @export var ability: Ability = Ability.NONE
+
+## For FULL_MOON: the piece type it becomes (the Werewolf's wolf form, kept in
+## res://data/pieces/forms/ so it isn't offered in the army builder).
+@export var transforms_into: PieceDef
 
 ## The Ram's rule: after capturing (or breaking a shield) it is removed from the
 ## board too, and counts as lost.
 @export var dies_on_capture := false
+
+## The Parapet's rule: nothing can jump over it. Leaps (Knight, Elephant,
+## Catapult), the Wizard's and Rogue's leaps all stop at it, whichever side it's
+## on, and a Cannon can't use it as a screen. A Knight counts as moving two
+## squares straight first, then one to the side.
+@export var blocks_jumps := false
+
+## The Vampire's rule: it starts without a shield and gains one whenever it
+## captures (if it hasn't one). The shield works like the Shield keyword's.
+@export var shield_on_capture := false
+
+## The Squire's rule: these piece types (by id), on squares this piece could
+## reach, can't be captured.
+@export var protects: Array[String] = []
+
+## The Jester's rule: when an enemy would capture one of its side's pieces (not a
+## pawn type) on a square this piece could reach, they swap places and this piece
+## is captured instead. One Jester per capture.
+@export var decoy := false
 
 ## Shown on the piece card under "Special Rule": anything about how it plays that
 ## its types, keywords and move picture can't show. Empty for most pieces.
@@ -57,6 +85,15 @@ func ability_gradient() -> PackedColorArray:
 	if ability_colors.size() >= 2:
 		return ability_colors
 	return PackedColorArray([Color("#4a4a4a"), Color("#9a9a9a")])
+
+## The colour for writing the ability's name on its gradient: white, or dark
+## grey on a pale gradient (the Ghost's and Werewolf's).
+func ability_label_color() -> Color:
+	var colors := ability_gradient()
+	var light := 0.0
+	for color in colors:
+		light += color.get_luminance()
+	return Color("#262626") if light / colors.size() > 0.62 else Color.WHITE
 
 func is_king_type() -> bool:
 	return types & Type.KING != 0

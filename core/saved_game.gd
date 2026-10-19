@@ -19,7 +19,16 @@ var black_army: Army
 ## The bot's Piece.Team, or -1 for a two-player game.
 var bot_team := -1
 var bot_level := PracticeBot.Level.MEDIUM
+## The eval bar was chosen for this game (it's always on against the bot).
+var eval_bar := false
 var moves: PackedStringArray = []
+## When the game started and when it was last saved (a move, an undo...), in
+## seconds since 1970. 0 = not known (saved by an older version).
+var started_time := 0.0
+var saved_time := 0.0
+
+## A local game left this long without a move ends on its own (Mac: 2 days).
+const ABANDONED_AFTER := 2 * 24 * 60 * 60
 
 ## A record of `state`, which was started from these armies and settings.
 static func from_state(state: GameState, white: Army, black: Army, p_bot_team: int, p_bot_level: int) -> SavedGame:
@@ -43,7 +52,8 @@ func create_state(rules: GameRules) -> GameState:
 		state.make_move(move)
 	return state
 
-func save() -> Error:
+func save(now := Time.get_unix_time_from_system()) -> Error:
+	saved_time = now
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
@@ -60,6 +70,29 @@ static func load_saved() -> SavedGame:
 		return null
 	return from_dict(json.data)
 
+## If the saved game has gone ABANDONED_AFTER without a move, end it (delete
+## the save) and return a note saying so, for the next time the app opens;
+## otherwise "". A save from before times were kept starts its clock now.
+static func end_if_abandoned(now := Time.get_unix_time_from_system()) -> String:
+	var saved := load_saved()
+	if saved == null:
+		return ""
+	if saved.saved_time <= 0:
+		saved.save(now)
+		return ""
+	if now - saved.saved_time < ABANDONED_AFTER:
+		return ""
+	delete_saved()
+	var since := saved.started_time if saved.started_time > 0 else saved.saved_time
+	return "Your game from %s was ended because no move was made for 2 days." % date_text(since)
+
+## A date like "Oct 19", in the device's time zone.
+static func date_text(unix_time: float) -> String:
+	var bias_minutes: int = Time.get_time_zone_from_system().get("bias", 0)
+	var date := Time.get_datetime_dict_from_unix_time(int(unix_time) + bias_minutes * 60)
+	const MONTHS := ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+	return "%s %d" % [MONTHS[int(date.month) - 1], int(date.day)]
+
 static func delete_saved() -> void:
 	if FileAccess.file_exists(save_path):
 		DirAccess.remove_absolute(save_path)
@@ -70,7 +103,10 @@ func to_dict() -> Dictionary:
 		"black": army_to_dict(black_army),
 		"bot_team": bot_team,
 		"bot_level": bot_level,
+		"eval_bar": eval_bar,
 		"moves": Array(moves),
+		"started": started_time,
+		"saved": saved_time,
 	}
 
 static func from_dict(data: Dictionary) -> SavedGame:
@@ -81,6 +117,9 @@ static func from_dict(data: Dictionary) -> SavedGame:
 		return null
 	saved.bot_team = int(data.get("bot_team", -1))
 	saved.bot_level = int(data.get("bot_level", PracticeBot.Level.MEDIUM))
+	saved.eval_bar = bool(data.get("eval_bar", false))
+	saved.started_time = float(data.get("started", 0.0))
+	saved.saved_time = float(data.get("saved", 0.0))
 	for text in data.get("moves", []):
 		saved.moves.append(str(text))
 	return saved
