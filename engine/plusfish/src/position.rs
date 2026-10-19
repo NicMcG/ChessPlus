@@ -656,7 +656,19 @@ impl Position {
         if m.flags & F_SHIELD != 0 || victim == 0 {
             return 0;
         }
-        let vv = val[kind_of(victim)];
+        self.see_from(r, m, val[kind_of(victim)], val)
+    }
+
+    /// The same for a quiet move: what the moving piece stands to lose on its
+    /// new square (0 or less). Castling and abilities count as safe.
+    pub fn see_quiet(&self, r: &Rules, m: Move, val: &[i32]) -> i32 {
+        if m.flags & (F_CASTLE | F_RAISE | F_CRACK | F_SHIELD | F_CAPTURE) != 0 {
+            return 0;
+        }
+        self.see_from(r, m, 0, val)
+    }
+
+    fn see_from(&self, r: &Rules, m: Move, vv: i32, val: &[i32]) -> i32 {
         if m.flags & (F_CRACK | F_EP) != 0 {
             // The Archer stays put; en passant: a pawn for a pawn, then
             // whatever happens on the landing square (rare; ignored).

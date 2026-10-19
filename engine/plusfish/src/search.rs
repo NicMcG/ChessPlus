@@ -627,6 +627,10 @@ impl<'a> Searcher<'a> {
             legal += 1;
             let gives_check = child.in_check(r, child.side);
             let quiet = !m.is_tactical() && m.flags & (F_RAISE | F_CASTLE) == 0;
+            // Quiet moves that put a piece where it's simply lost, near the leaves.
+            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 1 && best > -MATE_BOUND && p.see_quiet(r, m, &self.values) < -50 * depth * depth {
+                continue;
+            }
             // Late move pruning for quiet moves near the leaves.
             let lmp_limit = if improving { 4 + depth * depth * 3 } else { 3 + depth * depth * 2 };
             if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > lmp_limit && best > -MATE_BOUND {
