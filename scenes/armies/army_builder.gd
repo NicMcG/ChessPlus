@@ -266,10 +266,11 @@ func _fit_tray() -> void:
 	for button: Button in _tray_buttons.values():
 		button.custom_minimum_size = Vector2(width, height)
 		button.add_theme_font_size_override("font_size", roundi(width * 0.14))
-		var cost: Label = button.get_node_or_null("Cost")
+		var cost: CostBadge = button.get_node_or_null("Cost")
 		if cost == null:
 			continue
-		cost.add_theme_font_size_override("font_size", roundi(width * 0.18))
+		cost.font_size = roundi(width * 0.18)
+		_place_cost(cost)
 
 func _build_tray() -> void:
 	var defs := PieceCatalog.all_defs()
@@ -285,6 +286,9 @@ func _build_tray() -> void:
 		var normal := StyleBoxFlat.new()
 		normal.bg_color = background
 		normal.set_corner_radius_all(4)
+		# Every box outlined (Mac's design), in a lighter shade of its colour.
+		normal.set_border_width_all(2)
+		normal.border_color = background.lightened(0.35)
 		var hover := normal.duplicate()
 		hover.bg_color = background.lightened(0.12)
 		var chosen := normal.duplicate()
@@ -344,29 +348,25 @@ static func type_color(def: PieceDef) -> Color:
 		return Color("#5a2d82")
 	if def.is_pawn_type():
 		return Color("#2f6b34")
-	return Color(0.17, 0.17, 0.18)
+	return Color(0.3, 0.3, 0.32)
 
 ## The cost in the button's bottom-right corner, e.g. "3" (not for kings: every
 ## army has exactly one, and it's free).
 func _add_cost_label(button: Button, def: PieceDef) -> void:
 	if def.is_king_type():
 		return
-	var cost := Label.new()
+	# On a small dark badge, so it reads on top of the picture.
+	var cost := CostBadge.new()
 	cost.name = "Cost"
 	cost.text = Army.format_points(def.value)
-	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	cost.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
+	button.add_child(cost)
+	_place_cost(cost)
+
+## Keep the badge in the button's bottom-right corner (after it changes size).
+static func _place_cost(cost: CostBadge) -> void:
+	cost.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 5)
 	cost.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	cost.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	cost.add_theme_color_override("font_color", Color.WHITE)
-	# On a small dark badge, so it reads on top of the picture.
-	var badge := StyleBoxFlat.new()
-	badge.bg_color = Color(0.08, 0.08, 0.09, 0.85)
-	badge.set_corner_radius_all(6)
-	badge.content_margin_left = 6
-	badge.content_margin_right = 6
-	cost.add_theme_stylebox_override("normal", badge)
-	button.add_child(cost)
 
 ## Where the selected piece type may go (only the king is restricted).
 func _allowed_squares() -> Array[Vector2i]:
