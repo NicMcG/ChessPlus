@@ -927,7 +927,7 @@ func _update_eval_bar() -> void:
 	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if bar_on else 1.0
 	status_label.text = _status_base
 	if not (bar_on or hints_on):
-		board_view.hint_arrow = []
+		_show_hint("")
 		return
 	eval_bar.flipped = board_view.flipped
 	var ply := shown_ply()
@@ -935,7 +935,7 @@ func _update_eval_bar() -> void:
 	var found: Dictionary = plusfish.results.get(ply, {})
 	if found.is_empty():
 		eval_bar.set_unknown()
-		board_view.hint_arrow = []
+		_show_hint("")
 		return
 	# The final position shows the game's result (it may have been a resignation).
 	var result := ""
@@ -949,9 +949,40 @@ func _update_eval_bar() -> void:
 		result = "1/2-1/2"
 	eval_bar.set_score(int(found["cp"]), found.get("mate"), result)
 	var best: String = found.get("best", "") if hints_on else ""
-	board_view.hint_arrow = _arrow_for(best)
+	_show_hint(best)
 	if best != "" and result == "":
 		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
+
+## Show Plusfish's suggestion on the board ("" = none): the arrow, and for a
+## promotion or Raise Dead the piece it turns into or brings back.
+func _show_hint(move_text: String) -> void:
+	board_view.hint_arrow = _arrow_for(move_text)
+	board_view.hint_piece = _hint_piece_for(move_text)
+
+## Promotions ("e7-e8=Q": the piece on the square moved to) and Raise Dead
+## ("d1!=Q": the piece on the Necromancer's square, which gets a ring).
+var _promotion_text := RegEx.create_from_string("^[a-z][0-9]+[-x]([a-z][0-9]+)=([A-Z]+)$")
+var _raise_text := RegEx.create_from_string("^([a-z][0-9]+)!=([A-Z]+)$")
+## Piece types by symbol, for reading the moves (made when first needed).
+var _defs_by_symbol := {}
+
+## For a promotion or Raise Dead: BoardView.hint_piece (the piece belongs to
+## the side to move in the position shown); {} for any other move.
+func _hint_piece_for(move_text: String) -> Dictionary:
+	var ring := false
+	var found := _promotion_text.search(move_text)
+	if found == null:
+		found = _raise_text.search(move_text)
+		ring = true
+	if found == null:
+		return {}
+	if _defs_by_symbol.is_empty():
+		for def in PieceCatalog.all_defs():
+			_defs_by_symbol[def.symbol.to_upper()] = def
+	var def: PieceDef = _defs_by_symbol.get(found.get_string(2))
+	if def == null:
+		return {}
+	return {"square": Board.parse_square(found.get_string(1)), "def": def, "team": board_view.state.side_to_move, "ring": ring}
 
 ## A move's text ("e2-e4", "a1!c3") as [from, to] squares; [] if it has none.
 func _arrow_for(move_text: String) -> Array:
