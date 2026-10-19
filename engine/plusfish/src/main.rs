@@ -298,6 +298,70 @@ fn main() {
                 k
             });
         }
+        "see-check" => {
+            // Compares the static exchange evaluation with a brute-force
+            // search of the legal captures on the same square.
+            fn exch(p: &Position, r: &Rules, s: usize, val: &[i32]) -> i32 {
+                let mut best = 0;
+                for m in p.legal_moves(r) {
+                    if m.to as usize != s || m.flags & F_CAPTURE == 0 || m.flags & (F_CRACK | F_EP) != 0 {
+                        continue;
+                    }
+                    let k = kind_of(p.sq[m.from as usize]);
+                    let mut gain = val[kind_of(p.sq[s])];
+                    if m.promo != 0 {
+                        gain += val[m.promo as usize - 1] - val[k];
+                    }
+                    let mut c = p.clone();
+                    c.make(r, m);
+                    let sub = if r.info[k].dies { gain -= val[k]; 0 } else { exch(&c, r, s, val) };
+                    best = best.max(gain - sub);
+                }
+                best
+            }
+            let params = load_params(&cat, args.get("params"));
+            let (mut n, mut same, mut sign_same) = (0, 0, 0);
+            let mut shown = 0;
+            for i in 0..args.num("count", 200usize) {
+                let mut rng = Rng::new(5000 + i as u64);
+                let (w, b) = random_pair(&cat, &mut rng, (BUDGET, BUDGET));
+                let mut g = army_game(&cat, &w, &b, 8, 8);
+                let r = g.rules.clone();
+                let val: Vec<i32> = (0..r.info.len()).map(|k| piece_value(&params, k)).collect();
+                for _ in 0..80 {
+                    if g.outcome() != Outcome::None {
+                        break;
+                    }
+                    let legal = g.pos.legal_moves(&r);
+                    for &m in &legal {
+                        if m.flags & F_CAPTURE == 0 || m.flags & (F_CRACK | F_EP) != 0 {
+                            continue;
+                        }
+                        let k = kind_of(g.pos.sq[m.from as usize]);
+                        let mut gain = val[kind_of(g.pos.sq[m.to as usize])];
+                        if m.promo != 0 {
+                            gain += val[m.promo as usize - 1] - val[k];
+                        }
+                        let mut c = g.pos.clone();
+                        c.make(&r, m);
+                        let brute = if r.info[k].dies { gain - val[k] } else { gain - exch(&c, &r, m.to as usize, &val) };
+                        let see = g.pos.see(&r, m, &val);
+                        n += 1;
+                        if see == brute {
+                            same += 1;
+                        }
+                        if (see >= 0) == (brute >= 0) {
+                            sign_same += 1;
+                        } else if shown < args.num("show", 5) {
+                            shown += 1;
+                            println!("{}  {}  see {} brute {}", fen(&g.pos, &r, true), move_text(&r, m), see, brute);
+                        }
+                    }
+                    g.play(legal[rng.below(legal.len())]);
+                }
+            }
+            println!("{} captures: same value {:.1}%, same sign {:.1}%", n, same as f64 * 100.0 / n as f64, sign_same as f64 * 100.0 / n as f64);
+        }
         "perft-suite" => {
             if !verify::run_perft_suite(&cat) {
                 std::process::exit(1);

@@ -645,6 +645,188 @@ impl Position {
         false
     }
 
+    /// Static exchange evaluation: the material balance for the side making
+    /// capture `m` if both sides keep recapturing on that square, least
+    /// valuable piece first, and each may stop when it suits. `val` gives each
+    /// kind's value; kings count as huge and can't capture into an attacked
+    /// square. Simplifications: a shield on the contested square ends the
+    /// exchange; promotions after the first capture are ignored.
+    pub fn see(&self, r: &Rules, m: Move, val: &[i32]) -> i32 {
+        let victim = self.sq[m.capture_square() as usize];
+        if m.flags & F_SHIELD != 0 || victim == 0 {
+            return 0;
+        }
+        let vv = val[kind_of(victim)];
+        if m.flags & (F_CRACK | F_EP) != 0 {
+            // The Archer stays put; en passant: a pawn for a pawn, then
+            // whatever happens on the landing square (rare; ignored).
+            return vv;
+        }
+        let from = m.from as usize;
+        let s = m.to as usize;
+        let mut sqa = self.sq;
+        let mut occ = self.occ;
+        let mover = sqa[from];
+        let us = team_of(mover);
+        let king_val = 100_000;
+        let piece_val = |c: u16| if r.info[kind_of(c)].is_king { king_val } else { val[kind_of(c)] };
+        let mut gain = [0i32; 40];
+        gain[0] = vv;
+        if r.info[kind_of(mover)].dies {
+            return vv - val[kind_of(mover)];
+        }
+        sqa[from] = 0;
+        occ[us] &= !(1u128 << from);
+        occ[1 - us] &= !(1u128 << s);
+        let placed = if m.promo != 0 { code(m.promo as usize - 1, us) | MOVED } else { mover | MOVED };
+        if m.promo != 0 {
+            gain[0] += val[m.promo as usize - 1] - val[kind_of(mover)];
+        }
+        sqa[s] = placed;
+        occ[us] |= 1u128 << s;
+        let mut on_sq = piece_val(placed);
+        let mut side = 1 - us;
+        let mut d = 0;
+        loop {
+            let occupant = sqa[s];
+            if r.info[kind_of(occupant)].shield && occupant & BROKEN == 0 {
+                break;
+            }
+            let a = match Self::least_attacker(r, &sqa, occ, s, side, val) {
+                Some(a) => a,
+                None => break,
+            };
+            let ac = sqa[a];
+            let ak = kind_of(ac);
+            if r.info[ak].is_king {
+                // Only if the square isn't defended after taking.
+                let mut sq2 = sqa;
+                let mut occ2 = occ;
+                sq2[a] = 0;
+                occ2[side] &= !(1u128 << a);
+                occ2[1 - side] &= !(1u128 << s);
+                sq2[s] = ac;
+                occ2[side] |= 1u128 << s;
+                if Self::least_attacker(r, &sq2, occ2, s, 1 - side, val).is_some() {
+                    break;
+                }
+            }
+            d += 1;
+            if d >= gain.len() {
+                break;
+            }
+            gain[d] = on_sq - gain[d - 1];
+            if r.info[ak].dies {
+                // A Ram captures and dies: nothing is left on the square.
+                gain[d] -= val[ak];
+                break;
+            }
+            if gain[d].max(-gain[d - 1]) < 0 {
+                break;
+            }
+            sqa[a] = 0;
+            occ[side] &= !(1u128 << a);
+            occ[1 - side] &= !(1u128 << s);
+            sqa[s] = ac | MOVED;
+            occ[side] |= 1u128 << s;
+            on_sq = piece_val(ac);
+            side = 1 - side;
+        }
+        while d > 0 {
+            gain[d - 1] = -(-gain[d - 1]).max(gain[d]);
+            d -= 1;
+        }
+        gain[0]
+    }
+
+    /// The least valuable piece of `by` that could capture on `s`, on board
+    /// `sqa` (like `attacked`, but finding the cheapest attacker).
+    fn least_attacker(r: &Rules, sqa: &[u16; MAX_SQ], occ: [u128; 2], s: usize, by: usize, val: &[i32]) -> Option<usize> {
+        let mut best: Option<(i32, usize)> = None;
+        let mut consider = |from: usize, c: u16| {
+            let v = if r.info[kind_of(c)].is_king { 100_000 } else { val[kind_of(c)] };
+            if best.map_or(true, |b| v < b.0) {
+                best = Some((v, from));
+            }
+        };
+        let (a, b) = r.rev_index[by][s];
+        for rr in &r.rev[a as usize..b as usize] {
+            let line = &r.lines[by][rr.line as usize];
+            let mut screens = 0;
+            let sqs = &r.rev_sq[rr.start as usize..rr.start as usize + rr.len as usize];
+            for (i, &p) in sqs.iter().enumerate() {
+                let c = sqa[p as usize];
+                if c == 0 {
+                    continue;
+                }
+                if team_of(c) == by {
+                    let k = kind_of(c);
+                    let mask = if screens == 0 { line.plain_mask } else { line.hop_mask };
+                    if mask & (1 << k) != 0 {
+                        let dist = (i + 1) as u8;
+                        let hop = screens == 1;
+                        for at in &line.attackers {
+                            if at.kind as usize == k && at.hop == hop {
+                                let limit = if c & MOVED != 0 { at.lim_moved } else { at.lim_unmoved };
+                                if dist <= limit {
+                                    consider(p as usize, c);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                screens += 1;
+                if screens > 1 || !line.has_hop {
+                    break;
+                }
+            }
+        }
+        let um = r.unusual[by];
+        if um != 0 {
+            for from in bits(occ[by]) {
+                let c = sqa[from];
+                let k = kind_of(c);
+                if um & (1 << k) == 0 {
+                    continue;
+                }
+                for ray in r.rays_of(k, by, from) {
+                    if ray.mode == Mode::MoveOnly {
+                        continue;
+                    }
+                    let sqs = r.ray_squares(ray);
+                    let reaches = if ray.is_path {
+                        sqs[sqs.len() - 1] as usize == s && sqs[..sqs.len() - 1].iter().all(|&p| sqa[p as usize] == 0)
+                    } else if ray.leap > 0 {
+                        match sqs.iter().position(|&p| p as usize == s) {
+                            None => false,
+                            Some(idx) => {
+                                let limit = if c & MOVED != 0 { ray.lim_moved } else { ray.lim_unmoved } as usize;
+                                idx >= ray.leap as usize
+                                    && idx < limit
+                                    && (0..idx).all(|j| {
+                                        let p = sqa[sqs[j] as usize];
+                                        if j < ray.leap as usize {
+                                            !ray.leap_own || (p != 0 && team_of(p) == by)
+                                        } else {
+                                            p == 0
+                                        }
+                                    })
+                            }
+                        }
+                    } else {
+                        false
+                    };
+                    if reaches {
+                        consider(from, c);
+                        break;
+                    }
+                }
+            }
+        }
+        best.map(|b| b.1)
+    }
+
     /// `_rule_reaches` for a leaping rule.
     fn ray_reaches(&self, r: &Rules, ray: &Ray, c: u16, team: usize, s: usize) -> bool {
         let sqs = r.ray_squares(ray);
