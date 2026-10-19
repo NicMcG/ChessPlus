@@ -125,18 +125,13 @@ const LAYERS := {
 	Sound.ARROW_WHOOSH: [[["arrow_whistle"], 0.75, -2.0]],
 	# A bowstring plucked as the arrow is loosed.
 	Sound.BOW: [[["bow_shot"], 1.0, 2.0]],
-	# The arrow striking home (Mac: no rumbly explosion): a quick stab and the
-	# sharp thunk of an arrow hitting wood.
-	Sound.ARROW_HIT: [
-		[["chop"], 1.15, 6.0],
-		[["knifeSlice2"], 1.6, -2.0],
-		[WOOD_KNOCK, 1.25, 5.0],
-		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.3, 0.0],
-	],
-	# A laser bolt fired along with the bow (Mac).
-	Sound.LASER: [[["laserLarge_001", "laserLarge_002"], 1.15, -3.0]],
+	# The arrow striking home: just a quick stab (Mac: no explosion, no wood).
+	Sound.ARROW_HIT: [[["chop"], 1.15, 6.0], [["knifeSlice2"], 1.6, -2.0]],
+	# A laser bolt fired along with the bow, echoing a little (Mac).
+	Sound.LASER: [[["laser_echo_1", "laser_echo_2"], 1.15, -3.0]],
 	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0]],
-	# A special ability powering up (Mac): crackling high-voltage arcs...
+	# A special ability powering up (Mac): crackling high-voltage arcs, pitched
+	# down over a low engine rumble so it's deep and heavy...
 	Sound.ABILITY: [[["electric_charge"], 1.0, -3.0]],
 	# ...then the piece slamming down: a deep thump, rock and wood.
 	Sound.GROUND_SLAM: [
