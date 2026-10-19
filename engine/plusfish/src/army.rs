@@ -391,3 +391,88 @@ pub fn army_game(cat: &Arc<Catalog>, white: &Army, black: &Army, w: i32, h: i32)
     }
     Game::new(rules, p)
 }
+
+impl Army {
+    /// The game's saved-army format (`ArmyLibrary` saves an `Army` resource
+    /// like this; `from_tres` reads it back).
+    pub fn to_tres(&self, cat: &Catalog) -> String {
+        let mut kinds: Vec<usize> = Vec::new();
+        for p in &self.pieces {
+            if !kinds.contains(&p.0) {
+                kinds.push(p.0);
+            }
+        }
+        let mut s = String::from("[gd_resource type=\"Resource\" script_class=\"Army\" format=3]\n\n");
+        s += "[ext_resource type=\"Script\" path=\"res://core/army.gd\" id=\"1_army\"]\n";
+        s += "[ext_resource type=\"Script\" path=\"res://core/army_piece.gd\" id=\"2_piece\"]\n";
+        for (i, &k) in kinds.iter().enumerate() {
+            s += &format!("[ext_resource type=\"Resource\" path=\"res://data/pieces/{}.tres\" id=\"{}_{}\"]\n", cat.defs[k].id, i + 3, cat.defs[k].id);
+        }
+        let ext = |k: usize| -> String {
+            let i = kinds.iter().position(|&x| x == k).unwrap();
+            format!("{}_{}", i + 3, cat.defs[k].id)
+        };
+        let mut refs = Vec::new();
+        for (i, p) in self.pieces.iter().enumerate() {
+            let id = format!("Resource_p{}", i + 1);
+            s += &format!("\n[sub_resource type=\"Resource\" id=\"{}\"]\nscript = ExtResource(\"2_piece\")\ndef = ExtResource(\"{}\")\nsquare = Vector2i({}, {})\n", id, ext(p.0), p.1, p.2);
+            refs.push(format!("SubResource(\"{}\")", id));
+        }
+        s += "\n[resource]\nscript = ExtResource(\"1_army\")\n";
+        s += &format!("army_name = {}\n", crate::json::quote(&self.name));
+        s += &format!("pieces = Array[ExtResource(\"2_piece\")]([{}])\n", refs.join(", "));
+        if !self.mirror {
+            s += "mirror_for_black = false\n";
+        }
+        s
+    }
+}
+
+/// A list of armies: "pool:<file>" (or any file) with one army per line,
+/// a folder of saved .tres armies, or "a;b;c".
+///
+/// Pool files: blank lines and lines starting with # are skipped; each line is
+/// "<army> | <name> | anything else", fields split by '|' (only the army is
+/// required).
+pub fn parse_army_list(cat: &Catalog, spec: &str, rng: &mut Rng) -> Result<Vec<Army>, String> {
+    let spec = spec.trim();
+    let file = spec.strip_prefix("pool:").unwrap_or(spec);
+    let path = std::path::Path::new(file);
+    let mut armies = Vec::new();
+    if path.is_dir() {
+        let mut files: Vec<_> = std::fs::read_dir(path)
+            .map_err(|e| e.to_string())?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().map(|x| x == "tres").unwrap_or(false))
+            .collect();
+        files.sort();
+        for f in files {
+            armies.push(parse_army(cat, &f.to_string_lossy(), rng)?);
+        }
+    } else if spec.starts_with("pool:") || (path.is_file() && !file.ends_with(".tres")) {
+        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {}", file, e))?;
+        for line in text.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let mut fields = line.split('|').map(|f| f.trim());
+            let army_text = fields.next().unwrap();
+            let mut a = parse_army(cat, army_text, rng)?;
+            a.name = match fields.next() {
+                Some(n) if !n.is_empty() => n.to_string(),
+                _ => a.to_text(cat, 8),
+            };
+            armies.push(a);
+        }
+    } else {
+        for part in spec.split(';').filter(|p| !p.trim().is_empty()) {
+            let mut a = parse_army(cat, part, rng)?;
+            if a.name.starts_with("random") || a.name.is_empty() || a.name == part.trim() {
+                a.name = if a.mirror { a.to_text(cat, 8) } else { a.name.clone() };
+            }
+            armies.push(a);
+        }
+    }
+    Ok(armies)
+}

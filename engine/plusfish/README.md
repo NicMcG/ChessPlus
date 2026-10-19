@@ -120,7 +120,8 @@ plusfish match --white "<army A>" --black "<army B>" --games 400
 A and B swap colours every game. You get A's score, the Elo difference with a
 95% margin, how games ended, and White's overall score. `--out games.jsonl`
 saves the games. With `--armies random --params a.txt --params-b b.txt` it
-A/B-tests two evaluation files over random army pairs instead.
+A/B-tests two evaluation files over random army pairs instead, and with
+`--armies pool:armies/pool.txt` over pairs from the army pool (below).
 
 ### Piece values
 
@@ -147,6 +148,75 @@ average across pieces), with 95% ranges. A piece is flagged under/overpriced
 when it's at least half a point off and outside its range. The numbers come
 from engine play, which isn't human play; treat them as strong hints, and
 re-run after changing costs.
+
+### The army pool
+
+`armies/pool.txt` is a fixed pool of varied, decent-to-strong armies for
+repeatable engine tests and for checking piece values on real builds (see
+`reports/ARMY_POOL.md`). Each line is `<army> | <name> | niche | style |
+cost | Elo`; only the army is required, `#` starts a comment. `armies/*.tres`
+are the same armies in the game's saved-army format.
+
+```
+plusfish match --armies pool:armies/pool.txt --params new.txt --params-b none --games 1000
+plusfish tournament --armies pool:armies/pool.txt --with-standard --games 40 --nodes 6000
+plusfish export-tres --armies pool:armies/pool.txt --dir armies
+```
+
+* `match --armies pool:<file>` plays ordered pairs of pool armies, each pair
+  twice (side A as White, then as Black), so only the evaluations differ.
+* `tournament` takes `pool:<file>`, `"a;b;c"` or a folder of `.tres` armies;
+  `--with-standard` adds Standard and then also shows each army's Elo against
+  Standard, its head-to-head score against it, and its Elo within the pool
+  (relative to the pool average, without Standard). Pairings where a king
+  starts attacked are skipped.
+* `export-tres` writes each army as a `.tres` and checks it reads back the
+  same. `verify/check_saved_armies.gd` loads them with the game's own classes
+  and checks them against `Army.problems`.
+
+### Evolving armies
+
+```
+plusfish evolve --dir run1 --seed 1 --threads 6 --nodes 4000 --minutes 120
+```
+
+Quality-diversity search (MAP-Elites, `src/evolve.rs`). Plain evolution
+collapses onto one build, so armies are sorted into 9 niches and each niche
+keeps its best army:
+
+* **Niches**: extra royal (Queen / Wizard / none) x number of pawns (0-3 /
+  4-6 / 7+). Style (most points in sliders, leapers or steppers, plus ability
+  pieces) is reported, not a niche, so each niche gets enough tries.
+* **Mutations** (1 to 3 per child): swap a piece for another type, move a
+  piece (the king only between d1 and e1), swap two squares, add a piece,
+  remove one, or trade one piece for one or two others. Children must pass
+  `Army::problems` and cost at least `--min-cost` (36). 15% of each batch are
+  fresh random armies.
+* **Fitness**: an Elo rating on one scale with Standard = 0. A short round
+  robin at the start rates the fixed reference armies (Standard, the Berserker
+  build from FINDINGS.md, 4 random armies) and White's first-move edge. A
+  candidate's rating is its performance against its opponents' ratings
+  (references and current elites, both colours), with a weak prior (mean 0,
+  sd 200) so a few lucky games don't crown a champion.
+* **Racing**: every candidate plays 12 games; it plays 12 more if within 60
+  Elo of its niche's elite, then 24 more if within 25; it replaces the elite
+  only if still rated higher after that (the elite is topped up to the same
+  number of games). An empty niche takes the first army that lands in it.
+* **The king-capture bug**: pairings where a king starts attacked are never
+  played, and candidates whose king is attacked, or who attack the other
+  king, at the start against more than `--max-exposure` (3%) of 300 random
+  armies are thrown out before playing.
+* Options: `--batch` (30 candidates per generation), `--generations` (60),
+  `--minutes` (150), `--patience` (stop after this many generations without a
+  new elite once all niches are filled; 12), `--nodes`, `--threads` (6 by
+  default), `--seed`.
+* **Checkpoints**: `<dir>/state.txt` (reference ratings, elites, generation)
+  and `<dir>/games.txt` (every game) are written after each generation; run
+  the same command again to carry on. `<dir>/archive.txt` lists the current
+  elites with niche, style, cost, rating and exposure.
+
+The ratings during evolution are noisy and biased upwards for the winners
+(they won the races), so the pool's numbers come from a separate tournament.
 
 ### Tuning the engine
 

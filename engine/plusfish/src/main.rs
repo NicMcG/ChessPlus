@@ -32,10 +32,18 @@ Balancing
               --games N (default 100)  --nodes N per move (default 20000)
               --params-b <file>        give side B a different evaluation
               --armies random          A/B test: random army pairs, played both ways
+              --armies pool:<file>     A/B test over pairs from an army pool
+                                       (e.g. pool:engine/plusfish/armies/pool.txt)
               --out games.jsonl        save the games
   tournament  Round robin between armies, with Elo ratings.
-              --armies \"<a>;<b>;<c>\"  or a folder of saved .tres armies
-              --games N per pairing (default 20)  --nodes N
+              --armies \"<a>;<b>;<c>\", pool:<file>, or a folder of .tres armies
+              --games N per pairing (default 20)  --nodes N  --with-standard
+  evolve    Evolve a varied pool of strong armies (MAP-Elites, see README).
+              --dir <run folder> (resumes if it has a state)  --seed N
+              --nodes N (4000)  --generations N (60)  --minutes M (150)
+              --batch N (30)  --threads N (default 6 here)
+  export-tres  Write each army of a pool file as a saved-army .tres file.
+              --armies pool:<file> --dir <folder>
   selfplay  Random-army games for the balance report / tuning.
               --games N  --nodes N  --out games.jsonl
               --budget-spread P   each side's budget is 39 minus up to P points
@@ -317,7 +325,30 @@ fn main() {
             };
             let random_armies = args.get("armies") == Some("random");
             let seed: u64 = args.num("seed", 1);
+            // --armies pool:<file>: A/B test over ordered pairs of pool armies
+            // (each pair played twice, A taking each side), skipping pairings
+            // where a king starts attacked.
+            let mut pool_pairs: Vec<(Army, Army)> = Vec::new();
+            if let Some(spec) = args.get("armies").filter(|s| s.starts_with("pool:")) {
+                let pool = parse_army_list(&cat, spec, &mut rng).unwrap_or_else(|e| die(&e));
+                for (i, w) in pool.iter().enumerate() {
+                    for (j, bl) in pool.iter().enumerate() {
+                        if i != j && !start_is_broken(&army_game(&cat, w, bl, 8, 8)) {
+                            pool_pairs.push((w.clone(), bl.clone()));
+                        }
+                    }
+                }
+                if pool_pairs.is_empty() {
+                    die("the pool needs at least two armies that can play each other");
+                }
+                Rng::new(seed).shuffle(&mut pool_pairs);
+                println!("pool: {} armies, {} ordered pairings, each played with A as White and as Black", pool.len(), pool_pairs.len());
+            }
             let pair = |i: usize, _rng: &mut Rng| -> (Army, Army, bool) {
+                if !pool_pairs.is_empty() {
+                    let (w, bl) = pool_pairs[(i / 2) % pool_pairs.len()].clone();
+                    return (w, bl, i % 2 == 0);
+                }
                 let (w, bl) = if random_armies {
                     // A/B test of evaluations: the same random armies twice, colours swapped.
                     let mut prng = Rng::new(seed * 104729 + (i / 2) as u64);
@@ -351,42 +382,38 @@ fn main() {
         }
         "tournament" => {
             // Round robin between armies: every pair plays both colours.
-            let spec = args.get("armies").unwrap_or_else(|| die("--armies \"a;b;c\" or a folder of saved armies"));
+            let spec = args.get("armies").unwrap_or_else(|| die("--armies \"a;b;c\", pool:<file> or a folder of saved armies"));
             let mut rng = Rng::new(args.num("seed", 5));
-            let mut armies: Vec<Army> = Vec::new();
-            let path = std::path::Path::new(spec);
-            if path.is_dir() {
-                let mut files: Vec<_> = std::fs::read_dir(path).unwrap().filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().map(|x| x == "tres").unwrap_or(false)).collect();
-                files.sort();
-                for f in files {
-                    armies.push(parse_army(&cat, &f.to_string_lossy(), &mut rng).unwrap_or_else(|e| die(&e)));
-                }
-            } else {
-                for part in spec.split(';').filter(|p| !p.trim().is_empty()) {
-                    let mut a = parse_army(&cat, part, &mut rng).unwrap_or_else(|e| die(&e));
-                    if a.name.starts_with("random") || a.name.is_empty() || a.name == part.trim() {
-                        a.name = a.to_text(&cat, 8);
-                    }
-                    armies.push(a);
-                }
+            let mut armies = parse_army_list(&cat, spec, &mut rng).unwrap_or_else(|e| die(&e));
+            if args.flag("with-standard") && !armies.iter().any(|a| a.name == "Standard") {
+                armies.insert(0, standard(&cat));
             }
             if armies.len() < 2 {
                 die("need at least two armies");
             }
             for a in &armies {
                 let p = a.problems(&cat, 8);
-                println!("{:<40} {:>5} pts  {}", a.name, a.cost(&cat), if p.is_empty() { "legal".into() } else { p.join(" ") });
+                println!("{:<28} {:<34} {:>5} pts  {}", a.name, a.to_text(&cat, 8), a.cost(&cat), if p.is_empty() { "legal".into() } else { p.join(" ") });
             }
             let per_pair: usize = args.num("games", 20);
             let mut pairs: Vec<(usize, usize)> = Vec::new();
+            let mut skipped = Vec::new();
             for i in 0..armies.len() {
                 for j in 0..armies.len() {
                     if i != j {
+                        // A king attacked at the start (see FINDINGS.md): not a real game.
+                        if start_is_broken(&army_game(&cat, &armies[i], &armies[j], 8, 8)) {
+                            skipped.push(format!("{} (White) v {}", armies[i].name, armies[j].name));
+                            continue;
+                        }
                         for _ in 0..(per_pair / 2).max(1) {
                             pairs.push((i, j));
                         }
                     }
                 }
+            }
+            for s in &skipped {
+                println!("skipped (a king starts attacked): {}", s);
             }
             let params = load_params(&cat, args.get("params"));
             let cfg = PlayConfig { nodes: args.num("nodes", 20_000), random_plies: args.num("random-plies", 6), ..Default::default() };
@@ -397,16 +424,22 @@ fn main() {
                 (armies[w].clone(), armies[b].clone(), true)
             };
             let progress = |_rec: &GameRecord, n: usize| {
-                if n % 20 == 0 || n == total {
+                if n % 50 == 0 || n == total {
                     eprintln!("  {}/{}", n, total);
                 }
             };
             let recs = run_games(&cat, total, threads(&args), &params, &params, &cfg, args.num("seed", 5), &pair_fn, &progress);
+            if let Some(path) = args.get("out") {
+                save_games(&cat, &recs, path);
+            }
             // Ratings: result ~ rating(white army) - rating(black army) + white edge.
             let na = armies.len();
             let mut x = Vec::new();
             let mut y = Vec::new();
             let mut score = vec![(0.0f64, 0usize); na];
+            // Head to head against the first army named Standard, if any.
+            let std_i = armies.iter().position(|a| a.name == "Standard");
+            let mut h2h = vec![(0.0f64, 0usize); na];
             for (g, rec) in recs.iter().enumerate() {
                 let (w, b) = pairs[g];
                 let mut row = vec![0.0; na];
@@ -419,37 +452,111 @@ fn main() {
                 score[w].1 += 1;
                 score[b].0 += 1.0 - rec.result as f64;
                 score[b].1 += 1;
+                if Some(b) == std_i {
+                    h2h[w].0 += rec.result as f64;
+                    h2h[w].1 += 1;
+                }
+                if Some(w) == std_i {
+                    h2h[b].0 += 1.0 - rec.result as f64;
+                    h2h[b].1 += 1;
+                }
             }
             let (beta, _, cov) = tune::logistic_cov(&x, &y, 0.05);
-            // Uncertainty of each rating relative to the field average.
-            let se: Vec<f64> = (0..na)
-                .map(|i| {
-                    let c: Vec<f64> = (0..na).map(|j| if i == j { 1.0 } else { 0.0 } - 1.0 / na as f64).collect();
-                    let mut v = 0.0;
-                    for a in 0..na {
-                        for b in 0..na {
-                            v += c[a] * cov[a][b] * c[b];
-                        }
+            // Uncertainty of a contrast c . rating.
+            let contrast_se = |c: &[f64]| -> f64 {
+                let mut v = 0.0;
+                for a in 0..na {
+                    for b in 0..na {
+                        v += c[a] * cov[a][b] * c[b];
                     }
-                    v.max(0.0).sqrt()
-                })
-                .collect();
-            let mean = beta[..na].iter().sum::<f64>() / na as f64;
+                }
+                v.max(0.0).sqrt()
+            };
+            // Relative to the field average, and to the average without Standard.
+            let others: Vec<usize> = (0..na).filter(|&j| Some(j) != std_i).collect();
+            let field = |i: usize, group: &[usize]| -> (f64, f64) {
+                let mut c = vec![0.0; na];
+                for &j in group {
+                    c[j] -= 1.0 / group.len() as f64;
+                }
+                c[i] += 1.0;
+                let v: f64 = (0..na).map(|j| c[j] * beta[j]).sum();
+                (v, contrast_se(&c))
+            };
             let elo = 400.0 / std::f64::consts::LN_10;
             let mut order: Vec<usize> = (0..na).collect();
             order.sort_by(|&a, &b| beta[b].partial_cmp(&beta[a]).unwrap());
-            println!("\n{:<4} {:<40} {:>6} {:>8} {:>7}", "rank", "army", "Elo", "+-95%", "score");
+            print!("\n{:<4} {:<28} {:>6} {:>6} {:>7}", "rank", "army", "Elo", "+-95%", "score");
+            if std_i.is_some() {
+                print!(" {:>9} {:>6} {:>9} {:>9} {:>6}", "vs Std", "+-95%", "h2h Std", "in pool", "+-95%");
+            }
+            println!();
             for (rank, &i) in order.iter().enumerate() {
-                println!(
-                    "{:<4} {:<40} {:>+6.0} {:>8.0} {:>6.1}%",
-                    rank + 1,
-                    armies[i].name,
-                    (beta[i] - mean) * elo,
-                    1.96 * se[i] * elo,
-                    100.0 * score[i].0 / score[i].1.max(1) as f64
-                );
+                let (r, se) = field(i, &(0..na).collect::<Vec<_>>());
+                print!("{:<4} {:<28} {:>+6.0} {:>6.0} {:>6.1}%", rank + 1, armies[i].name, r * elo, 1.96 * se * elo, 100.0 * score[i].0 / score[i].1.max(1) as f64);
+                if let Some(s) = std_i {
+                    if i == s {
+                        print!(" {:>9} {:>6} {:>9}", "0", "", "");
+                    } else {
+                        let mut c = vec![0.0; na];
+                        c[i] = 1.0;
+                        c[s] = -1.0;
+                        let (pr, pse) = field(i, &others);
+                        print!(
+                            " {:>+9.0} {:>6.0} {:>8.1}% {:>+9.0} {:>6.0}",
+                            (beta[i] - beta[s]) * elo,
+                            1.96 * contrast_se(&c) * elo,
+                            100.0 * h2h[i].0 / h2h[i].1.max(1) as f64,
+                            pr * elo,
+                            1.96 * pse * elo
+                        );
+                    }
+                }
+                println!();
             }
             println!("White's first-move edge: {:+.0} Elo", beta[na] * elo);
+        }
+        "evolve" => {
+            use plusfish_core::evolve::*;
+            let d = EvolveConfig::default();
+            let cfg = EvolveConfig {
+                dir: std::path::PathBuf::from(args.get("dir").unwrap_or("evolve_run")),
+                seed: args.num("seed", d.seed),
+                threads: args.num("threads", d.threads),
+                nodes: args.num("nodes", d.nodes),
+                generations: args.num("generations", d.generations),
+                max_minutes: args.num("minutes", d.max_minutes),
+                batch: args.num("batch", d.batch),
+                min_cost: args.num("min-cost", d.min_cost),
+                max_exposure: args.num("max-exposure", d.max_exposure),
+                patience: args.num("patience", d.patience),
+                ..d
+            };
+            let params = load_params(&cat, args.get("params"));
+            evolve(&cat, &params, &cfg);
+        }
+        "export-tres" => {
+            let spec = args.get("armies").unwrap_or_else(|| die("--armies pool:<file>"));
+            let dir = std::path::PathBuf::from(args.get("dir").unwrap_or_else(|| die("--dir <folder>")));
+            let mut rng = Rng::new(1);
+            let armies = parse_army_list(&cat, spec, &mut rng).unwrap_or_else(|e| die(&e));
+            std::fs::create_dir_all(&dir).unwrap_or_else(|e| die(&e.to_string()));
+            for a in &armies {
+                let file: String = a.name.chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' }).collect();
+                let path = dir.join(format!("{}.tres", file.trim_matches('_')));
+                let text = a.to_tres(&cat);
+                // Check it reads back as the same army.
+                let back = Army::from_tres(&cat, &text).unwrap_or_else(|e| die(&e));
+                let mut x = a.pieces.clone();
+                let mut y = back.pieces.clone();
+                x.sort();
+                y.sort();
+                if x != y || back.mirror != a.mirror || back.name != a.name || !back.problems(&cat, 8).is_empty() {
+                    die(&format!("{} doesn't read back the same", a.name));
+                }
+                std::fs::write(&path, text).unwrap_or_else(|e| die(&e.to_string()));
+                println!("{}  {}  ({} points)", path.display(), a.to_text(&cat, 8), a.cost(&cat));
+            }
         }
         "selfplay" => {
             let games: usize = args.num("games", 1000);

@@ -3,6 +3,7 @@
 pub mod army;
 pub mod defs;
 pub mod eval;
+pub mod evolve;
 pub mod game;
 pub mod html;
 pub mod json;
