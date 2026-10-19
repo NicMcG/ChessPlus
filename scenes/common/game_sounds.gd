@@ -3,7 +3,8 @@ extends Node
 
 ## Plays the game's sound effects. Most are recordings in res://audio/sfx/ (their
 ## licences are there): Kenney's free (CC0) Impact, Interface, RPG Audio, Sci-Fi
-## and Music Jingles packs, a public-domain wolf howl and sheep, and a giggle
+## and Music Jingles packs, OpenGameArt's CC0 "Scrapes" (the move sound), a
+## public-domain wolf howl and sheep, and a giggle
 ## and a thunder crack from Wikimedia Commons (credited on the main menu). The
 ## rest are made by code (the cannon's boom, the arrow's whoosh, the bow's twang,
 ## a balloon pop, Raise Dead's swell, the checkmate bell's long hum and the
@@ -85,7 +86,8 @@ const SLAP := ["impactSoft_heavy_000", "impactSoft_heavy_001", "impactSoft_heavy
 const PLANK := ["impactPlank_medium_000", "impactPlank_medium_001", "impactPlank_medium_002"]
 const LAYERS := {
 	Sound.MOVE: [[WOOD_KNOCK, 1.0, 0.0]],
-	Sound.SCRAPE: [[["scratch_004", "scratch_005"], 0.5, -9.0]],
+	# Something heavy pushed across stone (Mac: a chair or a stone block, not a squeak).
+	Sound.SCRAPE: [[["stone_scrape_1", "stone_scrape_2"], 0.8, -5.0]],
 	# Punchy: a heavy punch, a flat slap and a wooden thwack together.
 	Sound.CAPTURE: [[PUNCH_HEAVY, 0.95, 3.0], [SLAP, 1.15, 2.0], [PLANK, 1.05, -2.0]],
 	Sound.CHECK: [[["impactBell_heavy_000"], 1.15, -4.0]],
@@ -127,7 +129,8 @@ const LAYERS := {
 	Sound.HOWL: [[["wolf_howl"], 1.0, -3.0]],
 	Sound.ILLEGAL: [[["error_005", "error_006"], 1.0, -6.0]],
 	Sound.BLOCKED: [[WOOD_HEAVY, 0.55, 3.0], [PLANK, 0.6, -2.0]],
-	Sound.GIGGLE: [[["jester_giggle"], 1.05, -2.0]],
+	# Short, soft, higher and echoing (Mac).
+	Sound.GIGGLE: [[["jester_giggle"], 1.3, -9.0]],
 	Sound.POP: [["made", 0.0]],
 	Sound.SHEEP: [[["sheep_baa"], 1.0, -2.0]],
 	Sound.BITE: [[["chop"], 1.2, 2.0], [PUNCH_MEDIUM, 1.4, -4.0]],

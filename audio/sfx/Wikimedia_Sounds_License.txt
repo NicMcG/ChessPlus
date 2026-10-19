@@ -2,8 +2,8 @@ Sounds cut from recordings on Wikimedia Commons (cut short, faded in and out,
 volume evened out):
 
 jester_giggle.wav
-  From "Short male snorts and giggles.ogg" by pfranzen, CC BY 3.0
-  https://commons.wikimedia.org/wiki/File:Short_male_snorts_and_giggles.ogg
+  From "Giggle.ogg" by Lomond, CC BY 3.0 (cut short and given an echo)
+  https://commons.wikimedia.org/wiki/File:Giggle.ogg
   https://creativecommons.org/licenses/by/3.0/
   (needs a credit: shown on the main menu)
 

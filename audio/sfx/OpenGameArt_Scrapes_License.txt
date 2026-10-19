@@ -1,0 +1,5 @@
+stone_scrape_1.wav, stone_scrape_2.wav
+
+Cut from "Scrapes" (scrape-1.ogg, scrape-2.ogg): an object dragged across a
+cinder block, made for the game Stendhal. CC0 (public domain): no credit needed.
+https://opengameart.org/content/scrapes
