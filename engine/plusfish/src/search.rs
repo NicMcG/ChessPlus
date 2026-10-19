@@ -99,6 +99,10 @@ pub struct Limits {
     pub depth: Option<i32>,
     pub nodes: Option<u64>,
     pub movetime_ms: Option<u64>,
+    /// With a clock: the time we'd like to use. The search stops after a depth
+    /// once past it, sooner when the best move has stayed the same for a few
+    /// depths and later when it keeps changing. `movetime_ms` is the hard limit.
+    pub soft_ms: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -297,6 +301,8 @@ impl<'a> Searcher<'a> {
         }
         let multipv = multipv.max(1).min(root_moves.len());
         let mut prev_scores: Vec<i32> = vec![0; multipv];
+        let mut stable = 0;
+        let mut last_best = Move::NONE;
         for depth in 1..=max_depth {
             self.seldepth = 0;
             self.must_finish = depth == 1;
@@ -368,6 +374,15 @@ impl<'a> Searcher<'a> {
             if multipv == 1 && is_mate(best.lines[0].score) && depth > 8 && (MATE - best.lines[0].score.abs()) < depth {
                 break;
             }
+            let first = best.lines[0].pv.first().copied().unwrap_or(Move::NONE);
+            stable = if first == last_best { stable + 1 } else { 0 };
+            last_best = first;
+            if let Some(soft) = limits.soft_ms {
+                let f = if stable >= 3 { 0.6 } else if stable == 0 && depth > 4 { 1.6 } else { 1.0 };
+                if (now_ms() - self.start) as f64 >= soft as f64 * f {
+                    break;
+                }
+            }
             if let Some(ms) = limits.movetime_ms {
                 // Don't start a depth we're unlikely to finish.
                 if (now_ms() - self.start) * 2 > ms && limits.depth.is_none() {
@@ -409,7 +424,7 @@ impl<'a> Searcher<'a> {
                     h.age = age;
                     h.stop = hs;
                     h.depth_offset = (i % 2) as i32;
-                    let lim = Limits { depth: limits.depth, nodes: None, movetime_ms: None };
+                    let lim = Limits { depth: limits.depth, nodes: None, movetime_ms: None, soft_ms: None };
                     h.search(pos, history_keys, lim, 1, |_| {});
                     h.nodes
                 }));

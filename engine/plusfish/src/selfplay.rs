@@ -64,7 +64,7 @@ pub fn start_is_broken(g: &Game) -> bool {
 pub fn pick_opening_move(s: &mut Searcher, g: &Game, rng: &mut Rng) -> Move {
     let legal = g.pos.legal_moves(&g.rules);
     let k = legal.len().min(8);
-    let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: Some(3), nodes: Some(200_000), movetime_ms: None }, k, |_| {});
+    let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: Some(3), nodes: Some(200_000), movetime_ms: None, soft_ms: None }, k, |_| {});
     let best = rep.lines.first().map(|l| l.score).unwrap_or(0);
     let good: Vec<&Line> = rep.lines.iter().filter(|l| l.score >= best - 40 && !l.pv.is_empty()).collect();
     if good.is_empty() {
@@ -100,7 +100,7 @@ pub fn play_game(cat: &Arc<Catalog>, white: &Army, black: &Army, pa: &Params, pb
         if ply < cfg.random_plies {
             m = pick_opening_move(s, &g, &mut rng);
         } else {
-            let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(cfg.nodes), movetime_ms: None }, 1, |_| {});
+            let rep = s.search(&g.pos, &g.keys[..g.keys.len() - 1], Limits { depth: None, nodes: Some(cfg.nodes), movetime_ms: None, soft_ms: None }, 1, |_| {});
             let line = &rep.lines[0];
             m = line.pv.first().copied().unwrap_or_else(|| g.pos.legal_moves(r)[0]);
             let white_score = if g.pos.side == WHITE { line.score } else { -line.score };
