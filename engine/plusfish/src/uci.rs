@@ -27,6 +27,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
     let mut game = army_game(&cat, &standard(&cat), &standard(&cat), 8, 8);
     let mut hash_mb = 64usize;
     let mut multipv = 1usize;
+    let mut threads = 1usize;
     let stop = Arc::new(AtomicBool::new(false));
     let mut worker: Option<std::thread::JoinHandle<Option<SearchTables>>> = None;
     // The last "position" setup (everything before "moves"), its game before
@@ -55,6 +56,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                 say("id author Plusfish for Chess Plus".into());
                 say("option name Hash type spin default 64 min 1 max 4096".into());
                 say("option name MultiPV type spin default 1 min 1 max 32".into());
+                say("option name Threads type spin default 1 min 1 max 256".into());
                 say("uciok".into());
             }
             "isready" => say("readyok".into()),
@@ -74,6 +76,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                         tables = None;
                     }
                     (Some("multipv"), Some(v)) => multipv = v.max(1),
+                    (Some("threads"), Some(v)) => threads = v.max(1),
                     _ => say("info string unknown option".into()),
                 }
             }
@@ -156,6 +159,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                 let out2 = out.clone();
                 let mpv = multipv;
                 let mb = hash_mb;
+                let nthreads = threads;
                 let et = match &base {
                     Some(b) if Arc::ptr_eq(&b.1.rules, &g.rules) => b.2.clone(),
                     _ => Arc::new(EvalTables::new(&g.rules)),
@@ -170,7 +174,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                     };
                     s.stop = stop2;
                     let keys = &g.keys[..g.keys.len() - 1];
-                    let rep = s.search(&g.pos, keys, limits, mpv, |rep| {
+                    let rep = s.search_threads(&g.pos, keys, limits, mpv, nthreads, |rep| {
                         let _l = out2.lock().unwrap();
                         for (i, line) in rep.lines.iter().enumerate() {
                             let nps = if rep.ms > 0 { rep.nodes * 1000 / rep.ms } else { 0 };

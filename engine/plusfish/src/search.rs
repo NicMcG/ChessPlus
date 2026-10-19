@@ -146,6 +146,9 @@ pub struct Searcher<'a> {
     /// True while the first depth runs: limits don't apply until there's a move.
     must_finish: bool,
     root_excluded: Vec<Move>,
+    /// Lazy SMP helpers search one ply deeper on odd thread numbers, so the
+    /// threads don't all do the same work.
+    depth_offset: i32,
 }
 
 fn is_mate(s: i32) -> bool {
@@ -196,6 +199,7 @@ impl<'a> Searcher<'a> {
             stopped: false,
             must_finish: false,
             root_excluded: Vec::new(),
+            depth_offset: 0,
         }
     }
 
@@ -296,7 +300,7 @@ impl<'a> Searcher<'a> {
                 let score = loop {
                     self.keys.clear();
                     self.keys.extend_from_slice(history_keys);
-                    let s = self.negamax(pos, depth, alpha, beta, 0, true, false);
+                    let s = self.negamax(pos, depth + self.depth_offset, alpha, beta, 0, true, false);
                     if self.stopped {
                         break s;
                     }
@@ -361,6 +365,50 @@ impl<'a> Searcher<'a> {
         best.nodes = self.nodes;
         best.ms = now_ms() - self.start;
         best
+    }
+
+    /// `search` on `threads` threads (Lazy SMP): helper threads search the
+    /// same position with their own move-ordering tables, sharing the hash
+    /// table, and stop when this (the main) thread finishes. Only the main
+    /// thread's limits and results count; the node total includes helpers.
+    /// Native only: the WebAssembly build has no threads.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn search_threads(&mut self, pos: &Position, history_keys: &[u64], limits: Limits, multipv: usize, threads: usize, report: impl FnMut(&Report)) -> Report {
+        if threads <= 1 {
+            return self.search(pos, history_keys, limits, multipv, report);
+        }
+        let helper_stop = Arc::new(AtomicBool::new(false));
+        let (r, et, params) = (self.r, self.et, self.params);
+        let age = self.age;
+        std::thread::scope(|sc| {
+            let mut handles = Vec::new();
+            for i in 1..threads {
+                let tt = self.tt.clone();
+                let hs = helper_stop.clone();
+                handles.push(sc.spawn(move || {
+                    let mut h = Searcher::new(r, et, params, 1);
+                    h.tt = tt;
+                    h.age = age;
+                    h.stop = hs;
+                    h.depth_offset = (i % 2) as i32;
+                    let lim = Limits { depth: limits.depth, nodes: None, movetime_ms: None };
+                    h.search(pos, history_keys, lim, 1, |_| {});
+                    h.nodes
+                }));
+            }
+            let mut rep = self.search(pos, history_keys, limits, multipv, report);
+            helper_stop.store(true, Ordering::SeqCst);
+            for h in handles {
+                rep.nodes += h.join().unwrap_or(0);
+            }
+            rep
+        })
+    }
+
+    /// Without threads (WebAssembly): an ordinary search.
+    #[cfg(target_arch = "wasm32")]
+    pub fn search_threads(&mut self, pos: &Position, history_keys: &[u64], limits: Limits, multipv: usize, _threads: usize, report: impl FnMut(&Report)) -> Report {
+        self.search(pos, history_keys, limits, multipv, report)
     }
 
     fn is_repetition(&self, p: &Position) -> bool {
