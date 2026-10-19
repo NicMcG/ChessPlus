@@ -26,6 +26,11 @@ import random
 import sys
 
 STANDARD = {"pawn": 8, "knight": 2, "bishop": 2, "rook": 2, "queen": 1}
+# The well-known values of the standard pieces. Weak bots distort piece values
+# (long-range pieces look stronger, pawns weaker); fitting a straight line that
+# maps the measured standard pieces onto these, then applying it to every piece,
+# corrects for that ("corrected" column).
+KNOWN = {"pawn": 1, "knight": 3, "bishop": 3, "rook": 5, "queen": 9}
 RIDGE = 0.5  # Keeps rarely seen pieces from running away.
 
 
@@ -145,18 +150,33 @@ def main():
     print(f"{len(games)} games. White wins {white:.0%}, draws {draws:.0%}. Endings: {ends}")
     print(f"White's first-move edge: worth about {beta[0] / scale:.1f} points")
     print()
-    print(f"{'piece':<12}{'cost':>6}{'measured':>10}{'likely range':>16}{'appears in':>12}")
+    a, b = correction(values)
+    print(f"Correction from the standard pieces: corrected = {a:.3f} x measured + {b:.3f}")
+    print()
+    print(f"{'piece':<12}{'cost':>6}{'measured':>10}{'corrected':>11}{'likely range':>16}{'appears in':>12}")
     seen = {p: sum(1 for g in games for side in ("white", "black") if p in g[side]) for p in pieces}
-    for p in sorted(pieces, key=lambda p: values[p] - costs.get(p, 0)):
+    corrected = {p: a * values[p] + b for p in pieces}
+    for p in sorted(pieces, key=lambda p: corrected[p] - costs.get(p, 0)):
         s = sorted(samples[p])
         low, high = s[int(len(s) * 0.05)], s[int(len(s) * 0.95) - 1]
-        print(f"{p:<12}{costs.get(p, 0):>6.1f}{values[p]:>10.1f}{f'{low:.1f} to {high:.1f}':>16}{seen[p]:>12}")
+        print(f"{p:<12}{costs.get(p, 0):>6.1f}{values[p]:>10.1f}{corrected[p]:>11.1f}{f'{a * low + b:.1f} to {a * high + b:.1f}':>16}{seen[p]:>12}")
+    with open(os.path.join(folders[0], "bot_values.json"), "w", encoding="utf-8") as f:
+        json.dump({p: round(corrected[p], 2) for p in pieces}, f, indent=1, sort_keys=True)
     out = os.path.join(folders[0], "values.json")
     with open(out, "w", encoding="utf-8") as f:
         json.dump({p: round(values[p], 2) for p in pieces}, f, indent=1, sort_keys=True)
     with open(os.path.join(folders[0], "ranges.json"), "w", encoding="utf-8") as f:
         json.dump({p: [round(sorted(samples[p])[1], 2), round(sorted(samples[p])[-2], 2)] for p in pieces}, f, indent=1, sort_keys=True)
     print("\nWrote", out)
+
+
+def correction(values):
+    """The straight line (a, b) that best maps the measured standard pieces onto KNOWN."""
+    xs = [values[p] for p in KNOWN if p in values]
+    ys = [KNOWN[p] for p in KNOWN if p in values]
+    mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+    a = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+    return a, my - a * mx
 
 
 def read_costs():
