@@ -31,7 +31,7 @@ def ghost(team):
                   "M 22.5,27.5 L 22.5,34.6", inner(team), 1.0)
     eye = inner(team)
     # Sad eyes (Mac): tall jellybeans, dented on the outside, their tops leaning in.
-    for cx, lean, flip in ((18.4, 20, -1), (26.6, -20, 1)):
+    for cx, lean, flip in ((18.4, 35, -1), (26.6, -35, 1)):
         out += '<g transform="translate(%s 16.2) rotate(%s) scale(%s 1)">%s</g>' % (cx, lean, flip, shape(JELLYBEAN, eye, "none"))
     return out
 
