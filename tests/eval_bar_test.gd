@@ -146,6 +146,123 @@ func test_best_move_live_in_testing_mode() -> void:
 	game.free()
 	_finish()
 
+func _open_bot_game(best_move: bool) -> Node:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.white_army = StandardSetup.army()
+	game.black_army = StandardSetup.army()
+	game.bot_team = Piece.Team.BLACK
+	game.bot_level = PracticeBot.Level.EASY
+	game.bot_delay_frames = 1
+	game.bot_min_seconds = 0.0
+	game.best_move_on = best_move
+	_root().add_child(game)
+	game.board_view.move_time = 0.0
+	return game
+
+## Play your move and wait (up to 5 s) for the bot's reply.
+func _play_and_wait_for_bot(game: Node, san: String) -> void:
+	var moves: int = game.state.history.size()
+	game.play(Notation.find_move(game.state, san))
+	var started := Time.get_ticks_msec()
+	while game.state.history.size() < moves + 2 and Time.get_ticks_msec() - started < 5000:
+		await _frames(1)
+
+func test_best_move_against_the_bot_when_chosen() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_bot_game(true)
+	check(game.live_best_move(), "Your turn: best move shown")
+	game.play(Notation.find_move(game.state, "e4"))
+	check(not game.live_best_move(), "Not while the bot is to move")
+	game.plusfish.results[1] = {"ply": 1, "cp": 30, "mate": null, "outcome": "none", "best": "e7-e5", "best_san": "e5"}
+	game._on_evaluated(1, game.plusfish.results[1])
+	check(game.board_view.hint_arrow.is_empty(), "No arrow for the bot's move")
+	check(not game.status_label.text.contains("best:"), "...and none in the status line")
+	var started := Time.get_ticks_msec()
+	while game.state.history.size() < 2 and Time.get_ticks_msec() - started < 5000:
+		await _frames(1)
+	check_eq(game.state.history.size(), 2, "The bot answered")
+	check(game.live_best_move(), "Your turn again")
+	game.plusfish.results[2] = {"ply": 2, "cp": 40, "mate": null, "outcome": "none", "best": "g1-f3", "best_san": "Nf3"}
+	game._on_evaluated(2, game.plusfish.results[2])
+	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Best move arrow g1-f3")
+	check(game.status_label.text.ends_with("best: Nf3"), "Status names the best move: " + game.status_label.text)
+	game.view_move(1)
+	check(game.live_best_move(), "Looking back: shown even where the bot was to move")
+	check_eq(game.board_view.hint_arrow, [Vector2i(4, 6), Vector2i(4, 4)], "That position's best move")
+	game.free()
+	_finish()
+
+func test_no_best_move_against_the_bot_unless_chosen() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_bot_game(false)
+	await _play_and_wait_for_bot(game, "e4")
+	check_eq(game.state.history.size(), 2, "The bot answered")
+	check(not game.live_best_move(), "Not chosen: no best move")
+	game.plusfish.results[2] = {"ply": 2, "cp": 40, "mate": null, "outcome": "none", "best": "g1-f3", "best_san": "Nf3"}
+	game._on_evaluated(2, game.plusfish.results[2])
+	check(game.eval_bar.known, "The eval bar still shows against the bot")
+	check(game.board_view.hint_arrow.is_empty(), "But no arrow")
+	check(not game.status_label.text.contains("best:"), "...and no best move in the status line")
+	game.free()
+	_finish()
+
+func test_switches_during_a_bot_game() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_bot_game(false)
+	await _play_and_wait_for_bot(game, "e4")
+	check(game.hint_toggles.visible, "Switches shown against the bot")
+	check(game.eval_toggle.button_pressed, "Eval bar starts on")
+	check(not game.best_move_toggle.button_pressed, "Best move starts off")
+	game.plusfish.results[2] = {"ply": 2, "cp": 40, "mate": null, "outcome": "none", "best": "g1-f3", "best_san": "Nf3"}
+	game._on_evaluated(2, game.plusfish.results[2])
+	check(game.board_view.hint_arrow.is_empty(), "No arrow yet")
+	game.best_move_toggle.button_pressed = true
+	check(game.best_move_on, "Best move switched on")
+	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Arrow straight away")
+	check(game.status_label.text.ends_with("best: Nf3"), "And in the status line: " + game.status_label.text)
+	game.eval_toggle.button_pressed = false
+	check(not game.eval_bar.visible, "Eval bar switched off")
+	check(is_equal_approx(game._board_area.ratio, 1.0), "Board area back to square")
+	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Best move still shown without the bar")
+	var saved := SavedGame.load_saved()
+	check(saved != null and saved.best_move and saved.eval_bar_hidden, "Both switches saved with the game")
+	game.best_move_toggle.button_pressed = false
+	check(game.board_view.hint_arrow.is_empty(), "Best move switched off: arrow gone")
+	check(not game.status_label.text.contains("best:"), "...and the status line is plain")
+	game.eval_toggle.button_pressed = true
+	check(game.eval_bar.visible, "Eval bar back on")
+	game.free()
+	SavedGame.delete_saved()
+	_finish()
+
+func test_no_switches_for_two_players() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_game()
+	game.eval_bar_on = true
+	_play_all(game, ["e4"])
+	check(not game.hint_toggles.visible, "Two players: no switches")
+	game.free()
+	_finish()
+
+func test_best_move_choice_is_saved_with_the_game() -> void:
+	SavedGame.delete_saved()
+	var game := _open_bot_game(true)
+	await _play_and_wait_for_bot(game, "e4")
+	var saved := SavedGame.load_saved()
+	check(saved != null and saved.best_move, "Saved with the game")
+	game.free()
+	var main: Node = load("res://scenes/main/main.tscn").instantiate()
+	_root().add_child(main)
+	main.continue_game()
+	check(main.screen.best_move_on, "Continuing keeps it on")
+	check(not main.screen.eval_bar_hidden, "And the eval bar as it was")
+	main.free()
+	SavedGame.delete_saved()
+
 func test_bar_only_after_the_game() -> void:
 	PlusfishLink.enabled = true
 	PlusfishLink.pretend_available = true

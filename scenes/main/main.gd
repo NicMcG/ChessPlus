@@ -218,6 +218,8 @@ func continue_game() -> void:
 	game.bot_team = saved.bot_team
 	game.bot_level = saved.bot_level
 	game.eval_bar_on = saved.eval_bar
+	game.best_move_on = saved.best_move
+	game.eval_bar_hidden = saved.eval_bar_hidden
 	game.resume = saved
 	game.menu_requested.connect(show_main_menu)
 	_show(game)
