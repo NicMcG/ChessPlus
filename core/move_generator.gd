@@ -148,6 +148,39 @@ static func reach_squares(board: Board, from: Vector2i, piece: Piece) -> Diction
 					break
 	return squares
 
+## Why the piece on `from` can't move or capture onto `to`, if it's down to a
+## Parapet or a Squire (Mac: they react when that's tried): the square of the
+## Squire protecting a Knight on `to`, or of a Parapet in the way (without it,
+## the piece could go there). NO_SQUARE otherwise.
+static func blocker(state: GameState, from: Vector2i, to: Vector2i) -> Vector2i:
+	var board := state.board
+	var piece := board.get_piece(from)
+	if piece == null:
+		return Board.NO_SQUARE
+	var target := board.get_piece(to)
+	if target and target.team != piece.team:
+		var guards := board.pieces_of(target.team)
+		for square: Vector2i in guards.keys():
+			var guard: Piece = guards[square]
+			if target.def.id in guard.def.protects and reach_squares(board, square, guard).has(to):
+				return square
+	var parapets: Array[Vector2i] = []
+	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		var on_board := board.pieces_of(team)
+		for square: Vector2i in on_board.keys():
+			if on_board[square].def.blocks_jumps and square != to and square != from:
+				parapets.append(square)
+	for square in parapets:
+		var parapet := board.get_piece(square)
+		board.set_piece(square, null)
+		var moves: Array[Move] = []
+		for rule in piece.def.move_rules:
+			_add_rule_moves(state, from, piece, rule, moves)
+		board.set_piece(square, parapet)
+		if moves.any(func(m: Move) -> bool: return m.to == to):
+			return square
+	return Board.NO_SQUARE
+
 ## The squares a leap of `step` passes over on its way (not where it lands), as
 ## offsets from where it starts: none for a one-square step; for a straight or
 ## diagonal leap, the squares in between; for a Knight-like leap (Mac's rule),

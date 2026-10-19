@@ -141,6 +141,43 @@ func test_jester_swap_animates_and_plusfish_steps_aside() -> void:
 	var move := state.find_move("c7xe5")
 	state.make_move(move)
 	var animation := MoveAnimation.for_move(move, state, false)
-	check(animation.has_segment(jester, "hop"), "The Jester jumps into the way")
-	check(animation.has_segment(jester, "knock"), "And is knocked off")
-	check(animation.has_segment(move.decoy_piece, "slide"), "The rook moves to the Jester's square")
+	check(animation.has_segment(jester, "dash"), "The Jester flashes into the way")
+	check(animation.has_segment(jester, "burst"), "And bursts like a balloon")
+	check(animation.has_extra("confetti"), "In a shower of confetti")
+	check(animation.has_segment(move.decoy_piece, "dash"), "The rook flashes to the Jester's square")
+	check(GameSounds.Sound.GIGGLE in animation.all_sounds() and GameSounds.Sound.POP in animation.all_sounds(), "A giggle, then a pop")
+
+# --- Parapets and Squires react when they stop a move (Mac, Oct 2026) ---------------
+
+func test_blocker_finds_the_parapet_or_squire() -> void:
+	var state := _game("4k3/8/8/8/R2(pa)4/8/8/4K3 w - - 0 1")
+	check_eq(MoveGenerator.blocker(state, Board.parse_square("a4"), Board.parse_square("h4")), Board.parse_square("d4"), "A Parapet in the Rook's way")
+	check_eq(MoveGenerator.blocker(state, Board.parse_square("a4"), Board.parse_square("b5")), Board.NO_SQUARE, "Rooks can't go diagonally anyway")
+	state = _game("4k3/8/8/8/8/8/1(PA)6/1N2K3 w - - 0 1")
+	check_eq(MoveGenerator.blocker(state, Board.parse_square("b1"), Board.parse_square("c3")), Board.parse_square("b2"), "A Knight can't leap a Parapet")
+	state = _game("k7/4(sq)3/8/4n3/8/8/8/K3R3 w - - 0 1")
+	check_eq(MoveGenerator.blocker(state, Board.parse_square("e1"), Board.parse_square("e5")), Board.parse_square("e7"), "The Squire protecting the Knight")
+
+func test_tapping_a_blocked_square_thocks_and_pulses() -> void:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.start_fen = "4k3/8/8/8/R2(pa)4/8/8/4K3 w - - 0 1"
+	(Engine.get_main_loop() as SceneTree).root.add_child(game)
+	game.board_view.tap(Board.parse_square("a4"))
+	game.board_view.tap(Board.parse_square("h4"))
+	check_eq(game.sounds.last_played, GameSounds.Sound.BLOCKED, "A thock, like hitting a wall")
+	check(game.board_view._pulses.has(Board.parse_square("d4")), "The Parapet swells")
+	game.board_view.tap(Board.parse_square("a4"))
+	game.board_view.tap(Board.parse_square("b5"))
+	check_eq(game.sounds.last_played, GameSounds.Sound.ILLEGAL, "Anywhere else it can't go: a buzz")
+	game.free()
+
+func test_aiming_whirrs_until_a_target_is_chosen() -> void:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.start_fen = "4k3/8/8/8/8/2n5/8/A3K3 w - - 0 1"
+	(Engine.get_main_loop() as SceneTree).root.add_child(game)
+	game.board_view.tap(Board.parse_square("a1"))
+	game.use_ability()
+	check(game.sounds.is_looping(), "A whirr while aiming")
+	game.board_view.tap(Board.parse_square("c3"))
+	check(not game.sounds.is_looping(), "It stops once the shot is taken")
+	game.free()
