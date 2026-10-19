@@ -85,7 +85,9 @@ var sounds: GameSounds
 @onready var redo_button: Button = %Redo
 @onready var menu_button: Button = %Menu
 @onready var promotion_overlay: ColorRect = %PromotionOverlay
-@onready var promotion_choices: HBoxContainer = %PromotionChoices
+@onready var promotion_choices: GridContainer = %PromotionChoices
+## The shimmering purple behind Raise Dead's choices.
+@onready var picker_shimmer: ColorRect = %Shimmer
 @onready var _layout: VBoxContainer = $Margin/Layout
 @onready var _board_area: Control = $Margin/Layout/BoardArea
 @onready var _moves_scroll: ScrollContainer = $Margin/Layout/MovesScroll
@@ -426,11 +428,34 @@ func _can_undo() -> bool:
 		return state.history.any(func(m: Move) -> bool: return m.piece.team != bot_team)
 	return not state.history.is_empty()
 
-## Several moves go between the same two squares: the promotion choices.
-## Show a button with each new piece's picture.
+## Behind Raise Dead's choices: purples with bands of light sweeping across.
+const SHIMMER_SHADER := """
+shader_type canvas_item;
+void fragment() {
+	vec3 dark = vec3(0.16, 0.04, 0.28);
+	vec3 light = vec3(0.58, 0.28, 0.82);
+	float wave = 0.5 + 0.5 * sin((UV.x * 2.0 + UV.y * 1.2 - TIME * 0.7) * 3.14159);
+	float band = smoothstep(0.8, 1.0, sin((UV.x * 1.4 - UV.y * 0.7 - TIME * 0.45) * 6.28318));
+	vec3 color = mix(dark, light, 0.3 + 0.35 * wave) + vec3(0.35, 0.25, 0.4) * band;
+	COLOR = vec4(color, 1.0);
+}
+"""
+
+## Several moves go between the same two squares: the promotion choices, or the
+## pieces Raise Dead can bring back. Show a button with each piece's picture, in
+## a grid (up to 4 across, so a long list doesn't run off a phone's screen);
+## Raise Dead's has a shimmering purple background.
 func _ask_which_move(moves: Array[Move]) -> void:
 	for child in promotion_choices.get_children():
 		child.queue_free()
+	promotion_choices.columns = clampi(moves.size(), 1, 4)
+	var raising := not moves.is_empty() and moves[0].ability == PieceDef.Ability.RAISE_DEAD
+	picker_shimmer.visible = raising
+	if raising and picker_shimmer.material == null:
+		var shader := Shader.new()
+		shader.code = SHIMMER_SHADER
+		picker_shimmer.material = ShaderMaterial.new()
+		picker_shimmer.material.shader = shader
 	for move in moves:
 		var button := Button.new()
 		# The piece it would become (promotion) or bring back (Raise Dead).
