@@ -254,9 +254,15 @@ impl<'a> Searcher<'a> {
             return true;
         }
         if self.must_finish {
-            // An outside "stop" still counts.
+            // An outside "stop" still counts, and so does a far-overrun node
+            // limit (a safety net: depth 1 should never take this long).
             if self.nodes & 1023 == 0 && self.stop.load(Ordering::Relaxed) {
                 self.stopped = true;
+            }
+            if let Some(n) = self.limits.nodes {
+                if self.nodes >= n.saturating_mul(64).max(1 << 20) {
+                    self.stopped = true;
+                }
             }
             return self.stopped;
         }
@@ -540,7 +546,7 @@ impl<'a> Searcher<'a> {
             depth = 1;
         }
         if depth <= 0 {
-            return self.quiesce(p, alpha, beta, ply);
+            return self.quiesce(p, alpha, beta, ply, 0);
         }
         self.nodes += 1;
         // Transposition table.
@@ -756,7 +762,10 @@ impl<'a> Searcher<'a> {
         })
     }
 
-    fn quiesce(&mut self, p: &Position, mut alpha: i32, beta: i32, ply: usize) -> i32 {
+    /// `qply`: plies since the main search ended. Check evasions (every move)
+    /// are only searched near the start: chains of capture-with-check and
+    /// evasion can otherwise grow without limit in busy army positions.
+    fn quiesce(&mut self, p: &Position, mut alpha: i32, beta: i32, ply: usize, qply: usize) -> i32 {
         self.pv_len[ply] = 0;
         self.nodes += 1;
         if ply > self.seldepth {
@@ -782,7 +791,7 @@ impl<'a> Searcher<'a> {
             tt_move = e.mv;
         }
         let orig_alpha = alpha;
-        let in_check = p.in_check(r, p.side);
+        let in_check = qply < Q_CHECK_PLIES && p.in_check(r, p.side);
         let raw_eval = if in_check { -INF } else if hit { e.eval as i32 } else { self.eval(p) };
         let stand = if in_check { -MATE + ply as i32 } else { raw_eval };
         if !in_check {
@@ -829,7 +838,7 @@ impl<'a> Searcher<'a> {
                 continue;
             }
             legal += 1;
-            let s = -self.quiesce(&child, -beta, -alpha, ply + 1);
+            let s = -self.quiesce(&child, -beta, -alpha, ply + 1, qply + 1);
             if self.stopped {
                 break;
             }
@@ -874,6 +883,9 @@ impl<'a> Searcher<'a> {
         best
     }
 }
+
+/// Quiescence plies in which a side in check searches all its moves.
+const Q_CHECK_PLIES: usize = 6;
 
 /// "+1.25", "-0.40" or "#3" / "#-2" (mate in N moves), for people.
 pub fn score_text(s: i32) -> String {
