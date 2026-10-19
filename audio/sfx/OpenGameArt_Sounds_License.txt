@@ -4,11 +4,13 @@ bite.wav            "Apple Bite" (apple_bite.ogg, the first bite)
                     https://opengameart.org/content/apple-bite
 glass_shatter.wav   "Glass Break" (glass_breaking.wav)
                     https://opengameart.org/content/glass-break
-power_up.wav        "Overloading Sound" (overloading.wav, 2.2-3.9 s; CC0 is one of its licences)
-                    https://opengameart.org/content/overloading-sound
+power_up.wav        "Rage Mode" (rage.wav, 1.45-2.25 s: the climb to its peak)
+                    https://opengameart.org/content/rage-mode
+wolf_growl.wav      "Dog Growl" (dog-growl.ogg)
+                    https://opengameart.org/content/dog-growl
 zombie_groan.wav    "Zombie moans" by darsycho (darsycho__zombie-moans.ogg, 3.55-4.85 s)
                     https://opengameart.org/content/zombie-moans
-strum.wav           "Guitar" (guitar-1.ogg)
+strum.wav           "Guitar" (guitar-1.ogg, the first stroke only)
                     https://opengameart.org/content/guitar-0
 lullaby.wav         "4 Music Box Tracks" (musicbox3_sad_tune.ogg, 2.2-3.8 s: the last notes of the opening)
                     https://opengameart.org/content/4-music-box-tracks

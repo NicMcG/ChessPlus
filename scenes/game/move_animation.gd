@@ -364,7 +364,9 @@ func _full_moon(move: Move) -> void:
 	# once it's a wolf. It starts with the build-up (see _activation).
 	extras.append({"kind": "moon", "at": at, "start": -0.75 / 1.3, "end": RISE + AFTER + 0.3})
 	# The howl starts as it rises in the moonlight (Mac).
-	_cue(0.0, GameSounds.Sound.HOWL)
+	# A growl, then the howl (Mac).
+	_cue(0.0, GameSounds.Sound.GROWL)
+	_cue(0.5, GameSounds.Sound.HOWL)
 	_cue(RISE, GameSounds.Sound.SPARKLE)
 	_cue(RISE + AFTER, GameSounds.Sound.LAND)
 
@@ -381,22 +383,24 @@ func _haunt(move: Move) -> void:
 	hidden_before[move.piece] = true
 	_cue(0.0, GameSounds.Sound.HAUNT)
 
-## Raise Dead (Mac's design): a snap of lightning and thunder with an impact
-## flash; the Necromancer sinks into fog of its colour, and the raised piece
-## rises out of it with a zombie's groan.
+## Raise Dead (Mac's design): the Necromancer sinks into fog of its colour;
+## once it's gone under, a snap of lightning and thunder with an impact flash,
+## and the raised piece rises out of the fog with a zombie's groan.
 func _raise_dead(move: Move) -> void:
 	var at := Vector2(move.from)
 	var fog: Color = move.piece.def.ability_gradient()[0]
-	extras.append({"kind": "lightning", "at": at, "start": 0.0, "end": 0.28, "color": fog.lerp(Color.WHITE, 0.6)})
-	_add(move.piece, {"kind": "sink", "at": at, "start": 0.15, "end": 0.9})
-	extras.append({"kind": "smoke", "at": at, "start": 0.05, "end": 1.7, "color": fog, "size": 0.75})
-	_add(move.raised, {"kind": "rise", "at": at, "start": 0.8, "end": 1.6})
+	# The Necromancer goes under first; then the lightning strikes (Mac) and the
+	# raised piece rises with a groan.
+	const STRIKE := 0.8
+	_add(move.piece, {"kind": "sink", "at": at, "start": 0.0, "end": 0.75})
+	extras.append({"kind": "smoke", "at": at, "start": 0.0, "end": 2.0, "color": fog, "size": 0.75})
+	extras.append({"kind": "lightning", "at": at, "start": STRIKE, "end": STRIKE + 0.28, "color": fog.lerp(Color.WHITE, 0.6)})
+	extras.append({"kind": "impact_frame", "at": at, "start": STRIKE, "end": STRIKE + 0.12})
+	_add(move.raised, {"kind": "rise", "at": at, "start": STRIKE + 0.15, "end": STRIKE + 0.95})
 	hidden_before[move.raised] = true
-	extras.append({"kind": "impact_frame", "at": at, "start": 0.0, "end": 0.12})
-	_cue(0.0, GameSounds.Sound.THUNDER)
 	_cue(0.0, GameSounds.Sound.RAISE_DEAD)
-	# A zombie's groan as the raised piece rises from the grave (Mac).
-	_cue(0.8, GameSounds.Sound.GROAN)
+	_cue(STRIKE, GameSounds.Sound.THUNDER)
+	_cue(STRIKE + 0.15, GameSounds.Sound.GROAN)
 
 ## Move `piece` from `from` to `to`: dropped there by dragging (a slam, with a
 ## thud and a puff of dust), leaping (a hop) or sliding. Returns when it arrives.
