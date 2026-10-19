@@ -267,6 +267,11 @@ The engine is a line-by-line port of `core/move_generator.gd` and
   covered: Haunts, Songs of Slumber, Full Moons, Jester swaps, Vampire
   shields gained and broken, Parapets stopping leaps and Cannon screens,
   Squires protecting attacked pieces, and kings exposed before the first move.
+After Mac's Parapet change (Oct 2026: a Parapet only stops the opponent's
+jumps and Cannon screens, never its own side's), 120 more games leaning
+towards Parapets and leaping pieces (28,627 positions, 10,467 with a
+Parapet, 5,100 where one stopped a leap or screen): no Parapet mismatches,
+one two-Jester case.
 
 ```
 plusfish trace-games --count 40 --seed 1 > games.txt
