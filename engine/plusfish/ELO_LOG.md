@@ -32,3 +32,4 @@ should be worth about as much.
 | 16 | Eval: king-zone attacks squared (-1.5 mg) | nodes 6k | 8000 | +1.3 ±4.4 | reverted |
 | 17 | Time management: soft target (left/35 + 3/4 inc), hard limit up to 4x; stop early when the best move is stable, later when it keeps changing | time 10+0.1 | 512 | +30.6 ±17.1 | kept |
 | 18 | Static exchange evaluation (full capture sequence on the square, least valuable first; cannons' screens, Rams, shields, leapers) replaces the rough estimate; see-check command compares it with brute force (99.3% same sign, the rest pins/checks) | nodes 6k | 1298 | +20.6 ±10.8 | kept |
+| 19 | Prune captures with SEE < -120*depth near the leaves (retry of #11 with the real SEE) | nodes 6k | 6900 | +6.3 ±4.7 | kept |
