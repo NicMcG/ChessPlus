@@ -37,6 +37,9 @@ each pair of games from the same opening with colours swapped).
   --random-plies N      opening plies picked among good moves (default 8)
   --seed N              which army pairs and openings (default 1)
   --standard            standard armies instead of random ones
+  --pool <file>         armies from a pool file (first column of each line,
+                        as armies/pool.txt): every ordered pair of different
+                        armies in turn, a new random opening each time
 ";
 
 struct Engine {
@@ -282,6 +285,17 @@ pub fn run(cat: &Arc<Catalog>, args: &Args, pieces: &str) {
     let rplies: usize = args.num("random-plies", 8);
     let seed: u64 = args.num("seed", 1);
     let standard_only = args.flag("standard");
+    let pool: Vec<Army> = match args.get("pool") {
+        None => Vec::new(),
+        Some(path) => std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("{}: {}", path, e))
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(|l| Army::from_text(cat, l.split('|').next().unwrap().trim()).unwrap_or_else(|e| panic!("{}: {}", l, e)))
+            .collect(),
+    };
+    let pool_pairs: Vec<(usize, usize)> = (0..pool.len()).flat_map(|i| (0..pool.len()).filter(move |&j| j != i).map(move |j| (i, j))).collect();
     let (lo, hi) = ((0.05f64 / 0.95).ln(), (0.95f64 / 0.05).ln());
     let bdesc = match budget {
         Budget::Nodes(n) => format!("{} nodes/move", n),
@@ -318,7 +332,14 @@ pub fn run(cat: &Arc<Catalog>, args: &Args, pieces: &str) {
                         break;
                     }
                     let mut rng = Rng::new(seed.wrapping_mul(1_000_003).wrapping_add(i as u64));
-                    let (w, bl) = if standard_only { (standard(cat), standard(cat)) } else { random_pair(cat, &mut rng, (BUDGET, BUDGET)) };
+                    let (w, bl) = if !pool_pairs.is_empty() {
+                        let (a, b) = pool_pairs[i % pool_pairs.len()];
+                        (pool[a].clone(), pool[b].clone())
+                    } else if standard_only {
+                        (standard(cat), standard(cat))
+                    } else {
+                        random_pair(cat, &mut rng, (BUDGET, BUDGET))
+                    };
                     // The opening: a few plies picked at random among good moves.
                     let mut g = army_game(cat, &w, &bl, 8, 8);
                     let opening = {
