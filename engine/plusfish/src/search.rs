@@ -624,6 +624,11 @@ impl<'a> Searcher<'a> {
                 continue;
             }
             self.played[ply] = m;
+            // Futility pruning: near the leaves, a quiet move can't lift a
+            // position this far below alpha.
+            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 1 && static_eval + 100 + 120 * depth <= alpha && !is_mate(alpha) {
+                continue;
+            }
             let ext = if gives_check && ply < 64 { 1 } else { 0 };
             let new_depth = depth - 1 + ext;
             let score;
