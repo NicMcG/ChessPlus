@@ -319,3 +319,10 @@ func test_builder_drag_and_right_click() -> void:
 	var knight_button: Button = builder._tray_buttons[KNIGHT]
 	check(knight_button.get_node("Cost").color.a > 0.5, "Cost badge drawn")
 	builder.free()
+
+func test_king_badge_says_k() -> void:
+	var builder := _builder(_fresh_library())
+	var badge: CostBadge = builder._tray_buttons[KING].get_node("Cost")
+	check_eq(badge.text, "K", "The king's badge says K")
+	check_eq(badge.color, builder.type_color(KING), "On gold")
+	builder.free()
