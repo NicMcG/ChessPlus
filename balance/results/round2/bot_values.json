@@ -1,0 +1,20 @@
+{
+ "archer": 3.89,
+ "berserker": 2.15,
+ "bishop": 3.42,
+ "cannon": 3.26,
+ "cavalry": 3.0,
+ "chariot": 3.66,
+ "elephant": 1.21,
+ "knight": 2.43,
+ "lance": 4.55,
+ "man": 2.85,
+ "necromancer": 3.49,
+ "paladin": 1.96,
+ "pawn": 1.27,
+ "queen": 9.05,
+ "ram": 3.31,
+ "rogue": 3.02,
+ "rook": 4.83,
+ "wizard": 8.88
+}
