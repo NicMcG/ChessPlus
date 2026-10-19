@@ -49,6 +49,10 @@ enum Sound {
 	HOWL,
 	## Full Moon: a growl before the howl.
 	GROWL,
+	## A piece slamming back down onto the board after powering up an ability.
+	GROUND_SLAM,
+	## Crack Shot: a laser bolt firing along with the bow.
+	LASER,
 	## An ordinary move's wood scraping along the board as it slides.
 	SCRAPE,
 	## A tap where the selected piece can't go: a negative buzz.
@@ -121,15 +125,26 @@ const LAYERS := {
 	Sound.ARROW_WHOOSH: [[["arrow_whistle"], 0.75, -2.0]],
 	# A bowstring plucked as the arrow is loosed.
 	Sound.BOW: [[["bow_shot"], 1.0, 2.0]],
-	# The arrow striking home: thwack and crunch.
+	# The arrow striking home (Mac: no rumbly explosion): a quick stab and the
+	# sharp thunk of an arrow hitting wood.
 	Sound.ARROW_HIT: [
-		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.1, 6.0],
-		[PUNCH_HEAVY, 1.1, 4.0],
-		[["explosionCrunch_000"], 1.4, -2.0],
+		[["chop"], 1.15, 6.0],
+		[["knifeSlice2"], 1.6, -2.0],
+		[WOOD_KNOCK, 1.25, 5.0],
+		[["impactPlank_medium_000", "impactPlank_medium_001"], 1.3, 0.0],
 	],
+	# A laser bolt fired along with the bow (Mac).
+	Sound.LASER: [[["laserLarge_001", "laserLarge_002"], 1.15, -3.0]],
 	Sound.MAGIC_HUM: [[["forceField_001"], 0.6, -10.0]],
-	# A special ability powering up (Mac).
-	Sound.ABILITY: [[["power_up"], 1.0, 0.0]],
+	# A special ability powering up (Mac): crackling high-voltage arcs...
+	Sound.ABILITY: [[["electric_charge"], 1.0, -3.0]],
+	# ...then the piece slamming down: a deep thump, rock and wood.
+	Sound.GROUND_SLAM: [
+		[["lowFrequency_explosion_000", "lowFrequency_explosion_001"], 1.6, 0.0],
+		[["impactMining_000", "impactMining_001"], 0.7, 4.0],
+		[WOOD_HEAVY, 0.75, 3.0],
+		[PUNCH_HEAVY, 0.7, 2.0],
+	],
 	# A rushing whoosh (it loops; see start_loop).
 	Sound.AIMING: [[["thrusterFire_003"], 1.3, -15.0]],
 	Sound.RAISE_DEAD: [[["forceField_000"], 0.55, -2.0]],

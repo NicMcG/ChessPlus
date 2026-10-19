@@ -986,6 +986,25 @@ func _draw_flying_arrow(extra: Dictionary) -> void:
 		alpha = 1.0 - fall
 	var tail := tip - direction * s * 0.8
 	var side := Vector2(-direction.y, direction.x)
+	# A streak of light all the way back to the Archer (Mac), in the ability's
+	# colour round a white core, fading away just after the arrow strikes.
+	const STREAK_FADE := 0.4
+	if extra.has("trail") and since_hit < STREAK_FADE:
+		var glow: Color = extra.trail
+		var fade := 1.0 - clampf(since_hit / STREAK_FADE, 0.0, 1.0)
+		var start := from + direction * s * 0.3
+		var length := start.distance_to(tail)
+		var steps := 10
+		for i in steps:
+			# Brightest at the arrow, dimmer back towards the Archer.
+			var k := float(i) / steps
+			var a := tail - direction * length * k
+			var b := tail - direction * length * (k + 1.0 / steps)
+			var strength := (1.0 - k * 0.6) * fade
+			var narrow := 1.0 - k * 0.5
+			draw_line(a, b, Color(glow, 0.22 * strength), maxf(5, s * 0.4 * narrow))
+			draw_line(a, b, Color(glow.lerp(Color.WHITE, 0.2), 0.75 * strength), maxf(3, s * 0.2 * narrow))
+			draw_line(a, b, Color(1, 1, 1, strength), maxf(2, s * 0.07 * narrow))
 	# A glowing trail in the ability's colour behind the arrow in flight (Mac).
 	if since_hit < 0 and extra.has("trail"):
 		var trail: Color = extra.trail

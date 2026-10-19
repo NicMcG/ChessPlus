@@ -115,7 +115,7 @@ func test_crack_shot_arrow_and_sink() -> void:
 	var animation := MoveAnimation.for_move(move, state, false)
 	check(animation.has_extra("arrow"), "An arrow flies")
 	check(animation.has_segment(victim, "sink"), "The target sinks into the board")
-	check_eq(_sounds(animation), [Sound.ABILITY, Sound.MAGIC_HUM, Sound.BOW, Sound.ARROW_WHOOSH, Sound.ARROW_HIT], "Activation, magic, the bow, whoosh, then thwack")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.GROUND_SLAM, Sound.MAGIC_HUM, Sound.BOW, Sound.LASER, Sound.ARROW_WHOOSH, Sound.ARROW_HIT], "Crackling power-up, the slam, then magic, the bow and a laser, whoosh, then the stab")
 
 func test_raise_dead_sinks_and_rises() -> void:
 	var state := _game("k7/8/8/8/8/8/3(NC)4/4K3 w - - 0 1")
@@ -127,7 +127,7 @@ func test_raise_dead_sinks_and_rises() -> void:
 	check(animation.has_segment(necromancer, "sink"), "Necromancer sinks")
 	check(animation.has_segment(move.raised, "rise"), "The raised piece rises")
 	check(animation.has_extra("smoke"), "Purple smoke")
-	check_eq(_sounds(animation), [Sound.ABILITY, Sound.RAISE_DEAD, Sound.THUNDER, Sound.GROAN], "Activation, the swell, then once it's under, thunder, then a zombie's groan")
+	check_eq(_sounds(animation), [Sound.ABILITY, Sound.GROUND_SLAM, Sound.RAISE_DEAD, Sound.THUNDER, Sound.GROAN], "Activation, the swell, then once it's under, thunder, then a zombie's groan")
 	check(animation.has_extra("lightning"), "Lightning strikes")
 
 func test_check_shakes_the_king_last() -> void:

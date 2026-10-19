@@ -265,9 +265,11 @@ func _crack_shot(move: Move) -> void:
 	extras.append({"kind": "arrow", "from": from, "to": target, "start": 0.0, "end": hit,
 			"stuck_to": move.captured, "until": hit + 1.0 if move.captured else hit + 0.35,
 			"trail": move.piece.def.ability_gradient()[1]})
-	# Magic humming under the whole shot, the bow's twang, the whoosh of flight.
+	# Magic humming under the whole shot, the bow's twang with a laser bolt
+	# (Mac), the whoosh of flight.
 	_cue(0.0, GameSounds.Sound.MAGIC_HUM)
 	_cue(0.0, GameSounds.Sound.BOW)
+	_cue(0.0, GameSounds.Sound.LASER)
 	_cue(0.02, GameSounds.Sound.ARROW_WHOOSH)
 	_cue(hit, GameSounds.Sound.ARROW_HIT)
 	# An anime impact frame as it strikes: a flash of stark light and lines.
@@ -305,7 +307,13 @@ func _activation(move: Move) -> void:
 	if not tracks.has(move.piece):
 		tracks[move.piece] = []
 	tracks[move.piece].push_front(charge)
+	# Crackling electricity as it powers up, then it slams back down onto the
+	# board (Mac): a thump, dust and a ring bursting out.
 	_cue(0.0, GameSounds.Sound.ABILITY)
+	const LANDS := WAIT * 0.97
+	_cue(LANDS, GameSounds.Sound.GROUND_SLAM)
+	extras.append({"kind": "dust", "at": Vector2(move.from), "start": LANDS, "end": LANDS + 0.45})
+	extras.append({"kind": "shockwave", "at": Vector2(move.from), "start": LANDS, "end": LANDS + 0.4})
 	var glow: Color = move.piece.def.ability_gradient()[1].lerp(Color.WHITE, 0.3)
 	extras.append({"kind": "light", "at": Vector2(move.from), "start": 0.0, "end": WAIT + 0.15, "color": glow})
 
@@ -572,8 +580,10 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 		"shake":
 			pose.pos = (segment.at as Vector2) + Vector2(shake_offset(t), 0)
 		"charge":
-			# Rises towards the player, holds there, then settles back down.
-			var up := smoothstep(0.0, 0.45, t) * (1.0 - smoothstep(0.8, 1.0, t))
+			# Rises towards the player, holds there, then slams back down
+			# (falling faster and faster).
+			var fall := clampf((t - 0.84) / 0.13, 0.0, 1.0)
+			var up := smoothstep(0.0, 0.45, t) * (1.0 - fall * fall)
 			pose.scale = Vector2.ONE * (1.0 + 0.35 * up)
 			pose.lift = 0.18 * up
 			pose.shadow = up
