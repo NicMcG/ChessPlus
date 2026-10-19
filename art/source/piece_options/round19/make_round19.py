@@ -22,20 +22,23 @@ HILT = 12.5
 SCALE = 0.82
 
 
-def parts(length):
+def parts(length, grip=1.7):
     """The dagger's outline pieces, with the guard's centre at (0, 0) and the
-    blade pointing up (-y), `length` from the guard to the point."""
+    blade pointing up (-y), `length` from the guard to the point. `grip` is
+    half the grip's width at the guard."""
     blade = ("M -3.3,-2 L -3.3,-4.6 L -2.5,-5.6 L -2.5,-7.6 L -3.1,-8.6 L 0,-%s L 3.1,-8.6 "
              "L 2.5,-7.6 L 2.5,-5.6 L 3.3,-4.6 L 3.3,-2 Z" % length)
     guard = ("M -2,-2.2 L -5.6,-2.2 C -6.4,-3.6 -8.6,-3.4 -8.6,-1.4 L -8.6,1.4 C -8.6,3.4 -6.4,3.6 -5.6,2.2 "
              "L -2,2.2 L -2,3 L 2,3 L 2,2.2 L 5.6,2.2 C 6.4,3.6 8.6,3.4 8.6,1.4 L 8.6,-1.4 "
              "C 8.6,-3.4 6.4,-3.6 5.6,-2.2 L 2,-2.2 L 2,-3 L -2,-3 Z")
-    grip = "M -1.7,3 L 1.7,3 L 1.5,9 L -1.5,9 Z"
-    pommel = "M -1.8,9 L 1.8,9 L 3.6,12.2 C 1.2,13.1 -1.2,13.1 -3.6,12.2 Z"
+    low = grip - 0.2
+    grip_path = "M -%s,3 L %s,3 L %s,9 L -%s,9 Z" % (grip, grip, low, low)
+    pommel = "M -%s,9 L %s,9 L %s,12.2 C 1.2,13.1 -1.2,13.1 -%s,12.2 Z" % (low + 0.3, low + 0.3, low + 2.1, low + 2.1)
+    grip = grip_path
     return blade, guard, grip, pommel
 
 
-def dagger(fill, angle, length, centre=CENTRE, along=None, gem=True, bands=True, dot=False):
+def dagger(fill, angle, length, centre=CENTRE, along=None, gem=True, bands=True, dot=False, ridge=True, grip=1.7):
     """A dagger pointing at `angle` degrees (0 = up, clockwise). The point
     `along` from the guard towards the tip (default: the middle of the whole
     dagger, pommel to tip) is put on `centre`."""
@@ -44,13 +47,14 @@ def dagger(fill, angle, length, centre=CENTRE, along=None, gem=True, bands=True,
     rad = math.radians(angle)
     ux, uy = math.sin(rad), -math.cos(rad)
     gx, gy = centre[0] - ux * along, centre[1] - uy * along
-    blade, guard, grip, pommel = parts(length)
+    blade, guard, grip, pommel = parts(length, grip)
     line = "#fff" if fill == "#000" else "#000"
     out = '<g transform="translate(%.2f %.2f) rotate(%s) scale(%s)">' % (gx, gy, angle, SCALE)
     for d in (blade, grip, pommel, guard):
         out += '<path d="%s" fill="%s" stroke="#000" stroke-width="%.2f"/>' % (d, fill, 1.4 / SCALE)
     # The blade's ridge, the guard's square centre and the grip's bands.
-    out += '<path d="M 0,-2.4 L 0,-%s" fill="none" stroke="%s" stroke-width="0.8"/>' % (length - 3, line)
+    if ridge:
+        out += '<path d="M 0,-2.4 L 0,-%s" fill="none" stroke="%s" stroke-width="0.8"/>' % (length - 3, line)
     if gem:
         out += '<rect x="-1.2" y="-1.2" width="2.4" height="2.4" fill="none" stroke="%s" stroke-width="0.8"/>' % line
     if dot:

@@ -69,7 +69,7 @@ def vampire(team):
             dx, dy = x - sx, y - 20.2
             k = 2.4 / math.hypot(dx, dy)
             bones += "M %.2f,%.2f L %.2f,%.2f " % (sx + dx * k, 20.2 + dy * k, x, y)
-    out += detail(bones, inner(team), 0.9)
+    out += detail(bones, inner(team), 1.4)  # Cburnett-thick (Mac)
     eyes = "#000" if team == "white" else "#fff"
     out += circle(20.9, 20.6, 0.9, eyes, "none") + circle(24.1, 20.6, 0.9, eyes, "none")
     return out

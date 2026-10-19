@@ -61,6 +61,15 @@ black_cavalry = (line(LANCE, 4.5, "#000") + line("M 37.5,37.7 L 16.5,10", 0.9, "
                  + line("M 15.5,12 L 7,11.9", 0.9, "#fff")
                  + mirror(black_horse))
 
+# The Archer a tad smaller (Mac, Oct 2026): 92% about the middle of the square.
+ARCHER_SCALE = 0.92
+
+def smaller(body, k=ARCHER_SCALE):
+    return '<g transform="translate(%.2f %.2f) scale(%s)">%s</g>' % (22.5 * (1 - k), 22.5 * (1 - k), k, body)
+
+white_archer = smaller(white_archer)
+black_archer = smaller(black_archer)
+
 for name, body in {"white_archer": white_archer, "black_archer": black_archer,
                    "white_cavalry": white_cavalry, "black_cavalry": black_cavalry}.items():
     io.open("../pieces/%s.svg" % name, "w", encoding="utf-8", newline="").write(HEAD + body + TAIL)
