@@ -615,6 +615,10 @@ impl<'a> Searcher<'a> {
             moves.swap(i, bi);
             scores.swap(i, bi);
             let m = moves[i];
+            // Captures that probably lose a lot, near the leaves.
+            if !is_pv && !in_check && depth <= 4 && legal > 0 && m.flags & F_CAPTURE != 0 && best > -MATE_BOUND && self.capture_gain(p, m) < -120 * depth {
+                continue;
+            }
             let mut child = p.clone();
             child.make(r, m);
             if child.leaves_king_attacked(p, r, m) {
