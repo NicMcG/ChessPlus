@@ -41,6 +41,25 @@ enum Ability { NONE, CRACK_SHOT, RAISE_DEAD }
 ## board too, and counts as lost.
 @export var dies_on_capture := false
 
+## The Parapet's rule: nothing can jump over it. Leaps (Knight, Elephant,
+## Catapult), the Wizard's and Rogue's leaps all stop at it, whichever side it's
+## on, and a Cannon can't use it as a screen. A Knight counts as moving two
+## squares straight first, then one to the side.
+@export var blocks_jumps := false
+
+## The Vampire's rule: it starts without a shield and gains one whenever it
+## captures (if it hasn't one). The shield works like the Shield keyword's.
+@export var shield_on_capture := false
+
+## The Squire's rule: these piece types (by id), on squares this piece could
+## reach, can't be captured.
+@export var protects: Array[String] = []
+
+## The Jester's rule: when an enemy would capture one of its side's pieces (not a
+## pawn type) on a square this piece could reach, they swap places and this piece
+## is captured instead. One Jester per capture.
+@export var decoy := false
+
 ## Shown on the piece card under "Special Rule": anything about how it plays that
 ## its types, keywords and move picture can't show. Empty for most pieces.
 @export_multiline var special_rule := ""

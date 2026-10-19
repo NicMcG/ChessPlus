@@ -112,12 +112,22 @@ func make_move(move: Move) -> void:
 		return
 	if move.breaks_shield():
 		# Nothing moves: the shielded piece just loses its shield. (A Ram dies doing it.)
-		move.shield_target.shield_broken = true
+		if move.shield_target.gained_shield:
+			move.shield_target.gained_shield = false
+			move.broke_gained_shield = true
+		else:
+			move.shield_target.shield_broken = true
 		if move.piece.def.dies_on_capture:
 			_remove_dead_attacker(move, move.from)
 		_clear_en_passant()
 		_next_turn()
 		return
+	if move.decoy_piece:
+		# A Jester takes the hit: the target moves to the Jester's square, and the
+		# Jester (move.captured) is taken off where the target stood.
+		move.decoy_piece_had_moved = move.decoy_piece.has_moved
+		board.set_piece(move.decoy_square, move.decoy_piece)
+		move.decoy_piece.has_moved = true
 	if move.ability == PieceDef.Ability.CRACK_SHOT:
 		# The Archer shoots from where it stands.
 		board.set_piece(move.capture_square, null)
@@ -125,6 +135,10 @@ func make_move(move: Move) -> void:
 		_clear_en_passant()
 		_next_turn()
 		return
+	# A Vampire gains a shield by capturing (if it hasn't one already).
+	if move.captured and move.piece.def.shield_on_capture and not move.piece.has_active_shield():
+		move.piece.gained_shield = true
+		move.gained_shield = true
 	if move.captured:
 		lost[move.captured.team].append(move.captured)
 	board.set_piece(move.from, null)
@@ -184,13 +198,21 @@ func undo_move(move: Move) -> void:
 		lost[move.piece.team].pop_back()
 		move.attacker_died = false
 	if move.breaks_shield():
-		move.shield_target.shield_broken = false
+		if move.broke_gained_shield:
+			move.shield_target.gained_shield = true
+			move.broke_gained_shield = false
+		else:
+			move.shield_target.shield_broken = false
 		board.set_piece(move.from, move.piece)  # Back, if it was a Ram that died.
 		return
+	if move.gained_shield:
+		move.piece.gained_shield = false
+		move.gained_shield = false
 	if move.captured:
 		lost[move.captured.team].pop_back()
 	if move.ability == PieceDef.Ability.CRACK_SHOT:
 		board.set_piece(move.capture_square, move.captured)
+		_undo_decoy(move)
 		return
 	if move.is_castling():
 		move.partner.has_moved = move.partner_had_moved
@@ -199,6 +221,15 @@ func undo_move(move: Move) -> void:
 	board.set_piece(move.to, null)
 	board.set_piece(move.capture_square, move.captured)  # null if nothing was captured.
 	board.set_piece(move.from, move.piece)
+	_undo_decoy(move)
+
+## Undo a Jester swap: the Jester back on its square, the target back on its own.
+func _undo_decoy(move: Move) -> void:
+	if move.decoy_piece == null:
+		return
+	board.set_piece(move.decoy_square, move.captured)
+	board.set_piece(move.capture_square, move.decoy_piece)
+	move.decoy_piece.has_moved = move.decoy_piece_had_moved
 
 ## How many times the current position has occurred, counting now. "Same position"
 ## means the same pieces on the same squares, same side to move, same castling

@@ -64,6 +64,17 @@ static func program_path() -> String:
 			return path
 	return ""
 
+## True if Plusfish knows every rule of the pieces in `state` (it doesn't yet know
+## the Parapet's, Vampire's, Squire's or Jester's rules, so their games get no
+## eval bar until it's updated).
+static func supports(state: GameState) -> bool:
+	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		for piece: Piece in state.board.pieces_of(team).values():
+			var def := piece.def
+			if def.blocks_jumps or def.shield_on_capture or def.decoy or not def.protects.is_empty():
+				return false
+	return true
+
 ## True if Plusfish can run here.
 static func available() -> bool:
 	if not enabled:

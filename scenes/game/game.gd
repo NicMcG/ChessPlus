@@ -701,8 +701,18 @@ func _build_eval_bar() -> void:
 	board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 ## Once the game is over: evaluate all its positions (the one on screen first).
+## Whether Plusfish knows the rules of every piece in this game (worked out once).
+var _plusfish_checked := false
+var _plusfish_ok := true
+
+func _plusfish_knows_pieces() -> bool:
+	if not _plusfish_checked:
+		_plusfish_checked = true
+		_plusfish_ok = PlusfishLink.supports(_create_start_state())
+	return _plusfish_ok
+
 func _start_analysis() -> void:
-	if not PlusfishLink.available():
+	if not PlusfishLink.available() or not _plusfish_knows_pieces():
 		return
 	var moves := []
 	for move in state.history:
@@ -740,7 +750,7 @@ func _start_live_analysis() -> void:
 ## if live_eval(); the best-move hints only ever after the game, so the engine
 ## never tells anyone what to play.
 func _update_eval_bar() -> void:
-	var on := (is_over() or live_eval()) and PlusfishLink.available()
+	var on := (is_over() or live_eval()) and PlusfishLink.available() and _plusfish_knows_pieces()
 	if on and not is_over():
 		_start_live_analysis()
 	eval_bar.visible = on
