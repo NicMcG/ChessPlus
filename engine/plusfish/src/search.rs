@@ -133,6 +133,8 @@ pub struct Searcher<'a> {
     killers: [[Move; 2]; MAX_PLY + 2],
     /// The move played to reach each ply (NONE after a null move).
     played: [Move; MAX_PLY + 2],
+    /// Static evaluation at each ply (-INF when in check), for "improving".
+    evals: [i32; MAX_PLY + 2],
     /// Counter-moves: the quiet reply that last refuted a move, by side and
     /// that move's from/to squares.
     counter: Vec<Move>,
@@ -191,6 +193,7 @@ impl<'a> Searcher<'a> {
             age: 0,
             killers: [[Move::NONE; 2]; MAX_PLY + 2],
             played: [Move::NONE; MAX_PLY + 2],
+            evals: [-INF; MAX_PLY + 2],
             counter: vec![Move::NONE; 2 * MAX_SQ * MAX_SQ],
             history: vec![0; 2 * MAX_SQ * MAX_SQ],
             pv: vec![[Move::NONE; MAX_PLY + 1]; MAX_PLY + 1],
@@ -550,10 +553,13 @@ impl<'a> Searcher<'a> {
         }
         let static_eval = if in_check { -INF } else if e.key == p.key && e.bound != 0 { e.eval as i32 } else { self.eval(p) };
         let us = p.side;
+        self.evals[ply] = static_eval;
+        // Is our position better than two plies ago? If not, prune harder.
+        let improving = !in_check && (ply < 2 || self.evals[ply - 2] == -INF || static_eval > self.evals[ply - 2]);
 
         if !is_pv && !in_check && !root {
             // Reverse futility pruning.
-            if depth <= 6 && static_eval - 90 * depth >= beta && !is_mate(beta) {
+            if depth <= 6 && static_eval - 90 * depth + if improving { 45 } else { 0 } >= beta && !is_mate(beta) {
                 return static_eval;
             }
             // Null move: if passing still beats beta, a real move surely will.
@@ -613,7 +619,8 @@ impl<'a> Searcher<'a> {
             let gives_check = child.in_check(r, child.side);
             let quiet = !m.is_tactical() && m.flags & (F_RAISE | F_CASTLE) == 0;
             // Late move pruning for quiet moves near the leaves.
-            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 4 + depth * depth * 3 && best > -MATE_BOUND {
+            let lmp_limit = if improving { 4 + depth * depth * 3 } else { 3 + depth * depth * 2 };
+            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > lmp_limit && best > -MATE_BOUND {
                 continue;
             }
             self.played[ply] = m;
