@@ -6,7 +6,8 @@
 #
 # What it does:
 #   1. Exports the "Web" preset into build/web/ (needs Godot's export templates).
-#   2. Patches the service worker (see tools/patch_service_worker.py).
+#   2. Patches the service worker (see tools/patch_service_worker.py) and adds
+#      Plusfish (web/plusfish.js + web/plusfish.wasm) for the eval bar.
 #   3. Copies just those built files into a fresh temporary git repository, plus an
 #      empty .nojekyll file (tells GitHub to serve the files exactly as they are).
 #   4. Force-pushes that as the gh-pages branch, replacing the previous build.
@@ -23,6 +24,8 @@ mkdir -p build/web
 "$GODOT" --headless --path . --export-release "Web" build/web/index.html > /dev/null 2>&1
 test -f build/web/index.html || { echo "Export failed: no build/web/index.html"; exit 1; }
 python tools/patch_service_worker.py build/web/index.service.worker.js
+# Plusfish (the eval bar's engine): the page loads plusfish.js, which loads plusfish.wasm.
+cp web/plusfish.js web/plusfish.wasm build/web/
 
 cp build/web/* "$TMP/"
 : > "$TMP/.nojekyll"

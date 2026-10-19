@@ -34,6 +34,9 @@ const HOVER_TINT := Color(1, 1, 1, 0.3)
 const ABILITY_MARK := Color(0.95, 0.7, 0.1, 0.9)
 ## The see-through arrows players draw with the right mouse button.
 const ARROW_COLOR := Color(0.1, 0.55, 0.15, 0.6)
+## Plusfish's best move, shown when looking over a finished game (blue, so it
+## can't be mistaken for a player's own green arrow).
+const HINT_ARROW_COLOR := Color(0.15, 0.45, 0.85, 0.6)
 ## How far (in pixels) the pointer must move while held before it counts as a drag.
 const DRAG_THRESHOLD := 10.0
 ## A dragged piece is drawn this much bigger, so a finger doesn't hide it.
@@ -95,6 +98,12 @@ var hidden_squares: Array[Vector2i] = []
 # Arrows (PC): drag with the right mouse button from one square to another.
 ## Each arrow is [from square, to square].
 var arrows: Array = []
+## Plusfish's suggestion: [from square, to square], or empty for none. Set by
+## the game screen after it shows a position (show_game clears it).
+var hint_arrow: Array = []:
+	set(value):
+		hint_arrow = value
+		queue_redraw()
 ## Where the right button went down (NO_SQUARE when it isn't held).
 var _arrow_start := Board.NO_SQUARE
 var _arrow_pointer := Vector2.ZERO
@@ -124,6 +133,7 @@ func refresh() -> void:
 	_shake_square = Board.NO_SQUARE
 	# A new move (or a different position) clears the arrows.
 	arrows.clear()
+	hint_arrow = []
 	_arrow_start = Board.NO_SQUARE
 	queue_redraw()
 
@@ -455,6 +465,8 @@ func _draw() -> void:
 	_draw_coordinates()
 	for move in _selected_moves:
 		_draw_target(move)
+	if hint_arrow.size() == 2 and hint_arrow[0] != hint_arrow[1]:
+		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
 	for arrow: Array in arrows:
 		_draw_arrow(square_center(arrow[0]), square_center(arrow[1]))
 	# The arrow being drawn right now follows the pointer to the square under it.
@@ -469,7 +481,7 @@ func _draw() -> void:
 
 ## A see-through arrow from the middle of one square to the middle of another,
 ## drawn as one shape (so the overlapping parts don't look darker).
-func _draw_arrow(from: Vector2, to: Vector2) -> void:
+func _draw_arrow(from: Vector2, to: Vector2, color := ARROW_COLOR) -> void:
 	var s := _square_size()
 	var direction := (to - from).normalized()
 	var side := Vector2(-direction.y, direction.x)
@@ -482,7 +494,7 @@ func _draw_arrow(from: Vector2, to: Vector2) -> void:
 		start + side * shaft, neck + side * shaft, neck + side * head, to,
 		neck - side * head, neck - side * shaft, start - side * shaft,
 	])
-	draw_colored_polygon(points, ARROW_COLOR)
+	draw_colored_polygon(points, color)
 
 ## The squares along the bottom and left edges as they're shown, with the text
 ## each gets: [square, "a"] for the file letters along the bottom row, [square,

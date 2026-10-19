@@ -1,0 +1,34 @@
+Balance report from 15989 self-play games
+White scores 58.5% overall (first-move edge with equal armies: +76 Elo); 15% draws; 103 plies per game on average
+Endings: adjudicated_win 11762, checkmate 1809, fifty_moves 1131, repetition 874, insufficient_material 253, adjudicated_draw 105, max_plies 44, stalemate 11
+
+Values are on the army-cost scale (the fit is scaled so that, on average, value = cost).
+  worth (army): what one extra piece of the type at the start is worth, from game results
+  worth (board): what a fresh one (shield intact, ability unused) is worth while on the
+                 board mid-game; more precise, but blind to promotion and one-shot pieces
+
+piece         cost   games   worth (army)  Elo/piece  worth (board)  verdict
+Queen            9    9227    10.33 ±0.40       +637    10.21 ±0.06  UNDERPRICED by ~1.3
+Wizard           8    9343     8.26 ±0.35       +509     7.43 ±0.05  about right
+Rook             5   10749     4.65 ±0.22       +287     5.14 ±0.04  slightly overpriced (-0.3)
+Archer           4   10868     4.55 ±0.19       +280     4.33 ±0.07  UNDERPRICED by ~0.5
+Cannon           4   10589     3.53 ±0.18       +218     2.51 ±0.04  slightly overpriced (-0.5)
+Chariot          4   10768     3.67 ±0.18       +226     4.41 ±0.04  slightly overpriced (-0.3)
+Ram            3.5   10691     2.95 ±0.16       +182     3.43 ±0.04  OVERPRICED by ~0.6
+Rogue          3.5   10853     3.50 ±0.17       +216     4.05 ±0.03  about right
+Bishop           3   10960     3.39 ±0.15       +209     3.27 ±0.03  slightly underpriced (+0.4)
+Cavalry          3   10801     3.22 ±0.15       +198     4.13 ±0.03  slightly underpriced (+0.2)
+Knight           3   10829     2.99 ±0.15       +184     3.25 ±0.03  about right
+Man              3   10894     2.80 ±0.15       +172     3.34 ±0.03  slightly overpriced (-0.2)
+Necromancer      3   10890     3.66 ±0.16       +225     3.71 ±0.06  UNDERPRICED by ~0.7
+Berserker      2.5   11196     2.67 ±0.14       +165     2.19 ±0.04  slightly underpriced (+0.2)
+Lance          2.5   11020     3.43 ±0.14       +211     2.35 ±0.05  UNDERPRICED by ~0.9
+Paladin          2   11826     1.54 ±0.12        +95     1.49 ±0.05  slightly overpriced (-0.5)
+Elephant       1.5   12990     1.00 ±0.10        +62     0.90 ±0.02  slightly overpriced (-0.5)
+Pawn             1   15839     0.83 ±0.05        +51     0.98 ±0.01  slightly overpriced (-0.2)
+
+Other terms (board regression, in points):
+  ability:archer         +1.09 ±0.05
+  shield:paladin         +0.66 ±0.04
+  raise_potential        +0.41 ±0.03
+  tempo                  -0.03 ±0.02

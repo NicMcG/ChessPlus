@@ -7,6 +7,9 @@ extends SceneTree
 ## Moves are in algebraic notation, e.g. e4 e5 Nf3. "tap:e2" taps square e2.
 ## "fen:<position>" starts from a FEN position, with "_" instead of spaces.
 ## "hold:g1>f3" starts dragging the g1 piece and holds it most of the way to f3.
+## "wait:2" lets 2 seconds pass (animations, the checkmate effect, Plusfish).
+## "board" presses View board on the result screen (and skips the checkmate effect).
+## "view:5" looks at the position after 5 moves, as tapping the move list does.
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -27,6 +30,15 @@ func _initialize() -> void:
 			game.board_view.pointer_move(start.lerp(end, 0.8))
 		elif arg.begins_with("tap:"):
 			game.board_view.tap(Board.parse_square(arg.substr(4)))
+		elif arg.begins_with("wait:"):
+			var until := Time.get_ticks_msec() + int(float(arg.substr(5)) * 1000)
+			while Time.get_ticks_msec() < until:
+				await process_frame
+		elif arg == "board":
+			game._stop_checkmate_effect()
+			game._on_game_over_action("board")
+		elif arg.begins_with("view:"):
+			game.view_move(int(arg.substr(5)))
 		else:
 			var move := Notation.find_move(game.state, arg)
 			if move == null:
