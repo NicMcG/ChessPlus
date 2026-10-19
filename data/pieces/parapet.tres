@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="PieceDef" format=3]
+
+[ext_resource type="Script" path="res://core/move_rule.gd" id="1_rule"]
+[ext_resource type="Script" path="res://core/piece_def.gd" id="2_def"]
+
+[sub_resource type="Resource" id="Resource_rule1"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 0), Vector2i(-1, 0)])
+max_steps = 0
+
+[sub_resource type="Resource" id="Resource_rule2"]
+script = ExtResource("1_rule")
+directions = Array[Vector2i]([Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)])
+max_steps = 1
+
+[resource]
+script = ExtResource("2_def")
+id = "parapet"
+display_name = "Parapet"
+symbol = "PA"
+value = 3
+move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
+keywords = 2
+blocks_jumps = true
+special_rule = "Nothing can jump over it: Knights, Elephants, Catapults and the Wizard's and Rogue's leaps can't pass it, and a Cannon can't use it as a screen. (A Knight counts as moving 2 squares straight, then 1 to the side.)"

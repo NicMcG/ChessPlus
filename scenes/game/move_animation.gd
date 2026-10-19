@@ -58,7 +58,7 @@ static func for_move(move: Move, state: GameState, dragged: bool, p_speed := 1.0
 	elif move.ability == PieceDef.Ability.CRACK_SHOT:
 		a._crack_shot(move)
 		a._activation(move)
-	elif move.captured and is_cannon_shot(move):
+	elif move.captured and is_cannon_shot(move) and move.decoy_piece == null:
 		a._cannon(move, dragged)
 	elif move.breaks_shield():
 		a._shield_break(move, dragged)
@@ -66,6 +66,8 @@ static func for_move(move: Move, state: GameState, dragged: bool, p_speed := 1.0
 		a._castling(move, dragged)
 	else:
 		a._ordinary(move, state, dragged)
+	if move.decoy_piece:
+		a._jester_swap(move)
 	# Check (but not checkmate, which the game screen shows its own way): once
 	# everything has landed, the king shakes and flashes red.
 	if state.is_in_check() and state.outcome() == GameState.Outcome.NONE:
@@ -241,6 +243,27 @@ func _activation(move: Move) -> void:
 	_cue(0.0, GameSounds.Sound.ABILITY)
 	var glow: Color = move.piece.def.ability_gradient()[1].lerp(Color.WHITE, 0.3)
 	extras.append({"kind": "light", "at": Vector2(move.from), "start": 0.0, "end": WAIT + 0.15, "color": glow})
+
+## A Jester taking the hit: first the Jester and the piece it protects swap
+## places with a swish, then the capture happens as planned (on the Jester).
+func _jester_swap(move: Move) -> void:
+	const SWAP := 0.24
+	for segments: Array in tracks.values():
+		for segment: Dictionary in segments:
+			segment.start += SWAP
+			segment.end += SWAP
+	for extra: Dictionary in extras:
+		extra.start += SWAP
+		extra.end += SWAP
+		if extra.has("until"):
+			extra.until += SWAP
+	for cue: Array in cues:
+		cue[0] += SWAP
+	var jester_from := Vector2(move.decoy_square)
+	var target_at := Vector2(move.capture_square)
+	_add(move.captured, {"kind": "hop", "from": jester_from, "to": target_at, "start": 0.0, "end": SWAP})
+	_add(move.decoy_piece, {"kind": "slide", "from": target_at, "to": jester_from, "start": 0.0, "end": SWAP})
+	_cue(0.0, GameSounds.Sound.SWIPE)
 
 ## Raise Dead: the Necromancer sinks into purple smoke and the raised piece
 ## rises up out of it.

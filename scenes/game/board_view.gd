@@ -456,6 +456,8 @@ func _draw() -> void:
 			if square in _check_squares:
 				rect.position += tremble(Time.get_ticks_msec() / 1000.0) * rect.size.x
 			_draw_piece(piece, rect)
+			if piece.gained_shield:
+				_draw_gained_shield(rect)
 	# Moving pieces last, so they pass over the others.
 	for piece: Piece in poses:
 		if poses[piece].visible:
@@ -586,6 +588,19 @@ func _point(pos: Vector2) -> Vector2:
 	var column := state.board.width - 1 - pos.x if flipped else pos.x
 	var row := pos.y if flipped else state.board.height - 1 - pos.y
 	return _origin() + Vector2(column + 0.5, row + 0.5) * s
+
+## A Vampire that has gained a shield: a small shield in the top-right corner of
+## its square (until it has its own art for it).
+func _draw_gained_shield(rect: Rect2) -> void:
+	var s := rect.size.x
+	var top_right := rect.position + Vector2(s * 0.7, s * 0.06)
+	var w := s * 0.24
+	var points := PackedVector2Array([
+		top_right, top_right + Vector2(w, 0), top_right + Vector2(w, w * 0.55),
+		top_right + Vector2(w / 2, w * 1.1), top_right + Vector2(0, w * 0.55)])
+	draw_colored_polygon(points, Color(0.55, 0.78, 1.0))
+	points.append(top_right)
+	draw_polyline(points, Color(0.1, 0.2, 0.4), maxf(1.0, s * 0.025), true)
 
 ## Draw a piece the animation is moving: `pose` is from MoveAnimation.pose.
 ## It's scaled and turned about the middle of its bottom edge, so a slam

@@ -10,6 +10,8 @@ var team: Team
 var has_moved: bool = false
 ## For pieces with the Shield keyword: true once the shield has been broken.
 var shield_broken: bool = false
+## For pieces that gain a shield by capturing (the Vampire): true while it has one.
+var gained_shield: bool = false
 ## For pieces with a special ability: true once it has been used (once per game).
 var ability_used: bool = false
 
@@ -17,9 +19,10 @@ func _init(p_def: PieceDef, p_team: Team) -> void:
 	def = p_def
 	team = p_team
 
-## True if this piece has a Shield that hasn't been broken yet.
+## True if this piece has a Shield that hasn't been broken yet (or a shield it
+## gained by capturing, for the Vampire).
 func has_active_shield() -> bool:
-	return def.has_shield() and not shield_broken
+	return (def.has_shield() and not shield_broken) or gained_shield
 
 ## True if this piece has a special ability it hasn't used yet.
 func can_use_ability() -> bool:

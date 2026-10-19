@@ -57,6 +57,16 @@ var raised_from_lost: Piece
 var raised_lost_index := -1
 var attacker_died := false
 
+## A Jester swap: the piece the capture was aimed at (it moves to the Jester's
+## square, `decoy_square`, and `captured` is the Jester instead).
+var decoy_piece: Piece
+var decoy_square: Vector2i
+var decoy_piece_had_moved := false
+## Filled in by make_move: the shield the capture broke was one the target gained
+## (Vampire), and the capturing piece gained a shield by this capture.
+var broke_gained_shield := false
+var gained_shield := false
+
 ## True for captures and for shield breaks (both are written with "x").
 func is_capture() -> bool:
 	return captured != null or breaks_shield()

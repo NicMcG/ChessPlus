@@ -54,6 +54,8 @@ static func write(state: GameState) -> String:
 			row += piece.letter() if piece.def.symbol.length() == 1 else "(%s)" % piece.letter()
 			if piece.shield_broken:
 				row += "'"
+			if piece.gained_shield:
+				row += "+"
 			if piece.ability_used:
 				row += "^"
 		if empty > 0:
@@ -88,6 +90,11 @@ static func _parse_pieces(text: String, defs: Array[PieceDef]) -> Board:
 				if last:
 					last.shield_broken = true
 				continue
+			if token == "+":
+				# The piece just before this mark has gained a shield (a Vampire).
+				if last:
+					last.gained_shield = true
+				continue
 			if token == "^":
 				# The piece just before this mark has used its special ability.
 				if last:
@@ -115,7 +122,7 @@ static func _row_width(row: String) -> int:
 	for token in _tokens(row):
 		if token.is_valid_int():
 			width += token.to_int()
-		elif token != "'" and token != "^":
+		elif token != "'" and token != "^" and token != "+":
 			width += 1
 	return width
 
