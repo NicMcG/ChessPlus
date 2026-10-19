@@ -623,13 +623,66 @@ static func has_ability_ready(piece: Piece) -> bool:
 
 ## A faint glow around the edge of a piece in its ability's colours: its
 ## silhouette drawn slightly offset all the way round, behind it.
-func _draw_ability_glow(texture: Texture2D, rect: Rect2, colors: PackedColorArray, alpha: float) -> void:
+func _draw_ability_glow(texture: Texture2D, rect: Rect2, colors: PackedColorArray, alpha: float, craters := false) -> void:
 	var outline := silhouette(texture)
-	var reach := rect.size.x * 0.035
-	for i in 12:
-		var offset := Vector2.from_angle(TAU * i / 12.0) * reach
-		var color := colors[0].lerp(colors[1], 0.5 + 0.5 * sin(TAU * i / 12.0)).lerp(Color.WHITE, 0.25)
-		draw_texture_rect(outline, Rect2(rect.position + offset, rect.size), false, Color(color, 0.22 * alpha))
+	# A moon-like glow is wider, so its craters show (Mac).
+	var reach := rect.size.x * (CRATER_GLOW_REACH if craters else 0.035)
+	for ring: float in ([0.5, 1.0] if craters else [1.0]):
+		for i in 12:
+			var offset := Vector2.from_angle(TAU * i / 12.0) * reach * ring
+			var color := colors[0].lerp(colors[1], 0.5 + 0.5 * sin(TAU * i / 12.0)).lerp(Color.WHITE, 0.25)
+			draw_texture_rect(outline, Rect2(rect.position + offset, rect.size), false, Color(color, (0.3 if craters else 0.22) * alpha))
+	if craters:
+		draw_texture_rect(crater_specks(texture), rect, false, Color(1, 1, 1, alpha))
+
+## Dark specks like the moon's craters, only in the glow round `texture`'s
+## picture (the band within CRATER_GLOW_REACH of its size outside its edge).
+## Cached.
+static func crater_specks(texture: Texture2D) -> Texture2D:
+	if not _specks.has(texture):
+		var image := texture.get_image()
+		if image.is_compressed():
+			image.decompress()
+		image.convert(Image.FORMAT_RGBA8)
+		var size := image.get_size()
+		var reach := size.x * CRATER_GLOW_REACH
+		var specks := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+		var alpha_at := func(p: Vector2i) -> float:
+			if p.x < 0 or p.y < 0 or p.x >= size.x or p.y >= size.y:
+				return 0.0
+			return image.get_pixelv(p).a
+		# How much of the glow (and not the piece) is at `p`.
+		var glow_at := func(p: Vector2i) -> float:
+			var most := 0.0
+			for ring: float in [0.5, 1.0]:
+				for i in 12:
+					most = maxf(most, alpha_at.call(p - Vector2i(Vector2.from_angle(TAU * i / 12.0) * reach * ring)))
+			return most * (1.0 - alpha_at.call(p))
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 1969  # The same specks every time.
+		var placed := 0
+		for attempt in 400:
+			if placed >= 14:
+				break
+			var at := Vector2i(rng.randi_range(0, size.x - 1), rng.randi_range(0, size.y - 1))
+			if glow_at.call(at) < 0.8:
+				continue
+			placed += 1
+			var radius := size.x * rng.randf_range(0.016, 0.026)
+			for y in range(int(at.y - radius), int(at.y + radius) + 1):
+				for x in range(int(at.x - radius), int(at.x + radius) + 1):
+					var p := Vector2i(x, y)
+					if Vector2(p - at).length() > radius:
+						continue
+					var strength: float = glow_at.call(p)
+					if strength > 0.05:
+						specks.set_pixelv(p, Color(0.16, 0.16, 0.2, minf(1.0, strength * 1.4)))
+		specks.generate_mipmaps()
+		_specks[texture] = ImageTexture.create_from_image(specks)
+	return _specks[texture]
+
+static var _specks := {}
+const CRATER_GLOW_REACH := 0.065
 
 ## A white silhouette of `texture` (same shape, every pixel white).
 static func silhouette(texture: Texture2D) -> Texture2D:
@@ -647,6 +700,7 @@ static func silhouette(texture: Texture2D) -> Texture2D:
 
 static func clear_cache() -> void:
 	_silhouettes.clear()
+	_specks.clear()
 
 ## The middle of a square on screen, for a position in squares that can be
 ## between squares (animations).
@@ -1024,7 +1078,7 @@ func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0
 	var texture := _piece_texture(piece, as_def, intact)
 	if texture:
 		if has_ability_ready(piece) and as_def == null:
-			_draw_ability_glow(texture, rect, piece.def.ability_gradient(), alpha)
+			_draw_ability_glow(texture, rect, piece.def.ability_gradient(), alpha, piece.def.ability_craters)
 		draw_texture_rect(texture, rect, false, Color(1, 1, 1, alpha))
 		var strength := maxf(flash.r, maxf(flash.g, flash.b))
 		if strength > 0.01:

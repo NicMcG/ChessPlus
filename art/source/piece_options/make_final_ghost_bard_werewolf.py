@@ -8,6 +8,7 @@ Run from this folder:  python make_final_ghost_bard_werewolf.py
 """
 import io
 import math
+import re
 import os
 import sys
 
@@ -42,12 +43,34 @@ JELLYBEAN = "M 0,-3 C 1.7,-3 2.1,-1.4 1.6,0 C 1.2,1.2 1.9,2.6 0.4,3.05 C -1.5,3.
 
 
 # --- The coif: the Man, and the Werewolf's human form ------------------------------------
-def coif(team, behind=""):
+# The coif squashed a tad from top to bottom (Mac, Oct 2026), its bottom (the
+# ties' ends) staying put.
+SQUASH, SQUASH_BASE = 0.92, 39.6
+
+
+def squashed(svg):
+    """`svg` with every point in its paths moved towards the bottom; line widths
+    stay as they are."""
+    def path(m):
+        points = re.sub(r"(-?[0-9.]+),(-?[0-9.]+)",
+                        lambda p: "%s,%.2f" % (p.group(1), SQUASH_BASE - (SQUASH_BASE - float(p.group(2))) * SQUASH),
+                        m.group(1))
+        return 'd="%s"' % points
+    return re.sub(r'd="([^"]*)"', path, svg)
+
+
+def coif(team, behind="", fur=()):
     """The Man's linen coif (Mac, Oct 2026): on the white one, no line round the
     opening, the centre seam running down to the opening; on the black one, a
-    Cburnett-thick white line round the opening and black ties."""
+    Cburnett-thick white line round the opening and black ties. `fur`: tufts
+    (paths) on its sides that join it with no line between them (Mac), as on
+    the black one: drawn with a double-width outline under the coif, then filled
+    again over it, so only their outside edge shows."""
     fill, line = colours(team)
-    out = behind + shape(r22.COIF_FACE, fill) + shape(r22.COIF, fill)
+    out = behind + shape(r22.COIF_FACE, fill)
+    out += "".join('<path fill="%s" stroke="#000" stroke-width="3" d="%s"/>' % (fill, d) for d in fur)
+    out += shape(r22.COIF, fill)
+    out += "".join('<path fill="%s" stroke="none" d="%s"/>' % (fill, d) for d in fur)
     if team == "white":
         out += detail("M 22.5,4.6 L 22.5,14.2", "#000", 1.1)
         out += detail(r22.COIF_TIES, "#000", 1.4)
@@ -59,15 +82,15 @@ def coif(team, behind=""):
 
 
 def man(team):
-    return coif(team)
+    return squashed(coif(team))
 
 
 # --- Werewolf: the coif with ears and three tufts of fur a side --------------------------
 def werewolf(team):
     fill, line = colours(team)
     left = [(12.4, 12.6), (7.8, 15.4), (10.6, 18.5), (6.6, 21.6), (10.2, 24.7), (7.6, 27.8), (11.6, 30.6)]
-    fur = shape(r22.poly(left), fill) + shape(r22.poly(r22.mirror_points(left)), fill)
-    return coif(team, fur + r23.ears(team))
+    fur = (r22.poly(left), r22.poly(r22.mirror_points(left)))
+    return squashed(coif(team, r23.ears(team), fur))
 
 
 # --- The wolf: round 22's maned wolf, with three of its six spikes ------------------------

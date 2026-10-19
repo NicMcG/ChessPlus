@@ -21,7 +21,7 @@ const LEGEND := {
 	"move": "Moves here (can't capture)",
 	"capture": "Captures here only",
 	"first": "Only on its first move",
-	"jump": "Jumps here (can't be blocked)",
+	"jump": "Jumps here",
 	"slide": "Moves any distance this way",
 	"slide_move": "Moves any distance this way (can't capture)",
 }

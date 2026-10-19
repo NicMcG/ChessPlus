@@ -34,6 +34,9 @@ const EXPLANATIONS := {
 const ITALIC_FONT := preload("res://art/fonts/OpenSans-Italic.ttf")
 
 var def: PieceDef
+## Whose moves the mini board and legend show: `def`'s, or (for a piece with two
+## forms, like the Werewolf) its other form's.
+var moves_def: PieceDef
 var team := Piece.Team.WHITE
 ## How big the card is drawn: 1 = normal (the pop-up in games); the army builder
 ## uses more. Change it with set_zoom.
@@ -45,12 +48,14 @@ var tooltip_owner: Control
 ## Show `p_def`. Safe to call before or after the card is on screen.
 func show_piece(p_def: PieceDef, p_team := Piece.Team.WHITE) -> void:
 	def = p_def
+	moves_def = p_def
 	team = p_team
 	if is_node_ready():
 		_refresh()
 
-## A piece that changes form (the Werewolf) has a second card for its other form
-## (Mac): a button turns the card over. Returns [the piece it starts as, the form
+## A piece that changes form (the Werewolf) shows both pictures, and a grey
+## button switches the mini board and legend between its two forms' moves
+## (Mac); the rest of the card stays. Returns [the piece it starts as, the form
 ## it changes into], or [] for an ordinary piece. Works from either form.
 static func forms_of(p_def: PieceDef) -> Array:
 	if p_def.transforms_into:
@@ -60,17 +65,20 @@ static func forms_of(p_def: PieceDef) -> Array:
 			return [other, p_def]
 	return []
 
-## Show the other form's card (the button under the name).
+## Show the other form's moves (the button under the name).
 func turn_over() -> void:
 	var forms := forms_of(def)
 	if forms.is_empty():
 		return
-	def = forms[1] if def == forms[0] else forms[0]
-	_refresh()
+	moves_def = forms[1] if moves_def == forms[0] else forms[0]
+	_update_form_button()
+	%GuideBoard.show_piece(moves_def, team)
+	_fill_legend()
 
 var _form_button: Button
 
-## The "After Full Moon" / "Before Full Moon" button, in the ability's colours.
+## The grey "Wolf moves" / "Human moves" button: it names the moves it switches
+## to.
 func _update_form_button() -> void:
 	var forms := forms_of(def)
 	if forms.is_empty():
@@ -83,15 +91,16 @@ func _update_form_button() -> void:
 		_form_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		_form_button.pressed.connect(turn_over)
 		%Name.get_parent().add_child(_form_button)
-	var base: PieceDef = forms[0]
-	_form_button.text = ("After " if def == base else "Before ") + base.ability_name
+	var other: PieceDef = forms[1] if moves_def == forms[0] else forms[0]
+	_form_button.text = other.form_name + " moves"
 	_form_button.add_theme_font_size_override("font_size", _z(20))
-	var style := GradientStyleBox.new(base.ability_gradient(), 8, _z(12), _z(4))
+	var grey := Color("#6E6E6E")
+	var style := GradientStyleBox.new(PackedColorArray([grey, grey]), 8, _z(12), _z(4))
 	_form_button.add_theme_stylebox_override("normal", style)
 	_form_button.add_theme_stylebox_override("hover", style.shaded(0.15))
 	_form_button.add_theme_stylebox_override("pressed", style.shaded(-0.2))
 	for color in ["font_color", "font_hover_color", "font_pressed_color"]:
-		_form_button.add_theme_color_override(color, base.ability_label_color())
+		_form_button.add_theme_color_override(color, Color.WHITE)
 	_form_button.show()
 
 func _ready() -> void:
@@ -255,7 +264,12 @@ func _refresh() -> void:
 	hide_tooltip()
 	for child in %Pictures.get_children():
 		child.queue_free()
-	for texture in PieceArt.all_textures(def, team):
+	var textures := PieceArt.all_textures(def, team)
+	var forms := forms_of(def)
+	if not forms.is_empty():
+		# Both forms' pictures, like the Paladin with and without its shield.
+		textures = PieceArt.all_textures(forms[0], team) + PieceArt.all_textures(forms[1], team)
+	for texture in textures:
 		var picture := TextureRect.new()
 		picture.texture = texture
 		picture.custom_minimum_size = Vector2(_z(88), _z(88))
@@ -265,7 +279,7 @@ func _refresh() -> void:
 	%Name.text = def.display_name
 	_update_form_button()
 	_fill_details()
-	%GuideBoard.show_piece(def, team)
+	%GuideBoard.show_piece(moves_def, team)
 	_fill_legend()
 	_fill_keywords()
 	var special := special_rules(def)
@@ -275,7 +289,9 @@ func _refresh() -> void:
 	# The name in a box like the keywords', filled with the piece's gradient.
 	%AbilityName.text = def.ability_name.to_upper()
 	%AbilityName.add_theme_color_override("font_color", def.ability_label_color())
-	%AbilityChip.add_theme_stylebox_override("panel", GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4)))
+	var chip := GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4))
+	chip.craters = def.ability_craters
+	%AbilityChip.add_theme_stylebox_override("panel", chip)
 	%AbilityText.text = def.ability_text
 
 ## "3 points" followed by the types in italics, e.g. "Free · King, Royal".
@@ -313,7 +329,7 @@ func _italic_font() -> Font:
 func _fill_legend() -> void:
 	for child in %Legend.get_children():
 		child.queue_free()
-	for kind in PieceGuideBoard.legend_kinds(PieceGuide.guide(def)):
+	for kind in PieceGuideBoard.legend_kinds(PieceGuide.guide(moves_def)):
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var icon := LegendIcon.new()
