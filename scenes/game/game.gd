@@ -97,6 +97,20 @@ var _wide_box: HBoxContainer
 var _side: VBoxContainer
 var wide := false
 
+## Plusfish's evaluations of a finished game (PlusfishLink), shown in the bar
+## beside the board (EvalBar) and as a blue best-move arrow, when looking over
+## the board after the game.
+var plusfish: PlusfishLink
+var eval_bar: EvalBar
+## The board and the eval bar side by side, inside the board area.
+var _board_row: HBoxContainer
+## The status line before the eval part was added to it.
+var _status_base := ""
+## The eval bar's width as a share of the board's.
+const EVAL_BAR_SHARE := 0.05
+## Picks the squares out of a move's text ("e2-e4", "a1xb2", "a1!c3", ...).
+var _move_squares := RegEx.create_from_string("^([a-z][0-9]+)[-x!]([a-z][0-9]+)")
+
 ## Looking back: the number of moves played in the position being shown, or -1
 ## when showing the game as it is now. Looking back never changes the game.
 var viewing := -1
@@ -131,6 +145,7 @@ func _ready() -> void:
 	_bot_timer = Timer.new()
 	_bot_timer.one_shot = true
 	add_child(_bot_timer)
+	_build_eval_bar()
 	_build_wide_layout()
 	resized.connect(fit_layout)
 	fit_layout()
@@ -599,6 +614,7 @@ func _update_text() -> void:
 		status_label.text = _online_ending()
 	if viewing >= 0:
 		status_label.text = "Viewing %s" % _move_name(viewing - 1)
+	_status_base = status_label.text
 	var result := state.result_text()
 	if online and result == "*":
 		result = _online_result_text()
@@ -613,6 +629,83 @@ func _update_text() -> void:
 	if online:
 		_update_online_controls()
 	_update_game_over()
+	_update_eval_bar()
+
+# --- Looking over a finished game with Plusfish ----------------------------------
+
+## The eval bar goes to the left of the board, inside the board area (which
+## keeps the board square: it widens by the bar's share while the bar shows).
+func _build_eval_bar() -> void:
+	plusfish = PlusfishLink.new()
+	plusfish.evaluated.connect(_on_evaluated)
+	add_child(plusfish)
+	_board_row = HBoxContainer.new()
+	_board_row.add_theme_constant_override("separation", 6)
+	_board_area.add_child(_board_row)
+	eval_bar = EvalBar.new()
+	eval_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	eval_bar.size_flags_stretch_ratio = EVAL_BAR_SHARE
+	eval_bar.hide()
+	_board_row.add_child(eval_bar)
+	board_view.reparent(_board_row)
+	board_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	board_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+## Once the game is over: evaluate all its positions (the one on screen first).
+func _start_analysis() -> void:
+	if not PlusfishLink.available():
+		return
+	var moves := []
+	for move in state.history:
+		moves.append(move.to_text())
+	plusfish.analyse(_create_start_state(), moves)
+
+## The position on the board, as the number of moves played to reach it.
+func shown_ply() -> int:
+	return viewing if viewing >= 0 else state.history.size()
+
+## Show (or hide) the bar, the best-move arrow and the eval in the status line
+## for the position on the board. Only after the game: never while it's on.
+func _update_eval_bar() -> void:
+	var on := is_over() and PlusfishLink.available()
+	eval_bar.visible = on
+	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if on else 1.0
+	status_label.text = _status_base
+	if not on:
+		board_view.hint_arrow = []
+		return
+	eval_bar.flipped = board_view.flipped
+	var ply := shown_ply()
+	plusfish.prioritise(ply)
+	var found: Dictionary = plusfish.results.get(ply, {})
+	if found.is_empty():
+		eval_bar.set_unknown()
+		board_view.hint_arrow = []
+		return
+	# The final position shows the game's result (it may have been a resignation).
+	var result := ""
+	if ply == state.history.size() and state.result_text() != "*":
+		result = state.result_text()
+	elif found.get("outcome", "none") == "checkmate":
+		result = "1-0" if int(found["cp"]) > 0 else "0-1"
+	elif found.get("outcome", "none") != "none":
+		result = "1/2-1/2"
+	eval_bar.set_score(int(found["cp"]), found.get("mate"), result)
+	var best: String = found.get("best", "")
+	board_view.hint_arrow = _arrow_for(best)
+	if best != "" and result == "":
+		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
+
+## A move's text ("e2-e4", "a1!c3") as [from, to] squares; [] if it has none.
+func _arrow_for(move_text: String) -> Array:
+	var found := _move_squares.search(move_text)
+	if found == null:
+		return []
+	return [Board.parse_square(found.get_string(1)), Board.parse_square(found.get_string(2))]
+
+func _on_evaluated(ply: int, _result: Dictionary) -> void:
+	if is_over() and ply == shown_ply():
+		_update_eval_bar()
 
 # --- The result screen ----------------------------------------------------------
 
@@ -630,6 +723,10 @@ func _update_game_over() -> void:
 	elif not over:
 		game_over_panel.hide()
 		_stop_checkmate_effect()
+	if over and not _was_over:
+		_start_analysis()
+	elif not over and _was_over:
+		plusfish.stop()
 	_was_over = over
 
 func show_game_over() -> void:
