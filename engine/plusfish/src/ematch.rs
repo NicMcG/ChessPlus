@@ -296,8 +296,11 @@ pub fn run(cat: &Arc<Catalog>, args: &Args, pieces: &str) {
         wdl: [usize; 3],
         reasons: std::collections::BTreeMap<String, usize>,
         done_pairs: usize,
+        /// When the SPRT decided: (games, Elo, margin, LLR). Games still being
+        /// played then are counted too, but don't undo the decision.
+        decision: Option<(usize, f64, f64, f64)>,
     }
-    let tally = Mutex::new(Tally { penta: [0; 5], wdl: [0; 3], reasons: Default::default(), done_pairs: 0 });
+    let tally = Mutex::new(Tally { penta: [0; 5], wdl: [0; 3], reasons: Default::default(), done_pairs: 0, decision: None });
     let t0 = Instant::now();
     std::thread::scope(|scope| {
         for _ in 0..conc.max(1) {
@@ -360,7 +363,8 @@ pub fn run(cat: &Arc<Catalog>, args: &Args, pieces: &str) {
                             if sprt.is_some() { format!("  LLR {:.2} [{:.2}, {:.2}]", llr, lo, hi) } else { String::new() }
                         );
                     }
-                    if decided {
+                    if decided && t.decision.is_none() {
+                        t.decision = Some((n * 2, elo, m, llr));
                         stop.store(true, Ordering::SeqCst);
                     }
                 }
@@ -381,6 +385,10 @@ pub fn run(cat: &Arc<Catalog>, args: &Args, pieces: &str) {
     );
     println!("Pairs (A's score 0, 0.5, 1, 1.5, 2): {:?}", t.penta);
     if let Some((e0, e1)) = sprt {
+        let llr = t.decision.map(|d| d.3).unwrap_or(llr);
+        if let Some((g, e, mm, l)) = t.decision {
+            println!("SPRT decided after {} games: Elo {:+.1} ±{:.1}, LLR {:.2}", g, e, mm, l);
+        }
         let verdict = if llr >= hi {
             format!("H1 accepted (A gains at least ~{} Elo)", e1)
         } else if llr <= lo {
