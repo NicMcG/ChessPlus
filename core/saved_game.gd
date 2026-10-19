@@ -21,6 +21,10 @@ var bot_team := -1
 var bot_level := PracticeBot.Level.MEDIUM
 ## The eval bar was chosen for this game (it's always on against the bot).
 var eval_bar := false
+## The engine's best move was chosen for this game against the bot.
+var best_move := false
+## The eval bar was switched off during this game against the bot.
+var eval_bar_hidden := false
 var moves: PackedStringArray = []
 ## When the game started and when it was last saved (a move, an undo...), in
 ## seconds since 1970. 0 = not known (saved by an older version).
@@ -104,6 +108,8 @@ func to_dict() -> Dictionary:
 		"bot_team": bot_team,
 		"bot_level": bot_level,
 		"eval_bar": eval_bar,
+		"best_move": best_move,
+		"eval_bar_hidden": eval_bar_hidden,
 		"moves": Array(moves),
 		"started": started_time,
 		"saved": saved_time,
@@ -118,6 +124,8 @@ static func from_dict(data: Dictionary) -> SavedGame:
 	saved.bot_team = int(data.get("bot_team", -1))
 	saved.bot_level = int(data.get("bot_level", PracticeBot.Level.MEDIUM))
 	saved.eval_bar = bool(data.get("eval_bar", false))
+	saved.best_move = bool(data.get("best_move", false))
+	saved.eval_bar_hidden = bool(data.get("eval_bar_hidden", false))
 	saved.started_time = float(data.get("started", 0.0))
 	saved.saved_time = float(data.get("saved", 0.0))
 	for text in data.get("moves", []):
