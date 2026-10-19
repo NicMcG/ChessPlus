@@ -30,6 +30,10 @@ enum Sound {
 	DUST,
 	## A special ability being used (before its own effect starts).
 	ABILITY,
+	## The burst of light as a promoting pawn turns into its new piece.
+	SPARKLE,
+	## The quick swipe of an en passant capture.
+	SWIPE,
 }
 
 ## Each sound's layers, played together. A layer is either [file names in
@@ -47,7 +51,10 @@ const LAYERS := {
 	Sound.SLAM: [[["impactWood_heavy_000", "impactWood_heavy_001", "impactWood_heavy_002"], 0.85, 2.0]],
 	Sound.LAND: [[["impactWood_medium_000", "impactWood_medium_001", "impactWood_medium_002"], 1.0, 0.0]],
 	Sound.CASTLE: [[["impactWood_medium_000", "impactWood_medium_002"], 0.9, 0.0]],
-	Sound.PROMOTE: [[["maximize_006"], 1.0, 0.0]],
+	# A rising swell as the pawn lifts and spins.
+	Sound.PROMOTE: [[["maximize_006"], 0.9, 2.0], [["maximize_008"], 0.7, -4.0]],
+	Sound.SPARKLE: [[["glass_002", "glass_004"], 1.5, 0.0], [["impactBell_heavy_000"], 2.0, -10.0]],
+	Sound.SWIPE: [["made", -2.0]],
 	Sound.CANNON_FIRE: [["made", 0.0]],
 	Sound.CANNON_HIT: [[["impactMining_000", "impactMining_001"], 0.8, 2.0]],
 	Sound.ARROW_WHOOSH: [["made", 0.0]],
@@ -139,7 +146,7 @@ static func clear_cache() -> void:
 static func make_stream(sound: Sound) -> AudioStreamWAV:
 	var noise := RandomNumberGenerator.new()
 	noise.seed = 7  # The same "random" sound every time.
-	var length: float = {Sound.CANNON_FIRE: 0.9, Sound.ARROW_WHOOSH: 0.3,
+	var length: float = {Sound.CANNON_FIRE: 0.9, Sound.ARROW_WHOOSH: 0.3, Sound.SWIPE: 0.2,
 			Sound.RAISE_DEAD: 1.3, Sound.CHECKMATE: 6.0, Sound.DUST: 2.0}.get(sound, 0.2)
 	var count := int(length * RATE)
 	var data := PackedByteArray()
@@ -160,6 +167,10 @@ static func make_stream(sound: Sound) -> AudioStreamWAV:
 				var cutoff := 0.05 + 0.25 * t / length
 				band += (white - band) * cutoff
 				value = 1.6 * band * sin(PI * t / length)
+			Sound.SWIPE:  # A short, sharp rush of air, brighter than the arrow's.
+				var cutoff := 0.2 + 0.5 * t / length
+				band += (white - band) * cutoff
+				value = 1.4 * (white - band * 0.5) * sin(PI * t / length) * (1.0 - t / length)
 			Sound.RAISE_DEAD:  # Two slightly out-of-tune low notes rising, with a breathy hiss.
 				var rise := 1.0 + 0.5 * t / length
 				var swell := sin(PI * t / length)

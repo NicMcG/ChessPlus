@@ -41,6 +41,8 @@ const SLIDE := 0.22
 const HOP := 0.32
 const SLAM := 0.3
 const KNOCK := 0.38
+## A promoting piece glows white-gold (a captured piece flashes white then red).
+const PROMOTION_GLOW := Color(1.0, 0.95, 0.7)
 
 # --- Building a plan --------------------------------------------------------------
 
@@ -119,22 +121,48 @@ func _ordinary(move: Move, state: GameState, dragged: bool) -> void:
 	var from := Vector2(move.from)
 	var landed := Vector2(move.lands_on())
 	var arrived := _travel(move.piece, from, landed, dragged, is_leap(move))
-	if move.captured:
+	if move.captured and move.capture_square != move.to:
+		_en_passant(move, arrived, dragged)
+	elif move.captured:
 		_knock_off(move.captured, Vector2(move.capture_square), landed - from, arrived)
 		_impact(move.piece, landed, landed - from, arrived)
 		_cue(arrived, GameSounds.Sound.CAPTURE)
 	elif not dragged and from != landed:
 		_cue(arrived, GameSounds.Sound.LAND if is_leap(move) else GameSounds.Sound.MOVE)
 	if move.promotion:
-		var promoted := state.board.get_piece(move.lands_on())
-		var swap := arrived + 0.15
-		_add(move.piece, {"kind": "fade_out", "at": landed, "start": swap, "end": swap + 0.05})
-		_add(promoted, {"kind": "pop", "at": landed, "start": swap, "end": swap + 0.35})
-		hidden_before[promoted] = true
-		extras.append({"kind": "light", "at": landed, "start": arrived, "end": arrived + 0.55})
-		_cue(arrived + 0.05, GameSounds.Sound.PROMOTE)
+		_promotion(move, state.board.get_piece(move.lands_on()), landed, arrived)
 	if move.attacker_died:
 		_add(move.piece, {"kind": "fade_out", "at": landed, "start": arrived + 0.15, "end": arrived + 0.5})
+
+## Promotion (Mac's design): the pawn rises towards the player, growing and
+## spinning faster and faster, glowing white, among sparkles; edge-on at the top
+## there's a burst of light and it turns into the new piece, which finishes the
+## turn, hangs there a moment and drops back onto its square.
+func _promotion(move: Move, promoted: Piece, at: Vector2, arrived: float) -> void:
+	const RISE := 0.6
+	const AFTER := 0.75
+	var swap := arrived + RISE
+	_add(move.piece, {"kind": "promote_rise", "at": at, "start": arrived, "end": swap})
+	_add(move.piece, {"kind": "fade_out", "at": at, "start": swap, "end": swap})
+	_add(promoted, {"kind": "promote_reveal", "at": at, "start": swap, "end": swap + AFTER})
+	hidden_before[promoted] = true
+	extras.append({"kind": "sparkles", "at": at, "start": arrived + 0.1, "end": swap + 0.45})
+	extras.append({"kind": "light", "at": at + Vector2(0, -0.0), "start": swap, "end": swap + 0.5, "size": 1.8, "lift": 0.55})
+	_cue(arrived, GameSounds.Sound.PROMOTE)
+	_cue(swap, GameSounds.Sound.SPARKLE)
+	_cue(swap + AFTER, GameSounds.Sound.LAND)
+
+## En passant (my design for Mac): the pawn sweeps diagonally past the pawn it
+## captures; as it goes by, a slash streaks across that pawn, which is swept off
+## sideways, flashing.
+func _en_passant(move: Move, arrived: float, dragged: bool) -> void:
+	var victim := Vector2(move.capture_square)
+	var hit := 0.0 if dragged else arrived * 0.55
+	var sideways := Vector2(move.capture_square - move.from)
+	_knock_off(move.captured, victim, sideways + Vector2(0, (move.from - move.to).y) * 0.3, hit)
+	extras.append({"kind": "slash", "at": victim, "dir": Vector2(move.to - move.from), "start": hit, "end": hit + 0.28})
+	_cue(0.0 if dragged else hit * 0.4, GameSounds.Sound.SWIPE)
+	_cue(hit, GameSounds.Sound.CAPTURE)
 
 ## Castling (with any piece that has the Castle keyword): the king and its
 ## partner both hop into place, one just after the other, each landing with a knock.
@@ -393,6 +421,25 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			var up := smoothstep(0.0, 0.45, t) * (1.0 - smoothstep(0.8, 1.0, t))
 			pose.scale = Vector2.ONE * (1.0 + 0.35 * up)
 			pose.lift = 0.18 * up
+			pose.shadow = up
+		"promote_rise":
+			# Up towards the player, growing, spinning round faster and faster
+			# (turning about its upright axis, so it shows edge-on), glowing.
+			var up := smoothstep(0.0, 0.6, t)
+			var turn := 2.5 * PI * pow(t, 1.6)
+			pose.scale = Vector2(cos(turn), 1.0) * (1.0 + 0.8 * up)
+			pose.lift = 0.55 * up
+			pose.flash = smoothstep(0.55, 1.0, t)
+			pose.flash_color = PROMOTION_GLOW
+			pose.shadow = up
+		"promote_reveal":
+			# The new piece: finishes the turn, glow fading, then drops back down.
+			var turn := 2.5 * PI + 1.5 * PI * ease_out(minf(1.0, t / 0.45))
+			var up := 1.0 - smoothstep(0.55, 1.0, t)
+			pose.scale = Vector2(cos(turn), 1.0) * (1.0 + 0.8 * up)
+			pose.lift = 0.55 * up
+			pose.flash = 1.0 - smoothstep(0.0, 0.35, t)
+			pose.flash_color = PROMOTION_GLOW
 			pose.shadow = up
 		"impact":
 			# Squashed by the hit, then springs back, pushed back a touch.
