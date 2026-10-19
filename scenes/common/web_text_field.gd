@@ -24,6 +24,10 @@ func _ready() -> void:
 	WebOverlay.set_value(_id, _text)
 	_show_own_text(false)
 	edit.focus_mode = Control.FOCUS_NONE
+	# Godot has its own hidden text box for phone keyboards; if it opened too,
+	# the keyboard could end up typing into that instead of the real box (seen on
+	# Android tablets in Chrome).
+	edit.virtual_keyboard_enabled = false
 
 func _process(_delta: float) -> void:
 	var show := edit.is_visible_in_tree()
@@ -38,8 +42,19 @@ func _process(_delta: float) -> void:
 		_text = edit.text
 		WebOverlay.set_value(_id, _text)
 
+## Leaving the scene tree: remove the web box, unless it was only a move to
+## another place on the screen (a layout change), which re-enters straight away.
 func _exit_tree() -> void:
-	if _id != "":
+	_remove_unless_back.call_deferred()
+
+func _remove_unless_back() -> void:
+	if is_inside_tree() or _id == "":
+		return
+	WebOverlay.remove(_id)
+	_id = ""
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _id != "":
 		WebOverlay.remove(_id)
 		_id = ""
 

@@ -4,13 +4,16 @@ extends RefCounted
 ## Builds a game from two armies.
 
 ## A new game with `white` starting on ranks 1-2 and `black` on ranks 8-7 (each
-## army's row 0 is its owner's back row). Every piece starts unmoved.
+## army's row 0 is its owner's back row). Black's army is turned round (files
+## mirrored too) unless it says otherwise (Army.mirror_for_black), so it looks
+## from Black's side as it was built. Every piece starts unmoved.
 static func create_game(white: Army, black: Army, base_rules: GameRules, width := 8, height := 8) -> GameState:
 	var board := Board.new(width, height)
 	for piece in white.pieces:
 		board.set_piece(piece.square, Piece.new(piece.def, Piece.Team.WHITE))
 	for piece in black.pieces:
-		board.set_piece(Vector2i(piece.square.x, height - 1 - piece.square.y), Piece.new(piece.def, Piece.Team.BLACK))
+		var file := width - 1 - piece.square.x if black.mirror_for_black else piece.square.x
+		board.set_piece(Vector2i(file, height - 1 - piece.square.y), Piece.new(piece.def, Piece.Team.BLACK))
 	var rules: GameRules = base_rules.duplicate()
 	rules.promotion_options = promotion_options_for(board)
 	return GameState.new(board, rules)

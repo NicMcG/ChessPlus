@@ -76,7 +76,7 @@ func test_lance_promotes_like_a_pawn() -> void:
 	white.place(QUEEN, Vector2i(3, 0))
 	var black := Army.new()
 	black.place(KING, Vector2i(4, 0))
-	black.place(ROOK, Vector2i(7, 0))
+	black.place(ROOK, Vector2i(0, 0))  # Turned round for Black: on h8.
 	var game := ArmySetup.create_game(white, black, StandardSetup.create_rules())
 	var to_a8 := _moves_of(game, "lance").filter(func(t: String) -> bool: return t.begins_with("a1-a8"))
 	check_eq(to_a8, ["a1-a8=L", "a1-a8=Q", "a1-a8=R"], "Must promote; same choices as pawns (queen, rook, lance)")

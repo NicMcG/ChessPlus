@@ -197,8 +197,9 @@ func test_main_starts_a_game_with_two_armies() -> void:
 	_open(main)
 	main.start_game(StandardSetup.army(), _small_army("Small"))
 	var game: Node = main.screen
-	check_eq(game.state.board.get_piece(Board.parse_square("b8")).def, KNIGHT, "Black's knight on b8")
-	check_eq(game.state.board.get_piece(Board.parse_square("a7")).def, PAWN, "Black's pawn on a7")
-	check(game.state.board.is_empty(Board.parse_square("d8")), "Black has no queen")
+	# Built on b1 / a2; Black's army is turned round, so g8 / h7.
+	check_eq(game.state.board.get_piece(Board.parse_square("g8")).def, KNIGHT, "Black's knight on g8")
+	check_eq(game.state.board.get_piece(Board.parse_square("h7")).def, PAWN, "Black's pawn on h7")
+	check(game.state.board.pieces_of(Piece.Team.BLACK).values().all(func(p: Piece) -> bool: return p.def != QUEEN), "Black has no queen")
 	check(game.menu_button.visible, "Menu button shown")
 	main.free()
