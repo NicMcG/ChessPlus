@@ -20,8 +20,7 @@ extends Node
 ## "best_san", "outcome", "depth".
 signal evaluated(ply: int, result: Dictionary)
 
-## Search size per position. The web version is slower (and runs on the main
-## thread), so it searches less.
+## Search size per position. The web version is slower, so it searches less.
 @export var desktop_nodes := 150000
 @export var web_nodes := 20000
 ## Seconds between positions in the web version, so the game stays responsive.
@@ -273,8 +272,25 @@ func _on_reply(line: String, job: int) -> void:
 	_queue.erase(ply)
 	evaluated.emit(ply, reply)
 
+## Web: the position being worked out in the background (web/plusfish.js runs
+## Plusfish in a Web Worker, so the game and its sounds never wait for it), and
+## the job it belongs to. -1 = none.
+var _web_task := -1
+var _web_task_job := -1
+
 func _process(delta: float) -> void:
-	if _queue.is_empty() or not OS.has_feature("web"):
+	if not OS.has_feature("web"):
+		return
+	var pf: JavaScriptObject = JavaScriptBridge.get_interface("plusfish")
+	if _web_task >= 0:
+		var out: Variant = pf.take(_web_task)
+		if out == null:
+			return  # Still working.
+		_web_task = -1
+		for line in str(out).split("\n", false):
+			_on_reply(line, _web_task_job)
+		return
+	if _queue.is_empty():
 		return
 	_web_wait -= delta
 	if _web_wait > 0.0 or not available():
@@ -284,7 +300,5 @@ func _process(delta: float) -> void:
 	var request := _request.duplicate()
 	request["plies"] = [ply]
 	request["nodes"] = web_nodes
-	var pf: JavaScriptObject = JavaScriptBridge.get_interface("plusfish")
-	var out := str(pf.run(JSON.stringify(request)))
-	for line in out.split("\n", false):
-		_on_reply(line, _job)
+	_web_task_job = _job
+	_web_task = int(pf.submit(JSON.stringify(request)))

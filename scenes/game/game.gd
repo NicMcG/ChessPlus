@@ -162,6 +162,11 @@ func _ready() -> void:
 	redo_button.pressed.connect(redo)
 	play_from_here_button.pressed.connect(play_from_here)
 	ability_button.pressed.connect(use_ability)
+	# The ability button floats just above the bottom row of buttons instead of
+	# taking up room in the layout: showing or hiding it mustn't resize the board.
+	ability_button.top_level = true
+	_buttons.item_rect_changed.connect(_place_ability_button)
+	resized.connect(_place_ability_button.call_deferred)
 	board_view.selection_changed.connect(_on_selection_changed)
 	board_view.sound_cue.connect(func(sound: int) -> void: sounds.play(sound))
 	move_list.move_tapped.connect(view_move)
@@ -622,12 +627,14 @@ func _refresh_ability_button() -> void:
 				if row and row.pieces.has(haunts[0].piece):
 					row.haunting = haunts[0].piece
 		ability_button.visible = not haunts.is_empty()
+		_place_ability_button()
 		if ability_button.visible:
 			var ghost := haunts[0].piece
 			ability_button.text = ghost.def.ability_name.to_upper()
 			_style_ability_button(ghost.def.ability_gradient(), ghost.def.ability_label_color(), true)
 		return
 	ability_button.visible = piece.def.ability != PieceDef.Ability.NONE
+	_place_ability_button()
 	if not ability_button.visible:
 		return
 	ability_button.text = piece.def.ability_name.to_upper()
@@ -652,6 +659,15 @@ func _haunt_moves() -> Array[Move]:
 
 ## The ability button gets the piece's gradient (lighter under the mouse,
 ## darker while pressed when it can be used).
+## Put the ability button just above the bottom row of buttons, centred on it.
+func _place_ability_button() -> void:
+	if not is_inside_tree() or not ability_button.visible:
+		return
+	var row := _buttons.get_global_rect()
+	var button_size := ability_button.get_combined_minimum_size()
+	ability_button.size = button_size
+	ability_button.global_position = Vector2(row.get_center().x - button_size.x / 2, row.position.y - button_size.y - 14)
+
 func _style_ability_button(colors: PackedColorArray, text_color: Color, usable: bool) -> void:
 	var style := GradientStyleBox.new(colors, 12, 16, 8)
 	ability_button.add_theme_stylebox_override("normal", style)
@@ -923,7 +939,7 @@ func is_over() -> bool:
 func _update_game_over() -> void:
 	var over := is_over()
 	if over and not _was_over and viewing < 0:
-		show_game_over()
+		_show_game_over_when_still()
 	elif not over:
 		game_over_panel.hide()
 		_stop_checkmate_effect()
@@ -933,6 +949,19 @@ func _update_game_over() -> void:
 		plusfish.stop()
 		_live_moves = -1
 	_was_over = over
+
+## The result screen, once the last move's animation has finished (a draw
+## found automatically used to cover the move as it played).
+var _game_over_wait := 0
+
+func _show_game_over_when_still() -> void:
+	_game_over_wait += 1
+	var this_one := _game_over_wait
+	if board_view.is_animating():
+		await board_view.animation_finished
+	if this_one != _game_over_wait or not is_over() or viewing >= 0:
+		return
+	show_game_over()
 
 func show_game_over() -> void:
 	var texts := result_texts()
