@@ -1,6 +1,7 @@
 """Final Assassin: round 19 ref_x_points_up (Mac's reference dagger, two crossed
-in an X at the middle of the whole dagger, points up), a little bigger, with no
-bands on the grips and no square on the guards. White and black, to ../pieces/.
+in an X at the middle of the whole dagger, points up), a little bigger, with
+shorter blades, no bands on the grips, and a dot in the middle of each guard in
+the opposite colour instead of the square. White and black, to ../pieces/.
 
 Run from this folder:  python make_final_assassin.py
 """
@@ -17,8 +18,11 @@ r19.SCALE = 0.94
 
 def assassin(team):
     fill = "#fff" if team == "white" else "#000"
-    return (r19.dagger(fill, 45, 36, gem=False, bands=False)
-            + r19.dagger(fill, -45, 36, gem=False, bands=False))
+    # Crossing a little further up the blades than the very middle of the
+    # dagger, so the two guards don't run into each other.
+    along = (31 - r19.HILT) / 2 * r19.SCALE + 3
+    return (r19.dagger(fill, 45, 31, along=along, gem=False, bands=False, dot=True)
+            + r19.dagger(fill, -45, 31, along=along, gem=False, bands=False, dot=True))
 
 
 if __name__ == "__main__":

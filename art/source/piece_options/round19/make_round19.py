@@ -35,7 +35,7 @@ def parts(length):
     return blade, guard, grip, pommel
 
 
-def dagger(fill, angle, length, centre=CENTRE, along=None, gem=True, bands=True):
+def dagger(fill, angle, length, centre=CENTRE, along=None, gem=True, bands=True, dot=False):
     """A dagger pointing at `angle` degrees (0 = up, clockwise). The point
     `along` from the guard towards the tip (default: the middle of the whole
     dagger, pommel to tip) is put on `centre`."""
@@ -53,6 +53,9 @@ def dagger(fill, angle, length, centre=CENTRE, along=None, gem=True, bands=True)
     out += '<path d="M 0,-2.4 L 0,-%s" fill="none" stroke="%s" stroke-width="0.8"/>' % (length - 3, line)
     if gem:
         out += '<rect x="-1.2" y="-1.2" width="2.4" height="2.4" fill="none" stroke="%s" stroke-width="0.8"/>' % line
+    if dot:
+        # A dot in the middle of the guard, in the opposite colour.
+        out += '<circle cx="0" cy="0" r="1.15" fill="%s" stroke="none"/>' % line
     if bands:
         out += '<path d="M -1.6,5 L 1.6,5 M -1.5,7 L 1.5,7" fill="none" stroke="%s" stroke-width="0.8"/>' % line
     return out + "</g>"
