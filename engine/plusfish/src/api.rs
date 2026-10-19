@@ -3,17 +3,20 @@
 //! game; the reply is one JSON line per position.
 //!
 //! Request (one line of JSON):
-//!   pieces    every piece type, as the game's PieceDef/MoveRule fields:
+//!   pieces    every piece type (forms such as the Werewolf's wolf too), as the
+//!             game's PieceDef/MoveRule fields:
 //!             {id, name, symbol, value, types, keywords, ability, dies_on_capture,
+//!              blocks_jumps, shield_on_capture, protects ([piece id, ...]), decoy,
+//!              transforms_into (piece id or null),
 //!              rules: [{directions: [[x, y], ...], max_steps, first_move_max_steps,
 //!              mode, captures_by_hopping, leap_steps, leap_over, path,
 //!              mirror_files, mirror_ranks}]}
 //!   width, height
 //!   board     the starting position: [[piece id, team (0 White, 1 Black), file,
-//!             rank, moved, shield_broken, ability_used], ...]
+//!             rank, moved, shield_broken, ability_used, gained_shield], ...]
 //!   side, halfmove, fullmove, ep ([[file, rank], ...]), ep_victim ([file, rank]
-//!             or null), lost ([[piece id, team], ...]), promo ([piece id, ...]),
-//!             castling_corner
+//!             or null), lost ([[piece id, team, ability_used], ...] in the order
+//!             lost), promo ([piece id, ...]), castling_corner
 //!   moves     the moves played since, as Move.to_text() ("e2-e4", "a1!c3", ...)
 //!   plies     which positions to evaluate (number of moves played); default all
 //!   nodes     search nodes per position (default 100000); depth (optional)
@@ -80,30 +83,27 @@ pub fn catalog_from_json(j: &Json) -> Result<Catalog, String> {
     let mut defs = Vec::new();
     for p in list {
         let s = |k: &str| p.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let def = PieceDef {
-            id: s("id"),
-            name: s("name"),
-            symbol: s("symbol"),
-            value: num(p, "value", 0.0),
-            rules: p.get("rules").and_then(|r| r.as_arr()).map(|r| r.iter().map(rule_from_json).collect()).unwrap_or_default(),
-            types: num(p, "types", 0.0) as u8,
-            keywords: num(p, "keywords", 0.0) as u8,
-            ability: match num(p, "ability", 0.0) as i32 {
-                1 => Ability::CrackShot,
-                2 => Ability::RaiseDead,
-                _ => Ability::None,
-            },
-            dies_on_capture: flag(p, "dies_on_capture"),
-        };
+        let mut def = PieceDef::blank();
+        def.id = s("id");
+        def.name = s("name");
+        def.symbol = s("symbol");
+        def.value = num(p, "value", 0.0);
+        def.rules = p.get("rules").and_then(|r| r.as_arr()).map(|r| r.iter().map(rule_from_json).collect()).unwrap_or_default();
+        def.types = num(p, "types", 0.0) as u8;
+        def.keywords = num(p, "keywords", 0.0) as u8;
+        def.ability = Ability::from_code(num(p, "ability", 0.0) as i32);
+        def.dies_on_capture = flag(p, "dies_on_capture");
+        def.blocks_jumps = flag(p, "blocks_jumps");
+        def.shield_on_capture = flag(p, "shield_on_capture");
+        def.decoy = flag(p, "decoy");
+        def.protects = p.get("protects").and_then(|v| v.as_arr()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
+        def.transforms_into = p.get("transforms_into").and_then(|v| v.as_str()).filter(|t| !t.is_empty()).map(String::from);
         if def.id.is_empty() || def.symbol.is_empty() {
             return Err("every piece needs an id and a symbol".into());
         }
         defs.push(def);
     }
-    if defs.is_empty() || defs.len() > MAX_KINDS {
-        return Err(format!("need 1 to {} piece types", MAX_KINDS));
-    }
-    Ok(Catalog { defs })
+    Catalog::new(defs)
 }
 
 /// Builds the game the request describes (start position plus moves).
@@ -134,16 +134,21 @@ pub fn game_from_request(req: &Json, cat: &Arc<Catalog>) -> Result<Game, String>
         if b(6) {
             flags |= USED;
         }
+        if b(7) {
+            flags |= GAINED;
+        }
         placed.push(((rank * w + file) as usize, kind(id)?, team, flags));
     }
     let mut promo: Vec<usize> = Vec::new();
     for p in req.get("promo").and_then(|v| v.as_arr()).map(|v| v.as_slice()).unwrap_or(&[]) {
         promo.push(kind(p.as_str().unwrap_or(""))?);
     }
-    let mut lost: Vec<(usize, usize)> = Vec::new();
+    // Lost pieces in the order they were lost: kind, team, ability used.
+    let mut lost: Vec<(usize, usize, bool)> = Vec::new();
     for e in req.get("lost").and_then(|v| v.as_arr()).map(|v| v.as_slice()).unwrap_or(&[]) {
         let a = e.as_arr().ok_or("bad lost entry")?;
-        lost.push((kind(a.first().and_then(|v| v.as_str()).unwrap_or(""))?, a.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as usize));
+        let used = matches!(a.get(2), Some(Json::Bool(true))) || a.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0) != 0.0;
+        lost.push((kind(a.first().and_then(|v| v.as_str()).unwrap_or(""))?, (a.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as usize).min(1), used));
     }
     let mut present: Vec<usize> = placed.iter().map(|p| p.1).collect();
     present.extend(promo.iter().copied());
@@ -171,9 +176,8 @@ pub fn game_from_request(req: &Json, cat: &Arc<Catalog>) -> Result<Game, String>
             p.ep_victim = (y as i32 * w + x as i32) as u8;
         }
     }
-    for (k, team) in lost {
-        let n = p.lost[team.min(1)][k] + 1;
-        p.set_lost(r, team.min(1), k, n);
+    for (k, team, used) in lost {
+        p.lose(r, team, code(k, team) | if used { USED } else { 0 });
     }
     let mut game = Game::new(rules.clone(), p);
     for mv in req.get("moves").and_then(|v| v.as_arr()).map(|v| v.as_slice()).unwrap_or(&[]) {
@@ -217,9 +221,11 @@ pub fn eval_request(input: &str, emit: &mut dyn FnMut(String)) -> Result<(), Str
         let outcome = pos.outcome(r, keys);
         let white = pos.side == WHITE;
         let (mut cp, mut mate, mut best, mut best_san, mut depth, mut nodes) = (0i32, None::<i32>, String::new(), String::new(), 0, 0u64);
-        if outcome == Outcome::Checkmate {
-            // The side to move has been mated.
-            cp = if white { -20000 } else { 20000 };
+        if outcome == Outcome::Checkmate || outcome == Outcome::KingExposed {
+            // The side to move has been mated, or (king exposed at the start)
+            // has won at once.
+            let white_won = (outcome == Outcome::Checkmate) != white;
+            cp = if white_won { 20000 } else { -20000 };
             mate = Some(0);
         } else if outcome == Outcome::None {
             let rep = searcher.search(pos, &keys[..ply], limits, 1, |_| {});

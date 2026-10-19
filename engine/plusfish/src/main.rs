@@ -369,7 +369,11 @@ fn main() {
             }
         }
         "trace-games" => {
-            let text = verify::write_trace_games(&cat, args.num("count", 50), args.num("seed", 1), args.num("plies", 300));
+            let favor: Vec<usize> = args
+                .get("favor")
+                .map(|list| list.split(',').map(|id| cat.kind_by_id(id.trim()).unwrap_or_else(|| die(&format!("unknown piece {}", id)))).collect())
+                .unwrap_or_default();
+            let text = verify::write_trace_games(&cat, args.num("count", 50), args.num("seed", 1), args.num("plies", 300), &favor);
             print!("{}", text);
         }
         "trace-check" => {

@@ -111,7 +111,7 @@ var _status_base := ""
 ## The eval bar's width as a share of the board's.
 const EVAL_BAR_SHARE := 0.05
 ## Picks the squares out of a move's text ("e2-e4", "a1xb2", "a1!c3", ...).
-var _move_squares := RegEx.create_from_string("^([a-z][0-9]+)[-x!]([a-z][0-9]+)")
+var _move_squares := RegEx.create_from_string("^([a-z][0-9]+)[-x!~]([a-z][0-9]+)")
 
 ## Looking back: the number of moves played in the position being shown, or -1
 ## when showing the game as it is now. Looking back never changes the game.
@@ -890,7 +890,7 @@ func _update_eval_bar() -> void:
 		result = state.result_text()
 	elif ply == state.history.size() and resigned >= 0:
 		result = _resigned_result()
-	elif found.get("outcome", "none") == "checkmate":
+	elif found.get("outcome", "none") in ["checkmate", "king_exposed"]:
 		result = "1-0" if int(found["cp"]) > 0 else "0-1"
 	elif found.get("outcome", "none") != "none":
 		result = "1/2-1/2"

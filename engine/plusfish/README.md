@@ -21,9 +21,13 @@ What it's for:
 
 When a game is over, the game screen shows an eval bar beside the board, a
 blue arrow for Plusfish's best move, and "best: ..." in the status line, for
-the final position and for any earlier position tapped in the move list. Never
-during a game. The game side is `res://scenes/game/plusfish_link.gd`
-(`PlusfishLink`) and `res://scenes/game/eval_bar.gd` (`EvalBar`).
+the final position and for any earlier position tapped in the move list.
+During a game the bar alone shows (always against the bot, and when chosen for
+local and online games); best moves are only ever shown afterwards. The game
+side is `res://scenes/game/plusfish_link.gd` (`PlusfishLink`) and
+`res://scenes/game/eval_bar.gd` (`EvalBar`). `PlusfishLink.supports()` turns
+the bar off for games with a special ability newer than Plusfish knows
+(`KNOWN_ABILITIES`).
 
 * PC: the game runs `plusfish evalgame` (this folder's `bin/plusfish.exe`, or a
   fresh `target/release` build) on a background thread, sends the game once,
@@ -83,9 +87,11 @@ plusfish eval --fen "<fen>"          # static evaluation, biggest terms first
 Scores are in pawns from White's point of view; `#3` means mate in 3.
 
 FENs are the game's own dialect (`core/fen.gd`): two-letter symbols in
-brackets `(PD)`, `'` after a piece = broken shield, `^` = ability used. Two
-optional extra fields that the game's reader ignores: `lost=Qn(PD)` (lost
-pieces, which matter for Raise Dead) and `promo=QR(CH)` (the promotion
+brackets `(PD)`, `'` after a piece = broken shield, `+` = a shield gained by
+capturing (Vampire), `^` = ability used; a Werewolf that has changed is its
+wolf form `(WF)^`. Two optional extra fields that the game's reader ignores:
+`lost=Qn(PD)G^G` (lost pieces in the order lost, which matter for Raise Dead
+and Haunt; `G^` = a lost Ghost whose Haunt is used) and `promo=QR(CH)` (the promotion
 choices; without it, FEN positions promote to Q/R/B/N like the game's FEN
 tests). Army games promote like the real game: to any non-king, non-pawn type
 on the board at the start.
@@ -106,8 +112,9 @@ bestmove e7-e6
 Also `position fen ...`, `position startpos`, `go depth N / nodes N /
 wtime .. btime .. / infinite` + `stop`, `setoption name MultiPV value 3`,
 `d` (board, FEN, legal moves) and `eval`. Moves use the game's move text
-(`e2-e4`, `e7-e8=Q`, Crack Shot `a1!c3`, Raise Dead `d2!=Q`); SAN like `Nf3`
-is accepted too.
+(`e2-e4`, `e7-e8=Q`, Crack Shot `a1!c3`, Raise Dead `d2!=Q`, Haunt `@e3`,
+Song of Slumber `c1~g5`, Full Moon `e4!`); SAN like `Nf3` is accepted too.
+A Jester swap is written like any capture.
 
 ## Balancing
 
@@ -201,15 +208,27 @@ The engine is a line-by-line port of `core/move_generator.gd` and
   every position's FEN, full legal move list, check status and outcome.
   Plusfish replays them and must match exactly. 630 games, 142,000 positions,
   zero mismatches, covering Crack Shot, Raise Dead, shields, Rams, cannons,
-  en passant, castling, promotions and all five game endings.
+  en passant, castling, promotions and all five game endings. After the
+  third batch of pieces (Oct 2026), another 850 games (169,000 positions),
+  700 of them leaning towards the 11 new pieces (`--favor`): 2 mismatches,
+  both the two-Jester case below. `trace-check` lists what a trace
+  covered: Haunts, Songs of Slumber, Full Moons, Jester swaps, Vampire
+  shields gained and broken, Parapets stopping leaps and Cannon screens,
+  Squires protecting attacked pieces, and kings exposed before the first move.
 
 ```
 plusfish trace-games --count 40 --seed 1 > games.txt
+plusfish trace-games --count 40 --seed 1 --favor parapet,jester,ghost > games.txt
 godot --headless --path <ChessPlus> -s res://tools/plusfish_trace.gd -- games.txt trace.jsonl
 plusfish trace-check games.txt trace.jsonl
 ```
 
 (Copy `verify/plusfish_trace.gd` into the game's `tools/` folder first.)
+
+One rule can't be matched exactly: if two Jesters could both take the same
+hit, the game picks whichever its internal piece list holds first, which
+depends on the order pieces last moved; Plusfish picks the one on the lower
+square.
 
 ## Engine details
 
@@ -229,4 +248,5 @@ that stretches while the best move keeps changing. About 5M perft
 nodes/s and 0.5M search nodes/s per core; the game's GDScript bot does about
 4,500.
 
-Limits: boards up to 128 squares (16x8, 11x11, ...) and 32 piece types.
+Limits: boards up to 128 squares (16x8, 11x11, ...) and 64 piece types
+(forms such as the Werewolf's wolf count; the game had 31 in Oct 2026).

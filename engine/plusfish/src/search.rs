@@ -80,7 +80,14 @@ impl TT {
         let b = self.words[i + 2].load(Ordering::Relaxed);
         TTEntry {
             key: k ^ a ^ b,
-            mv: Move { from: a as u8, to: (a >> 8) as u8, flags: (a >> 16) as u8, promo: (a >> 24) as u8, extra: (a >> 32) as u8, steps: (a >> 40) as u8 },
+            mv: Move {
+                from: a as u8,
+                to: (a >> 8) as u8,
+                flags: (a >> 16) as u8 as u16 | ((b >> 40) as u8 as u16) << 8,
+                promo: (a >> 24) as u8,
+                extra: (a >> 32) as u8,
+                steps: (a >> 40) as u8,
+            },
             score: (a >> 48) as u16 as i16,
             eval: b as u16 as i16,
             depth: (b >> 16) as u8 as i8,
@@ -94,12 +101,13 @@ impl TT {
         let m = e.mv;
         let a = m.from as u64
             | (m.to as u64) << 8
-            | (m.flags as u64) << 16
+            | (m.flags as u8 as u64) << 16
             | (m.promo as u64) << 24
             | (m.extra as u64) << 32
             | (m.steps as u64) << 40
             | (e.score as u16 as u64) << 48;
-        let b = e.eval as u16 as u64 | (e.depth as u8 as u64) << 16 | (e.bound as u64) << 24 | (e.age as u64) << 32;
+        // The move's high flag bits ride in the second word.
+        let b = e.eval as u16 as u64 | (e.depth as u8 as u64) << 16 | (e.bound as u64) << 24 | (e.age as u64) << 32 | ((m.flags >> 8) as u64) << 40;
         let i = slot * 3;
         self.words[i].store(e.key ^ a ^ b, Ordering::Relaxed);
         self.words[i + 1].store(a, Ordering::Relaxed);
@@ -488,7 +496,7 @@ impl<'a> Searcher<'a> {
                 }
                 let attacker = self.values[kind_of(p.sq[m.from as usize])];
                 if m.flags & F_CAPTURE != 0 {
-                    let victim = self.values[kind_of(p.sq[m.capture_square() as usize])];
+                    let victim = self.values[kind_of(p.sq[victim_square(*m) as usize])];
                     let crack = if m.flags & F_CRACK != 0 { 50 } else { 0 };
                     if self.capture_gain(p, *m) < -50 {
                         // Probably loses material: after the killers.
@@ -511,7 +519,7 @@ impl<'a> Searcher<'a> {
                 if ply > 0 && *m == self.counter_of(p.side, self.played[ply - 1]) {
                     return 680_000;
                 }
-                if m.flags & F_RAISE != 0 {
+                if m.flags & (F_RAISE | F_HAUNT) != 0 {
                     return 600_000 + self.values[m.extra as usize];
                 }
                 self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize]
@@ -567,9 +575,9 @@ impl<'a> Searcher<'a> {
         }
         self.nodes += 1;
         // Transposition table.
-        let (_, e) = self.tt.probe(p.key, self.age);
+        let (_, e) = self.tt.probe(p.tt_key(), self.age);
         let mut tt_move = Move::NONE;
-        if e.key == p.key && e.bound != 0 {
+        if e.key == p.tt_key() && e.bound != 0 {
             tt_move = e.mv;
             let s = from_tt(e.score as i32, ply);
             if !is_pv && e.depth as i32 >= depth && !root {
@@ -578,7 +586,7 @@ impl<'a> Searcher<'a> {
                 }
             }
         }
-        let static_eval = if in_check { -INF } else if e.key == p.key && e.bound != 0 { e.eval as i32 } else { self.eval(p) };
+        let static_eval = if in_check { -INF } else if e.key == p.tt_key() && e.bound != 0 { e.eval as i32 } else { self.eval(p) };
         let us = p.side;
         self.evals[ply] = static_eval;
         // Is our position better than two plies ago? If not, prune harder.
@@ -594,6 +602,7 @@ impl<'a> Searcher<'a> {
                 let mut child = p.clone();
                 child.ep = 0;
                 child.ep_victim = NO_SQ;
+                child.frozen = NO_SQ;
                 child.halfmove += 1;
                 child.set_side(r, 1 - us);
                 child.update_key(r);
@@ -648,7 +657,7 @@ impl<'a> Searcher<'a> {
             }
             legal += 1;
             let gives_check = child.in_check(r, child.side);
-            let quiet = !m.is_tactical() && m.flags & (F_RAISE | F_CASTLE) == 0;
+            let quiet = !m.is_tactical() && m.flags & (F_ABILITY | F_CASTLE) == 0;
             // Quiet moves that put a piece where it's simply lost, near the leaves.
             if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 1 && best > -MATE_BOUND && p.see_quiet(r, m, &self.values) < -50 * depth * depth {
                 continue;
@@ -753,12 +762,12 @@ impl<'a> Searcher<'a> {
         } else {
             B_UPPER
         };
-        let (slot, e) = self.tt.probe(p.key, self.age);
-        if e.key != p.key || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
+        let (slot, e) = self.tt.probe(p.tt_key(), self.age);
+        if e.key != p.tt_key() || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
             self.tt.store(
                 slot,
                 TTEntry {
-                    key: p.key,
+                    key: p.tt_key(),
                     mv: best_move,
                     score: to_tt(best, ply).clamp(-INF, INF) as i16,
                     eval: static_eval.clamp(-INF, INF) as i16,
@@ -795,8 +804,8 @@ impl<'a> Searcher<'a> {
             return self.eval(p);
         }
         // Transposition table: any stored result is deep enough here.
-        let (_, e) = self.tt.probe(p.key, self.age);
-        let hit = e.key == p.key && e.bound != 0;
+        let (_, e) = self.tt.probe(p.tt_key(), self.age);
+        let hit = e.key == p.tt_key() && e.bound != 0;
         let mut tt_move = Move::NONE;
         if hit {
             let s = from_tt(e.score as i32, ply);
@@ -839,7 +848,7 @@ impl<'a> Searcher<'a> {
             // Delta pruning: even winning this piece can't lift us to alpha.
             if !in_check && m.promo == 0 {
                 let gain = if m.flags & F_CAPTURE != 0 {
-                    self.values[kind_of(p.sq[m.capture_square() as usize])]
+                    self.values[kind_of(p.sq[victim_square(m) as usize])]
                 } else {
                     self.values[kind_of(p.sq[m.to as usize])] / 2
                 };
@@ -881,8 +890,8 @@ impl<'a> Searcher<'a> {
         if in_check && legal == 0 {
             return -MATE + ply as i32;
         }
-        let (slot, e) = self.tt.probe(p.key, self.age);
-        if e.key != p.key || e.depth <= 0 || e.age != self.age {
+        let (slot, e) = self.tt.probe(p.tt_key(), self.age);
+        if e.key != p.tt_key() || e.depth <= 0 || e.age != self.age {
             let bound = if best >= beta {
                 B_LOWER
             } else if best > orig_alpha {
@@ -892,7 +901,7 @@ impl<'a> Searcher<'a> {
             };
             self.tt.store(
                 slot,
-                TTEntry { key: p.key, mv: best_move, score: to_tt(best, ply).clamp(-INF, INF) as i16, eval: raw_eval.clamp(-INF, INF) as i16, depth: 0, bound, age: self.age },
+                TTEntry { key: p.tt_key(), mv: best_move, score: to_tt(best, ply).clamp(-INF, INF) as i16, eval: raw_eval.clamp(-INF, INF) as i16, depth: 0, bound, age: self.age },
             );
         }
         best
