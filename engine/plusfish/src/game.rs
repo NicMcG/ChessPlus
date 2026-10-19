@@ -40,15 +40,10 @@ impl Game {
 
     /// "1-0", "0-1", "1/2-1/2" or "*".
     pub fn result_text(&self) -> &'static str {
-        match self.outcome() {
-            Outcome::None => "*",
-            Outcome::Checkmate => {
-                if self.pos.side == WHITE {
-                    "0-1"
-                } else {
-                    "1-0"
-                }
-            }
+        match self.outcome().white_score(self.pos.side) {
+            None => "*",
+            Some(s) if s > 0.75 => "1-0",
+            Some(s) if s < 0.25 => "0-1",
             _ => "1/2-1/2",
         }
     }
@@ -90,8 +85,18 @@ pub fn parse_square(r: &Rules, t: &str) -> Option<usize> {
     Some((y * r.w + x) as usize)
 }
 
-/// `Move.to_text()`: "e2-e4", "e4xd5", "e7-e8=Q", "a1!c3" (Crack Shot), "d2!=Q" (Raise Dead).
+/// `Move.to_text()`: "e2-e4", "e4xd5", "e7-e8=Q", "a1!c3" (Crack Shot), "d2!=Q"
+/// (Raise Dead), "@e3" (Haunt), "c1~g5" (Song of Slumber), "e4!" (Full Moon).
 pub fn move_text(r: &Rules, m: Move) -> String {
+    if m.flags & F_HAUNT != 0 {
+        return format!("@{}", square_name(r, m.to as usize));
+    }
+    if m.flags & F_SONG != 0 {
+        return format!("{}~{}", square_name(r, m.from as usize), square_name(r, m.to as usize));
+    }
+    if m.flags & F_MOON != 0 {
+        return format!("{}!", square_name(r, m.from as usize));
+    }
     if m.flags & F_RAISE != 0 {
         return format!("{}!={}", square_name(r, m.from as usize), r.def(m.extra as usize).symbol.to_uppercase());
     }
@@ -113,12 +118,22 @@ pub fn move_text(r: &Rules, m: Move) -> String {
 
 /// Standard algebraic notation as the game writes it (`Notation.san`).
 pub fn san(p: &Position, r: &Rules, m: Move) -> String {
-    let mover = kind_of(p.sq[m.from as usize]);
+    let mover = if m.flags & F_HAUNT != 0 { m.extra as usize } else { kind_of(p.sq[m.from as usize]) };
     let sym = r.def(mover).symbol.to_uppercase();
     let mut t = String::new();
     if m.flags & F_RAISE != 0 {
         t = format!("{}!={}", sym, r.def(m.extra as usize).symbol.to_uppercase());
         return t + &check_suffix(p, r, m);
+    }
+    // Text only, like the game: G@e3 (Haunt), BDc1~g5 (Song of Slumber), WWe4! (Full Moon).
+    if m.flags & F_HAUNT != 0 {
+        return format!("{}@{}", sym, square_name(r, m.to as usize)) + &check_suffix(p, r, m);
+    }
+    if m.flags & F_SONG != 0 {
+        return format!("{}{}~{}", sym, square_name(r, m.from as usize), square_name(r, m.to as usize)) + &check_suffix(p, r, m);
+    }
+    if m.flags & F_MOON != 0 {
+        return format!("{}{}!", sym, square_name(r, m.from as usize)) + &check_suffix(p, r, m);
     }
     if m.flags & F_CASTLE != 0 {
         t = if m.to > m.from { "O-O".into() } else { "O-O-O".into() };
@@ -209,13 +224,26 @@ fn piece_token(r: &Rules, c: u16) -> String {
     if c & BROKEN != 0 {
         t.push('\'');
     }
+    if c & GAINED != 0 {
+        t.push('+');
+    }
     if c & USED != 0 {
         t.push('^');
     }
     t
 }
 
-/// Placement tokens: digits, "X", "(XY)", "'" and "^".
+/// A piece's marks: "'" (broken shield), "+" (gained shield), "^" (ability used).
+fn mark_bit(t: &str) -> Option<u16> {
+    match t {
+        "'" => Some(BROKEN),
+        "+" => Some(GAINED),
+        "^" => Some(USED),
+        _ => None,
+    }
+}
+
+/// Placement tokens: digits, "X", "(XY)", "'", "+" and "^".
 fn tokens(row: &str) -> Vec<String> {
     let chars: Vec<char> = row.chars().collect();
     let mut out = Vec::new();
@@ -249,15 +277,27 @@ fn tokens(row: &str) -> Vec<String> {
 
 /// Pieces in a FEN-style list such as "Qn(PD)" -> (kind, team) pairs.
 pub fn parse_piece_list(cat: &Catalog, text: &str) -> Result<Vec<(usize, usize)>, String> {
-    let mut out = Vec::new();
+    Ok(parse_marked_list(cat, text)?.into_iter().map(|(k, t, _)| (k, t)).collect())
+}
+
+/// The same with each piece's marks as flag bits (a lost Ghost's "^" =
+/// its Haunt is used).
+pub fn parse_marked_list(cat: &Catalog, text: &str) -> Result<Vec<(usize, usize, u16)>, String> {
+    let mut out: Vec<(usize, usize, u16)> = Vec::new();
     for t in tokens(text) {
-        if t.chars().all(|c| c.is_ascii_digit()) || t == "'" || t == "^" || t == "," {
+        if let Some(bit) = mark_bit(&t) {
+            if let Some(last) = out.last_mut() {
+                last.2 |= bit;
+            }
+            continue;
+        }
+        if t.chars().all(|c| c.is_ascii_digit()) || t == "," {
             continue;
         }
         let letters = t.trim_start_matches('(').trim_end_matches(')');
         let k = cat.kind_by_symbol(letters).ok_or(format!("unknown piece: {}", t))?;
         let team = if letters == letters.to_uppercase() { WHITE } else { BLACK };
-        out.push((k, team));
+        out.push((k, team, 0));
     }
     Ok(out)
 }
@@ -273,7 +313,8 @@ pub struct ParsedFen {
     pub ep: Option<String>,
     pub halfmove: u32,
     pub fullmove: u32,
-    pub lost: Vec<(usize, usize)>,
+    /// Lost pieces in order: kind, team, marks.
+    pub lost: Vec<(usize, usize, u16)>,
     pub promo: Option<Vec<usize>>,
 }
 
@@ -287,7 +328,7 @@ pub fn parse_fen_text(cat: &Catalog, text: &str) -> Result<ParsedFen, String> {
     let width_of = |row: &str| -> i32 {
         tokens(row)
             .iter()
-            .map(|t| if t.chars().all(|c| c.is_ascii_digit()) { t.parse::<i32>().unwrap_or(0) } else if t == "'" || t == "^" { 0 } else { 1 })
+            .map(|t| if t.chars().all(|c| c.is_ascii_digit()) { t.parse::<i32>().unwrap_or(0) } else if mark_bit(t).is_some() { 0 } else { 1 })
             .sum()
     };
     let w = width_of(rows[0]);
@@ -301,10 +342,10 @@ pub fn parse_fen_text(cat: &Catalog, text: &str) -> Result<ParsedFen, String> {
                 file += t.parse::<i32>().unwrap();
                 continue;
             }
-            if t == "'" || t == "^" {
+            if let Some(bit) = mark_bit(&t) {
                 if let Some(l) = last {
                     let p: &mut (usize, usize, u16) = &mut pieces[l];
-                    p.2 |= if t == "'" { BROKEN } else { USED };
+                    p.2 |= bit;
                 }
                 continue;
             }
@@ -336,7 +377,7 @@ pub fn parse_fen_text(cat: &Catalog, text: &str) -> Result<ParsedFen, String> {
     };
     for f in fields.iter().skip(6) {
         if let Some(v) = f.strip_prefix("lost=") {
-            pf.lost = parse_piece_list(cat, v)?;
+            pf.lost = parse_marked_list(cat, v)?;
         } else if let Some(v) = f.strip_prefix("promo=") {
             pf.promo = Some(parse_piece_list(cat, v)?.into_iter().map(|(k, _)| k).collect());
         }
@@ -364,8 +405,8 @@ pub fn army_promo(cat: &Catalog, kinds_on_board: &[usize]) -> Vec<usize> {
     v
 }
 
-pub fn kinds_mask(kinds: impl IntoIterator<Item = usize>) -> u32 {
-    kinds.into_iter().fold(0u32, |m, k| m | (1 << k))
+pub fn kinds_mask(kinds: impl IntoIterator<Item = usize>) -> u64 {
+    kinds.into_iter().fold(0u64, |m, k| m | (1u64 << k))
 }
 
 /// A game from a FEN. Promotion choices: the FEN's `promo=` field if it has
@@ -384,7 +425,7 @@ pub fn game_from_fen(cat: &Arc<Catalog>, text: &str, promo: Option<Vec<usize>>) 
     let mut p = Position::empty();
     for &(s, k, flags) in &pf.pieces {
         let team = if flags & BLACK_BIT != 0 { BLACK } else { WHITE };
-        let mut c = code(k, team) | (flags & (BROKEN | USED));
+        let mut c = code(k, team) | (flags & (BROKEN | GAINED | USED));
         let def = r.def(k);
         if def.is_king() || def.has_castle() {
             c |= MOVED;
@@ -437,9 +478,8 @@ pub fn game_from_fen(cat: &Arc<Catalog>, text: &str, promo: Option<Vec<usize>>) 
     }
     p.halfmove = pf.halfmove;
     p.fullmove = pf.fullmove;
-    for &(k, team) in &pf.lost {
-        let n = p.lost[team][k] + 1;
-        p.set_lost(r, team, k, n);
+    for &(k, team, marks) in &pf.lost {
+        p.lose(r, team, code(k, team) | marks);
     }
     Ok(Game::new(rules.clone(), p))
 }
@@ -497,6 +537,14 @@ pub fn fen(p: &Position, r: &Rules, with_extras: bool) -> String {
         let mut lost = String::new();
         for team in 0..2 {
             for k in 0..r.info.len() {
+                if k as u8 == r.haunt_kind {
+                    // Ghosts in the order they were lost, "^" if Haunt is used.
+                    for i in 0..p.ghost_n[team] {
+                        let used = if p.ghosts[team] & (1 << i) == 0 { USED } else { 0 };
+                        lost += &piece_token(r, code(k, team) | used);
+                    }
+                    continue;
+                }
                 for _ in 0..p.lost[team][k] {
                     lost += &piece_token(r, code(k, team));
                 }
@@ -539,5 +587,6 @@ pub fn outcome_name(o: Outcome) -> &'static str {
         Outcome::FiftyMoves => "fifty_moves",
         Outcome::Repetition => "repetition",
         Outcome::Insufficient => "insufficient_material",
+        Outcome::KingExposed => "king_exposed",
     }
 }

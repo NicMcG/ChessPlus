@@ -184,10 +184,10 @@ func test_raise_dead_brings_back_a_werewolf_not_a_wolf() -> void:
 	var raise := _play(state, "a1!=WW")
 	check(raise != null and raise.raised.can_use_ability(), "Fresh, with its Full Moon back")
 
-func test_eval_bar_steps_aside() -> void:
+func test_eval_bar_knows_the_abilities() -> void:
 	for id in ["ghost", "bard", "werewolf"]:
 		var state := _game("4k3/8/8/8/3%s4/8/8/4K3 w - - 0 1" % ("(%s)" % _def(id).symbol if _def(id).symbol.length() > 1 else _def(id).symbol))
-		check(not PlusfishLink.supports(state), "Plusfish doesn't know the %s's ability yet" % id)
+		check(PlusfishLink.supports(state), "Plusfish knows the %s's ability" % id)
 
 # --- On the game screen ------------------------------------------------------------------
 

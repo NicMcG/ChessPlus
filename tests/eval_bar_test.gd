@@ -65,7 +65,7 @@ func test_request_describes_the_game() -> void:
 	for def in PieceCatalog.all_defs():
 		check(ids.has(def.id), "Sends piece type " + def.id)
 	check_eq(request["board"].size(), 32, "Every piece on the board")
-	check(request["board"].has(["king", Piece.Team.BLACK, 4, 7, false, false, false]), "Black's king on e8, unmoved")
+	check(request["board"].has(["king", Piece.Team.BLACK, 4, 7, false, false, false, false]), "Black's king on e8, unmoved")
 	check_eq(request["moves"], ["e2-e4", "e7-e5"], "The moves")
 	check_eq(request["promo"].size(), 4, "Promotion choices from the armies")
 	var pawn: Dictionary = request["pieces"][ids.find("pawn")]
@@ -79,7 +79,29 @@ func test_request_mirrors_black_armies_as_the_game_does() -> void:
 	army.place(load("res://data/pieces/rook.tres"), Vector2i(0, 0))
 	var start := ArmySetup.create_game(army, army, StandardSetup.create_rules())
 	var board: Array = PlusfishLink.request_for(start, [])["board"]
-	check(board.has(["rook", Piece.Team.BLACK, 7, 7, false, false, false]), "Black's rook where the game put it (h8)")
+	check(board.has(["rook", Piece.Team.BLACK, 7, 7, false, false, false, false]), "Black's rook where the game put it (h8)")
+
+## A start with the new pieces' state: a Vampire's gained shield, a lost Ghost
+## that can still Haunt, and a Werewolf (whose wolf form goes along too).
+func _new_pieces_start() -> GameState:
+	var start := Fen.parse("4k3/8/8/3v+4/8/8/(WW)7/4K2(BD) w - - 0 1", PieceCatalog.all_defs(), StandardSetup.create_rules())
+	start.lost[Piece.Team.WHITE].append(Piece.new(load("res://data/pieces/ghost.tres"), Piece.Team.WHITE))
+	return start
+
+func test_request_carries_the_new_rules() -> void:
+	var request := PlusfishLink.request_for(_new_pieces_start(), ["@e4"])
+	var pieces := {}
+	for p: Dictionary in request["pieces"]:
+		pieces[p["id"]] = p
+	check(pieces.has("werewolf_wolf"), "The wolf form is sent with the Werewolf")
+	check_eq(pieces["werewolf"]["transforms_into"], "werewolf_wolf", "And linked to it")
+	check_eq(pieces["parapet"]["blocks_jumps"], true, "The Parapet blocks jumps")
+	check_eq(pieces["vampire"]["shield_on_capture"], true, "The Vampire gains shields")
+	check_eq(pieces["squire"]["protects"], ["knight"], "The Squire protects knights")
+	check_eq(pieces["jester"]["decoy"], true, "The Jester takes hits")
+	check(request["board"].has(["vampire", Piece.Team.BLACK, 3, 4, false, false, false, true]), "The Vampire's gained shield")
+	check_eq(request["lost"], [["ghost", Piece.Team.WHITE, false]], "The lost Ghost, Haunt unused")
+	check(JSON.parse_string(JSON.stringify(request)) is Dictionary, "Turns into JSON")
 
 # --- The game screen --------------------------------------------------------------------
 
@@ -166,3 +188,29 @@ func test_real_engine_finds_the_mate() -> void:
 	check(game.eval_bar.known and game.eval_bar.score_text() == "M1", "Bar shows the mate")
 	game.free()
 	_finish()
+
+func test_real_engine_follows_the_new_abilities() -> void:
+	if PlusfishLink.program_path() == "" or OS.has_feature("web"):
+		print("    (Plusfish not built: cargo build --release in engine/plusfish to run this test)")
+		return
+	# Haunt, a capture of the Ghost by the shielded Vampire, Full Moon, then
+	# Song of Slumber: Plusfish must replay every one to evaluate each position.
+	var start := _new_pieces_start()
+	var moves := ["@e4", "d5xe4", "a2!", "e8-d8", "h1~e4"]
+	var replay := _new_pieces_start()
+	for text: String in moves:
+		var move := replay.find_move(text)
+		check(move != null, "The game allows " + text)
+		replay.make_move(move)
+	var link := PlusfishLink.new()
+	_root().add_child(link)
+	link.desktop_nodes = 5000
+	link.analyse(start, moves)
+	for i in 2000:
+		if link.results.size() == moves.size() + 1:
+			break
+		await _frames(1)
+		OS.delay_msec(10)
+	check_eq(link.results.size(), moves.size() + 1, "Every position evaluated")
+	check(str(link.results.get(0, {}).get("best", "")) != "", "A best move at the start")
+	link.free()
