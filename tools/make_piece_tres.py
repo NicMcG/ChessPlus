@@ -63,7 +63,7 @@ PIECES = {
     "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
-    ], ability=5, ability_name="Full Moon", colors=["#F5F2E3", "#8E959E"], transforms_into="forms/werewolf_wolf",
+    ], ability=5, ability_name="Full Moon", colors=["#789EFF", "#283199"], transforms_into="forms/werewolf_wolf",
         ability_text="Once per game: the Werewolf turns into a wolf for the rest of the game (press After Full Moon to see how the wolf moves). Uses your turn."),
     # The Werewolf after Full Moon. Kept in forms/ so the army builder doesn't offer it.
     "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3, path="forms/werewolf_wolf", rules=[

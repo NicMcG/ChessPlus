@@ -299,7 +299,10 @@ func _activation(move: Move) -> void:
 			extra.until = extra.until * SLOWER + WAIT
 	for cue: Array in cues:
 		cue[0] = cue[0] * SLOWER + WAIT
-	var charge := {"kind": "charge", "at": Vector2(move.from), "start": 0.0, "end": WAIT}
+	# The Bard's build-up is gentle (Mac): no electricity and no slam; it just
+	# strums as it rises, and settles softly.
+	var gentle := move.ability == PieceDef.Ability.SONG_OF_SLUMBER
+	var charge := {"kind": "charge", "at": Vector2(move.from), "start": 0.0, "end": WAIT, "gentle": gentle}
 	if move.ability == PieceDef.Ability.FULL_MOON:
 		# Still a Werewolf while it builds up (the game already has it as a wolf).
 		charge.as_def = move.piece.base_def
@@ -307,13 +310,16 @@ func _activation(move: Move) -> void:
 	if not tracks.has(move.piece):
 		tracks[move.piece] = []
 	tracks[move.piece].push_front(charge)
-	# Crackling electricity as it powers up, then it slams back down onto the
-	# board (Mac): a thump, dust and a ring bursting out.
-	_cue(0.0, GameSounds.Sound.ABILITY)
-	const LANDS := WAIT * 0.97
-	_cue(LANDS, GameSounds.Sound.GROUND_SLAM)
-	extras.append({"kind": "dust", "at": Vector2(move.from), "start": LANDS, "end": LANDS + 0.45})
-	extras.append({"kind": "shockwave", "at": Vector2(move.from), "start": LANDS, "end": LANDS + 0.4})
+	if gentle:
+		_cue(0.0, GameSounds.Sound.STRUM)
+	else:
+		# Crackling electricity as it powers up, then it slams back down onto
+		# the board (Mac): a thump, dust and a ring bursting out.
+		_cue(0.0, GameSounds.Sound.ABILITY)
+		const LANDS := WAIT * 0.97
+		_cue(LANDS, GameSounds.Sound.GROUND_SLAM)
+		extras.append({"kind": "dust", "at": Vector2(move.from), "start": LANDS, "end": LANDS + 0.45})
+		extras.append({"kind": "shockwave", "at": Vector2(move.from), "start": LANDS, "end": LANDS + 0.4})
 	var glow: Color = move.piece.def.ability_gradient()[1].lerp(Color.WHITE, 0.3)
 	extras.append({"kind": "light", "at": Vector2(move.from), "start": 0.0, "end": WAIT + 0.15, "color": glow})
 
@@ -356,8 +362,8 @@ func _song_of_slumber(move: Move) -> void:
 	extras.append({"kind": "notes", "from": Vector2(move.from), "to": Vector2(move.to), "start": 0.0, "end": 1.0})
 	extras.append({"kind": "light", "at": Vector2(move.to), "start": 0.7, "end": 1.3, "color": Color(1.0, 0.8, 0.35), "size": 0.9})
 	_add(move.frozen, {"kind": "drowse", "at": Vector2(move.to), "start": 0.7, "end": 1.5})
-	_cue(0.0, GameSounds.Sound.STRUM)
-	_cue(0.35, GameSounds.Sound.LULLABY)
+	# The strum came as the Bard rose (see _activation); the notes as they fly.
+	_cue(0.0, GameSounds.Sound.LULLABY)
 
 ## Full Moon: like a promotion, the Werewolf rises spinning in a silvery
 ## moonlit glow, howling, and comes back down as the wolf.
@@ -581,9 +587,10 @@ static func segment_pose(segment: Dictionary, t: float) -> Dictionary:
 			pose.pos = (segment.at as Vector2) + Vector2(shake_offset(t), 0)
 		"charge":
 			# Rises towards the player, holds there, then slams back down
-			# (falling faster and faster).
+			# (falling faster and faster), or, if gentle, settles softly.
 			var fall := clampf((t - 0.84) / 0.13, 0.0, 1.0)
-			var up := smoothstep(0.0, 0.45, t) * (1.0 - fall * fall)
+			var down := smoothstep(0.8, 1.0, t) if segment.get("gentle", false) else fall * fall
+			var up := smoothstep(0.0, 0.45, t) * (1.0 - down)
 			pose.scale = Vector2.ONE * (1.0 + 0.35 * up)
 			pose.lift = 0.18 * up
 			pose.shadow = up
