@@ -750,21 +750,25 @@ impl<'a> Searcher<'a> {
                     || (n > 1 && p.see_quiet(r, m, &self.values) < -50 * depth * depth)
             };
             // Making a move and testing it costs about as much as a leaf node,
-            // so skip it if the move is surely legal and surely gives no check.
-            if prune_quiet {
+            // so skip it if the move is surely legal and surely gives no check;
+            // for quiet moves that are searched, those answers save the tests.
+            let (mut sure_legal, mut no_check) = (false, false);
+            if quiet && !in_check {
                 let (checks, pins) = *sens.get_or_insert_with(|| (p.attack_sensitive(r, us, true), p.attack_sensitive(r, 1 - us, false)));
-                if p.quiet_surely_legal(r, m, pins) && !p.quiet_might_check(r, m, checks) {
+                sure_legal = p.quiet_surely_legal(r, m, pins);
+                no_check = !p.quiet_might_check(r, m, checks);
+                if prune_quiet && sure_legal && no_check {
                     legal += 1;
                     continue;
                 }
             }
             let mut child = p.clone();
             child.make(r, m);
-            if child.leaves_king_attacked(p, r, m) {
+            if !sure_legal && child.leaves_king_attacked(p, r, m) {
                 continue;
             }
             legal += 1;
-            let gives_check = child.in_check(r, child.side);
+            let gives_check = !no_check && child.in_check(r, child.side);
             if prune_quiet && !gives_check {
                 continue;
             }
