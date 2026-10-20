@@ -200,17 +200,47 @@ func save() -> void:
 	if library.save(army) == OK:
 		saved.emit(army)
 
-## Upload the army as it is now and show its code, for a friend to import.
+## Share: choose between a code (the army is uploaded to the server) and
+## text to send yourself (nothing is uploaded).
 func share() -> void:
 	if share_button.disabled:
 		return
 	share_panel = ModalPanel.new("Share army")
-	var message := share_panel.add_text("Uploading...")
+	share_panel.add_text("Get a short code for your friend to type in (the army is uploaded to the game's server), or copy the army as text to send them yourself.")
+	share_panel.add_button("Get a code", func() -> void:
+		share_panel.close()
+		share_code())
+	share_panel.add_button("Copy as text", func() -> void:
+		share_panel.close()
+		share_text())
+	share_panel.add_button("Cancel", share_panel.close)
 	add_child(share_panel)
+
+## The army as it is now, named as it will be saved.
+func _army_to_share() -> Army:
 	var copy := army.copy()
 	copy.army_name = army.army_name.strip_edges()
+	return copy
+
+## Show the army as a line of text (ArmyShare.to_text), with a Copy button.
+func share_text() -> void:
+	share_panel = ModalPanel.new("Share army")
+	share_panel.add_text("Send this to your friend. They tap Import army in My armies and paste it in:")
+	var text := ArmyShare.to_text(_army_to_share(), rules, BOARD_WIDTH)
+	var shown := share_panel.add_text(text, 24)
+	shown.name = "ArmyText"
+	var copy_button := share_panel.add_button("Copy text", func() -> void: DisplayServer.clipboard_set(text))
+	copy_button.pressed.connect(func() -> void: copy_button.text = "Copied!")
+	share_panel.add_button("Done", share_panel.close)
+	add_child(share_panel)
+
+## Upload the army as it is now and show its code, for a friend to import.
+func share_code() -> void:
+	share_panel = ModalPanel.new("Share army")
+	var message := share_panel.add_text("Uploading...")
+	add_child(share_panel)
 	var server := backend if backend else _real_server()
-	var result: Dictionary = await ArmyShare.share(server, copy)
+	var result: Dictionary = await ArmyShare.share(server, _army_to_share())
 	if not is_instance_valid(share_panel):
 		return
 	if not result.ok:
