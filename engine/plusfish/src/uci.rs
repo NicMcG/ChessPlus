@@ -2,6 +2,7 @@
 //!
 //!   uci / isready / ucinewgame / quit
 //!   setoption name Hash value <MB>   |   setoption name MultiPV value <n>
+//!   setoption name <search constant> value <n>    (SearchParams, for tuning)
 //!   position startpos [moves ...]                 (standard chess)
 //!   position army <white army> <black army> [moves ...]
 //!   position fen <fen ...> [moves ...]
@@ -28,6 +29,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
     let mut hash_mb = 64usize;
     let mut multipv = 1usize;
     let mut threads = 1usize;
+    let mut sp = SearchParams::default();
     let stop = Arc::new(AtomicBool::new(false));
     let mut worker: Option<std::thread::JoinHandle<Option<SearchTables>>> = None;
     // The last "position" setup (everything before "moves"), its game before
@@ -57,6 +59,9 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                 say("option name Hash type spin default 64 min 1 max 4096".into());
                 say("option name MultiPV type spin default 1 min 1 max 32".into());
                 say("option name Threads type spin default 1 min 1 max 256".into());
+                for s in SEARCH_PARAM_SPECS {
+                    say(format!("option name {} type spin default {} min {} max {}", s.name, s.default, s.min, s.max));
+                }
                 say("uciok".into());
             }
             "isready" => say("readyok".into()),
@@ -77,6 +82,15 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                     }
                     (Some("multipv"), Some(v)) => multipv = v.max(1),
                     (Some("threads"), Some(v)) => threads = v.max(1),
+                    (Some(n), _) if sp.get(n).is_some() => {
+                        let v = words.iter().position(|&w| w == "value").and_then(|i| words.get(i + 1)).and_then(|v| v.parse::<i32>().ok());
+                        match v {
+                            Some(v) => {
+                                sp.set(n, v);
+                            }
+                            None => say("info string bad value".into()),
+                        }
+                    }
                     _ => say("info string unknown option".into()),
                 }
             }
@@ -162,6 +176,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                 let mpv = multipv;
                 let mb = hash_mb;
                 let nthreads = threads;
+                let sp2 = sp;
                 let et = match &base {
                     Some(b) if Arc::ptr_eq(&b.1.rules, &g.rules) => b.2.clone(),
                     _ => Arc::new(EvalTables::new(&g.rules)),
@@ -175,6 +190,7 @@ pub fn run(cat: Arc<Catalog>, params: Arc<Params>) {
                         None => Searcher::new(r, et, &params, mb),
                     };
                     s.stop = stop2;
+                    s.sp = sp2;
                     let keys = &g.keys[..g.keys.len() - 1];
                     let rep = s.search_threads(&g.pos, keys, limits, mpv, nthreads, |rep| {
                         let _l = out2.lock().unwrap();

@@ -13,6 +13,7 @@ use plusfish_core::util::{Args, Rng};
 
 mod ematch;
 mod meta;
+mod spsa;
 mod startcheck;
 
 const HELP: &str = "\
@@ -40,6 +41,7 @@ Balancing
               --out games.jsonl        save the games
   enginematch Two engine programs play each other (to test engine changes);
               see plusfish enginematch --help
+  spsa      Tune the search constants by SPSA self-play; see plusfish spsa --help
   start-check How well starting-position scores predict which army wins;
               see plusfish start-check --help
   meta      Grow a pool of armies that look strongest at turn 0 against each
@@ -159,6 +161,10 @@ fn main() {
         print!("{}", meta::FIXED_HELP);
         return;
     }
+    if cmd == "spsa" && args.flag("help") {
+        print!("{}", spsa::HELP);
+        return;
+    }
     if cmd == "start-check" && args.flag("help") {
         print!("{}", startcheck::HELP);
         return;
@@ -197,6 +203,9 @@ fn main() {
         "enginematch" => {
             let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));
             ematch::run(&cat, &args, &dir.to_string_lossy());
+        }
+        "spsa" => {
+            spsa::run(&cat, &args, &load_params(&cat, args.get("params")));
         }
         "meta" => {
             meta::run(&cat, &load_params(&cat, args.get("params")), &args);

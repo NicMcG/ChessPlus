@@ -14,7 +14,18 @@ pub const FE_MAT: usize = 0;
 pub const FE_MOB: usize = 1;
 pub const FE_SHIELD: usize = 2;
 pub const FE_ABIL: usize = 3;
-pub const PER_KIND: usize = 4;
+/// Squares the piece would reach from its square on an empty board, minus
+/// its average over the board: a Knight on the rim or a Berserker on the last
+/// row (where it can never move again) is worth less.
+pub const FE_REACH: usize = 4;
+/// On a square it can never leave (a Berserker on the last row): it can only
+/// stand in the way. Unless tuned, cancels 90% of its material.
+pub const FE_DEAD: usize = 5;
+/// + relative row (0..7, further rows count as 7): where on the board a piece
+/// that doesn't promote stands.
+pub const FE_ROW: usize = 6;
+pub const ROWS: usize = 8;
+pub const PER_KIND: usize = FE_ROW + ROWS;
 pub const G: usize = MAX_KINDS * PER_KIND;
 pub const G_CENTER: usize = G;
 pub const G_DEVELOP: usize = G + 1;
@@ -35,7 +46,11 @@ pub fn feature_name(cat: &Catalog, i: usize) -> String {
     if i < G {
         let k = i / PER_KIND;
         let id = cat.defs.get(k).map(|d| d.id.clone()).unwrap_or(format!("kind{}", k));
-        let what = ["mat", "mob", "shield", "ability"][i % PER_KIND];
+        let f = i % PER_KIND;
+        if f >= FE_ROW {
+            return format!("row{}:{}", f - FE_ROW, id);
+        }
+        let what = ["mat", "mob", "shield", "ability", "reach", "dead"][f];
         return format!("{}:{}", what, id);
     }
     match i {
@@ -129,6 +144,13 @@ impl Params {
                 self.tuned[i] = true;
             }
         }
+        for k in 0..cat.len() {
+            let d = k * PER_KIND + FE_DEAD;
+            if !self.tuned[d] {
+                let m = self.w[k * PER_KIND + FE_MAT];
+                self.w[d] = [-0.9 * m[0], -0.9 * m[1]];
+            }
+        }
     }
 
     pub fn save(&self, cat: &Catalog, used: &[bool]) -> String {
@@ -177,6 +199,10 @@ pub struct EvalTables {
     /// Squares reached from each square on an empty board, per kind and team
     /// (like `PracticeBot.reach`), and the average over the board.
     reach_avg: Vec<f32>,
+    /// Squares reached from each square minus the average, [(kind * 2 + team) * nsq + square].
+    reach_rel: Vec<f32>,
+    /// Squares a piece can never leave, per kind and team (bit masks).
+    dead: Vec<u128>,
     center: Vec<f32>,
     /// Phase weight per kind: non-pawn, non-king material (army cost).
     phase_value: Vec<f32>,
@@ -188,26 +214,37 @@ impl EvalTables {
     pub fn new(r: &Rules) -> EvalTables {
         let nk = r.info.len();
         let mut reach_avg = vec![0.0f32; nk];
+        let mut reach_rel = vec![0.0f32; nk * 2 * r.nsq];
+        let mut dead = vec![0u128; nk * 2];
         for k in 0..nk {
-            let mut total = 0.0;
-            for s in 0..r.nsq {
-                let mut seen = 0u128;
-                for ray in r.rays_of(k, WHITE, s) {
-                    let sqs = r.ray_squares(ray);
-                    if ray.is_path {
-                        seen |= 1u128 << sqs[sqs.len() - 1];
-                        continue;
-                    }
-                    let lim = ray.lim_moved.max(ray.lim_unmoved).min(ray.len) as usize;
-                    for (i, &q) in sqs[..lim].iter().enumerate() {
-                        if i >= ray.leap as usize {
-                            seen |= 1u128 << q;
+            for t in 0..2 {
+                for s in 0..r.nsq {
+                    let mut seen = 0u128;
+                    for ray in r.rays_of(k, t, s) {
+                        let sqs = r.ray_squares(ray);
+                        if ray.is_path {
+                            seen |= 1u128 << sqs[sqs.len() - 1];
+                            continue;
+                        }
+                        let lim = ray.lim_moved.max(ray.lim_unmoved).min(ray.len) as usize;
+                        for (i, &q) in sqs[..lim].iter().enumerate() {
+                            if i >= ray.leap as usize {
+                                seen |= 1u128 << q;
+                            }
                         }
                     }
+                    reach_rel[(k * 2 + t) * r.nsq + s] = seen.count_ones() as f32;
+                    let i = &r.info[k];
+                    if seen == 0 && !i.can_promote && i.ability == Ability::None {
+                        dead[k * 2 + t] |= 1u128 << s;
+                    }
                 }
-                total += seen.count_ones() as f32;
             }
-            reach_avg[k] = total / r.nsq as f32;
+            let own = &mut reach_rel[k * 2 * r.nsq..(k + 1) * 2 * r.nsq];
+            reach_avg[k] = own[..r.nsq].iter().sum::<f32>() / r.nsq as f32;
+            for v in own.iter_mut() {
+                *v -= reach_avg[k];
+            }
         }
         let cx = (r.w - 1) as f32 / 2.0;
         let cy = (r.h - 1) as f32 / 2.0;
@@ -219,7 +256,7 @@ impl EvalTables {
             })
             .collect();
         let phase_value: Vec<f32> = r.info.iter().map(|i| if i.is_pawn || i.is_king { 0.0 } else { i.cost as f32 }).collect();
-        EvalTables { reach_avg, center, phase_value, phase_total: 62.0, raise_ref: 3.0 }
+        EvalTables { reach_avg, reach_rel, dead, center, phase_value, phase_total: 62.0, raise_ref: 3.0 }
     }
 }
 
@@ -274,6 +311,13 @@ pub fn features<A: Acc>(p: &Position, r: &Rules, et: &EvalTables, acc: &mut A) {
             let m = if i < 64 { mob[t][i] } else { 0 } as f32;
             i += 1;
             acc.add(base + FE_MOB, sign * (m - et.reach_avg[k] * 0.5));
+            let reach = et.reach_rel[(k * 2 + t) * r.nsq + s];
+            if reach != 0.0 {
+                acc.add(base + FE_REACH, sign * reach);
+            }
+            if et.dead[k * 2 + t] & (1u128 << s) != 0 {
+                acc.add(base + FE_DEAD, sign);
+            }
             if r.shielded(c) {
                 acc.add(base + FE_SHIELD, sign);
             }
@@ -336,6 +380,7 @@ pub fn features<A: Acc>(p: &Position, r: &Rules, et: &EvalTables, acc: &mut A) {
                     }
                 }
             } else {
+                acc.add(base + FE_ROW + row.clamp(0, ROWS as i32 - 1) as usize, sign);
                 acc.add(G_CENTER, sign * et.center[s]);
                 if row == 0 && !info.castle {
                     acc.add(G_DEVELOP, sign);
