@@ -33,39 +33,39 @@ PIECES = {
         ([(1, 0), (-1, 0)], 0, 0, {}),
         (DIAG, 1, 0, {}),
     ], extra={"blocks_jumps": "true"},
-        special_rule="Your opponent's pieces can't jump over it: their Knights, Elephants, Catapults and the Wizard's and Rogue's leaps can't pass it, and their Cannons can't use it as a screen. Your own pieces can. (A Knight counts as moving 2 squares straight, then 1 to the side.)"),
+        special_rule="Enemy pieces can't jump over the Parapet."),
     "vampire": dict(name="Vampire", symbol="V", value=4, rules=[
         ([(1, 0), (-1, 0), (0, -1)], 0, 0, {}),
         ([(1, 1), (-1, 1)], 1, 0, {}),
     ], extra={"shield_on_capture": "true"},
-        special_rule="Starts without a shield. Whenever it captures, it gains a shield if it doesn't have one: the next capture against it only breaks the shield."),
+        special_rule="Whenever the Vampire captures a piece, if the Vampire didn't have a shield, it gains one."),
     "squire": dict(name="Squire", symbol="SQ", value=3, rules=[
         (ORTHO, 2, 0, {}),
         (DIAG, 1, 0, {}),
     ], extra={"protects": 'Array[String](["knight"])'},
-        special_rule="Your Knights on squares it could move to can't be captured."),
+        special_rule="Your Knights that are within the Squire's move range can't be captured."),
     "jester": dict(name="Jester", symbol="J", value=4, rules=[
         (ALL8, 2, 1, {}),
         (ALL8, 1, 2, {}),
     ], extra={"decoy": "true"},
-        special_rule="When an enemy would capture one of your pieces (not a pawn) on a square the Jester could move or capture to, they swap places and the Jester is captured instead."),
+        special_rule="If an enemy piece would capture one of your non-pawn pieces on a square within the Jester's move range, the Jester and your piece swap places first."),
     # Batch 3: abilities (PieceDef.Ability HAUNT = 3, SONG_OF_SLUMBER = 4,
     # FULL_MOON = 5). Colours are the ability's gradient, left to right.
     "ghost": dict(name="Ghost", symbol="G", value=3, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
     ], ability=3, ability_name="Haunt", colors=["#A8D4F5", "#F0F8FF"],
-        ability_text="Once per game, after the Ghost has been captured: on a later turn, put it back on any empty square of the board. Uses your turn."),
+        ability_text="Place the Ghost from the Graveyard onto any open square."),
     "bard": dict(name="Bard", symbol="BD", value=3.5, rules=[
         (DIAG, 4, 0, {}),
     ], ability=4, ability_name="Song of Slumber", colors=["#F5C542", "#C46A12"],
-        ability_text="Once per game: choose an enemy piece (not the King) that the Bard could capture. It can't move on your opponent's next turn, so it doesn't give check either. Uses your turn."),
+        ability_text="Put an enemy non-king, non-pawn piece to sleep during your opponent's next turn. (It can't take actions.)"),
     "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
     ], ability=5, ability_name="Full Moon", colors=["#789EFF", "#283199"], transforms_into="forms/werewolf_wolf",
         extra={"form_name": '"Human"'},
-        ability_text="Once per game: the Werewolf turns into a wolf for the rest of the game (press Wolf moves to see how the wolf moves). Uses your turn."),
+        ability_text="The Werewolf transforms from human form into wolf form."),
     # The Werewolf after Full Moon. Kept in forms/ so the army builder doesn't offer it.
     "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3, path="forms/werewolf_wolf", rules=[
         ([(1, 0), (-1, 0), (0, -1)], 1, 0, {}),
