@@ -249,6 +249,21 @@ better. `--nodes` (fixed nodes per move: strength per node, as in self-play
 and the eval bar), `--tc BASE+INC` (a clock per game) or `--movetime MS`.
 Every measured change is in `ELO_LOG.md`.
 
+The search's margins and limits (pruning, reductions, history, singular
+extensions, correction history weights) are UCI options with the built-in
+values as defaults (`uci` lists them; `enginematch --uci-a "rfp_margin=97;..."`
+tries others). `plusfish spsa` tunes them by SPSA: each step plays a game
+pair between the values nudged up and down at random (random armies, fixed
+nodes) and moves towards the winner; it logs the values as it goes and ends
+with a `--uci-a` list to verify with `enginematch`:
+
+```
+plusfish spsa --pairs 12000 --concurrency 16 --r-end 0.01 --log spsa_log.txt --skip rfp_depth,lmp_depth
+```
+
+`--only` / `--skip` choose the constants, `--start <log or "a=1;b=2">`
+carries on from earlier values.
+
 `plusfish bench` searches fixed positions to a fixed depth: the node total is
 a fingerprint (a pure speed-up mustn't change it) and nodes/s the speed.
 `plusfish speed` times evaluation, move generation and making moves;
@@ -304,8 +319,13 @@ that follow the game's repetition rule exactly. Search: iterative deepening,
 aspiration windows, principal variation search, a lock-free transposition
 table (also used in quiescence), null-move pruning, reverse futility and
 futility pruning, late move reductions and pruning, an "improving" signal,
-check extensions, killer, counter-move and history ordering (with
-penalties), a static exchange evaluation that works for every piece type
+check and singular extensions (with multi-cut), killer, counter-move and
+history ordering (with penalties), capture history and continuation history
+(by piece type, so they suit any army), correction history (the search learns
+how far the evaluation is off for positions with the same material, pawns,
+pieces or last move, and corrects it), the hash move tried before the other
+moves are generated, quiet moves pruned before they're made when they surely
+can't matter, a static exchange evaluation that works for every piece type
 (ordering, quiescence and pruning), MultiPV, and a quiescence search over
 captures, shield breaks, Crack Shots and promotions. Lazy SMP on several
 threads (`analyse --threads N`, UCI `setoption name Threads`; not in the
