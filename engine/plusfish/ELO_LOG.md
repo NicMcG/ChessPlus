@@ -51,6 +51,29 @@ Lazy SMP adds to the clock result on top: 4 threads vs 1 = +102.5 ±24.1 (#5).
 | 24 | Eval: per-piece "worth while the armies are whole" term (fades out over the first 8 captures), tuned with the rest | start-check (below) | - | no better than #23 | reverted |
 | 25 | Full re-tune (every feature) instead of #23 | start-check (below) | - | same on random armies, worse on the pool; pawn-advance weights came out jagged | not used |
 | 26 | Eval: where pieces stand. Per piece type: `reach` (squares reached from its square on an empty board, minus the average), `row0`..`row7` (pieces that don't promote) and `dead` (a square it can never leave: a Berserker on the last row, prior -90% of its material); tuned with mat,mob,shield,ability on the 24,000 balance games (8,000 nodes), only for one-directional pieces (Berserker, Assassin, Cavalry, Ghost, Werewolf + wolf, Vampire) and short-range ones (Knight, Man, Elephant, Paladin, Catapult, Rogue, Squire, Jester, Necromancer, King). A dead Berserker went from 2.6 points (middlegame) to 0.8 | nodes 6k random / PR #13 pool; nodes 20k random / pool | 2000 / 2000; 1000 / 1000 | +47.2 ±10.5 / +69.9 ±11.6; +69.7 ±14.3 / +73.3 ±15.1 | kept |
+| 27 | Speed: quiet-move pruning decided before the move is made (skipped unmade when surely legal and surely not check), the hash move searched before the other moves are generated, a capture's exchange worked out only when it comes up, searched quiet moves skip the legality/check tests when sure | bench nps / time movetime 100 / time 10+0.1 / nodes 6k | - / 1000 / 400 / 2000 | 1.34x / +44.4 ±13.0 / +25.2 ±19.3 / +8.2 ±8.6 | kept |
+| 28 | Correction history (material, pawns, each side's pieces, last move; gravity updates, corrects the main search and quiescence's stand-pat) | nodes 6k / nodes 40k | 1000 / 600 | +37.7 ±13.1 / +46.0 ±14.7 | kept |
+| 29 | Capture history + continuation history one ply back (by piece kind and square, from the mover's side) | nodes 6k (2 seeds) / nodes 40k | 4000 / 600 | +12.7 ±6.3 / +10.4 ±14.9 | kept |
+| 30 | Singular extensions (depth >= 7, margin 2*depth, at (depth-1)/2) + multi-cut + negative extension | nodes 6k / nodes 40k | ~900 / 1400 | -1.2 ±11.8 / +9.4 ±10.6 | kept (deep searches; see #33) |
+| 31 | Internal iterative reduction, PV + expected-cut nodes (retry of #4) | nodes 6k / nodes 40k / 40k on top of #30 | 2750 / 400 / 300 | +1.0 ±7.2 / +20.0 ±18.4 / 0.0 ±22.0 | not kept |
+| 32 | Search constants as UCI options + `plusfish spsa`; SPSA-tuned values (31 constants) on the #26 search | nodes 6k / nodes 40k | 4300 / 600 | +5.8 ±6.2 / 0.0 ±15.7 | tool kept, values not |
+| 33 | #27 + #28 + #29 + #30 together (each measured on top of the ones before it): #27+#28+#29 vs the #26 build; #29 on top of #27+#28; #30 on top of the rest | nodes 6k / nodes 6k / nodes 40k | 2000 / 3000 / 1500 | +35.6 ±9.5 / +7.8 ±7.6 / +13.4 ±10.0 | kept |
+| 34 | SPSA re-tune of 27 constants on #33 (12,000 pairs at 6k, whole-number depth limits and singular-extension settings fixed) | nodes 6k | 6000 | +1.6 ±5.3 | not kept (the constants were already about right) |
+
+## Checkpoint: build after #33 vs the build after #26 (fork main)
+
+| Regime | Games | Elo ±95% |
+|--------|-------|----------|
+| 6,000 nodes/move (self-play) | 2000 | +29.8 ±9.5 |
+| 20,000 nodes/move (web eval bar), random armies | 1000 | +57.9 ±13.6 |
+| 20,000 nodes/move, the PR #13 meta pool | 1000 | +55.4 ±14.0 |
+| 150,000 nodes/move (PC eval bar) | 600 | +83.2 ±16.0 |
+| clock 10+0.1 s, 1 thread | 600 | +79.5 ±16.8 |
+
+The gain grows with the search: most of it comes from correction history and
+singular extensions, which do more the deeper the search goes. 400,000-node
+searches (the PC bot) run 1.1-1.4x the nodes/s they did (six random army
+positions).
 
 Variants of #26 against the build before it (6,000 nodes, 2000 games each, random armies / the PR #13 meta pool):
 
