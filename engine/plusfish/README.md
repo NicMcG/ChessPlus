@@ -337,6 +337,13 @@ jumps and Cannon screens, never its own side's), 120 more games leaning
 towards Parapets and leaping pieces (28,627 positions, 10,467 with a
 Parapet, 5,100 where one stopped a leap or screen): no Parapet mismatches,
 one two-Jester case.
+After Mac's Squire and Berserker changes (Oct 2026: a Squire protects Knights
+anywhere in its move pattern, even with pieces in between; the Berserker's
+L-moves go 2 straight then 1 sideways), 350 more games leaning towards
+Squires, Knights and Berserkers (78,784 positions, 11,258 with a Berserker,
+229 where a Squire protected an attacked Knight, 68 of them through a piece
+in its way): two mismatches, both the two-Jester case. The old engine
+failed on the Squire positions.
 
 ```
 plusfish trace-games --count 40 --seed 1 > games.txt

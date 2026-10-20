@@ -138,7 +138,7 @@ pub struct KindInfo {
     pub blocks_jumps: bool,
     /// The Vampire: gains a shield by capturing.
     pub gains_shield: bool,
-    /// The Squire: the kinds (bit mask) it protects on squares it reaches.
+    /// The Squire: the kinds (bit mask) it protects anywhere in its move pattern.
     pub protects: u64,
     /// The Jester: takes the hit for pieces it reaches.
     pub decoy: bool,
@@ -1158,8 +1158,8 @@ impl Position {
 
     /// The squares the piece `c` on `from` could move or capture to by its
     /// rules as the board stands: each line up to and including the first
-    /// piece it meets (`MoveGenerator.reach_squares`). The Squire's, Jester's
-    /// and Bard's range.
+    /// piece it meets (`MoveGenerator.reach_squares`). The Jester's and Bard's
+    /// range.
     pub fn reach(&self, r: &Rules, from: usize, c: u16) -> u128 {
         let pp = r.parapets != 0;
         let moved = c & MOVED != 0;
@@ -1190,6 +1190,26 @@ impl Position {
                 if o != 0 && (i >= leap || (pp && r.stops_jumps(o, team_of(c)))) {
                     break;
                 }
+            }
+        }
+        a
+    }
+
+    /// Every square in the piece's move pattern from `from`, as if nothing
+    /// stood in the way (`MoveGenerator.pattern_squares`). The Squire protects
+    /// Knights anywhere in it, even with pieces in between (Mac, Oct 2026).
+    pub fn pattern(&self, r: &Rules, from: usize, c: u16) -> u128 {
+        let moved = c & MOVED != 0;
+        let mut a = 0u128;
+        for ray in r.rays_of(kind_of(c), team_of(c), from) {
+            let sqs = r.ray_squares(ray);
+            if ray.is_path {
+                a |= 1u128 << sqs[sqs.len() - 1];
+                continue;
+            }
+            let limit = (if moved { ray.lim_moved } else { ray.lim_unmoved }).min(ray.len) as usize;
+            for &q in sqs.iter().take(limit).skip(ray.leap as usize) {
+                a |= 1u128 << q;
             }
         }
         a
@@ -1534,9 +1554,10 @@ impl Position {
     }
 
     /// The enemy's Squires and Jesters change the side to move's captures
-    /// (`MoveGenerator._apply_guards`): a protected piece (a Knight on a
-    /// square a Squire could reach) can't be captured, and a capture of a
-    /// piece a Jester could reach (not a pawn type, king or Jester) becomes a
+    /// (`MoveGenerator._apply_guards`): a protected piece (a Knight anywhere
+    /// in a Squire's move pattern, even through pieces) can't be captured,
+    /// and a capture of a piece a Jester could reach (not a pawn type, king
+    /// or Jester) becomes a
     /// swap in which the Jester is captured instead. If two Jesters could
     /// both take the hit, the one on the lower square does (the game picks
     /// whichever its piece list holds first).
@@ -1550,16 +1571,15 @@ impl Position {
             if info.protects == 0 && !info.decoy {
                 continue;
             }
-            let reach = self.reach(r, s, c);
             if info.protects != 0 {
-                for q in bits(reach & self.occ[them]) {
+                for q in bits(self.pattern(r, s, c) & self.occ[them]) {
                     if info.protects & (1u64 << kind_of(self.sq[q])) != 0 {
                         protected |= 1u128 << q;
                     }
                 }
             }
             if info.decoy {
-                jesters.push((s, reach));
+                jesters.push((s, self.reach(r, s, c)));
             }
         }
         if protected == 0 && jesters.is_empty() {

@@ -99,18 +99,13 @@ const KNOWN_ABILITIES := PieceDef.Ability.FULL_MOON
 
 ## True if Plusfish knows every rule of the pieces in `state`. A piece with a
 ## newer special ability gets no eval bar until Plusfish is updated for it.
-## (Plusfish knows Mac's Oct 2026 Parapet change too: only the opponent's
-## pieces are stopped.)
+## (Plusfish knows Mac's Oct 2026 changes too: a Parapet stops only the
+## opponent's pieces, a Squire protects Knights anywhere in its move pattern
+## even through pieces, and the Berserker's L-moves go 2 then 1.)
 static func supports(state: GameState) -> bool:
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		for piece: Piece in state.board.pieces_of(team).values():
 			if piece.def.ability > KNOWN_ABILITIES:
-				return false
-			# Mac (Oct 2026): a Squire protects Knights anywhere in its move
-			# range, even through pieces. Plusfish still has the old rule
-			# (only Knights it could move to), so it's off for Squire games
-			# until it's rebuilt with the new one.
-			if not piece.def.protects.is_empty():
 				return false
 	return true
 
