@@ -216,6 +216,8 @@ func _ready() -> void:
 		return
 	if resume:
 		_continue_saved_game(resume)
+	elif not testing_moves.is_empty():
+		_play_testing_moves()
 	else:
 		new_game()
 
@@ -228,6 +230,20 @@ func new_game() -> void:
 ## Testing mode (Mac's design): the game starts from this position, set up by
 ## hand; two players, the eval bar always on, and Menu goes back to the setup.
 var testing_position: TestingPosition
+## Testing mode: moves already played from testing_position when the screen
+## opens (an imported game, GameExport), as Move.to_text(). New game starts
+## without them.
+var testing_moves: PackedStringArray = []
+
+## Open on an imported game: its start, then its moves.
+func _play_testing_moves() -> void:
+	state = _create_start_state()
+	for text in testing_moves:
+		var move := state.find_move(text)
+		if move == null:
+			break
+		state.make_move(move)
+	_show_new_state()
 
 ## When this game started (seconds since 1970), kept with the saved game.
 var _started_time := Time.get_unix_time_from_system()
@@ -239,18 +255,23 @@ var resigned := -1
 ## The Resign button (local games): the first tap asks for a second one. After
 ## resigning, Undo takes the resignation back.
 func resign_local() -> void:
-	if online or is_over() or bot_thinking or viewing >= 0:
+	if online:
+		return
+	# After the game, this button shows the result screen again.
+	if is_over():
+		show_game_over()
+		return
+	if bot_thinking or viewing >= 0:
 		return
 	var now := Time.get_ticks_msec()
 	if _resign_tapped_ms < 0 or now - _resign_tapped_ms > 3000:
 		_resign_tapped_ms = now
 		resign_button.text = "Tap again"
 		get_tree().create_timer(3.0).timeout.connect(func() -> void:
-			if is_instance_valid(resign_button):
+			if is_instance_valid(resign_button) and not is_over():
 				resign_button.text = "Resign")
 		return
 	_resign_tapped_ms = -1
-	resign_button.text = "Resign"
 	resigned = _my_team() if is_bot_game() else state.side_to_move
 	board_view.refresh()
 	_update_input()
@@ -334,8 +355,8 @@ func step_forward() -> void:
 	if viewing >= 0:
 		view_move(viewing + 1)
 
-## Against the bot: take the game back to the position being looked at, and
-## carry on from there.
+## Against the bot (and in testing mode): take the game back to the position
+## being looked at, and carry on from there.
 func play_from_here() -> void:
 	if viewing < 0 or bot_thinking:
 		return
@@ -901,7 +922,11 @@ func _update_text() -> void:
 	if result == "*":
 		result = _resigned_result()
 	resign_button.visible = online == null
-	resign_button.disabled = is_over() or bot_thinking or viewing >= 0
+	if is_over():
+		resign_button.text = "Results"
+	elif resign_button.text == "Results":
+		resign_button.text = "Resign"
+	resign_button.disabled = not is_over() and (bot_thinking or viewing >= 0)
 	if online == null:
 		new_game_button.disabled = replay_ends_at_once()
 	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result, viewing, TIP)
@@ -914,7 +939,7 @@ func _update_text() -> void:
 	redo_button.disabled = not _can_redo()
 	view_nav.visible = viewing >= 0
 	step_back_button.disabled = viewing <= 0
-	play_from_here_button.visible = is_bot_game() and viewing >= 0
+	play_from_here_button.visible = (is_bot_game() or testing_position != null) and viewing >= 0
 	play_from_here_button.disabled = bot_thinking
 	if online:
 		_update_online_controls()
@@ -1228,6 +1253,7 @@ func show_game_over() -> void:
 	else:
 		buttons.append(["again", "New game"])
 	buttons.append(["board", "View board"])
+	buttons.append(["export", "Export game"])
 	if menu_button.visible:
 		buttons.append(["menu", menu_button.text])
 	game_over_panel.show_result(texts[0], texts[1], buttons)
@@ -1352,6 +1378,38 @@ func _on_game_over_action(action: String) -> void:
 			armies_requested.emit()
 		"rematch":
 			start_rematch()
+		"export":
+			show_export()
+
+## The game as a line of text (GameExport), with a Copy button, to keep or send
+## to someone; Testing mode's Import game reads it back.
+func show_export() -> void:
+	var text := GameExport.to_text(_create_start_state(), state.history)
+	export_panel = ModalPanel.new("Export game")
+	export_panel.add_text("Copy this text and keep it or send it to someone. To look over the game again, paste it into Import game in Testing mode.")
+	# A long game is a lot of text: it scrolls instead of filling the screen.
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	export_panel.column.add_child(scroll)
+	var shown := export_panel.add_text(text, 20)
+	shown.name = "GameText"
+	shown.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	shown.reparent(scroll)
+	var copy_button := export_panel.add_button("Copy text", func() -> void: DisplayServer.clipboard_set(text))
+	copy_button.pressed.connect(func() -> void: copy_button.text = "Copied!")
+	export_panel.add_button("Done", export_panel.close)
+	add_child(export_panel)
+	# A scroll box doesn't grow with what's in it: as tall as the wrapped text
+	# (known once it's laid out), up to EXPORT_TEXT_MAX_HEIGHT.
+	scroll.custom_minimum_size.y = EXPORT_TEXT_MAX_HEIGHT
+	await get_tree().process_frame
+	if is_instance_valid(shown):
+		scroll.custom_minimum_size.y = minf(shown.size.y, EXPORT_TEXT_MAX_HEIGHT)
+
+const EXPORT_TEXT_MAX_HEIGHT := 360.0
+
+## The Export game pop-up (null until first shown).
+var export_panel: ModalPanel
 
 # --- Online extras: draw offers, chat, rematch ------------------------------------
 
