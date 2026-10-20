@@ -228,6 +228,12 @@ pub struct Searcher<'a> {
     /// True while the first depth runs: limits don't apply until there's a move.
     must_finish: bool,
     root_excluded: Vec<Move>,
+    /// The move a singular-extension search leaves out at each ply (NONE
+    /// normally). Such a node neither cuts off on nor stores to the hash table.
+    excluded: [Move; MAX_PLY + 2],
+    /// The depth the current iteration started with (singular extensions
+    /// stop at twice that many plies).
+    root_depth: i32,
     /// Lazy SMP helpers search one ply deeper on odd thread numbers, so the
     /// threads don't all do the same work.
     depth_offset: i32,
@@ -306,6 +312,8 @@ impl<'a> Searcher<'a> {
             stopped: false,
             must_finish: false,
             root_excluded: Vec::new(),
+            excluded: [Move::NONE; MAX_PLY + 2],
+            root_depth: 0,
             depth_offset: 0,
             root_score: 0,
         }
@@ -479,6 +487,7 @@ impl<'a> Searcher<'a> {
                 let score = loop {
                     self.keys.clear();
                     self.keys.extend_from_slice(history_keys);
+                    self.root_depth = depth + self.depth_offset;
                     let s = self.negamax(pos, depth + self.depth_offset, alpha, beta, 0, true, false);
                     if self.stopped {
                         break s;
@@ -807,13 +816,14 @@ impl<'a> Searcher<'a> {
             return self.quiesce(p, alpha, beta, ply, 0);
         }
         self.nodes += 1;
+        let excluded = self.excluded[ply];
         // Transposition table.
         let (_, e) = self.tt.probe(p.tt_key(), self.age);
         let mut tt_move = Move::NONE;
         if e.key == p.tt_key() && e.bound != 0 {
             tt_move = e.mv;
             let s = from_tt(e.score as i32, ply);
-            if !is_pv && e.depth as i32 >= depth && !root {
+            if !is_pv && e.depth as i32 >= depth && !root && excluded == Move::NONE {
                 if e.bound == B_EXACT || (e.bound == B_LOWER && s >= beta) || (e.bound == B_UPPER && s <= alpha) {
                     return s;
                 }
@@ -827,7 +837,7 @@ impl<'a> Searcher<'a> {
         // Is our position better than two plies ago? If not, prune harder.
         let improving = !in_check && (ply < 2 || self.evals[ply - 2] == -INF || static_eval > self.evals[ply - 2]);
 
-        if !is_pv && !in_check && !root {
+        if !is_pv && !in_check && !root && excluded == Move::NONE {
             // Reverse futility pruning.
             if depth <= 6 && static_eval - 90 * depth + if improving { 45 } else { 0 } >= beta && !is_mate(beta) {
                 return static_eval;
@@ -856,12 +866,42 @@ impl<'a> Searcher<'a> {
             }
         }
 
+        // Singular extension: if every other move, searched at half depth,
+        // falls well short of the hash move's score, the hash move is
+        // extended. If even the others beat beta, cut off (multi-cut); if the
+        // hash move beats beta without being singular, search it shallower.
+        let mut se_ext = 0;
+        if !root && depth >= SE_DEPTH && (ply as i32) < 2 * self.root_depth && tt_move != Move::NONE && excluded == Move::NONE && e.key == p.tt_key() && (e.bound == B_LOWER || e.bound == B_EXACT) && e.depth as i32 >= depth - 3 {
+            let tt_score = from_tt(e.score as i32, ply);
+            if !is_mate(tt_score) {
+                let sbeta = tt_score - SE_MARGIN * depth;
+                self.excluded[ply] = tt_move;
+                let s = self.negamax(p, (depth - 1) / 2, sbeta - 1, sbeta, ply, false, false);
+                self.excluded[ply] = Move::NONE;
+                self.pv_len[ply] = 0;
+                self.evals[ply] = static_eval;
+                if self.stopped {
+                    return 0;
+                }
+                if s < sbeta {
+                    se_ext = 1;
+                } else if sbeta >= beta {
+                    return sbeta;
+                } else if tt_score >= beta {
+                    se_ext = -1;
+                }
+            }
+        }
+
         let mut moves = std::mem::take(&mut self.buffers[ply]);
         let (mut scores, mut gains) = std::mem::take(&mut self.order_bufs[ply]);
-        let mut hash_first = !root && self.hash_move_first(p, GEN_ALL, tt_move, &mut moves, &mut scores, &mut gains);
+        let mut hash_first = !root && excluded == Move::NONE && self.hash_move_first(p, GEN_ALL, tt_move, &mut moves, &mut scores, &mut gains);
         if !hash_first {
             moves.clear();
             p.gen_pseudo(r, &mut moves, GEN_ALL);
+            if excluded != Move::NONE {
+                moves.retain(|m| *m != excluded);
+            }
             if root && !self.root_excluded.is_empty() {
                 let ex = self.root_excluded.clone();
                 moves.retain(|m| !ex.contains(m));
@@ -938,7 +978,8 @@ impl<'a> Searcher<'a> {
             self.played[ply] = m;
             let key = self.ckey(p, m);
             self.ckeys[ply] = key;
-            let ext = if gives_check && ply < 64 { 1 } else { 0 };
+            let check_ext = if gives_check && ply < 64 { 1 } else { 0 };
+            let ext = if m == tt_move && se_ext > 0 && ply < 64 { se_ext } else if m == tt_move && se_ext < 0 { se_ext + check_ext } else { check_ext };
             let new_depth = depth - 1 + ext;
             let score;
             if legal == 1 {
@@ -1040,6 +1081,10 @@ impl<'a> Searcher<'a> {
             return 0;
         }
         if legal == 0 {
+            if excluded != Move::NONE {
+                // The excluded move was the only one: it's singular.
+                return alpha;
+            }
             if root && !self.root_excluded.is_empty() {
                 return -INF;
             }
@@ -1052,6 +1097,11 @@ impl<'a> Searcher<'a> {
         } else {
             B_UPPER
         };
+        // A singular-extension search (one move left out) learns nothing
+        // and stores nothing.
+        if excluded != Move::NONE {
+            return best;
+        }
         // Learn how far the search landed from the static evaluation, unless
         // a tactical best move explains it or the bound says nothing about it.
         if !in_check
@@ -1212,6 +1262,10 @@ const CONT_PLIES: usize = 1;
 const LMR_HIST_DIV: i32 = 9000;
 /// Capture ordering: capture history divided by this.
 const CAP_ORDER_DIV: i32 = 8;
+/// Singular extensions: least depth, and the margin per depth below the hash
+/// move's score that the other moves must stay under.
+const SE_DEPTH: i32 = 7;
+const SE_MARGIN: i32 = 2;
 
 /// Quiescence plies in which a side in check searches all its moves.
 const Q_CHECK_PLIES: usize = 6;
