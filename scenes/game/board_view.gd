@@ -32,7 +32,8 @@ const TARGET_MARK := Color(0.1, 0.1, 0.1, 0.25)
 const HOVER_TINT := Color(1, 1, 1, 0.3)
 ## Targets for a special ability (Crack Shot) are ringed in gold.
 const ABILITY_MARK := Color(0.95, 0.7, 0.1, 0.9)
-## The see-through arrows players draw with the right mouse button.
+## The see-through arrows players draw with the right mouse button, and the
+## rings round the squares they right-click.
 const ARROW_COLOR := Color(0.1, 0.55, 0.15, 0.6)
 ## Plusfish's best move, shown when looking over a finished game (blue, so it
 ## can't be mistaken for a player's own green arrow).
@@ -101,6 +102,8 @@ var hidden_squares: Array[Vector2i] = []
 # Arrows (PC): drag with the right mouse button from one square to another.
 ## Each arrow is [from square, to square].
 var arrows: Array = []
+## Squares ringed in green by right-clicking them (PC), for planning.
+var highlights: Array[Vector2i] = []
 ## Plusfish's suggestion: [from square, to square], or empty for none. Set by
 ## the game screen after it shows a position (show_game clears it).
 var hint_arrow: Array = []:
@@ -118,6 +121,10 @@ var hint_piece: Dictionary = {}:
 ## Where the right button went down (NO_SQUARE when it isn't held).
 var _arrow_start := Board.NO_SQUARE
 var _arrow_pointer := Vector2.ZERO
+## When the right button went down, and whether holding it still can still open
+## the piece's card (only on a piece, and not once the pointer leaves its square).
+var _right_time := 0
+var _right_hold_possible := false
 
 ## Plain white silhouettes of piece pictures (for flashes), made when first needed.
 static var _silhouettes := {}
@@ -142,8 +149,9 @@ func refresh() -> void:
 	if state and state.outcome() == GameState.Outcome.NONE and state.is_in_check():
 		_check_squares = MoveAnimation.royal_squares(state, state.side_to_move)
 	_shake_square = Board.NO_SQUARE
-	# A new move (or a different position) clears the arrows.
+	# A new move (or a different position) clears the arrows and rings.
 	arrows.clear()
+	highlights.clear()
 	hint_arrow = []
 	hint_piece = {}
 	_arrow_start = Board.NO_SQUARE
@@ -247,8 +255,10 @@ func tap(square: Vector2i) -> bool:
 
 ## The pointer went down at `pos` (a mouse press or a finger touching the screen).
 ## Holding still opens the piece's card only for a finger (`touch`): with a
-## mouse, right-clicking does that instead.
+## mouse, Shift + right-click (or holding the right button) does that instead.
 func pointer_down(pos: Vector2, touch := true) -> void:
+	# A left click clears the arrows and rings, as on chess websites.
+	clear_drawings()
 	_pressed = true
 	_dragging = false
 	_dropped = false
@@ -293,6 +303,7 @@ func pointer_up(pos: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	check_long_press(Time.get_ticks_msec())
+	check_right_hold(Time.get_ticks_msec())
 	advance_animation(delta)
 	# Kings in check tremble, aiming rings close in and sleeping pieces' "Zz"
 	# bobs: keep redrawing.
@@ -347,12 +358,14 @@ func right_down(pos: Vector2) -> void:
 		return
 	_arrow_start = _square_at(pos)
 	_arrow_pointer = pos
+	_right_time = Time.get_ticks_msec()
+	_right_hold_possible = _arrow_start != Board.NO_SQUARE and not state.board.is_empty(_arrow_start)
 
 ## The right mouse button came up. Dragged to another square: add an arrow
 ## there (or remove it, if that arrow is already drawn). Released where it went
-## down: a plain right-click, which clears the arrows and, on a piece, asks for
-## its info card.
-func right_up(pos: Vector2) -> void:
+## down: a plain right-click, which rings the square (or takes its ring off), or
+## with Shift held, on a piece, asks for its info card instead.
+func right_up(pos: Vector2, shift := false) -> void:
 	if state == null or _arrow_start == Board.NO_SQUARE:
 		_arrow_start = Board.NO_SQUARE
 		return
@@ -365,18 +378,49 @@ func right_up(pos: Vector2) -> void:
 			arrows.erase(arrow)
 		else:
 			arrows.append(arrow)
-	else:
-		arrows.clear()
+	elif end == start:
 		var piece := state.board.get_piece(start)
-		if piece and end == start:
-			_clear_selection()
-			info_requested.emit(piece)
+		if shift:
+			if piece:
+				_clear_selection()
+				info_requested.emit(piece)
+		elif highlights.has(start):
+			highlights.erase(start)
+		else:
+			highlights.append(start)
 	queue_redraw()
 
-## A plain right-click at `pos`.
-func right_click(pos: Vector2) -> void:
+## A plain right-click at `pos` (`shift`: with Shift held).
+func right_click(pos: Vector2, shift := false) -> void:
 	right_down(pos)
-	right_up(pos)
+	right_up(pos, shift)
+
+## Take away every arrow and ring the player has drawn.
+func clear_drawings() -> void:
+	if arrows.is_empty() and highlights.is_empty():
+		return
+	arrows.clear()
+	highlights.clear()
+	queue_redraw()
+
+## If the right button has been held still on a piece long enough, ask for its
+## info card and cancel the click (so letting go doesn't also ring the square).
+## `now_ms` is passed in so tests can pretend time has passed.
+func check_right_hold(now_ms: int) -> void:
+	if _arrow_start == Board.NO_SQUARE or not _right_hold_possible:
+		return
+	if _square_at(_arrow_pointer) != _arrow_start:
+		_right_hold_possible = false
+		return
+	if now_ms - _right_time < LONG_PRESS_MS:
+		return
+	var piece := state.board.get_piece(_arrow_start)
+	_arrow_start = Board.NO_SQUARE
+	_right_hold_possible = false
+	_clear_selection()
+	queue_redraw()
+	if piece:
+		info_requested.emit(piece)
 
 ## If the pointer has been held still on a piece long enough, ask for its info
 ## card and cancel the press (so letting go doesn't also select or move).
@@ -400,7 +444,7 @@ func _gui_input(event: InputEvent) -> void:
 		if button.pressed:
 			right_down(button.position)
 		else:
-			right_up(button.position)
+			right_up(button.position, button.shift_pressed)
 		accept_event()
 	if button and button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
@@ -548,6 +592,8 @@ func _draw() -> void:
 		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
 	if not hint_piece.is_empty():
 		_draw_hint_piece(hint_piece)
+	for square in highlights:
+		draw_arc(square_center(square), _square_size() * 0.45, 0.0, TAU, 48, ARROW_COLOR, _square_size() * 0.07, true)
 	for arrow: Array in arrows:
 		_draw_arrow(square_center(arrow[0]), square_center(arrow[1]))
 	# The arrow being drawn right now follows the pointer to the square under it.
