@@ -172,8 +172,7 @@ func _ready() -> void:
 	board_view.move_chosen.connect(play)
 	board_view.choice_needed.connect(_ask_which_move)
 	board_view.info_requested.connect(func(piece: Piece) -> void:
-		# The card's mini board the same way up as this board (Mac).
-		PieceInfo.open(self, piece.def, piece.team, (piece.team == Piece.Team.BLACK) != board_view.flipped))
+		PieceInfo.open(self, piece.def, piece.team))
 	new_game_button.pressed.connect(ask_new_game)
 	resign_button.pressed.connect(resign_local)
 	undo_button.pressed.connect(undo)

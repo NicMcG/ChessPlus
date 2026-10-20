@@ -39,11 +39,6 @@ var def: PieceDef
 ## forms, like the Werewolf) its other form's.
 var moves_def: PieceDef
 var team := Piece.Team.WHITE
-## Draw the mini board with the piece moving down the screen, as a Black piece
-## does on a board with White at the bottom (Mac: it must match the board you
-## see; in the army builder and on a board turned round for Black, Black moves
-## up like White).
-var upside_down := false
 ## How big the card is drawn: 1 = normal (the pop-up in games); the army builder
 ## uses more. Change it with set_zoom.
 var zoom := 1.0
@@ -52,11 +47,10 @@ var tooltip: PanelContainer
 var tooltip_owner: Control
 
 ## Show `p_def`. Safe to call before or after the card is on screen.
-func show_piece(p_def: PieceDef, p_team := Piece.Team.WHITE, p_upside_down := false) -> void:
+func show_piece(p_def: PieceDef, p_team := Piece.Team.WHITE) -> void:
 	def = p_def
 	moves_def = p_def
 	team = p_team
-	upside_down = p_upside_down
 	if is_node_ready():
 		_refresh()
 
@@ -79,7 +73,7 @@ func turn_over() -> void:
 		return
 	moves_def = forms[1] if moves_def == forms[0] else forms[0]
 	_update_form_button()
-	%GuideBoard.show_piece(moves_def, team, upside_down)
+	%GuideBoard.show_piece(moves_def, team)
 	_fill_legend()
 	_fill_move_note()
 
@@ -293,7 +287,7 @@ func _refresh() -> void:
 	%Name.text = def.display_name
 	_update_form_button()
 	_fill_details()
-	%GuideBoard.show_piece(moves_def, team, upside_down)
+	%GuideBoard.show_piece(moves_def, team)
 	_fill_legend()
 	_fill_move_note()
 	_fill_keywords()
