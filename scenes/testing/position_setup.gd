@@ -11,9 +11,13 @@ extends Control
 ## (PC) removes. "Add to captured" puts the chosen piece among the captured.
 ## "Load armies" sets up a saved army, the Standard set or pasted army text
 ## (ArmyShare.to_text) for either side, where it would start in a real game.
+## "Import game" reads a game from Export game (GameExport): its start is set up
+## here and it opens with its moves played, to look over.
 
 signal back_pressed
 signal start_pressed(position: TestingPosition)
+## A game was imported: start from `position` with `moves` already played.
+signal game_imported(position: TestingPosition, moves: PackedStringArray)
 
 var setup := TestingPosition.standard()
 ## The piece type chosen in the tray (null = Remove).
@@ -35,6 +39,9 @@ var load_button: Button
 var library: ArmyLibrary
 ## The Load armies pop-up (null when not showing).
 var load_panel: ModalPanel
+var import_button: Button
+## The Import game pop-up (null when not showing).
+var import_panel: ModalPanel
 ## Tray buttons, by piece type (null = Remove).
 var _tray_buttons := {}
 var _tray_group := ButtonGroup.new()
@@ -151,12 +158,15 @@ func _build_controls() -> void:
 	problems_label.add_theme_font_size_override("font_size", 24)
 	problems_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_side.add_child(problems_label)
-	# Load armies sits beside Start game.
+	# Load armies and Import game sit beside Start game.
 	var start_row := HBoxContainer.new()
 	start_row.add_theme_constant_override("separation", 12)
 	load_button = _button("Load armies", ask_load_armies)
-	load_button.custom_minimum_size = Vector2(220, 90)
+	load_button.custom_minimum_size = Vector2(200, 90)
 	start_row.add_child(load_button)
+	import_button = _button("Import game", ask_import_game)
+	import_button.custom_minimum_size = Vector2(200, 90)
+	start_row.add_child(import_button)
 	start_button = _button("Start game", func() -> void: start_pressed.emit(setup.copy()))
 	start_button.custom_minimum_size.y = 90
 	start_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -363,6 +373,43 @@ func _chosen_army(pick: OptionButton, pasted: String) -> Dictionary:
 	if pick.selected == 1:
 		return {"army": StandardSetup.army(), "error": ""}
 	return {"army": _saved_armies()[pick.selected - 2], "error": ""}
+
+## The Import game pop-up: paste the text from Export game.
+func ask_import_game() -> void:
+	import_panel = ModalPanel.new("Import game")
+	import_panel.add_text("Paste the text from Export game (on the result screen after a game). The game opens here with its moves played, to look over.")
+	var text_edit := LineEdit.new()
+	text_edit.name = "GameText"
+	text_edit.placeholder_text = GameExport.TEXT_START + ": ..."
+	text_edit.custom_minimum_size.y = 70
+	import_panel.column.add_child(text_edit)
+	var message := import_panel.add_text("")
+	message.name = "Message"
+	message.add_theme_color_override("font_color", Color("#ff8a80"))
+	import_panel.add_button("Import", func() -> void: import_game(text_edit.text))
+	import_panel.add_button("Cancel", import_panel.close)
+	add_child(import_panel)
+	PhoneTextInput.attach(text_edit, "Game text")
+
+## Read game text (GameExport.to_text): set up its start here and open the game
+## with its moves played; or say what's wrong in the pop-up.
+func import_game(text: String) -> void:
+	var error := "Paste the game text first."
+	var found := {}
+	if not text.strip_edges().is_empty():
+		found = GameExport.from_text(text)
+		error = found.error
+	if error != "":
+		if import_panel:
+			(import_panel.find_child("Message", true, false) as Label).text = error
+		return
+	setup = found.position
+	board.show_position(setup)
+	_refresh()
+	if import_panel:
+		import_panel.close()
+		import_panel = null
+	game_imported.emit(setup.copy(), found.moves)
 
 func add_captured() -> void:
 	if chosen == null:

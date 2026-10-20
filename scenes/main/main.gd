@@ -205,13 +205,15 @@ func show_testing_setup(position: TestingPosition = null) -> void:
 		setup.setup = position
 	setup.back_pressed.connect(show_main_menu)
 	setup.start_pressed.connect(start_testing_game)
+	setup.game_imported.connect(start_testing_game)
 	_show(setup)
 
-## A two-player game from a Testing mode position. Its Setup button goes back to
-## editing that position.
-func start_testing_game(position: TestingPosition) -> void:
+## A two-player game from a Testing mode position (with `moves` already played,
+## for an imported game). Its Setup button goes back to editing that position.
+func start_testing_game(position: TestingPosition, moves := PackedStringArray()) -> void:
 	var game := GAME.instantiate()
 	game.testing_position = position
+	game.testing_moves = moves
 	game.menu_requested.connect(func() -> void: show_testing_setup(position.copy()))
 	_show(game)
 
