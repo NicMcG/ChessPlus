@@ -26,32 +26,37 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_bottom = -80.0
 grow_horizontal = 2
 grow_vertical = 2
 horizontal_scroll_mode = 0
 
-[node name="Center" type="CenterContainer" parent="Scroll"]
+[node name="Page" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="Center" type="CenterContainer" parent="Scroll/Page"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="Layout" type="VBoxContainer" parent="Scroll/Center"]
+[node name="Layout" type="VBoxContainer" parent="Scroll/Page/Center"]
 custom_minimum_size = Vector2(480, 0)
 layout_mode = 2
 theme_override_constants/separation = 24
 
-[node name="Title" type="Label" parent="Scroll/Center/Layout"]
+[node name="Title" type="Label" parent="Scroll/Page/Center/Layout"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 72
 text = "Chess Plus"
 horizontal_alignment = 1
 
-[node name="Gap" type="Control" parent="Scroll/Center/Layout"]
+[node name="Gap" type="Control" parent="Scroll/Page/Center/Layout"]
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 
-[node name="Continue" type="Button" parent="Scroll/Center/Layout"]
+[node name="Continue" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 110)
@@ -59,14 +64,14 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "Continue game"
 
-[node name="Play" type="Button" parent="Scroll/Center/Layout"]
+[node name="Play" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "Play local"
 
-[node name="ContinueOnline" type="Button" parent="Scroll/Center/Layout"]
+[node name="ContinueOnline" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 110)
@@ -74,46 +79,42 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 34
 text = "Continue online game"
 
-[node name="Online" type="Button" parent="Scroll/Center/Layout"]
+[node name="Online" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "Play online"
 
-[node name="Armies" type="Button" parent="Scroll/Center/Layout"]
+[node name="Armies" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "My armies"
 
-[node name="Testing" type="Button" parent="Scroll/Center/Layout"]
+[node name="Testing" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "Testing mode"
 
-[node name="Sound" type="Button" parent="Scroll/Center/Layout"]
+[node name="Sound" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 text = "Sound: on"
 
-[node name="Credits" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -112.0
-offset_bottom = -16.0
-grow_horizontal = 2
-grow_vertical = 0
+[node name="Credits" type="Label" parent="Scroll/Page"]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
 theme_override_font_sizes/font_size = 20
 text = "Chess pieces by Cburnett (CC BY-SA 3.0) · Open Sans Italic font (SIL OFL 1.1)
 Sounds: giggle by Lomond (CC BY 3.0) · thunder by Jud McCranie (CC BY-SA 4.0)
 church bell by Pete w. View (CC BY-SA 4.0) · choir: Coro Santa Pazienza (CC BY 3.0)"
 horizontal_alignment = 1
+
+[node name="BottomGap" type="Control" parent="Scroll/Page"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
