@@ -45,7 +45,10 @@ Balancing
   start-check How well starting-position scores predict which army wins;
               see plusfish start-check --help
   meta      Grow a pool of armies that look strongest at turn 0 against each
-              other (eval bar); see plusfish meta --help
+              other (eval bar); see plusfish meta --help (--wide: search
+              wide, games decide)
+  climb-fixed Hill-climb one army with some squares pinned;
+              see plusfish climb-fixed --help
   tournament  Round robin between armies, with Elo ratings.
               --armies \"<a>;<b>;<c>\"  or a folder of saved .tres armies
               --games N per pairing (default 20)  --nodes N
@@ -150,7 +153,12 @@ fn main() {
         return;
     }
     if cmd == "meta" && args.flag("help") {
-        print!("{}", meta::HELP);
+        print!("{}
+{}", meta::HELP, meta::WIDE_HELP);
+        return;
+    }
+    if cmd == "climb-fixed" && args.flag("help") {
+        print!("{}", meta::FIXED_HELP);
         return;
     }
     if cmd == "spsa" && args.flag("help") {
@@ -201,6 +209,9 @@ fn main() {
         }
         "meta" => {
             meta::run(&cat, &load_params(&cat, args.get("params")), &args);
+        }
+        "climb-fixed" => {
+            meta::run_fixed(&cat, &load_params(&cat, args.get("params")), &args);
         }
         "start-check" => {
             let dir = find_pieces_dir(args.get("pieces")).unwrap_or_else(|e| die(&e));

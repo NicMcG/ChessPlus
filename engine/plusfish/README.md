@@ -231,6 +231,47 @@ it. It finds what *Plusfish thinks* is strong; `start-check --pool` then plays
 the pool out to see how far games agree, which is also a good place to look
 for evaluation mistakes to fix.
 
+### Searching wide (`meta --wide`)
+
+```
+plusfish meta --wide 38 --pool reports/meta_pool.txt --out meta_pool.txt --game-climb --threads 19
+```
+
+Plain `meta` follows one climber a round and trusts the eval. `--wide N`
+searches more widely and lets games decide (`plusfish meta --help` lists
+every setting):
+
+1. N armies climb at once on cheap turn-0 evals (most from random armies,
+   `--refine` from pool members), each on its own thread.
+2. The finishers are re-scored at the eval bar's budget and the best
+   `--shortlist` go on.
+3. With `--game-climb`, the best of those is polished with games: a few tweaks
+   the eval likes are each played against every member on the same openings,
+   and the best is kept if it scores clearly more.
+4. Each shortlisted army plays `--games` games against every member. Games,
+   not the eval, decide whether it joins, replaces a similar member (if it
+   scores at least `--replace-margin` more against the rest) or is thrown away.
+
+`--king-exposed win` (the default with `--wide`) scores a start that leaves
+Black's king attacked as an instant White win, as the game does now;
+`--king-exposed reject` throws such armies out, as plain `meta` does.
+`reports/meta_pool.txt` was grown with `reject` (see `reports/META_POOL.md`).
+The pool file shows each member's game score and eval
+(`army | name | cost | games (Elo) | eval | pieces`).
+
+### Climbing one army with squares pinned (`climb-fixed`)
+
+```
+plusfish climb-fixed --pool reports/meta_pool.txt --keep C@e1 --empty e2 --out fixed_climb.txt
+```
+
+Hill-climbs the best army against a pool while some pieces must stay on
+given squares (`--keep SYMBOL@square`, builder rows 1-2) and some squares must
+stay empty (`--empty`). Climbs start from every pool member (with the pins
+forced on) and `--restarts` random armies. Starts are scored by the game's
+rules, so an instant win from a king attacked at the start counts; the report
+gives each army's score with and without those wins.
+
 ### Testing engine changes
 
 `match --params` compares evaluation weights; to compare two *builds* of the
