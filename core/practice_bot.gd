@@ -14,14 +14,18 @@ extends RefCounted
 ## Levels: Easy looks 1 move ahead and adds a lot of randomness to its scores, so
 ## it makes human-like mistakes. Medium looks 2 moves ahead with a little
 ## randomness. Hard looks as deep as it can (up to 6) within its time limit.
+## Plusfish: the game screen asks the Plusfish engine (res://engine/plusfish/,
+## see PlusfishLink) for its best move instead; this class only plays as Hard
+## for it when Plusfish can't run.
 
-enum Level { EASY, MEDIUM, HARD }
+enum Level { EASY, MEDIUM, HARD, PLUSFISH }
 
-const LEVEL_NAMES := ["Easy", "Medium", "Hard"]
+const LEVEL_NAMES := ["Easy", "Medium", "Hard", "Plusfish"]
 const SETTINGS := {
 	Level.EASY: {"depth": 1, "noise": 150, "time_ms": 600},
 	Level.MEDIUM: {"depth": 2, "noise": 25, "time_ms": 1200},
 	Level.HARD: {"depth": 6, "noise": 0, "time_ms": 1500},
+	Level.PLUSFISH: {"depth": 6, "noise": 0, "time_ms": 1500},
 }
 ## Scores are in hundredths of a point ("centipawns"). Checkmate beats everything.
 const MATE := 1000000

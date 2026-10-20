@@ -40,6 +40,7 @@ func _ready() -> void:
 	for level_name in PracticeBot.LEVEL_NAMES:
 		level_pick.add_item(level_name)
 	level_pick.select(PracticeBot.Level.MEDIUM)
+	update_plusfish_choice()
 	for side in ["White", "Black", "Random"]:
 		side_pick.add_item(side)
 	choices = ArmyChoices.new(library, rules)
@@ -55,6 +56,25 @@ func _ready() -> void:
 	start_button.pressed.connect(start)
 	back_button.pressed.connect(func() -> void: closed.emit())
 	_update_labels()
+
+## The Plusfish level can only be picked where Plusfish runs (on PC, if the
+## program is there; on the web, once plusfish.wasm has loaded, which may be a
+## moment after the page opens, so it's checked again while it's off).
+func update_plusfish_choice() -> void:
+	var usable := PlusfishLink.available()
+	level_pick.set_item_disabled(PracticeBot.Level.PLUSFISH, not usable)
+	if not usable and level_pick.selected == PracticeBot.Level.PLUSFISH:
+		level_pick.select(PracticeBot.Level.HARD)
+
+var _plusfish_check_wait := 0.0
+
+func _process(delta: float) -> void:
+	if not level_pick.is_item_disabled(PracticeBot.Level.PLUSFISH):
+		return
+	_plusfish_check_wait -= delta
+	if _plusfish_check_wait <= 0.0:
+		_plusfish_check_wait = 0.5
+		update_plusfish_choice()
 
 ## The eval bar option (two players on this device; against the bot it's always on).
 var eval_check: CheckButton
