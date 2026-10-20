@@ -117,6 +117,25 @@ impl TT {
     }
 }
 
+/// Static evaluation correction history: for positions sharing a key (the
+/// material on the board; the pawn-type pieces; each side's other pieces),
+/// how far search results have landed from the static evaluation. The
+/// corrected evaluation drives the pruning; the hash table keeps the raw one.
+const CORR_SIZE: usize = 16384;
+const _: () = assert!(CORR_SIZE >= MAX_SQ * MAX_SQ);
+const CORR_TABLES: usize = 5;
+/// Entries are hundredths of a point times CORR_GRAIN, at most +-CORR_MAX.
+const CORR_GRAIN: i32 = 256;
+const CORR_MAX: i32 = 64 * CORR_GRAIN;
+/// How much each table counts (64 = all of it): material, pawns, pieces.
+const CORR_WEIGHTS: [i32; CORR_TABLES] = [32, 16, 16, 16, 0];
+/// Correct quiescence's stand-pat score too.
+const CORR_QS: bool = true;
+/// Update rule: false = each entry moves towards (search - raw eval);
+/// true = Stockfish's: a bonus of (search - corrected eval) * depth / 8 with
+/// "gravity" (entries shrink as they near CORR_MAX).
+const CORR_GRAVITY: bool = false;
+
 const B_EXACT: u8 = 1;
 const B_LOWER: u8 = 2;
 const B_UPPER: u8 = 3;
@@ -153,6 +172,7 @@ pub struct SearchTables {
     tt: Arc<TT>,
     age: u8,
     history: Vec<i32>,
+    corr: Vec<i16>,
 }
 
 pub struct Searcher<'a> {
@@ -170,6 +190,8 @@ pub struct Searcher<'a> {
     /// that move's from/to squares.
     counter: Vec<Move>,
     history: Vec<i32>,
+    /// Correction history: [table][side to move][key % CORR_SIZE].
+    corr: Vec<i16>,
     pv: Vec<[Move; MAX_PLY + 1]>,
     pv_len: [usize; MAX_PLY + 1],
     buffers: Vec<Vec<Move>>,
@@ -231,6 +253,7 @@ impl<'a> Searcher<'a> {
             evals: [-INF; MAX_PLY + 2],
             counter: vec![Move::NONE; 2 * MAX_SQ * MAX_SQ],
             history: vec![0; 2 * MAX_SQ * MAX_SQ],
+            corr: vec![0; CORR_TABLES * 2 * CORR_SIZE],
             pv: vec![[Move::NONE; MAX_PLY + 1]; MAX_PLY + 1],
             pv_len: [0; MAX_PLY + 1],
             buffers: (0..MAX_PLY + 2).map(|_| Vec::with_capacity(128)).collect(),
@@ -256,11 +279,12 @@ impl<'a> Searcher<'a> {
         s.tt = t.tt;
         s.age = t.age;
         s.history = t.history;
+        s.corr = t.corr;
         s
     }
 
     pub fn into_tables(self) -> SearchTables {
-        SearchTables { tt: self.tt, age: self.age, history: self.history }
+        SearchTables { tt: self.tt, age: self.age, history: self.history, corr: self.corr }
     }
 
     pub fn tt_mb(t: &SearchTables) -> usize {
@@ -272,11 +296,71 @@ impl<'a> Searcher<'a> {
         for h in self.history.iter_mut() {
             *h = 0;
         }
+        for c in self.corr.iter_mut() {
+            *c = 0;
+        }
     }
 
     #[inline]
     fn eval(&self, p: &Position) -> i32 {
         evaluate(p, self.r, self.et, self.params)
+    }
+
+    /// The correction-history slots for `p` (one per table, side to move
+    /// included): material (a sum of one random number per piece kind and
+    /// team, so only the counts matter), pawn-type pieces, and each side's
+    /// other pieces (kind, team and square, from the Zobrist numbers), and
+    /// the move that led here (`prev`; none = usize::MAX, not used).
+    fn corr_slots(&self, p: &Position, prev: Move) -> [usize; CORR_TABLES] {
+        let z = &self.r.z.piece;
+        let (mut mat, mut pawns, mut pieces) = (0u64, 0u64, [0u64; 2]);
+        let mut occ = p.occupied();
+        while occ != 0 {
+            let s = occ.trailing_zeros() as usize;
+            occ &= occ - 1;
+            let c = p.sq[s];
+            let (k, t) = (kind_of(c), team_of(c));
+            mat = mat.wrapping_add(z[k * 2 + t]);
+            let h = z[(s * crate::defs::MAX_KINDS + k) * 2 + t];
+            if self.r.info[k].is_pawn {
+                pawns ^= h;
+            } else {
+                pieces[t] ^= h;
+            }
+        }
+        let slot = |table: usize, h: u64| (table * 2 + p.side) * CORR_SIZE + (mix64(h) as usize & (CORR_SIZE - 1));
+        let last = if prev == Move::NONE { usize::MAX } else { (4 * 2 + p.side) * CORR_SIZE + prev.from as usize * MAX_SQ + prev.to as usize };
+        [slot(0, mat), slot(1, pawns), slot(2, pieces[0]), slot(3, pieces[1]), last]
+    }
+
+    /// The static evaluation plus what the correction history has learned.
+    fn corrected(&self, raw: i32, slots: &[usize; CORR_TABLES]) -> i32 {
+        let mut sum = 0;
+        for t in 0..CORR_TABLES {
+            if CORR_WEIGHTS[t] != 0 && slots[t] != usize::MAX {
+                sum += self.corr[slots[t]] as i32 * CORR_WEIGHTS[t];
+            }
+        }
+        (raw + sum / (64 * CORR_GRAIN)).clamp(-MATE_BOUND + 1, MATE_BOUND - 1)
+    }
+
+    /// Moves each entry towards `diff` (search result - raw evaluation), more
+    /// for deeper searches.
+    fn update_corr(&mut self, slots: &[usize; CORR_TABLES], diff: i32, depth: i32) {
+        let w = (depth + 1).min(16);
+        let target = (diff * CORR_GRAIN).clamp(-CORR_MAX, CORR_MAX);
+        let bonus = (diff * CORR_GRAIN * depth / 8).clamp(-CORR_MAX / 4, CORR_MAX / 4);
+        for t in 0..CORR_TABLES {
+            if CORR_WEIGHTS[t] != 0 && slots[t] != usize::MAX {
+                let e = &mut self.corr[slots[t]];
+                let v = if CORR_GRAVITY {
+                    *e as i32 + bonus - *e as i32 * bonus.abs() / CORR_MAX
+                } else {
+                    (*e as i32 * (256 - w) + target * w) / 256
+                };
+                *e = v.clamp(-CORR_MAX, CORR_MAX) as i16;
+            }
+        }
     }
 
     fn time_up(&mut self) -> bool {
@@ -661,7 +745,9 @@ impl<'a> Searcher<'a> {
                 }
             }
         }
-        let static_eval = if in_check { -INF } else if e.key == p.tt_key() && e.bound != 0 { e.eval as i32 } else { self.eval(p) };
+        let raw_eval = if in_check { -INF } else if e.key == p.tt_key() && e.bound != 0 { e.eval as i32 } else { self.eval(p) };
+        let corr_slots = if in_check { [0; CORR_TABLES] } else { self.corr_slots(p, if ply > 0 { self.played[ply - 1] } else { Move::NONE }) };
+        let static_eval = if in_check { -INF } else { self.corrected(raw_eval, &corr_slots) };
         let us = p.side;
         self.evals[ply] = static_eval;
         // Is our position better than two plies ago? If not, prune harder.
@@ -863,6 +949,17 @@ impl<'a> Searcher<'a> {
         } else {
             B_UPPER
         };
+        // Learn how far the search landed from the static evaluation, unless
+        // a tactical best move explains it or the bound says nothing about it.
+        if !in_check
+            && !root
+            && !is_mate(best)
+            && (best_move == Move::NONE || (!best_move.is_tactical() && best_move.flags & F_ABILITY == 0))
+            && !(bound == B_LOWER && best <= static_eval)
+            && !(bound == B_UPPER && best >= static_eval)
+        {
+            self.update_corr(&corr_slots, best - if CORR_GRAVITY { static_eval } else { raw_eval }, depth);
+        }
         let (slot, e) = self.tt.probe(p.tt_key(), self.age);
         if e.key != p.tt_key() || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
             self.tt.store(
@@ -871,7 +968,7 @@ impl<'a> Searcher<'a> {
                     key: p.tt_key(),
                     mv: best_move,
                     score: to_tt(best, ply).clamp(-INF, INF) as i16,
-                    eval: static_eval.clamp(-INF, INF) as i16,
+                    eval: raw_eval.clamp(-INF, INF) as i16,
                     depth: depth.min(127) as i8,
                     bound,
                     age: self.age,
@@ -918,7 +1015,13 @@ impl<'a> Searcher<'a> {
         let orig_alpha = alpha;
         let in_check = qply < Q_CHECK_PLIES && p.in_check(r, p.side);
         let raw_eval = if in_check { -INF } else if hit { e.eval as i32 } else { self.eval(p) };
-        let stand = if in_check { -MATE + ply as i32 } else { raw_eval };
+        let stand = if in_check {
+            -MATE + ply as i32
+        } else if CORR_QS {
+            self.corrected(raw_eval, &self.corr_slots(p, Move::NONE))
+        } else {
+            raw_eval
+        };
         if !in_check {
             if stand >= beta {
                 return stand;
