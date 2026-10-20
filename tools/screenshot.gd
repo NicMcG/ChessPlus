@@ -10,6 +10,7 @@ extends SceneTree
 ## "wait:2" lets 2 seconds pass (animations, the checkmate effect, Plusfish).
 ## "board" presses View board on the result screen (and skips the checkmate effect).
 ## "view:5" looks at the position after 5 moves, as tapping the move list does.
+## "export" presses Export game on the result screen (skips the checkmate effect).
 ## "testing" (anywhere) opens it as a testing-mode game from the standard position.
 
 func _initialize() -> void:
@@ -42,6 +43,9 @@ func _initialize() -> void:
 		elif arg == "board":
 			game._stop_checkmate_effect()
 			game._on_game_over_action("board")
+		elif arg == "export":
+			game._stop_checkmate_effect()
+			game._on_game_over_action("export")
 		elif arg.begins_with("view:"):
 			game.view_move(int(arg.substr(5)))
 		else:
