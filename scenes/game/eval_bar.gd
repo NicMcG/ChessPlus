@@ -22,8 +22,12 @@ var flipped := false:
 var cp := 0
 ## Moves to mate (+ White mates, - Black mates), or null.
 var mate: Variant = null
-## False until the position has been evaluated (the bar shows grey "...").
+## False until the position has been evaluated: the bar stays where it was
+## with "..." (grey only if nothing has been shown yet), so it doesn't flash
+## while Plusfish works out a new position.
 var known := false
+## Something has been shown since the game started (reset()).
+var _shown_any := false
 ## The game is over in this position: "1-0", "0-1", "1/2-1/2", or "".
 var result := ""
 
@@ -35,17 +39,25 @@ func set_score(p_cp: int, p_mate: Variant, p_result := "") -> void:
 	mate = p_mate
 	result = p_result
 	known = true
+	_shown_any = true
 	queue_redraw()
 
 func set_unknown() -> void:
 	known = false
 	queue_redraw()
 
+## A new game: back to grey in the middle until the first score.
+func reset() -> void:
+	known = false
+	_shown_any = false
+	shown = 0.5
+	queue_redraw()
+
 ## White's share of the bar for the current score: 50% when level, most of it
 ## at +4, all of it for a mate.
 func target() -> float:
 	if not known:
-		return 0.5
+		return shown if _shown_any else 0.5
 	if result == "1-0":
 		return 1.0
 	if result == "0-1":
@@ -74,7 +86,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
-	if not known:
+	if not known and not _shown_any:
 		draw_rect(r, UNKNOWN)
 	else:
 		draw_rect(r, BLACK_SIDE)
@@ -95,7 +107,7 @@ func _draw() -> void:
 	var at_bottom := white_ahead != flipped
 	var y := size.y - font_size * 0.45 if at_bottom else font_size * 1.15
 	var color := BLACK_SIDE if white_ahead else WHITE_SIDE
-	if not known:
+	if not known and not _shown_any:
 		color = WHITE_SIDE
 		y = size.y / 2 + font_size * 0.35
 	draw_string(font, Vector2((size.x - text_w) / 2, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)

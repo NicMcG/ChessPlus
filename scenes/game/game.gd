@@ -201,6 +201,9 @@ func _ready() -> void:
 			bot_engine = PlusfishLink.new()
 			bot_engine.desktop_nodes = PLUSFISH_BOT_NODES
 			bot_engine.web_nodes = PLUSFISH_BOT_WEB_NODES
+			# One store of answers for both: the eval bar shows the bot's own
+			# (bigger) searches instead of working those positions out again.
+			bot_engine.cache = plusfish.cache
 			add_child(bot_engine)
 	if online:
 		_start_online()
@@ -531,6 +534,7 @@ func _show_new_state() -> void:
 	viewing = -1
 	_view_state = null
 	redo_moves.clear()
+	eval_bar.reset()
 	board_view.show_game(state)
 	_update_text()
 	_save_progress()
