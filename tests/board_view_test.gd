@@ -222,8 +222,33 @@ func test_right_drag_draws_arrows() -> void:
 	check_eq(view.arrows.size(), 2, "Two arrows")
 	_right_drag(view, "e2", "e4")
 	check_eq(view.arrows.size(), 1, "Drawing the same arrow again removes it")
+	view.pointer_down(view.square_center(_square("d5")), false)
+	view.pointer_up(view.square_center(_square("d5")))
+	check_eq(view.arrows.size(), 0, "A left click clears them")
+	view.free()
+
+func test_right_click_rings_a_square() -> void:
+	var view := _sized_view(StandardSetup.create_game())
 	view.right_click(view.square_center(_square("d5")))
-	check_eq(view.arrows.size(), 0, "A right-click clears them")
+	check_eq(view.highlights, [_square("d5")] as Array[Vector2i], "d5 ringed")
+	view.right_click(view.square_center(_square("e2")))
+	check_eq(view.highlights.size(), 2, "A square with a piece can be ringed too")
+	view.right_click(view.square_center(_square("d5")))
+	check_eq(view.highlights, [_square("e2")] as Array[Vector2i], "Right-clicking it again takes the ring off")
+	_right_drag(view, "g1", "f3")
+	check_eq(view.highlights.size(), 1, "Drawing an arrow leaves the rings")
+	view.pointer_down(view.square_center(_square("a4")), false)
+	view.pointer_up(view.square_center(_square("a4")))
+	check(view.highlights.is_empty() and view.arrows.is_empty(), "A left click clears rings and arrows")
+	view.free()
+
+func test_a_move_clears_the_rings() -> void:
+	var view := _sized_view(StandardSetup.create_game())
+	view.right_click(view.square_center(_square("d5")))
+	var move := view.state.find_move("e2-e4")
+	view.state.make_move(move)
+	view.show_move(move)
+	check(view.highlights.is_empty(), "Cleared by the move")
 	view.free()
 
 func test_a_move_clears_the_arrows() -> void:
