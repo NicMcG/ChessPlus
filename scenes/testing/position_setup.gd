@@ -92,6 +92,7 @@ func _build_top_bar() -> void:
 	colour_button = _button("", toggle_tray_team)
 	colour_button.custom_minimum_size.x = 210
 	_top.add_child(colour_button)
+	_top.add_child(VolumeControl.make_room())
 	_layout.add_child(_top)
 
 func _build_controls() -> void:

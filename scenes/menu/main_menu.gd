@@ -8,6 +8,8 @@ signal online_pressed
 signal continue_online_pressed
 signal armies_pressed
 signal testing_pressed
+## The Sound button was pressed (the volume button's picture follows it).
+signal sound_toggled
 
 func _ready() -> void:
 	# Only offer to continue when there's an unfinished game saved.
@@ -23,11 +25,12 @@ func _ready() -> void:
 	%Armies.pressed.connect(func() -> void: armies_pressed.emit())
 	%Testing.pressed.connect(func() -> void: testing_pressed.emit())
 	%Sound.pressed.connect(toggle_sound)
-	_show_sound()
+	show_sound()
 
 func toggle_sound() -> void:
 	UserSettings.set_sound_on(not UserSettings.sound_on())
-	_show_sound()
+	show_sound()
+	sound_toggled.emit()
 
-func _show_sound() -> void:
+func show_sound() -> void:
 	%Sound.text = "Sound: " + ("on" if UserSettings.sound_on() else "off")

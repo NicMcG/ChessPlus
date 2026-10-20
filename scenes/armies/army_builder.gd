@@ -71,6 +71,8 @@ func _ready() -> void:
 		army.army_name = text
 		_refresh())
 	PhoneTextInput.attach(name_edit, "Army name")
+	# Room for the volume button in the top-right corner.
+	%TeamToggle.get_parent().add_child(VolumeControl.make_room())
 	army_board.columns = BOARD_WIDTH
 	army_board.rows = rules.army_start_rows
 	army_board.show_army(army)
