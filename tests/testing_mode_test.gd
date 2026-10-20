@@ -73,6 +73,44 @@ func test_copy_is_separate() -> void:
 	other.remove_at(Board.parse_square("e1"))
 	check(not position.get_at(Board.parse_square("e1")).is_empty(), "The original keeps its King")
 
+## A small army: King e1, Knight b1, Pawn a2 (as built).
+func _small_army(army_name: String) -> Army:
+	var army := Army.new()
+	army.army_name = army_name
+	army.place(_def("king"), Vector2i(4, 0))
+	army.place(_def("knight"), Vector2i(1, 0))
+	army.place(_def("pawn"), Vector2i(0, 1))
+	return army
+
+## The board's pieces as {square name: [piece id, team]}.
+func _pieces_by_name(position: TestingPosition) -> Dictionary:
+	var result := {}
+	for square: Vector2i in position.pieces:
+		var entry: Array = position.pieces[square]
+		result[Board.square_name(square)] = [entry[0].id, entry[1]]
+	return result
+
+func test_load_army_into_position() -> void:
+	var position := TestingPosition.standard()
+	position.load_army(_small_army("Small"), Piece.Team.BLACK)
+	var black := _pieces_by_name(position).values().filter(func(e: Array) -> bool: return e[1] == Piece.Team.BLACK)
+	check_eq(black.size(), 3, "Black's old pieces are gone; the army's 3 are there")
+	# Turned round for Black, as in a real game: the king on e1 becomes d8.
+	check_eq(position.get_at(Board.parse_square("d8")), [_def("king"), Piece.Team.BLACK], "King on d8")
+	check_eq(position.get_at(Board.parse_square("g8")), [_def("knight"), Piece.Team.BLACK], "Knight on g8")
+	check_eq(position.get_at(Board.parse_square("h7")), [_def("pawn"), Piece.Team.BLACK], "Pawn on h7")
+	check_eq(position.pieces.size(), 19, "White's 16 untouched")
+	# Same squares as a real game from these armies.
+	var real := ArmySetup.create_game(StandardSetup.army(), _small_army("Small"), StandardSetup.create_rules())
+	check_eq(Fen.write(position.create_state()).split(" ")[0], Fen.write(real).split(" ")[0], "Same board as a real game")
+	# The Standard set isn't turned round: Black's queen is on d8.
+	position.load_army(StandardSetup.army(), Piece.Team.BLACK)
+	check_eq(position.get_at(Board.parse_square("d8")), [_def("queen"), Piece.Team.BLACK], "Standard queen on d8")
+	# An army's piece replaces the other side's piece on its square.
+	position.place(Board.parse_square("b1"), _def("rook"), Piece.Team.BLACK)
+	position.load_army(_small_army("Small"), Piece.Team.WHITE)
+	check_eq(position.get_at(Board.parse_square("b1")), [_def("knight"), Piece.Team.WHITE], "White's knight replaced the black rook")
+
 # --- The setup screen and the game ---------------------------------------------------
 
 func _open_setup() -> Node:
@@ -116,6 +154,54 @@ func test_captured_pieces_in_setup() -> void:
 	setup.remove_captured(0)
 	check_eq(setup.setup.captured, [[_def("queen"), Piece.Team.BLACK]], "Tapping one puts it back")
 	setup.free()
+
+func test_load_armies_screen() -> void:
+	const TEST_DIR := "user://test_armies/"
+	if DirAccess.dir_exists_absolute(TEST_DIR):
+		for file in DirAccess.get_files_at(TEST_DIR):
+			DirAccess.remove_absolute(TEST_DIR + file)
+	var library := ArmyLibrary.new(TEST_DIR)
+	library.save(_small_army("Small"))
+	var setup: Node = load("res://scenes/testing/position_setup.tscn").instantiate()
+	setup.library = library
+	(Engine.get_main_loop() as SceneTree).root.add_child(setup)
+	check_eq(setup.army_choices(), PackedStringArray(["Leave as it is", "Standard", "Small", "Paste army text"]), "Saved armies offered")
+	setup.ask_load_armies()
+	var panel: ModalPanel = setup.load_panel
+	var white_pick: OptionButton = panel.find_child("WhitePick", true, false)
+	var black_pick: OptionButton = panel.find_child("BlackPick", true, false)
+	var black_text: LineEdit = panel.find_child("BlackText", true, false)
+	var message: Label = panel.find_child("Message", true, false)
+	check(not black_text.visible, "The text box shows only for pasted text")
+	black_pick.select(3)
+	black_pick.item_selected.emit(3)
+	check(black_text.visible, "Paste army text shows it")
+	# Nothing pasted yet: says so and loads nothing.
+	white_pick.select(2)
+	setup.load_chosen_armies()
+	check(message.text.contains("Black's army") and message.text.contains("Paste"), "Asks for the text: " + message.text)
+	check_eq(setup.setup.pieces.size(), 32, "Nothing loaded yet")
+	black_text.text = 'Chess Plus army "Pasted": - - - - - - - - / - - - - K - - (Q)'
+	setup.load_chosen_armies()
+	check(message.text.contains("Q)"), "Broken text says what's wrong: " + message.text)
+	black_text.text = 'Chess Plus army "Pasted": - - - - - - - - / R - - - K - - -'
+	setup.load_chosen_armies()
+	check(panel.is_queued_for_deletion(), "Loaded: the pop-up closes")
+	var pieces := _pieces_by_name(setup.setup)
+	check_eq(pieces.size(), 5, "3 white pieces, 2 black")
+	check_eq(pieces.get("e1"), ["king", Piece.Team.WHITE], "White's saved army: King e1")
+	check_eq(pieces.get("b1"), ["knight", Piece.Team.WHITE], "Knight b1")
+	check_eq(pieces.get("d8"), ["king", Piece.Team.BLACK], "Black's pasted army turned round: King d8")
+	check_eq(pieces.get("h8"), ["rook", Piece.Team.BLACK], "Rook h8")
+	check(not setup.start_button.disabled, "Ready to start")
+	# Leave as it is changes nothing for that side.
+	setup.ask_load_armies()
+	setup.load_panel.find_child("WhitePick", true, false).select(1)
+	setup.load_chosen_armies()
+	check_eq(setup.setup.pieces.size(), 18, "White got the Standard set; Black left alone")
+	setup.free()
+	for file in DirAccess.get_files_at(TEST_DIR):
+		DirAccess.remove_absolute(TEST_DIR + file)
 
 func test_tray_has_every_piece_and_the_wolf() -> void:
 	var defs: Array[PieceDef] = load("res://scenes/testing/position_setup.gd").tray_defs()
