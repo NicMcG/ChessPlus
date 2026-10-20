@@ -491,6 +491,34 @@ impl<'a> Searcher<'a> {
         false
     }
 
+    /// The hash move is tried before the other moves are even generated: it
+    /// often cuts off. If `tt_move` is a move here (in `mode`: a stored move
+    /// is checked against this position), makes it the only move in the list
+    /// and returns true; `rest_moves` adds the others when it's been searched.
+    fn hash_move_first(&self, p: &Position, mode: u8, tt_move: Move, moves: &mut Vec<Move>, scores: &mut Vec<i32>, gains: &mut Vec<i32>) -> bool {
+        if tt_move == Move::NONE || !p.is_pseudo_legal(self.r, tt_move, mode, moves) {
+            return false;
+        }
+        moves.clear();
+        moves.push(tt_move);
+        scores.clear();
+        scores.push(10_000_000);
+        gains.clear();
+        gains.push(NO_GAIN);
+        true
+    }
+
+    /// After `hash_move_first`: the other moves, in the order they'd have had
+    /// if all were generated at once (the hash move swapped to the front).
+    fn rest_moves(&self, p: &Position, mode: u8, tt_move: Move, ply: usize, moves: &mut Vec<Move>, scores: &mut Vec<i32>, gains: &mut Vec<i32>) {
+        p.gen_pseudo(self.r, moves, mode);
+        if let Some(j) = moves[1..].iter().position(|&x| x == tt_move) {
+            moves[j + 1] = moves[1];
+            moves.remove(1);
+        }
+        self.order(p, moves, tt_move, ply, scores, gains);
+    }
+
     /// Fills `scores` (move ordering, higher first) and `gains` (the capture
     /// gain, `capture_gain`, where it was worked out, else NO_GAIN) for `moves`.
     fn order(&self, p: &Position, moves: &[Move], tt_move: Move, ply: usize, scores: &mut Vec<i32>, gains: &mut Vec<i32>) {
@@ -643,14 +671,17 @@ impl<'a> Searcher<'a> {
         }
 
         let mut moves = std::mem::take(&mut self.buffers[ply]);
-        moves.clear();
-        p.gen_pseudo(r, &mut moves, GEN_ALL);
-        if root && !self.root_excluded.is_empty() {
-            let ex = self.root_excluded.clone();
-            moves.retain(|m| !ex.contains(m));
-        }
         let (mut scores, mut gains) = std::mem::take(&mut self.order_bufs[ply]);
-        self.order(p, &moves, tt_move, ply, &mut scores, &mut gains);
+        let mut hash_first = !root && self.hash_move_first(p, GEN_ALL, tt_move, &mut moves, &mut scores, &mut gains);
+        if !hash_first {
+            moves.clear();
+            p.gen_pseudo(r, &mut moves, GEN_ALL);
+            if root && !self.root_excluded.is_empty() {
+                let ex = self.root_excluded.clone();
+                moves.retain(|m| !ex.contains(m));
+            }
+            self.order(p, &moves, tt_move, ply, &mut scores, &mut gains);
+        }
         let mut best = -INF;
         let mut best_move = Move::NONE;
         let mut legal = 0;
@@ -659,7 +690,20 @@ impl<'a> Searcher<'a> {
         let mut n_quiets = 0;
         let mut sens: Option<(u128, u128)> = None;
         self.keys.push(p.key);
-        for i in 0..moves.len() {
+        let mut next = 0;
+        loop {
+            if next == moves.len() {
+                if !hash_first {
+                    break;
+                }
+                hash_first = false;
+                self.rest_moves(p, GEN_ALL, tt_move, ply, &mut moves, &mut scores, &mut gains);
+                if next == moves.len() {
+                    break;
+                }
+            }
+            let i = next;
+            next += 1;
             // Selection sort: the next best-ordered move.
             let mut bi = i;
             for j in i + 1..moves.len() {
