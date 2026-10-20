@@ -1347,12 +1347,38 @@ impl Position {
     /// GEN_CAPTURES (captures, shield breaks, Crack Shots), or GEN_TACTICAL
     /// (those plus quiet promotions).
     pub fn gen_pseudo(&self, r: &Rules, out: &mut Vec<Move>, mode: u8) {
+        self.gen_some(r, out, mode, self.occ[self.side], true);
+    }
+
+    /// Is `m` one of the moves `gen_pseudo` gives in `mode`? For a move from
+    /// elsewhere (the hash table), so that it can be played before generating
+    /// all the moves. `buf`: scratch space.
+    pub fn is_pseudo_legal(&self, r: &Rules, m: Move, mode: u8, buf: &mut Vec<Move>) -> bool {
+        let from = m.from as usize;
+        if from >= r.nsq {
+            return false;
+        }
+        if m.flags & F_HAUNT != 0 {
+            return mode == GEN_ALL && m == Move { from: m.from, to: m.from, flags: F_HAUNT, promo: 0, extra: r.haunt_kind, steps: 0 } && self.ghosts[self.side] != 0 && self.sq[from] == 0;
+        }
+        if self.occ[self.side] & (1u128 << from) == 0 {
+            return false;
+        }
+        buf.clear();
+        self.gen_some(r, buf, mode, 1u128 << from, false);
+        buf.contains(&m)
+    }
+
+    /// `gen_pseudo` for the side to move's pieces on `pieces`, and Haunts if
+    /// `haunts`.
+    #[inline(always)]
+    fn gen_some(&self, r: &Rules, out: &mut Vec<Move>, mode: u8, pieces: u128, haunts: bool) {
         let us = self.side;
         let tactical_only = mode != GEN_ALL;
         let far = r.far_rank(us);
         let pp = r.parapets != 0;
         let first = out.len();
-        for from in bits(self.occ[us]) {
+        for from in bits(pieces) {
             // A piece put to sleep by Song of Slumber can't move this turn.
             if from == self.frozen as usize {
                 continue;
@@ -1490,7 +1516,7 @@ impl Position {
         }
         // Haunt: a lost Ghost that hasn't used it can come back onto any empty
         // square.
-        if !tactical_only && self.ghosts[us] != 0 {
+        if haunts && !tactical_only && self.ghosts[us] != 0 {
             let empty = !self.occupied();
             for s in 0..r.nsq {
                 if empty & (1u128 << s) != 0 {
