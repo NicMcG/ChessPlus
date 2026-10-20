@@ -134,7 +134,7 @@ pub struct KindInfo {
     pub first_move: bool,
     pub can_capture: bool,
     pub cost: f64,
-    /// The Parapet: nothing leaps over it.
+    /// The Parapet: the other side's pieces can't leap over it.
     pub blocks_jumps: bool,
     /// The Vampire: gains a shield by capturing.
     pub gains_shield: bool,
@@ -529,15 +529,16 @@ impl Rules {
         }
     }
 
-    /// True if a leap of (dx, dy) from `from` passes over a Parapet (either
-    /// side's) on board `sqa` (`MoveGenerator._leap_blocked`). Squares passed:
+    /// True if a leap of (dx, dy) from `from` by a piece of `team` passes over
+    /// one of the other side's Parapets on board `sqa` (Mac: a Parapet only
+    /// stops its opponents' jumps; `MoveGenerator._leap_blocked`). Squares passed:
     /// none for a one-square step; the squares between for a straight or
     /// diagonal leap; for a Knight-like leap, the long leg first, then the
     /// short one: (1, 2) passes (0, 1) and (0, 2). Only called in games with
     /// Parapets.
     #[cold]
     #[inline(never)]
-    pub fn leap_blocked(&self, sqa: &[u16; MAX_SQ], from: usize, dx: i32, dy: i32) -> bool {
+    pub fn leap_blocked(&self, sqa: &[u16; MAX_SQ], from: usize, dx: i32, dy: i32, team: usize) -> bool {
         let (ax, ay) = (dx.abs(), dy.abs());
         if ax <= 1 && ay <= 1 {
             return false;
@@ -549,8 +550,7 @@ impl Rules {
             if x < 0 || y < 0 || x >= self.w || y >= self.h {
                 return false;
             }
-            let c = sqa[(y * self.w + x) as usize];
-            c != 0 && self.parapets & (1u64 << kind_of(c)) != 0
+            self.stops_jumps(sqa[(y * self.w + x) as usize], team)
         };
         if ax == ay || ax == 0 || ay == 0 {
             (1..ax.max(ay)).any(|k| over(sx * k, sy * k))
@@ -561,10 +561,17 @@ impl Rules {
         }
     }
 
-    /// True if `c` can't be leapt over (and isn't a Cannon screen).
+    /// True if `c` is a Parapet (of either side).
     #[inline(always)]
     pub fn is_parapet(&self, c: u16) -> bool {
         c != 0 && self.parapets & (1u64 << kind_of(c)) != 0
+    }
+
+    /// True if `c` is a Parapet that `team`'s pieces can't leap over or use
+    /// as a Cannon screen: one of the other side's (`MoveGenerator.stops_jumps`).
+    #[inline(always)]
+    pub fn stops_jumps(&self, c: u16, team: usize) -> bool {
+        self.is_parapet(c) && team_of(c) != team
     }
 
     /// True if the piece `c` has a shield up (Shield keyword unbroken, or one
@@ -848,7 +855,7 @@ impl Position {
             for (i, &p) in sqs.iter().enumerate() {
                 // A leap from here onwards would pass over a Parapet: nothing
                 // further along this line can attack.
-                if pp && line.big && r.leap_blocked(&self.sq, p as usize, line.dx, line.dy) {
+                if pp && line.big && r.leap_blocked(&self.sq, p as usize, line.dx, line.dy, by) {
                     break;
                 }
                 let c = self.sq[p as usize];
@@ -872,8 +879,8 @@ impl Position {
                     }
                 }
                 screens += 1;
-                // A Parapet can't be a Cannon's screen.
-                if screens > 1 || !line.has_hop || (pp && r.is_parapet(c)) {
+                // An opponent's Parapet can't be a Cannon's screen.
+                if screens > 1 || !line.has_hop || (pp && r.stops_jumps(c, by)) {
                     break;
                 }
             }
@@ -1048,7 +1055,7 @@ impl Position {
             let mut screens = 0;
             let sqs = &r.rev_sq[rr.start as usize..rr.start as usize + rr.len as usize];
             for (i, &p) in sqs.iter().enumerate() {
-                if pp && line.big && r.leap_blocked(sqa, p as usize, line.dx, line.dy) {
+                if pp && line.big && r.leap_blocked(sqa, p as usize, line.dx, line.dy, by) {
                     break;
                 }
                 let c = sqa[p as usize];
@@ -1073,7 +1080,7 @@ impl Position {
                     }
                 }
                 screens += 1;
-                if screens > 1 || !line.has_hop || (pp && r.is_parapet(c)) {
+                if screens > 1 || !line.has_hop || (pp && r.stops_jumps(c, by)) {
                     break;
                 }
             }
@@ -1125,7 +1132,7 @@ impl Position {
         if pp && ray.big {
             for j in 0..=idx {
                 let prev = if j == 0 { from } else { sqs[j - 1] as usize };
-                if r.leap_blocked(sqa, prev, ray.dx as i32, ray.dy as i32) {
+                if r.leap_blocked(sqa, prev, ray.dx as i32, ray.dy as i32, team) {
                     return false;
                 }
             }
@@ -1133,7 +1140,7 @@ impl Position {
         for j in 0..idx {
             let p = sqa[sqs[j] as usize];
             if j < ray.leap as usize {
-                if pp && r.is_parapet(p) {
+                if pp && r.stops_jumps(p, team) {
                     return false;
                 }
                 if ray.leap_own && (p == 0 || team_of(p) != team) {
@@ -1168,7 +1175,7 @@ impl Position {
             for i in 0..limit {
                 if pp && ray.big {
                     let prev = if i == 0 { from } else { sqs[i - 1] as usize };
-                    if r.leap_blocked(&self.sq, prev, ray.dx as i32, ray.dy as i32) {
+                    if r.leap_blocked(&self.sq, prev, ray.dx as i32, ray.dy as i32, team_of(c)) {
                         break;
                     }
                 }
@@ -1177,7 +1184,7 @@ impl Position {
                     a |= 1u128 << q;
                 }
                 let o = self.sq[q];
-                if o != 0 && (i >= leap || (pp && r.is_parapet(o))) {
+                if o != 0 && (i >= leap || (pp && r.stops_jumps(o, team_of(c)))) {
                     break;
                 }
             }
@@ -1261,16 +1268,16 @@ impl Position {
                 for i in 0..limit {
                     if check_leaps {
                         let prev = if i == 0 { from } else { sqs[i - 1] as usize };
-                        if r.leap_blocked(&self.sq, prev, ray.dx as i32, ray.dy as i32) {
+                        if r.leap_blocked(&self.sq, prev, ray.dx as i32, ray.dy as i32, us) {
                             break;
                         }
                     }
                     let to = sqs[i] as usize;
                     if i < leap {
-                        // Leapt squares: nothing leaps a Parapet, and the Rogue
-                        // can only leap one of its own pieces.
+                        // Leapt squares: nothing leaps an opponent's Parapet, and
+                        // the Rogue can only leap one of its own pieces.
                         let o = self.sq[to];
-                        if pp && r.is_parapet(o) {
+                        if pp && r.stops_jumps(o, us) {
                             break;
                         }
                         if ray.leap_own && (o == 0 || team_of(o) != us) {
@@ -1300,8 +1307,8 @@ impl Position {
                         continue;
                     }
                     if ray.hop {
-                        // A Parapet can't be a Cannon's screen.
-                        if ray.mode != Mode::MoveOnly && !(pp && r.is_parapet(t)) {
+                        // An opponent's Parapet can't be a Cannon's screen.
+                        if ray.mode != Mode::MoveOnly && !(pp && r.stops_jumps(t, us)) {
                             for j in i + 1..limit {
                                 let s2 = sqs[j] as usize;
                                 let t2 = self.sq[s2];

@@ -24,7 +24,8 @@ use std::time::Instant;
 pub const HELP: &str = "\
 enginematch: two engine programs play each other over UCI (random armies,
 each pair of games from the same opening with colours swapped).
-  --engine-a <exe> --engine-b <exe>    (A is the one being tested)
+  --engine-a <exe> --engine-b <exe>    (A is the one being tested; <exe>@<weights.txt>
+                                        runs it with other evaluation weights)
   --nodes N             nodes per move (default 6000); --nodes-b N gives B
                         a different number (to calibrate)
   --tc BASE+INC         or a clock per game, seconds (e.g. 10+0.1)
@@ -42,7 +43,7 @@ each pair of games from the same opening with colours swapped).
                         armies in turn, a new random opening each time
 ";
 
-struct Engine {
+pub(crate) struct Engine {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
@@ -50,9 +51,18 @@ struct Engine {
 }
 
 impl Engine {
-    fn start(exe: &str, pieces: &str, hash: usize, options: &str) -> Engine {
-        let mut child = Command::new(exe)
-            .args(["uci", "--pieces", pieces])
+    pub(crate) fn start(exe: &str, pieces: &str, hash: usize, options: &str) -> Engine {
+        // "engine.exe@weights.txt" runs the engine with other evaluation weights.
+        let (exe, params) = match exe.rsplit_once('@') {
+            Some((e, p)) => (e, Some(p)),
+            None => (exe, None),
+        };
+        let mut cmd = Command::new(exe);
+        cmd.args(["uci", "--pieces", pieces]);
+        if let Some(p) = params {
+            cmd.args(["--params", p]);
+        }
+        let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -73,7 +83,7 @@ impl Engine {
         e
     }
 
-    fn send(&mut self, line: &str) {
+    pub(crate) fn send(&mut self, line: &str) {
         writeln!(self.stdin, "{}", line).and_then(|_| self.stdin.flush()).unwrap_or_else(|e| panic!("{}: {}", self.name, e));
     }
 
@@ -95,7 +105,7 @@ impl Engine {
     }
 
     /// Asks for a move: (move text, last reported score for the mover, ms taken).
-    fn go(&mut self, position: &str, go: &str) -> (String, Option<i32>, u64) {
+    pub(crate) fn go(&mut self, position: &str, go: &str) -> (String, Option<i32>, u64) {
         self.send(position);
         let t = Instant::now();
         self.send(go);
@@ -222,7 +232,7 @@ fn play(cat: &Arc<Catalog>, w: &Army, b: &Army, opening: &[Move], a: &mut Engine
 }
 
 /// An army the UCI "position army" command reads back exactly.
-fn army_spec(cat: &Catalog, a: &Army) -> String {
+pub(crate) fn army_spec(cat: &Catalog, a: &Army) -> String {
     if !a.mirror && *a == standard(cat) {
         "standard".into()
     } else {
