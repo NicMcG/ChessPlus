@@ -2,7 +2,8 @@ class_name PlusfishLink
 extends Node
 
 ## Talks to Plusfish, the analysis engine in res://engine/plusfish/, to get an
-## evaluation of every position in a finished game (for the eval bar).
+## evaluation of every position in a finished game (for the eval bar), or of
+## the newest one (the eval bar during a game, and the Plusfish bot's moves).
 ##
 ## On PC it runs the Plusfish program (built with cargo, see
 ## res://engine/plusfish/README.md) on a background thread; it sends the whole
@@ -149,8 +150,10 @@ func stop() -> void:
 	_queue.clear()
 	_stop_thread()
 
+## True until every position asked for has a result (or the job failed). On the
+## web a position leaves the queue while the worker is still on it.
 func is_running() -> bool:
-	return not _queue.is_empty()
+	return not _queue.is_empty() or (_web_task >= 0 and _web_task_job == _job)
 
 func _exit_tree() -> void:
 	stop()
