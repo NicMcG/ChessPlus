@@ -80,6 +80,10 @@ enum Ability { NONE, CRACK_SHOT, RAISE_DEAD, HAUNT, SONG_OF_SLUMBER, FULL_MOON }
 ## Shown on the piece card under "Special Rule": anything about how it plays that
 ## its types, keywords and move picture can't show. Empty for most pieces.
 @export_multiline var special_rule := ""
+
+## A note in italics under the piece card's mini board, about how it moves
+## (Mac: the Knight's and Cavalry's "2 squares, then 1").
+@export_multiline var move_note := ""
 ## Shown under "Special Ability": a once-per-game action that uses a turn. The
 ## name (e.g. "Crack Shot") and what it does. Empty for most pieces.
 @export var ability_name := ""

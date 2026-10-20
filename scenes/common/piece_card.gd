@@ -29,6 +29,7 @@ const EXPLANATIONS := {
 	"Castle": "The king can castle with it while it's still in its back corner.",
 	"Promote": "Must turn into another piece when it reaches the far end (any non-pawn, non-king piece that started the game).",
 	"Shield": "The first capture only breaks its shield, and the attacker stays where it was. The second capture takes it. The shield never comes back.",
+	"Special Ability": "Once per game. Uses your turn.",
 }
 
 const ITALIC_FONT := preload("res://art/fonts/OpenSans-Italic.ttf")
@@ -38,6 +39,11 @@ var def: PieceDef
 ## forms, like the Werewolf) its other form's.
 var moves_def: PieceDef
 var team := Piece.Team.WHITE
+## Draw the mini board with the piece moving down the screen, as a Black piece
+## does on a board with White at the bottom (Mac: it must match the board you
+## see; in the army builder and on a board turned round for Black, Black moves
+## up like White).
+var upside_down := false
 ## How big the card is drawn: 1 = normal (the pop-up in games); the army builder
 ## uses more. Change it with set_zoom.
 var zoom := 1.0
@@ -46,10 +52,11 @@ var tooltip: PanelContainer
 var tooltip_owner: Control
 
 ## Show `p_def`. Safe to call before or after the card is on screen.
-func show_piece(p_def: PieceDef, p_team := Piece.Team.WHITE) -> void:
+func show_piece(p_def: PieceDef, p_team := Piece.Team.WHITE, p_upside_down := false) -> void:
 	def = p_def
 	moves_def = p_def
 	team = p_team
+	upside_down = p_upside_down
 	if is_node_ready():
 		_refresh()
 
@@ -72,8 +79,9 @@ func turn_over() -> void:
 		return
 	moves_def = forms[1] if moves_def == forms[0] else forms[0]
 	_update_form_button()
-	%GuideBoard.show_piece(moves_def, team)
+	%GuideBoard.show_piece(moves_def, team, upside_down)
 	_fill_legend()
+	_fill_move_note()
 
 var _form_button: Button
 
@@ -105,6 +113,9 @@ func _update_form_button() -> void:
 
 func _ready() -> void:
 	_make_tooltip()
+	# What a special ability is (Mac): on its heading and its name.
+	_explain_on_hover($Ability/AbilityHeader/AbilityTitle, "Special Ability")
+	_explain_on_hover(%AbilityChip, "Special Ability")
 	_apply_zoom()
 	if def:
 		_refresh()
@@ -160,6 +171,9 @@ func _apply_zoom() -> void:
 	%GuideBoard.custom_minimum_size = Vector2(_z(220), _z(220))
 	$Special/SpecialTitle.add_theme_font_size_override("font_size", _z(26))
 	%SpecialText.add_theme_font_size_override("font_size", _z(22))
+	%MoveNote.add_theme_font_size_override("font_size", _z(22))
+	%MoveNote.add_theme_font_override("font", _italic_font())
+	%MoveNote.add_theme_color_override("font_color", Color(0.78, 0.78, 0.78))
 	$Ability/AbilityHeader/AbilityTitle.add_theme_font_size_override("font_size", _z(26))
 	%AbilityName.add_theme_font_size_override("font_size", _z(22))
 	%AbilityText.add_theme_font_size_override("font_size", _z(22))
@@ -279,8 +293,9 @@ func _refresh() -> void:
 	%Name.text = def.display_name
 	_update_form_button()
 	_fill_details()
-	%GuideBoard.show_piece(moves_def, team)
+	%GuideBoard.show_piece(moves_def, team, upside_down)
 	_fill_legend()
+	_fill_move_note()
 	_fill_keywords()
 	var special := special_rules(def)
 	%Special.visible = not special.is_empty()
@@ -325,6 +340,11 @@ func _italic_font() -> Font:
 	italic.base_font = ITALIC_FONT
 	italic.variation_opentype = {"wght": 600}
 	return italic
+
+## The note about how the shown moves work, in italics (only some pieces).
+func _fill_move_note() -> void:
+	%MoveNote.text = moves_def.move_note
+	%MoveNote.visible = moves_def.move_note != ""
 
 func _fill_legend() -> void:
 	for child in %Legend.get_children():
