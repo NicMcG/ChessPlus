@@ -146,6 +146,195 @@ func test_best_move_live_in_testing_mode() -> void:
 	game.free()
 	_finish()
 
+func _open_bot_game(best_move: bool) -> Node:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.white_army = StandardSetup.army()
+	game.black_army = StandardSetup.army()
+	game.bot_team = Piece.Team.BLACK
+	game.bot_level = PracticeBot.Level.EASY
+	game.bot_delay_frames = 1
+	game.bot_min_seconds = 0.0
+	game.best_move_on = best_move
+	_root().add_child(game)
+	game.board_view.move_time = 0.0
+	return game
+
+## Play your move and wait (up to 5 s) for the bot's reply.
+func _play_and_wait_for_bot(game: Node, san: String) -> void:
+	var moves: int = game.state.history.size()
+	game.play(Notation.find_move(game.state, san))
+	var started := Time.get_ticks_msec()
+	while game.state.history.size() < moves + 2 and Time.get_ticks_msec() - started < 5000:
+		await _frames(1)
+
+func test_best_move_against_the_bot_when_chosen() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_bot_game(true)
+	check(game.live_best_move(), "Your turn: best move shown")
+	game.play(Notation.find_move(game.state, "e4"))
+	check(not game.live_best_move(), "Not while the bot is to move")
+	game.plusfish.results[1] = {"ply": 1, "cp": 30, "mate": null, "outcome": "none", "best": "e7-e5", "best_san": "e5"}
+	game._on_evaluated(1, game.plusfish.results[1])
+	check(game.board_view.hint_arrow.is_empty(), "No arrow for the bot's move")
+	check(not game.status_label.text.contains("best:"), "...and none in the status line")
+	var started := Time.get_ticks_msec()
+	while game.state.history.size() < 2 and Time.get_ticks_msec() - started < 5000:
+		await _frames(1)
+	check_eq(game.state.history.size(), 2, "The bot answered")
+	check(game.live_best_move(), "Your turn again")
+	game.plusfish.results[2] = {"ply": 2, "cp": 40, "mate": null, "outcome": "none", "best": "g1-f3", "best_san": "Nf3"}
+	game._on_evaluated(2, game.plusfish.results[2])
+	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Best move arrow g1-f3")
+	check(game.status_label.text.ends_with("best: Nf3"), "Status names the best move: " + game.status_label.text)
+	game.view_move(1)
+	check(game.live_best_move(), "Looking back: shown even where the bot was to move")
+	check_eq(game.board_view.hint_arrow, [Vector2i(4, 6), Vector2i(4, 4)], "That position's best move")
+	game.free()
+	_finish()
+
+func test_no_best_move_against_the_bot_unless_chosen() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_bot_game(false)
+	await _play_and_wait_for_bot(game, "e4")
+	check_eq(game.state.history.size(), 2, "The bot answered")
+	check(not game.live_best_move(), "Not chosen: no best move")
+	game.plusfish.results[2] = {"ply": 2, "cp": 40, "mate": null, "outcome": "none", "best": "g1-f3", "best_san": "Nf3"}
+	game._on_evaluated(2, game.plusfish.results[2])
+	check(game.eval_bar.known, "The eval bar still shows against the bot")
+	check(game.board_view.hint_arrow.is_empty(), "But no arrow")
+	check(not game.status_label.text.contains("best:"), "...and no best move in the status line")
+	game.free()
+	_finish()
+
+func test_switches_during_a_bot_game() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_bot_game(false)
+	await _play_and_wait_for_bot(game, "e4")
+	check(game.hint_toggles.visible, "Switches shown against the bot")
+	check(game.eval_toggle.button_pressed, "Eval bar starts on")
+	check(not game.best_move_toggle.button_pressed, "Best move starts off")
+	game.plusfish.results[2] = {"ply": 2, "cp": 40, "mate": null, "outcome": "none", "best": "g1-f3", "best_san": "Nf3"}
+	game._on_evaluated(2, game.plusfish.results[2])
+	check(game.board_view.hint_arrow.is_empty(), "No arrow yet")
+	game.best_move_toggle.button_pressed = true
+	check(game.best_move_on, "Best move switched on")
+	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Arrow straight away")
+	check(game.status_label.text.ends_with("best: Nf3"), "And in the status line: " + game.status_label.text)
+	game.eval_toggle.button_pressed = false
+	check(not game.eval_bar.visible, "Eval bar switched off")
+	check(is_equal_approx(game._board_area.ratio, 1.0), "Board area back to square")
+	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Best move still shown without the bar")
+	var saved := SavedGame.load_saved()
+	check(saved != null and saved.best_move and saved.eval_bar_hidden, "Both switches saved with the game")
+	game.best_move_toggle.button_pressed = false
+	check(game.board_view.hint_arrow.is_empty(), "Best move switched off: arrow gone")
+	check(not game.status_label.text.contains("best:"), "...and the status line is plain")
+	game.eval_toggle.button_pressed = true
+	check(game.eval_bar.visible, "Eval bar back on")
+	game.free()
+	SavedGame.delete_saved()
+	_finish()
+
+func test_no_switches_for_two_players() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_game()
+	game.eval_bar_on = true
+	_play_all(game, ["e4"])
+	check(not game.hint_toggles.visible, "Two players: no switches")
+	game.free()
+	_finish()
+
+func test_best_move_choice_is_saved_with_the_game() -> void:
+	SavedGame.delete_saved()
+	var game := _open_bot_game(true)
+	await _play_and_wait_for_bot(game, "e4")
+	var saved := SavedGame.load_saved()
+	check(saved != null and saved.best_move, "Saved with the game")
+	game.free()
+	var main: Node = load("res://scenes/main/main.tscn").instantiate()
+	_root().add_child(main)
+	main.continue_game()
+	check(main.screen.best_move_on, "Continuing keeps it on")
+	check(not main.screen.eval_bar_hidden, "And the eval bar as it was")
+	main.free()
+	SavedGame.delete_saved()
+
+func _def(id: String) -> PieceDef:
+	for def in PieceCatalog.all_defs():
+		if def.id == id:
+			return def
+	return null
+
+## Kings on a1 and h8, a White pawn on b7 and a Black one on g2, a White Rook
+## on h1 and a Black Queen on h5 (pawns promote to types on the board), a White
+## Necromancer on d2 with a lost Queen and Rook, and a Black Necromancer on f7
+## with a lost Bishop.
+func _promotion_position(to_move: Piece.Team) -> TestingPosition:
+	var position := TestingPosition.new()
+	position.place(Board.parse_square("a1"), _def("king"), Piece.Team.WHITE)
+	position.place(Board.parse_square("h8"), _def("king"), Piece.Team.BLACK)
+	position.place(Board.parse_square("b7"), _def("pawn"), Piece.Team.WHITE)
+	position.place(Board.parse_square("g2"), _def("pawn"), Piece.Team.BLACK)
+	position.place(Board.parse_square("d2"), _def("necromancer"), Piece.Team.WHITE)
+	position.place(Board.parse_square("f7"), _def("necromancer"), Piece.Team.BLACK)
+	position.place(Board.parse_square("h1"), _def("rook"), Piece.Team.WHITE)
+	position.place(Board.parse_square("h5"), _def("queen"), Piece.Team.BLACK)
+	position.captured.append([_def("queen"), Piece.Team.WHITE])
+	position.captured.append([_def("rook"), Piece.Team.WHITE])
+	position.captured.append([_def("bishop"), Piece.Team.BLACK])
+	position.side_to_move = to_move
+	return position
+
+func _open_testing_game(position: TestingPosition) -> Node:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.testing_position = position
+	_root().add_child(game)
+	game.board_view.move_time = 0.0
+	return game
+
+func _hand_in_best(game: Node, ply: int, best: String, best_san: String) -> void:
+	game.plusfish.results[ply] = {"ply": ply, "cp": 500, "mate": null, "outcome": "none", "best": best, "best_san": best_san}
+	game._on_evaluated(ply, game.plusfish.results[ply])
+
+func test_best_move_shows_what_a_pawn_promotes_to() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_testing_game(_promotion_position(Piece.Team.WHITE))
+	check(game.state.find_move("b7-b8=R") != null, "The position allows the promotion")
+	check(game.testing_position.problems().is_empty(), "A fine position: %s" % [game.testing_position.problems()])
+	_hand_in_best(game, 0, "b7-b8=R", "b8=R")
+	check_eq(game.board_view.hint_arrow, [Board.parse_square("b7"), Board.parse_square("b8")], "Arrow to the promotion square")
+	var hint: Dictionary = game.board_view.hint_piece
+	check_eq(hint.get("square"), Board.parse_square("b8"), "Badge on the promotion square")
+	check(hint.get("def") == _def("rook"), "Showing the Rook to promote to")
+	check_eq(hint.get("team"), Piece.Team.WHITE, "A White Rook")
+	check(not hint.get("ring", true), "No ring: the arrow shows which piece")
+	_hand_in_best(game, 0, "d2-e3", "NCe3")
+	check(game.board_view.hint_piece.is_empty(), "An ordinary move has no badge")
+	game.free()
+	_finish()
+
+func test_best_move_shows_what_raise_dead_brings_back() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_testing_game(_promotion_position(Piece.Team.BLACK))
+	check(game.state.find_move("f7!=B") != null, "Black's Necromancer can raise the Bishop")
+	_hand_in_best(game, 0, "f7!=B", "NC!=B")
+	check(game.board_view.hint_arrow.is_empty(), "Raise Dead has no arrow")
+	var hint: Dictionary = game.board_view.hint_piece
+	check_eq(hint.get("square"), Board.parse_square("f7"), "Badge on the Necromancer's square")
+	check(hint.get("def") == _def("bishop"), "Showing the Bishop it brings back")
+	check_eq(hint.get("team"), Piece.Team.BLACK, "A Black Bishop: the side to move")
+	check(hint.get("ring", false), "A ring marks the Necromancer")
+	game.play(game.state.find_move("g2-g1=Q"))
+	check(game.board_view.hint_piece.is_empty(), "Gone once a move is played")
+	game.free()
+	_finish()
+
 func test_bar_only_after_the_game() -> void:
 	PlusfishLink.enabled = true
 	PlusfishLink.pretend_available = true
