@@ -10,8 +10,6 @@ const SCENE_PATH := "res://scenes/common/piece_info.tscn"
 
 var def: PieceDef
 var team := Piece.Team.WHITE
-## Its moves drawn going down the screen (see PieceCard.upside_down).
-var upside_down := false
 
 ## The card's width inside the pop-up, and the height that fits every piece
 ## (worked out by prepare(); 0 until then).
@@ -26,17 +24,16 @@ static func prepare(host: Node) -> void:
 	card_height = await PieceCard.tallest_height(host, PieceCatalog.all_defs(), CARD_WIDTH)
 
 ## Show the card for `p_def` on top of `parent` (usually the current screen).
-static func open(parent: Node, p_def: PieceDef, p_team := Piece.Team.WHITE, p_upside_down := false) -> PieceInfo:
+static func open(parent: Node, p_def: PieceDef, p_team := Piece.Team.WHITE) -> PieceInfo:
 	var info: PieceInfo = load(SCENE_PATH).instantiate()
 	info.def = p_def
 	info.team = p_team
-	info.upside_down = p_upside_down
 	parent.add_child(info)
 	return info
 
 func _ready() -> void:
 	%Card.custom_minimum_size = Vector2(CARD_WIDTH, card_height)
-	%Card.show_piece(def, team, upside_down)
+	%Card.show_piece(def, team)
 	%Close.pressed.connect(close)
 	%Dim.gui_input.connect(func(event: InputEvent) -> void:
 		var press := event as InputEventMouseButton

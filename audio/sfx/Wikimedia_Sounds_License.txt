@@ -23,9 +23,10 @@ church_bell.wav
   same licence: shown on the main menu)
 
 holy_choir.wav
-  From "Johann Georg Ebeling - Ich steh an deiner Krippen hier (Tubular bells
-  and Angelic choir).ogg", public domain - no credit needed (first 4.8 s).
-  https://commons.wikimedia.org/wiki/File:Johann_Georg_Ebeling_-_Ich_steh_an_deiner_Krippen_hier_(Tubular_bells_and_Angelic_choir).ogg
+  From "Tallis - If ye love me.ogg", sung by Coro Santa Pazienza (Cathedral of
+  Pontremoli, 2017), CC BY 3.0 - credit required (shown on the main menu).
+  55.6-59.2 s: a held chord. https://creativecommons.org/licenses/by/3.0/
+  https://commons.wikimedia.org/wiki/File:Tallis_-_If_ye_love_me.ogg
 
 sheep_baa.wav
   From "Sheep bleating.ogg" (PDSounds), public domain - no credit needed.

@@ -234,26 +234,14 @@ func _click() -> InputEventMouseButton:
 	press.pressed = true
 	return press
 
-## Mac's bug: a Black piece's card showed it moving down the screen even on a
-## board turned round for Black, where it moves up.
-func test_mini_board_is_the_same_way_up_as_the_board() -> void:
+## Mac (Oct 2026): every card shows its piece moving up the screen, whatever
+## its colour and whichever way round the board is.
+func test_mini_board_always_shows_moving_up() -> void:
 	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
-	card.show_piece(_def("berserker"), Piece.Team.BLACK)
+	card.show_piece(_def("pawn"), Piece.Team.BLACK)
 	_root().add_child(card)
-	check(not card.get_node("%GuideBoard").upside_down, "Army builder (Black at the bottom): forward is up")
+	var guide := PieceGuide.guide(_def("pawn"))
+	check(guide.squares.has(Vector2i(0, 1)), "A pawn's step is (0, 1): forward")
+	check_eq(card.get_node("%GuideBoard").team, Piece.Team.BLACK, "Drawn as a Black pawn...")
+	check(not ("upside_down" in card.get_node("%GuideBoard")), "...with no way to turn it upside down")
 	card.free()
-	var game: Node = load("res://scenes/game/game.tscn").instantiate()
-	_root().add_child(game)
-	var black_pawn: Piece = game.state.board.get_piece(Board.parse_square("e7"))
-	var white_pawn: Piece = game.state.board.get_piece(Board.parse_square("e2"))
-	for case in [[false, black_pawn, true], [false, white_pawn, false], [true, black_pawn, false], [true, white_pawn, true]]:
-		game.board_view.flipped = case[0]
-		game.board_view.info_requested.emit(case[1])
-		var info: PieceInfo = null
-		for child in game.get_children():
-			if child is PieceInfo and not child.is_queued_for_deletion():
-				info = child
-		check(info != null and info.upside_down == case[2], "Board flipped %s, %s piece: moves down the card = %s" % [case[0], "Black" if case[1] == black_pawn else "White", case[2]])
-		if info:
-			info.free()
-	game.free()
