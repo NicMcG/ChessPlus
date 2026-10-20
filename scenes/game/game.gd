@@ -120,6 +120,11 @@ var wide := false
 ## the board after the game.
 var plusfish: PlusfishLink
 var eval_bar: EvalBar
+## After the game: the whole game's evaluation as a graph (under the board, or
+## beside it on wide screens), and the moves it judges mistakes or blunders
+## (moves played -> MoveQuality.Mark), also marked in the move list.
+var eval_graph: EvalGraph
+var move_marks := {}
 ## The board and the eval bar side by side, inside the board area.
 var _board_row: HBoxContainer
 ## The status line before the eval part was added to it.
@@ -167,6 +172,7 @@ func _ready() -> void:
 	_build_eval_bar()
 	_build_hint_toggles()
 	_build_top_moves()
+	_build_eval_graph()
 	_build_wide_layout()
 	resized.connect(fit_layout)
 	fit_layout()
@@ -588,9 +594,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_column], _wide_box)
 		_wide_box.move_child(_board_column, 0)
-		ScreenShape.move_to([status_label, clock_label, _top_row, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _side)
+		ScreenShape.move_to([status_label, clock_label, _top_row, hint_toggles, eval_graph, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _top_row, _board_column, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _top_row, _board_column, hint_toggles, eval_graph, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -1218,9 +1224,15 @@ func _update_eval_bar() -> void:
 	_top_row.visible = usable and top_moves_shown()
 	if bar_on or hints_on:
 		_follow_line()
+	# (After _follow_line: Plusfish's results are for the line on the board.)
+	_update_eval_graph(usable)
 	eval_bar.visible = bar_on
 	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if bar_on else 1.0
-	status_label.text = _status_base
+	# Looking at a mistake or blunder: say so.
+	var base := _status_base
+	if viewing > 0 and line_index < 0 and move_marks.has(viewing):
+		base = "%s  ·  %s" % [_status_base, MoveQuality.name_of(move_marks[viewing])]
+	status_label.text = base
 	if not (bar_on or hints_on):
 		_show_hint("")
 		_fill_top_moves({}, false)
@@ -1256,7 +1268,7 @@ func _update_eval_bar() -> void:
 	_show_hint(best)
 	# With the Top moves list showing, it names the move instead.
 	if best != "" and result == "" and not _top_row.visible:
-		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
+		status_label.text = "%s  ·  best: %s" % [base, found.get("best_san", best)]
 
 ## Show Plusfish's suggestion on the board ("" = none): the arrow, and for a
 ## promotion or Raise Dead the piece it turns into or brings back.
@@ -1299,6 +1311,46 @@ func _arrow_for(move_text: String) -> Array:
 func _on_evaluated(ply: int, _result: Dictionary) -> void:
 	if (is_over() or live_eval() or live_best_move()) and ply == shown_ply():
 		_update_eval_bar()
+	elif is_over():
+		# Another position for the graph (and maybe a mark for the move list).
+		_update_eval_graph(true)
+		if viewing > 0 and line_index < 0 and move_marks.has(viewing):
+			_update_eval_bar()
+
+## The graph sits where the bot game's switches were (they're gone once it ends).
+func _build_eval_graph() -> void:
+	eval_graph = EvalGraph.new()
+	eval_graph.hide()
+	eval_graph.ply_chosen.connect(view_move)
+	_layout.add_child(eval_graph)
+	_layout.move_child(eval_graph, hint_toggles.get_index() + 1)
+
+## Once the game is over: show the graph of every position evaluated so far and
+## mark the mistakes and blunders found (in the graph and the move list).
+func _update_eval_graph(usable: bool) -> void:
+	var on := usable and is_over() and not state.history.is_empty()
+	eval_graph.visible = on
+	var marks := {}
+	if on and line_index >= 0:
+		# On a side line Plusfish's results are the line's, not the game's: the
+		# graph and marks stay as they were, marking where the line leaves the game.
+		eval_graph.show_game(state.history.size(), eval_graph.chances, move_marks, viewing, board_view.flipped)
+		return
+	if on:
+		var moves := []
+		var movers := []
+		for move in state.history:
+			moves.append(move.to_text())
+			movers.append(move.piece.team)
+		marks = MoveQuality.marks(plusfish.results, moves, movers)
+		var chances := {}
+		for ply: int in plusfish.results:
+			if ply <= moves.size():
+				chances[ply] = MoveQuality.white_chances(plusfish.results[ply])
+		eval_graph.show_game(moves.size(), chances, marks, shown_ply(), board_view.flipped)
+	if marks != move_marks:
+		move_marks = marks
+		move_list.set_marks(marks)
 
 ## The Top moves list (Nicholas's fork, Oct 2026): a dropdown under the status
 ## line naming Plusfish's best moves for the position on the board with their
