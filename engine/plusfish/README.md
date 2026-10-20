@@ -165,7 +165,16 @@ plusfish enginematch --engine-a plusfish.exe@params.txt --engine-b plusfish.exe 
 
 The evaluation is a weighted sum of features: material, mobility, shield and
 ability terms for each piece type, plus pawn advancement, passed pawns, king
-shelter, king-zone attacks, Raise Dead potential and so on. `tune` fits the
+shelter, king-zone attacks, Raise Dead potential and so on. Where a piece
+stands counts too: per piece type, how many squares it would reach from its
+square on an empty board (`reach`, a Knight on the rim reaches fewer), which
+row it is on (`row0`..`row7`, for pieces that don't promote), and `dead` for a
+square it can never leave (a Berserker on the last row; unless tuned, that
+cancels 90% of its material). The tuned weights give these only to pieces
+whose moves differ forwards and backwards (Berserker, Assassin, Cavalry,
+Ghost, Werewolf and wolf, Vampire) and short-range pieces (Knight, Man,
+Elephant, Paladin, Catapult, Rogue, Squire, Jester, Necromancer, King):
+giving them to every piece was no stronger (ELO_LOG #26). `tune` fits the
 weights to self-play results (Texel tuning). The tuned weights in
 `params/tuned.txt` are built into the program; `--params none` falls back to
 weights derived from army costs, which is also what any new piece type gets

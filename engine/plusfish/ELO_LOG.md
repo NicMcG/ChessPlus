@@ -50,6 +50,21 @@ Lazy SMP adds to the clock result on top: 4 threads vs 1 = +102.5 ±24.1 (#5).
 | 23 | Re-tune the per-piece weights (material, mobility per piece type, shield, ability) on 20,680 self-play games with all 30 pieces (`tune --only mat,mob,shield,ability`); the 11 new pieces had only cost-based values and every mobility weight was the same 3.1 | nodes 6k / nodes 20k | 2000 / 500 | +74.6 ±11.0 / +100.7 ±23.2 | kept |
 | 24 | Eval: per-piece "worth while the armies are whole" term (fades out over the first 8 captures), tuned with the rest | start-check (below) | - | no better than #23 | reverted |
 | 25 | Full re-tune (every feature) instead of #23 | start-check (below) | - | same on random armies, worse on the pool; pawn-advance weights came out jagged | not used |
+| 26 | Eval: where pieces stand. Per piece type: `reach` (squares reached from its square on an empty board, minus the average), `row0`..`row7` (pieces that don't promote) and `dead` (a square it can never leave: a Berserker on the last row, prior -90% of its material); tuned with mat,mob,shield,ability on the 24,000 balance games (8,000 nodes), only for one-directional pieces (Berserker, Assassin, Cavalry, Ghost, Werewolf + wolf, Vampire) and short-range ones (Knight, Man, Elephant, Paladin, Catapult, Rogue, Squire, Jester, Necromancer, King). A dead Berserker went from 2.6 points (middlegame) to 0.8 | nodes 6k random / PR #13 pool; nodes 20k random / pool | 2000 / 2000; 1000 / 1000 | +47.2 ±10.5 / +69.9 ±11.6; +69.7 ±14.3 / +73.3 ±15.1 | kept |
+
+Variants of #26 against the build before it (6,000 nodes, 2000 games each, random armies / the PR #13 meta pool):
+
+| Variant | Random | Pool |
+|---|---|---|
+| Re-tune mat,mob,shield,ability only (control, no positional terms) | -7.1 ±8.6 | +5.2 ±10.7 |
+| `reach` only, other weights as they were | +23.3 ±9.5 | - |
+| `reach` + rows for every piece, other weights as they were | +30.1 ±10.2 | - |
+| `reach` + rows for every piece, re-tuned with the rest | +47.4 ±10.2 | - |
+| ... + `dead`, every piece | +52.2 ±10.6 | +62.5 ±11.2 |
+| ... + `dead`, one-directional pieces only | +32.9 ±9.9 | +74.1 ±11.1 |
+| ... + `dead`, one-directional + short-range (kept) | +47.2 ±10.5 | +69.9 ±11.6 |
+
+Kept against every piece, head to head (3000 games each): +3.9 ±7.7 random, +7.5 ±8.3 pool, with half as many weights.
 
 ## Judging the starting position (`start-check`)
 
