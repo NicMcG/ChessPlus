@@ -116,9 +116,35 @@ func test_bar_during_the_game_only_when_chosen() -> void:
 	game._on_evaluated(1, game.plusfish.results[1])
 	check(game.eval_bar.known, "Shows the score")
 	check(game.board_view.hint_arrow.is_empty(), "But no best-move arrow while the game is on")
+	check(not game.status_label.text.contains("best:"), "...and no best move in the status line")
 	game.free()
 	PlusfishLink.pretend_available = false
 	PlusfishLink.enabled = false
+
+func test_best_move_live_in_testing_mode() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.testing_position = TestingPosition.standard()
+	_root().add_child(game)
+	game.board_view.move_time = 0.0
+	check(game.live_best_move(), "Testing mode shows the best move while playing")
+	_play_all(game, ["e4"])
+	check(game.board_view.hint_arrow.is_empty(), "No arrow until Plusfish answers")
+	game.plusfish.results[1] = {"ply": 1, "cp": 30, "mate": null, "outcome": "none", "best": "e7-e5", "best_san": "e5"}
+	game._on_evaluated(1, game.plusfish.results[1])
+	check_eq(game.board_view.hint_arrow, [Vector2i(4, 6), Vector2i(4, 4)], "Best move arrow e7-e5")
+	check(game.status_label.text.ends_with("best: e5"), "Status names the best move: " + game.status_label.text)
+	_play_all(game, ["e5"])
+	check(game.board_view.hint_arrow.is_empty(), "The old arrow goes once a move is played")
+	check(not game.status_label.text.contains("best:"), "...and so does the old best move")
+	game.undo()
+	check_eq(game.board_view.hint_arrow, [Vector2i(4, 6), Vector2i(4, 4)], "Undo: the known best move is back")
+	game.plusfish.results[0] = {"ply": 0, "cp": 25, "mate": null, "outcome": "none", "best": "d2-d4", "best_san": "d4"}
+	game.view_move(0)
+	check_eq(game.board_view.hint_arrow, [Vector2i(3, 1), Vector2i(3, 3)], "Looking back: that position's best move")
+	game.free()
+	_finish()
 
 func test_bar_only_after_the_game() -> void:
 	PlusfishLink.enabled = true
@@ -186,6 +212,28 @@ func test_real_engine_finds_the_mate() -> void:
 	check_eq(game.plusfish.results.get(4, {}).get("outcome"), "checkmate", "Final position is mate")
 	game.view_move(3)
 	check(game.eval_bar.known and game.eval_bar.score_text() == "M1", "Bar shows the mate")
+	game.free()
+	_finish()
+
+func test_real_engine_shows_the_best_move_live_in_testing_mode() -> void:
+	if PlusfishLink.program_path() == "" or OS.has_feature("web"):
+		print("    (Plusfish not built: cargo build --release in engine/plusfish to run this test)")
+		return
+	PlusfishLink.enabled = true
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.testing_position = TestingPosition.standard()
+	_root().add_child(game)
+	game.board_view.move_time = 0.0
+	game.plusfish.desktop_nodes = 20000
+	_play_all(game, ["f3", "e5", "g4"])
+	# Wait (up to ~20 s) for the newest position.
+	for i in 2000:
+		if not game.board_view.hint_arrow.is_empty():
+			break
+		await _frames(1)
+		OS.delay_msec(10)
+	check_eq(game.board_view.hint_arrow, [Vector2i(3, 7), Vector2i(7, 3)], "Arrow for Qh4# while the game is on")
+	check(game.status_label.text.ends_with("best: Qh4#"), "Status names it: " + game.status_label.text)
 	game.free()
 	_finish()
 
