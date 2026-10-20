@@ -200,6 +200,7 @@ func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeB
 ## null for the standard start).
 func show_testing_setup(position: TestingPosition = null) -> void:
 	var setup := POSITION_SETUP.instantiate()
+	setup.library = library
 	if position:
 		setup.setup = position
 	setup.back_pressed.connect(show_main_menu)

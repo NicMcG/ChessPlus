@@ -28,6 +28,16 @@ func clear() -> void:
 	captured.clear()
 	side_to_move = Piece.Team.WHITE
 
+## Take all of `team`'s pieces off and set up `army` for that side instead,
+## where it would start in a real game (ArmySetup). Its pieces replace anything
+## of the other side's standing on their squares.
+func load_army(army: Army, team: Piece.Team) -> void:
+	for square: Vector2i in pieces.keys():
+		if pieces[square][1] == team:
+			pieces.erase(square)
+	for piece in army.pieces:
+		place(ArmySetup.board_square(army, piece, team, width, height), piece.def, team)
+
 ## A copy that can be changed without changing this one.
 func copy() -> TestingPosition:
 	var other := TestingPosition.new()

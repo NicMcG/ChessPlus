@@ -10,13 +10,19 @@ extends RefCounted
 static func create_game(white: Army, black: Army, base_rules: GameRules, width := 8, height := 8) -> GameState:
 	var board := Board.new(width, height)
 	for piece in white.pieces:
-		board.set_piece(piece.square, Piece.new(piece.def, Piece.Team.WHITE))
+		board.set_piece(board_square(white, piece, Piece.Team.WHITE, width, height), Piece.new(piece.def, Piece.Team.WHITE))
 	for piece in black.pieces:
-		var file := width - 1 - piece.square.x if black.mirror_for_black else piece.square.x
-		board.set_piece(Vector2i(file, height - 1 - piece.square.y), Piece.new(piece.def, Piece.Team.BLACK))
+		board.set_piece(board_square(black, piece, Piece.Team.BLACK, width, height), Piece.new(piece.def, Piece.Team.BLACK))
 	var rules: GameRules = base_rules.duplicate()
 	rules.promotion_options = promotion_options_for(board)
 	return GameState.new(board, rules)
+
+## Where one of `army`'s pieces starts on the board when `team` plays it.
+static func board_square(army: Army, piece: ArmyPiece, team: Piece.Team, width := 8, height := 8) -> Vector2i:
+	if team == Piece.Team.WHITE:
+		return piece.square
+	var file := width - 1 - piece.square.x if army.mirror_for_black else piece.square.x
+	return Vector2i(file, height - 1 - piece.square.y)
 
 ## What pawn-type pieces may promote to: each piece type on the board at the
 ## start, from either army, except king types (a second king would break the
