@@ -204,3 +204,56 @@ func test_right_click_opens_the_card() -> void:
 func test_tip_matches_the_device() -> void:
 	check(load("res://scenes/game/game.gd").tip_text(true).contains("hold"), "Phones: hold")
 	check(load("res://scenes/game/game.gd").tip_text(false).contains("right-click"), "PC: right-click")
+
+func test_move_note_in_italics() -> void:
+	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
+	card.show_piece(_def("knight"))
+	_root().add_child(card)
+	var note: Label = card.get_node("%MoveNote")
+	check(note.visible and note.text.begins_with("This piece always moves 2 squares, then 1 square."), "The Knight's note (Mac)")
+	check(note.get_theme_font("font") is FontVariation, "...in italics")
+	card.show_piece(_def("cavalry"))
+	check(note.visible, "The Cavalry has it too")
+	card.show_piece(_def("bishop"))
+	check(not note.visible, "Other pieces don't")
+	card.free()
+
+func test_special_ability_heading_explains_itself() -> void:
+	check_eq(PieceCard.EXPLANATIONS["Special Ability"], "Once per game. Uses your turn.", "Mac's wording")
+	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
+	card.show_piece(_def("archer"))
+	_root().add_child(card)
+	var title: Label = card.get_node("Ability/AbilityHeader/AbilityTitle")
+	title.gui_input.emit(_click())
+	check(card.tooltip.visible and card.tooltip_owner == title, "Tapping the heading explains it")
+	card.free()
+
+func _click() -> InputEventMouseButton:
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	return press
+
+## Mac's bug: a Black piece's card showed it moving down the screen even on a
+## board turned round for Black, where it moves up.
+func test_mini_board_is_the_same_way_up_as_the_board() -> void:
+	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
+	card.show_piece(_def("berserker"), Piece.Team.BLACK)
+	_root().add_child(card)
+	check(not card.get_node("%GuideBoard").upside_down, "Army builder (Black at the bottom): forward is up")
+	card.free()
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	_root().add_child(game)
+	var black_pawn: Piece = game.state.board.get_piece(Board.parse_square("e7"))
+	var white_pawn: Piece = game.state.board.get_piece(Board.parse_square("e2"))
+	for case in [[false, black_pawn, true], [false, white_pawn, false], [true, black_pawn, false], [true, white_pawn, true]]:
+		game.board_view.flipped = case[0]
+		game.board_view.info_requested.emit(case[1])
+		var info: PieceInfo = null
+		for child in game.get_children():
+			if child is PieceInfo and not child.is_queued_for_deletion():
+				info = child
+		check(info != null and info.upside_down == case[2], "Board flipped %s, %s piece: moves down the card = %s" % [case[0], "Black" if case[1] == black_pawn else "White", case[2]])
+		if info:
+			info.free()
+	game.free()

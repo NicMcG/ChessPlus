@@ -38,7 +38,7 @@ PIECES = {
         ([(1, 0), (-1, 0), (0, -1)], 0, 0, {}),
         ([(1, 1), (-1, 1)], 1, 0, {}),
     ], extra={"shield_on_capture": "true"},
-        special_rule="Whenever the Vampire captures a piece, if the Vampire didn't have a shield, it gains one."),
+        special_rule="Whenever the Vampire captures a piece, if the Vampire didn't have one, it gains SHIELD."),
     "squire": dict(name="Squire", symbol="SQ", value=3, rules=[
         (ORTHO, 2, 0, {}),
         (DIAG, 1, 0, {}),
@@ -59,7 +59,7 @@ PIECES = {
     "bard": dict(name="Bard", symbol="BD", value=3.5, rules=[
         (DIAG, 4, 0, {}),
     ], ability=4, ability_name="Song of Slumber", colors=["#F5C542", "#C46A12"],
-        ability_text="Put an enemy non-king, non-pawn piece to sleep during your opponent's next turn. (It can't take actions.)"),
+        ability_text="Put an enemy non-king piece within the Bard's move range to sleep during your opponent's next turn. (It can't take actions.)"),
     "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),

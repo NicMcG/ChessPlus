@@ -28,13 +28,16 @@ const LEGEND := {
 
 var def: PieceDef
 var team := Piece.Team.WHITE
+## The piece's forward is down the screen (see PieceCard.upside_down).
+var upside_down := false
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
-func show_piece(p_def: PieceDef, p_team: Piece.Team) -> void:
+func show_piece(p_def: PieceDef, p_team: Piece.Team, p_upside_down := false) -> void:
 	def = p_def
 	team = p_team
+	upside_down = p_upside_down
 	queue_redraw()
 
 ## The legend kinds this piece's picture uses, in LEGEND order.
@@ -122,8 +125,9 @@ func _draw() -> void:
 			# The piece sits on a light square: its picture reads best there.
 			var color := LIGHT_SQUARE if (col + row) % 2 == 0 else DARK_SQUARE
 			draw_rect(Rect2(origin + Vector2(col, row) * s, Vector2(s, s)), color)
-	# Forward is up the screen for White and down for Black, as on the real board.
-	var forward := -1 if team == Piece.Team.WHITE else 1
+	# Forward is up the screen, unless the board being looked at has this piece
+	# moving down it (a Black piece with White at the bottom).
+	var forward := 1 if upside_down else -1
 	var center := origin + Vector2(radius + 0.5, radius + 0.5) * s
 	for slide in guide.slides:
 		var dir: Vector2i = slide[0]
