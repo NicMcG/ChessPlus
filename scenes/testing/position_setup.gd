@@ -246,13 +246,18 @@ func fit_layout() -> void:
 	if wide and _side.get_parent() == _layout:
 		var row := HBoxContainer.new()
 		row.name = "Wide"
-		row.add_theme_constant_override("separation", 20)
+		row.add_theme_constant_override("separation", WIDE_GAP)
 		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		# The board and the controls side by side, centred together (Mac: they
+		# were far apart, the board in the middle of a wide empty area).
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.resized.connect(_fit_wide_board)
 		_layout.add_child(row)
 		_board_area.reparent(row, false)
 		_side.reparent(row, false)
 		_side.custom_minimum_size.x = 640
 		_side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_board_area.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	elif not wide and _side.get_parent() != _layout:
 		var row := _side.get_parent()
 		_board_area.reparent(_layout, false)
@@ -260,6 +265,20 @@ func fit_layout() -> void:
 		row.queue_free()
 		_side.custom_minimum_size.x = 0
 		_side.size_flags_vertical = Control.SIZE_SHRINK_END
+		_board_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_board_area.custom_minimum_size.x = 0
+
+const WIDE_GAP := 32
+
+## Wide screens: the board area only as wide as the (square) board, as tall as
+## the row allows, leaving room for the controls.
+func _fit_wide_board() -> void:
+	var row := _board_area.get_parent() as Control
+	if row == null or row == _layout:
+		return
+	var width := maxf(0.0, minf(row.size.y, row.size.x - _side.get_combined_minimum_size().x - WIDE_GAP))
+	if not is_equal_approx(_board_area.custom_minimum_size.x, width):
+		_board_area.custom_minimum_size.x = width
 
 # --- Actions (public, so tests can use them) -----------------------------------------
 
