@@ -149,6 +149,7 @@ func _ready() -> void:
 	add_child(_bot_timer)
 	_build_capture_rows()
 	_build_eval_bar()
+	_build_hint_toggles()
 	_build_wide_layout()
 	resized.connect(fit_layout)
 	fit_layout()
@@ -373,9 +374,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_column], _wide_box)
 		_wide_box.move_child(_board_column, 0)
-		ScreenShape.move_to([status_label, clock_label, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _side)
+		ScreenShape.move_to([status_label, clock_label, hint_toggles, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _board_column, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _board_column, hint_toggles, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -513,6 +514,8 @@ func _save_progress() -> void:
 		var saved := SavedGame.from_state(state, white_army, black_army, bot_team, bot_level)
 		saved.started_time = _started_time
 		saved.eval_bar = eval_bar_on
+		saved.best_move = best_move_on
+		saved.eval_bar_hidden = eval_bar_hidden
 		saved.save()
 
 ## If it's the bot's turn: block the board, say it's thinking, then let it move.
@@ -868,8 +871,16 @@ func shown_ply() -> int:
 ## (the creator chooses for both players). After any game it shows anyway.
 var eval_bar_on := false
 
+## Against the bot the bar is on unless the player switches it off during the
+## game (the "Eval bar" switch under the board).
+var eval_bar_hidden := false
+
 func live_eval() -> bool:
-	if is_bot_game() or eval_bar_on or testing_position:
+	if testing_position:
+		return true
+	if is_bot_game():
+		return not eval_bar_hidden
+	if eval_bar_on:
 		return true
 	return online != null and bool(online.row.get("eval_bar", false))
 
@@ -885,26 +896,39 @@ func _start_live_analysis() -> void:
 		moves.append(move.to_text())
 	plusfish.analyse_live(_create_start_state(), moves)
 
+## The engine's best move is on for this game against the bot (the "Best move"
+## switch under the board).
+var best_move_on := false
+
 ## Whether the best-move hints (blue arrow, "best: ..." in the status line) show
-## while the game is on. Only in testing mode, which is for studying positions;
-## in real games they show only after the game, so the engine never tells anyone
-## what to play.
+## while the game is on: in testing mode, which is for studying positions, and
+## against the bot if best_move_on was chosen (only on your turn, or when looking
+## back at an earlier position, so the arrow is always a move for you to
+## consider). Otherwise they show only after the game, so the engine never tells
+## anyone what to play.
 func live_best_move() -> bool:
-	return testing_position != null
+	if testing_position != null:
+		return true
+	if not (is_bot_game() and best_move_on):
+		return false
+	return viewing >= 0 or state.side_to_move != bot_team
 
 ## Show (or hide) the bar, the best-move arrow and the eval in the status line
 ## for the position on the board. The bar shows after the game, and during it
 ## if live_eval(); the best-move hints after the game, and during it if
-## live_best_move().
+## live_best_move() (with or without the bar).
 func _update_eval_bar() -> void:
-	var on := (is_over() or live_eval()) and PlusfishLink.available() and _plusfish_knows_pieces()
-	if on and not is_over():
+	var usable := PlusfishLink.available() and _plusfish_knows_pieces()
+	var bar_on := usable and (is_over() or live_eval())
+	var hints_on := usable and (is_over() or live_best_move())
+	_update_hint_toggles(usable)
+	if (bar_on or hints_on) and not is_over():
 		_start_live_analysis()
-	eval_bar.visible = on
-	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if on else 1.0
+	eval_bar.visible = bar_on
+	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if bar_on else 1.0
 	status_label.text = _status_base
-	if not on:
-		board_view.hint_arrow = []
+	if not (bar_on or hints_on):
+		_show_hint("")
 		return
 	eval_bar.flipped = board_view.flipped
 	var ply := shown_ply()
@@ -912,7 +936,7 @@ func _update_eval_bar() -> void:
 	var found: Dictionary = plusfish.results.get(ply, {})
 	if found.is_empty():
 		eval_bar.set_unknown()
-		board_view.hint_arrow = []
+		_show_hint("")
 		return
 	# The final position shows the game's result (it may have been a resignation).
 	var result := ""
@@ -925,10 +949,41 @@ func _update_eval_bar() -> void:
 	elif found.get("outcome", "none") != "none":
 		result = "1/2-1/2"
 	eval_bar.set_score(int(found["cp"]), found.get("mate"), result)
-	var best: String = found.get("best", "") if is_over() or live_best_move() else ""
-	board_view.hint_arrow = _arrow_for(best)
+	var best: String = found.get("best", "") if hints_on else ""
+	_show_hint(best)
 	if best != "" and result == "":
 		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
+
+## Show Plusfish's suggestion on the board ("" = none): the arrow, and for a
+## promotion or Raise Dead the piece it turns into or brings back.
+func _show_hint(move_text: String) -> void:
+	board_view.hint_arrow = _arrow_for(move_text)
+	board_view.hint_piece = _hint_piece_for(move_text)
+
+## Promotions ("e7-e8=Q": the piece on the square moved to) and Raise Dead
+## ("d1!=Q": the piece on the Necromancer's square, which gets a ring).
+var _promotion_text := RegEx.create_from_string("^[a-z][0-9]+[-x]([a-z][0-9]+)=([A-Z]+)$")
+var _raise_text := RegEx.create_from_string("^([a-z][0-9]+)!=([A-Z]+)$")
+## Piece types by symbol, for reading the moves (made when first needed).
+var _defs_by_symbol := {}
+
+## For a promotion or Raise Dead: BoardView.hint_piece (the piece belongs to
+## the side to move in the position shown); {} for any other move.
+func _hint_piece_for(move_text: String) -> Dictionary:
+	var ring := false
+	var found := _promotion_text.search(move_text)
+	if found == null:
+		found = _raise_text.search(move_text)
+		ring = true
+	if found == null:
+		return {}
+	if _defs_by_symbol.is_empty():
+		for def in PieceCatalog.all_defs():
+			_defs_by_symbol[def.symbol.to_upper()] = def
+	var def: PieceDef = _defs_by_symbol.get(found.get_string(2))
+	if def == null:
+		return {}
+	return {"square": Board.parse_square(found.get_string(1)), "def": def, "team": board_view.state.side_to_move, "ring": ring}
 
 ## A move's text ("e2-e4", "a1!c3") as [from, to] squares; [] if it has none.
 func _arrow_for(move_text: String) -> Array:
@@ -938,8 +993,46 @@ func _arrow_for(move_text: String) -> Array:
 	return [Board.parse_square(found.get_string(1)), Board.parse_square(found.get_string(2))]
 
 func _on_evaluated(ply: int, _result: Dictionary) -> void:
-	if (is_over() or live_eval()) and ply == shown_ply():
+	if (is_over() or live_eval() or live_best_move()) and ply == shown_ply():
 		_update_eval_bar()
+
+## The "Eval bar" and "Best move" switches under the board (beside the moves on
+## wide screens): against the bot, while the game is on. Each takes effect at
+## once and is saved with the game.
+var hint_toggles: HBoxContainer
+var eval_toggle: CheckButton
+var best_move_toggle: CheckButton
+
+func _build_hint_toggles() -> void:
+	hint_toggles = HBoxContainer.new()
+	hint_toggles.add_theme_constant_override("separation", 24)
+	hint_toggles.alignment = BoxContainer.ALIGNMENT_CENTER
+	hint_toggles.hide()
+	eval_toggle = CheckButton.new()
+	eval_toggle.text = "Eval bar"
+	eval_toggle.toggled.connect(func(on: bool) -> void:
+		eval_bar_hidden = not on
+		_hint_toggled())
+	best_move_toggle = CheckButton.new()
+	best_move_toggle.text = "Best move"
+	best_move_toggle.toggled.connect(func(on: bool) -> void:
+		best_move_on = on
+		_hint_toggled())
+	for toggle in [eval_toggle, best_move_toggle]:
+		toggle.focus_mode = Control.FOCUS_NONE
+		toggle.add_theme_font_size_override("font_size", 26)
+		hint_toggles.add_child(toggle)
+	_layout.add_child(hint_toggles)
+	_layout.move_child(hint_toggles, _board_column.get_index() + 1)
+
+func _hint_toggled() -> void:
+	_update_eval_bar()
+	_save_progress()
+
+func _update_hint_toggles(usable: bool) -> void:
+	hint_toggles.visible = usable and is_bot_game() and online == null and not is_over()
+	eval_toggle.set_pressed_no_signal(not eval_bar_hidden)
+	best_move_toggle.set_pressed_no_signal(best_move_on)
 
 # --- The result screen ----------------------------------------------------------
 

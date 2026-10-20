@@ -37,6 +37,9 @@ const ARROW_COLOR := Color(0.1, 0.55, 0.15, 0.6)
 ## Plusfish's best move, shown when looking over a finished game (blue, so it
 ## can't be mistaken for a player's own green arrow).
 const HINT_ARROW_COLOR := Color(0.15, 0.45, 0.85, 0.6)
+## The disc behind the piece a suggested move promotes to or brings back (pale,
+## so black and white pieces both show; the rim is the hint arrow's blue).
+const HINT_BADGE_COLOR := Color(0.85, 0.91, 1.0, 0.95)
 ## How far (in pixels) the pointer must move while held before it counts as a drag.
 const DRAG_THRESHOLD := 10.0
 ## A dragged piece is drawn this much bigger, so a finger doesn't hide it.
@@ -104,6 +107,14 @@ var hint_arrow: Array = []:
 	set(value):
 		hint_arrow = value
 		queue_redraw()
+## The piece Plusfish's suggestion promotes to or brings back (Raise Dead):
+## {"square", "def", "team", "ring"}, or empty for none. Drawn as a small blue
+## badge with the piece's picture in the square's top-right corner; "ring" also
+## circles the square (Raise Dead has no arrow). Cleared with hint_arrow.
+var hint_piece: Dictionary = {}:
+	set(value):
+		hint_piece = value
+		queue_redraw()
 ## Where the right button went down (NO_SQUARE when it isn't held).
 var _arrow_start := Board.NO_SQUARE
 var _arrow_pointer := Vector2.ZERO
@@ -134,6 +145,7 @@ func refresh() -> void:
 	# A new move (or a different position) clears the arrows.
 	arrows.clear()
 	hint_arrow = []
+	hint_piece = {}
 	_arrow_start = Board.NO_SQUARE
 	queue_redraw()
 
@@ -534,6 +546,8 @@ func _draw() -> void:
 			_draw_target(move)
 	if hint_arrow.size() == 2 and hint_arrow[0] != hint_arrow[1]:
 		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
+	if not hint_piece.is_empty():
+		_draw_hint_piece(hint_piece)
 	for arrow: Array in arrows:
 		_draw_arrow(square_center(arrow[0]), square_center(arrow[1]))
 	# The arrow being drawn right now follows the pointer to the square under it.
@@ -545,6 +559,22 @@ func _draw() -> void:
 		var size_px := _square_size() * DRAG_SCALE
 		var rect := Rect2(_pointer_pos - Vector2(size_px, size_px) / 2, Vector2(size_px, size_px))
 		_draw_piece(board.get_piece(_selected), rect)
+
+## The badge for hint_piece: the piece's picture on a pale disc with a blue rim
+## in the square's top-right corner (clear of the coordinates), plus a ring
+## round the square if asked for.
+func _draw_hint_piece(hint: Dictionary) -> void:
+	var rect := _square_rect(hint["square"])
+	var s := rect.size.x
+	if hint.get("ring", false):
+		draw_arc(rect.get_center(), s * 0.45, 0.0, TAU, 48, HINT_ARROW_COLOR, s * 0.07, true)
+	var radius := s * 0.28
+	var center := rect.position + Vector2(s - radius - s * 0.01, radius + s * 0.01)
+	draw_circle(center, radius, HINT_BADGE_COLOR)
+	draw_arc(center, radius, 0.0, TAU, 32, HINT_ARROW_COLOR.lerp(Color(0.15, 0.45, 0.85), 0.7), maxf(1.5, s * 0.035), true)
+	var picture := radius * 1.75
+	var def: PieceDef = hint["def"]
+	_draw_piece(Piece.new(def, hint["team"]), Rect2(center - Vector2(picture, picture) / 2, Vector2(picture, picture)), 1.0, Color(0, 0, 0), def)
 
 ## A see-through arrow from the middle of one square to the middle of another,
 ## drawn as one shape (so the overlapping parts don't look darker).
