@@ -223,13 +223,14 @@ search_params! {
     fut_mul = 120, 20, 400, 15.0;
     fut_depth = 3, 0, 8, 0.6;
     /// LMR: (lmr_base + ln depth * ln moves / lmr_div) in hundredths, -lmr_pv
-    /// on PV nodes, -history / lmr_history; from lmr_depth and after
+    /// on PV nodes, -history / lmr_history; from lmr_depth (at least 2: the
+    /// reduction is clamped to new_depth - 1) and after
     /// lmr_moves (lmr_moves_pv) moves.
     lmr_base = 75, -100, 300, 10.0;
     lmr_div = 220, 100, 500, 20.0;
     lmr_pv = 1, 0, 3, 0.6;
     lmr_history = 9000, 1000, 30000, 1200.0;
-    lmr_depth = 3, 1, 8, 0.6;
+    lmr_depth = 3, 2, 8, 0.6;
     lmr_moves = 2, 1, 8, 0.6;
     lmr_moves_pv = 4, 1, 10, 0.6;
     /// History bonus: depth^2 * hist_mul, at most hist_max.
