@@ -451,3 +451,24 @@ func test_real_engine_follows_the_new_abilities() -> void:
 	check_eq(link.results.size(), moves.size() + 1, "Every position evaluated")
 	check(str(link.results.get(0, {}).get("best", "")) != "", "A best move at the start")
 	link.free()
+
+func test_real_engine_knows_the_parapet_rule() -> void:
+	if PlusfishLink.program_path() == "" or OS.has_feature("web"):
+		print("    (Plusfish not built: cargo build --release in engine/plusfish to run this test)")
+		return
+	# Mac (Oct 2026): a Parapet only stops the opponent's jumps. The Knight
+	# jumps over its own Parapet on b2, which Plusfish must accept to go on.
+	var start := Fen.parse("k7/8/8/8/8/8/1(PA)6/1N5K w - - 0 1", PieceCatalog.all_defs(), StandardSetup.create_rules())
+	check(PlusfishLink.supports(start), "The eval bar works with Parapets")
+	var moves := ["b1-c3", "a8-b8"]
+	var link := PlusfishLink.new()
+	_root().add_child(link)
+	link.desktop_nodes = 5000
+	link.analyse(start, moves)
+	for i in 2000:
+		if link.results.size() == moves.size() + 1:
+			break
+		await _frames(1)
+		OS.delay_msec(10)
+	check_eq(link.results.size(), moves.size() + 1, "Plusfish follows a Knight over its own Parapet")
+	link.free()

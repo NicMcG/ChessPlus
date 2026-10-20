@@ -117,7 +117,8 @@ pub struct PieceDef {
     pub keywords: u8,
     pub ability: Ability,
     pub dies_on_capture: bool,
-    /// The Parapet: nothing can leap over it, and a Cannon can't use it as a screen.
+    /// The Parapet: the opponent's pieces can't leap over it, and their Cannons
+    /// can't use it as a screen (its own side's can, Mac).
     pub blocks_jumps: bool,
     /// The Vampire: it gains a shield whenever it captures (if it hasn't one).
     pub shield_on_capture: bool,
