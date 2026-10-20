@@ -8,7 +8,8 @@ extends VBoxContainer
 ## instead of letters. Move numbers are bold. Each move is a button: hovering
 ## highlights it, and
 ## tapping it asks to see the position after that move (move_tapped). The move
-## being looked at stays highlighted.
+## being looked at stays highlighted. After a game, mistakes and blunders
+## (MoveQuality) get an orange ? or a red ?? after the move.
 
 ## The player tapped a move: show the position after the first `moves_played` moves.
 signal move_tapped(moves_played: int)
@@ -16,6 +17,8 @@ signal move_tapped(moves_played: int)
 const FONT_SIZE := 26
 const NUMBER_WIDTH := 56
 const MOVE_WIDTH := 170
+## Extra room for a mark after a move.
+const MARK_WIDTH := 36
 ## Piece pictures in the list, and the smaller symbols (capture, check, ...).
 const PIECE_ICON_SIZE := 40
 const SYMBOL_ICON_SIZE := 30
@@ -32,6 +35,8 @@ var _result: Label
 var _bold: FontVariation
 ## The move buttons, in order (button i shows the position after i + 1 moves).
 var buttons: Array[Button] = []
+## Marked moves: moves played (button i is i + 1) -> MoveQuality.Mark.
+var marks := {}
 
 func _init() -> void:
 	_bold = FontVariation.new()
@@ -68,8 +73,29 @@ func show_moves(entries: Array, result: String, viewing: int, tip: String) -> vo
 		var button := _move_button(entries[i][2], entries[i][1], i + 1, i + 1 == viewing)
 		_grid.add_child(button)
 		buttons.append(button)
+	set_marks(marks)
 	_result.text = result
 	_result.visible = result != ""
+
+## Mark mistakes and blunders (moves played -> MoveQuality.Mark; {} for none).
+func set_marks(p_marks: Dictionary) -> void:
+	marks = p_marks
+	for i in buttons.size():
+		var label: Label = buttons[i].get_meta("mark_label")
+		var mark: MoveQuality.Mark = marks.get(i + 1, MoveQuality.Mark.NONE)
+		label.text = MoveQuality.sign_of(mark)
+		label.visible = mark != MoveQuality.Mark.NONE
+		if label.visible:
+			label.add_theme_color_override("font_color", MoveQuality.color_of(mark))
+		buttons[i].custom_minimum_size.x = MOVE_WIDTH + (MARK_WIDTH if label.visible else 0)
+
+## The mark shown after each move: "?", "??" or "" (for tests).
+func mark_signs() -> PackedStringArray:
+	var signs: PackedStringArray = []
+	for button in buttons:
+		var label: Label = button.get_meta("mark_label")
+		signs.append(label.text if label.visible else "")
+	return signs
 
 ## Each line of the list as plain text, e.g. ["1. e4 e5", "2. Nf3"] (for tests;
 ## each move button keeps its text notation as "notation" metadata).
@@ -119,6 +145,15 @@ func _move_button(parts: Array, text: String, moves_played: int, viewed: bool) -
 	row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	for part: Dictionary in parts:
 		row.add_child(_part(part, viewed))
+	# A mistake's ? or a blunder's ?? (hidden until set_marks).
+	var mark := _make_label("")
+	mark.add_theme_font_override("font", _bold)
+	mark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.hide()
+	mark.set_meta("keep_color", true)
+	row.add_child(mark)
+	button.set_meta("mark_label", mark)
 	button.add_child(row)
 	button.mouse_entered.connect(func() -> void: _tint(row, HOVER_TEXT))
 	button.mouse_exited.connect(func() -> void: _tint(row, Color.WHITE))
@@ -184,10 +219,10 @@ func _part(part: Dictionary, _viewed: bool) -> Control:
 	tile.add_child(picture)
 	return tile
 
-## Hovering turns the text parts gold.
+## Hovering turns the text parts gold (not a mistake's or blunder's mark).
 static func _tint(row: HBoxContainer, color: Color) -> void:
 	for child in row.get_children():
-		if child is Label:
+		if child is Label and not child.has_meta("keep_color"):
 			child.add_theme_color_override("font_color", color)
 
 ## A button background: a rounded box in `color`.
