@@ -20,10 +20,14 @@
 //!   moves     the moves played since, as Move.to_text() ("e2-e4", "a1!c3", ...)
 //!   plies     which positions to evaluate (number of moves played); default all
 //!   nodes     search nodes per position (default 100000); depth (optional)
+//!   multipv   how many of the best moves to find (default 1); with more than
+//!             one, the search shares its nodes between them
 //!
 //! Reply lines: {"ply", "cp" (White's point of view; mates are +-(20000 - plies)),
 //! "mate" (null, or moves to mate: + White mates, - Black mates), "outcome",
-//! "best" (move text), "best_san", "depth", "nodes"}.
+//! "best" (move text), "best_san", "depth", "nodes"}. With multipv above 1 also
+//! "lines": the best moves, best first: [{"move", "san", "cp", "mate"}, ...]
+//! (fewer if there are fewer legal moves; cp and mate as above).
 
 use crate::defs::*;
 use crate::eval::*;
@@ -214,6 +218,7 @@ pub fn eval_request(input: &str, emit: &mut dyn FnMut(String)) -> Result<(), Str
         next.make(r, m);
         positions.push(next);
     }
+    let multipv = (num(&req, "multipv", 1.0) as usize).clamp(1, 10);
     let mut searcher = Searcher::new(r, &et, &params, num(&req, "hash_mb", 16.0) as usize);
     for ply in plies {
         let pos = &positions[ply];
@@ -221,6 +226,7 @@ pub fn eval_request(input: &str, emit: &mut dyn FnMut(String)) -> Result<(), Str
         let outcome = pos.outcome(r, keys);
         let white = pos.side == WHITE;
         let (mut cp, mut mate, mut best, mut best_san, mut depth, mut nodes) = (0i32, None::<i32>, String::new(), String::new(), 0, 0u64);
+        let mut lines: Vec<String> = Vec::new();
         if outcome == Outcome::Checkmate || outcome == Outcome::KingExposed {
             // The side to move has been mated, or (king exposed at the start)
             // has won at once.
@@ -228,35 +234,62 @@ pub fn eval_request(input: &str, emit: &mut dyn FnMut(String)) -> Result<(), Str
             cp = if white_won { 20000 } else { -20000 };
             mate = Some(0);
         } else if outcome == Outcome::None {
-            let rep = searcher.search(pos, &keys[..ply], limits, 1, |_| {});
-            if let Some(line) = rep.lines.first() {
-                let s = if white { line.score } else { -line.score };
-                if s.abs() >= MATE_BOUND {
-                    let moves = (MATE - s.abs() + 1) / 2;
-                    mate = Some(if s > 0 { moves } else { -moves });
-                    cp = s.signum() * (20000 - (MATE - s.abs()));
-                } else {
-                    cp = s;
+            let rep = searcher.search(pos, &keys[..ply], limits, multipv, |_| {});
+            // Best first. (A search stopped part-way may have updated only the
+            // first line, which can leave it below the next.)
+            let mut sorted = rep.lines.clone();
+            sorted.sort_by(|a, b| b.score.cmp(&a.score));
+            for (i, line) in sorted.iter().enumerate() {
+                let (line_cp, line_mate) = white_score(if white { line.score } else { -line.score });
+                let Some(&m) = line.pv.first() else { continue };
+                let (text, line_san) = (move_text(r, m), san(pos, r, m));
+                if i == 0 {
+                    (cp, mate, best, best_san) = (line_cp, line_mate, text.clone(), line_san.clone());
                 }
-                if let Some(&m) = line.pv.first() {
-                    best = move_text(r, m);
-                    best_san = san(pos, r, m);
+                lines.push(format!(
+                    "{{\"move\":{},\"san\":{},\"cp\":{},\"mate\":{}}}",
+                    quote(&text),
+                    quote(&line_san),
+                    line_cp,
+                    mate_json(line_mate)
+                ));
+            }
+            if let Some(line) = rep.lines.first() {
+                if line.pv.is_empty() {
+                    (cp, mate) = white_score(if white { line.score } else { -line.score });
                 }
             }
             depth = rep.depth;
             nodes = rep.nodes;
         }
+        let extra = if multipv > 1 { format!(",\"lines\":[{}]", lines.join(",")) } else { String::new() };
         emit(format!(
-            "{{\"ply\":{},\"cp\":{},\"mate\":{},\"outcome\":{},\"best\":{},\"best_san\":{},\"depth\":{},\"nodes\":{}}}",
+            "{{\"ply\":{},\"cp\":{},\"mate\":{},\"outcome\":{},\"best\":{},\"best_san\":{},\"depth\":{},\"nodes\":{}{}}}",
             ply,
             cp,
-            mate.map(|m| m.to_string()).unwrap_or("null".into()),
+            mate_json(mate),
             quote(outcome_name(outcome)),
             quote(&best),
             quote(&best_san),
             depth,
-            nodes
+            nodes,
+            extra
         ));
     }
     Ok(())
+}
+
+/// A score from White's point of view as (cp, mate): mates become
+/// +-(20000 - plies to mate) and a number of moves to mate (+ White mates).
+fn white_score(s: i32) -> (i32, Option<i32>) {
+    if s.abs() >= MATE_BOUND {
+        let moves = (MATE - s.abs() + 1) / 2;
+        (s.signum() * (20000 - (MATE - s.abs())), Some(if s > 0 { moves } else { -moves }))
+    } else {
+        (s, None)
+    }
+}
+
+fn mate_json(mate: Option<i32>) -> String {
+    mate.map(|m| m.to_string()).unwrap_or("null".into())
 }
