@@ -27,7 +27,8 @@ const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
 const SELECTED_TINT := Color(0.95, 0.85, 0.2, 0.55)
 const LAST_MOVE_TINT := Color(0.95, 0.85, 0.2, 0.3)
-const CHECK_TINT := Color(0.9, 0.15, 0.1, 0.6)
+## A square marked with a right-click (like chess.com's red squares).
+const MARK_TINT := Color(0.92, 0.27, 0.2, 0.75)
 const TARGET_MARK := Color(0.1, 0.1, 0.1, 0.25)
 const HOVER_TINT := Color(1, 1, 1, 0.3)
 ## Targets for a special ability (Crack Shot) are ringed in gold.
@@ -123,8 +124,6 @@ var _arrow_start := Board.NO_SQUARE
 var _arrow_pointer := Vector2.ZERO
 ## When the right button went down, and whether holding it still can still open
 ## the piece's card (only on a piece, and not once the pointer leaves its square).
-var _right_time := 0
-var _right_hold_possible := false
 
 ## Plain white silhouettes of piece pictures (for flashes), made when first needed.
 static var _silhouettes := {}
@@ -303,7 +302,6 @@ func pointer_up(pos: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	check_long_press(Time.get_ticks_msec())
-	check_right_hold(Time.get_ticks_msec())
 	advance_animation(delta)
 	# Kings in check tremble, aiming rings close in and sleeping pieces' "Zz"
 	# bobs: keep redrawing.
@@ -358,14 +356,11 @@ func right_down(pos: Vector2) -> void:
 		return
 	_arrow_start = _square_at(pos)
 	_arrow_pointer = pos
-	_right_time = Time.get_ticks_msec()
-	_right_hold_possible = _arrow_start != Board.NO_SQUARE and not state.board.is_empty(_arrow_start)
 
 ## The right mouse button came up. Dragged to another square: add an arrow
 ## there (or remove it, if that arrow is already drawn). Released where it went
-## down: a plain right-click, which rings the square (or takes its ring off), or
-## with Shift held, on a piece, asks for its info card instead.
-func right_up(pos: Vector2, shift := false) -> void:
+## down: a right-click, which marks the square red (or takes the mark off).
+func right_up(pos: Vector2) -> void:
 	if state == null or _arrow_start == Board.NO_SQUARE:
 		_arrow_start = Board.NO_SQUARE
 		return
@@ -379,21 +374,27 @@ func right_up(pos: Vector2, shift := false) -> void:
 		else:
 			arrows.append(arrow)
 	elif end == start:
-		var piece := state.board.get_piece(start)
-		if shift:
-			if piece:
-				_clear_selection()
-				info_requested.emit(piece)
-		elif highlights.has(start):
+		if highlights.has(start):
 			highlights.erase(start)
 		else:
 			highlights.append(start)
 	queue_redraw()
 
-## A plain right-click at `pos` (`shift`: with Shift held).
-func right_click(pos: Vector2, shift := false) -> void:
+## A right-click at `pos`.
+func right_click(pos: Vector2) -> void:
 	right_down(pos)
-	right_up(pos, shift)
+	right_up(pos)
+
+## A middle click at `pos` (PC, Mac): on a piece, asks for its info card.
+func middle_click(pos: Vector2) -> void:
+	if state == null:
+		return
+	var square := _square_at(pos)
+	var piece := state.board.get_piece(square) if square != Board.NO_SQUARE else null
+	if piece:
+		_clear_selection()
+		queue_redraw()
+		info_requested.emit(piece)
 
 ## Take away every arrow and ring the player has drawn.
 func clear_drawings() -> void:
@@ -402,25 +403,6 @@ func clear_drawings() -> void:
 	arrows.clear()
 	highlights.clear()
 	queue_redraw()
-
-## If the right button has been held still on a piece long enough, ask for its
-## info card and cancel the click (so letting go doesn't also ring the square).
-## `now_ms` is passed in so tests can pretend time has passed.
-func check_right_hold(now_ms: int) -> void:
-	if _arrow_start == Board.NO_SQUARE or not _right_hold_possible:
-		return
-	if _square_at(_arrow_pointer) != _arrow_start:
-		_right_hold_possible = false
-		return
-	if now_ms - _right_time < LONG_PRESS_MS:
-		return
-	var piece := state.board.get_piece(_arrow_start)
-	_arrow_start = Board.NO_SQUARE
-	_right_hold_possible = false
-	_clear_selection()
-	queue_redraw()
-	if piece:
-		info_requested.emit(piece)
 
 ## If the pointer has been held still on a piece long enough, ask for its info
 ## card and cancel the press (so letting go doesn't also select or move).
@@ -444,7 +426,10 @@ func _gui_input(event: InputEvent) -> void:
 		if button.pressed:
 			right_down(button.position)
 		else:
-			right_up(button.position, button.shift_pressed)
+			right_up(button.position)
+		accept_event()
+	if button and button.button_index == MOUSE_BUTTON_MIDDLE and button.pressed:
+		middle_click(button.position)
 		accept_event()
 	if button and button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
@@ -533,9 +518,9 @@ func _draw() -> void:
 		draw_rect(_square_rect(last.to), LAST_MOVE_TINT)
 	if _selected != Board.NO_SQUARE:
 		draw_rect(_square_rect(_selected), SELECTED_TINT)
-	if state.is_in_check():
-		for square in _royal_squares(state.side_to_move):
-			draw_rect(_square_rect(square), CHECK_TINT)
+	# Squares marked red with a right-click, for planning (Mac).
+	for square in highlights:
+		draw_rect(_square_rect(square), MARK_TINT)
 	if _dragging:
 		var hover := _square_at(_pointer_pos)
 		if _selected_moves.any(func(m: Move) -> bool: return m.to == hover):
@@ -549,6 +534,12 @@ func _draw() -> void:
 			poses[piece] = _animation.pose(piece)
 		shaking = _animation.shake_squares()
 		extras = _animation.active_extras()
+	# The check's flash makes the king's red border flare (see _draw_check_border).
+	_check_flash = 0.0
+	for extra: Dictionary in extras:
+		if extra.kind == "red_flash":
+			var t: float = extra.t
+			_check_flash = maxf(_check_flash, absf(sin(t * TAU)) * (1.0 - 0.4 * t))
 	_draw_extras(extras, 0)
 	for rank in range(board.height):
 		for file in range(board.width):
@@ -592,8 +583,6 @@ func _draw() -> void:
 		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
 	if not hint_piece.is_empty():
 		_draw_hint_piece(hint_piece)
-	for square in highlights:
-		draw_arc(square_center(square), _square_size() * 0.45, 0.0, TAU, 48, ARROW_COLOR, _square_size() * 0.07, true)
 	for arrow: Array in arrows:
 		_draw_arrow(square_center(arrow[0]), square_center(arrow[1]))
 	# The arrow being drawn right now follows the pointer to the square under it.
@@ -759,6 +748,29 @@ static func crater_specks(texture: Texture2D) -> Texture2D:
 
 static var _specks := {}
 const CRATER_GLOW_REACH := 0.065
+
+## How strongly the king's check border is flaring now (0 = steady).
+var _check_flash := 0.0
+const CHECK_BORDER := Color(0.9, 0.08, 0.06)
+
+func _is_checked_king(piece: Piece) -> bool:
+	for square in _check_squares:
+		if state.board.get_piece(square) == piece:
+			return true
+	return false
+
+## A king in check gets a solid red border round its outline (Mac: instead of
+## a red square), flaring wider and glowing as the check flashes.
+func _draw_check_border(texture: Texture2D, rect: Rect2, alpha: float) -> void:
+	var outline := silhouette(texture)
+	var reach := rect.size.x * (0.038 + 0.025 * _check_flash)
+	if _check_flash > 0.01:
+		for i in 16:
+			var glow := Vector2.from_angle(TAU * i / 16.0) * reach * 2.2
+			draw_texture_rect(outline, Rect2(rect.position + glow, rect.size), false, Color(CHECK_BORDER, 0.25 * _check_flash * alpha))
+	for i in 16:
+		var offset := Vector2.from_angle(TAU * i / 16.0) * reach
+		draw_texture_rect(outline, Rect2(rect.position + offset, rect.size), false, Color(CHECK_BORDER, alpha))
 
 ## A white silhouette of `texture` (same shape, every pixel white).
 static func silhouette(texture: Texture2D) -> Texture2D:
@@ -986,8 +998,7 @@ func _draw_extras(extras: Array, layer: int) -> void:
 					var puff := base + Vector2(side * reach * s, -s * (0.02 + 0.03 * (i % 3)) * t)
 					draw_circle(puff, s * (0.05 + 0.07 * t), Color(0.86, 0.79, 0.66, 0.7 * (1.0 - t)))
 			"red_flash":
-				var rect := Rect2(_point(extra.at) - Vector2(s, s) / 2, Vector2(s, s))
-				draw_rect(rect, Color(1, 0.1, 0.05, 0.55 * absf(sin(t * TAU)) * (1.0 - 0.4 * t)))
+				pass  # Drawn as the king's border flaring (_check_flash).
 			"light":
 				var center := _point(extra.at) - Vector2(0, s * extra.get("lift", 0.0))
 				var r: float = s * extra.get("size", 1.0)
@@ -1152,6 +1163,8 @@ func _draw_flying_arrow(extra: Dictionary) -> void:
 ## `flash`: a colour the piece flashes (its strength is how bright it is).
 func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0), as_def: PieceDef = null, intact := false) -> void:
 	var texture := _piece_texture(piece, as_def, intact)
+	if texture and _is_checked_king(piece):
+		_draw_check_border(texture, rect, alpha)
 	if texture:
 		if has_ability_ready(piece) and as_def == null:
 			_draw_ability_glow(texture, rect, piece.def.ability_gradient(), alpha, piece.def.ability_craters)

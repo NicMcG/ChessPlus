@@ -148,7 +148,7 @@ var TIP := tip_text(DisplayServer.is_touchscreen_available())
 ## Phones: hold a piece. PC: Shift + right-click it (a plain right-click rings
 ## the square).
 static func tip_text(touchscreen: bool) -> String:
-	return "Tip: %s any piece to see how it moves." % ("hold" if touchscreen else "shift + right-click")
+	return "Tip: %s any piece to see how it moves." % ("hold" if touchscreen else "middle-click")
 
 func _ready() -> void:
 	sounds = GameSounds.new()
@@ -429,12 +429,16 @@ var line_index := -1
 var line_ply := 0
 
 ## Moves on the board make side lines while looking back, and after the game
-## from its last position. Online only once the game has ended (no help while
-## it's on).
+## from its last position. While a game is on, only against the bot and in
+## testing mode: two players (on one device, Mac, or online) only once the game
+## has ended.
 func can_branch() -> bool:
-	if online and not is_over():
+	if not is_over() and not (bot_team >= 0 or testing_position != null or side_lines_mid_game):
 		return false
 	return viewing >= 0 or is_over()
+
+## Tests: allow side lines while a two-player game is on.
+var side_lines_mid_game := false
 
 ## A move chosen on the board (or in the promotion / Raise Dead picker): played
 ## in the game, or, while looking back or after the game, in a side line.
@@ -654,6 +658,10 @@ func undo() -> void:
 	# After resigning, Undo takes the resignation back first.
 	if resigned >= 0:
 		resigned = -1
+		# Back in play: two players can't keep side lines while it's on (Mac).
+		if not can_branch():
+			side_lines.clear()
+			back_to_game()
 		_update_input()
 		_update_text()
 		_save_progress()

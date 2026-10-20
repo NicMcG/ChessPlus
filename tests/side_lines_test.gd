@@ -16,6 +16,9 @@ func _open() -> Node:
 	var game: Node = load("res://scenes/game/game.tscn").instantiate()
 	_root().add_child(game)
 	game.board_view.move_time = 0.0
+	# Most tests here look back during a two-player game, which players can only
+	# do after it ends (Mac); test_two_players_only_after_the_game checks that.
+	game.side_lines_mid_game = true
 	return game
 
 func _play_all(game: Node, moves: Array) -> void:
@@ -60,6 +63,21 @@ func test_a_move_while_looking_back_starts_a_side_line() -> void:
 	check_eq(game.status_label.text, "Side line: Black's move 2", "Status follows")
 	check_eq(game.move_list.side_line_text(0), "2. d4 exd4", "In the move list")
 	check_eq(game.move_list.lines(), PackedStringArray(["1. e4 e5", "2. Nf3 Nc6"]), "The game's moves as before")
+	game.free()
+
+func test_two_players_only_after_the_game() -> void:
+	var game := _open()
+	game.side_lines_mid_game = false
+	_play_all(game, OPENING)
+	game.view_move(2)
+	check(not game.can_branch(), "Two players, game on: no side lines (Mac)")
+	check(not game.board_view.input_enabled, "...so the board takes no moves while looking back")
+	game.back_to_game()
+	game.resign_local()
+	game.resign_local()
+	check(game.is_over(), "Game over")
+	game.view_move(2)
+	check(game.can_branch(), "...then side lines are allowed")
 	game.free()
 
 func test_the_games_own_move_steps_along_it() -> void:

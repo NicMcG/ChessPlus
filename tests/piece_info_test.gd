@@ -192,39 +192,22 @@ func test_mouse_hold_does_not_open_a_card() -> void:
 	check_eq(infos.size(), 0, "Holding the mouse button opens nothing")
 	view.free()
 
-func test_shift_right_click_opens_the_card() -> void:
+func test_middle_click_opens_the_card() -> void:
 	var view := _view(StandardSetup.create_game())
 	view.tap(Board.parse_square("g1"))
-	view.right_click(view.square_center(Board.parse_square("d8")), true)
-	check(infos.size() == 1 and infos[0].def.id == "queen", "Queen's card")
-	check(view.highlights.is_empty(), "No ring")
-	view.right_click(view.square_center(Board.parse_square("e4")), true)
+	view.middle_click(view.square_center(Board.parse_square("d8")))
+	check(infos.size() == 1 and infos[0].def.id == "queen", "Middle-clicking a piece opens its card (Mac)")
+	check(view.highlights.is_empty(), "...and marks nothing")
+	view.middle_click(view.square_center(Board.parse_square("e4")))
 	check_eq(infos.size(), 1, "Empty square: nothing")
 	view.right_click(view.square_center(Board.parse_square("d8")))
-	check_eq(infos.size(), 1, "A plain right-click opens nothing (it rings the square)")
-	view.free()
-
-func test_holding_the_right_button_opens_the_card() -> void:
-	var view := _view(StandardSetup.create_game())
-	var g1 := view.square_center(Board.parse_square("g1"))
-	view.right_down(g1)
-	view.check_right_hold(Time.get_ticks_msec() + BoardView.LONG_PRESS_MS / 2)
-	check_eq(infos.size(), 0, "Not yet")
-	view.check_right_hold(Time.get_ticks_msec() + BoardView.LONG_PRESS_MS + 10)
-	check(infos.size() == 1 and infos[0].def.id == "knight", "Knight's card")
-	view.right_up(g1)
-	check(view.highlights.is_empty(), "Letting go doesn't ring the square")
-	# Moving off the square (drawing an arrow) stops it opening.
-	view.right_down(g1)
-	view._gui_input(_motion(view.square_center(Board.parse_square("f3"))))
-	view.check_right_hold(Time.get_ticks_msec() + BoardView.LONG_PRESS_MS + 10)
-	view.right_up(view.square_center(Board.parse_square("f3")))
-	check_eq(infos.size(), 1, "No card while drawing an arrow")
-	check_eq(view.arrows.size(), 1, "The arrow is drawn")
-	# An empty square never opens one.
-	view.right_down(view.square_center(Board.parse_square("e4")))
-	view.check_right_hold(Time.get_ticks_msec() + BoardView.LONG_PRESS_MS + 10)
-	check_eq(infos.size(), 1, "Empty square: nothing")
+	check_eq(infos.size(), 1, "A right-click opens nothing (it marks the square)")
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_MIDDLE
+	press.pressed = true
+	press.position = view.square_center(Board.parse_square("e1"))
+	view._gui_input(press)
+	check(infos.size() == 2 and infos[1].def.id == "king", "The real middle button works too")
 	view.free()
 
 func _motion(pos: Vector2) -> InputEventMouseMotion:
@@ -234,7 +217,7 @@ func _motion(pos: Vector2) -> InputEventMouseMotion:
 
 func test_tip_matches_the_device() -> void:
 	check(load("res://scenes/game/game.gd").tip_text(true).contains("hold"), "Phones: hold")
-	check(load("res://scenes/game/game.gd").tip_text(false).contains("shift + right-click"), "PC: shift + right-click")
+	check(load("res://scenes/game/game.gd").tip_text(false).contains("middle-click"), "PC: middle-click")
 
 func test_move_note_in_italics() -> void:
 	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
