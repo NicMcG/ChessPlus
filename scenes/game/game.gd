@@ -8,6 +8,9 @@ extends Control
 signal menu_requested
 ## Online: both players are in the rematch; the main scene opens it.
 signal rematch_ready(session: OnlineSession)
+## Pressed "Choose armies" on the result screen of a game that ended before its
+## first move (e.g. King exposed). Only offered if something is listening.
+signal armies_requested
 
 ## If set, games start from this FEN position instead of the standard one. Any
 ## piece in res://data/pieces/ can appear in it (e.g. "E"/"e" for elephants).
@@ -809,6 +812,8 @@ func _update_text() -> void:
 		result = _resigned_result()
 	resign_button.visible = online == null
 	resign_button.disabled = is_over() or bot_thinking or viewing >= 0
+	if online == null:
+		new_game_button.disabled = replay_ends_at_once()
 	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result, viewing, TIP)
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
@@ -1041,6 +1046,11 @@ func is_over() -> bool:
 		return true
 	return online != null and online.status() in [OnlineSession.FINISHED, OnlineSession.CANCELLED]
 
+## The game ended before its first move (e.g. King exposed), so a new game from
+## the same start would end the same way at once: "Play again" would do nothing.
+func replay_ends_at_once() -> bool:
+	return state.history.is_empty() and state.outcome() != GameState.Outcome.NONE
+
 ## Show the result once, when the game ends; hide it if the game is back on
 ## (e.g. the last move was undone).
 func _update_game_over() -> void:
@@ -1075,6 +1085,10 @@ func show_game_over() -> void:
 	var buttons := []
 	if online:
 		buttons.append(["rematch", "Rematch"])
+	elif replay_ends_at_once():
+		# The same armies again would end the same way straight away.
+		if not armies_requested.get_connections().is_empty():
+			buttons.append(["armies", "Choose armies"])
 	elif is_bot_game():
 		buttons.append(["again", "Play again"])
 	else:
@@ -1200,6 +1214,8 @@ func _on_game_over_action(action: String) -> void:
 			game_over_panel.hide()
 		"menu":
 			menu_requested.emit()
+		"armies":
+			armies_requested.emit()
 		"rematch":
 			start_rematch()
 
