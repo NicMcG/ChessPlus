@@ -142,7 +142,8 @@ func test_graph_and_marks_after_the_game() -> void:
 	check_eq(game.viewing, 3, "Graph tap: looking at the position after g4")
 	check_eq(game.eval_graph.current, 3, "The graph marks where you're looking")
 	check(game.status_label.text.contains("Blunder"), "Status says so: " + game.status_label.text)
-	check(game.status_label.text.ends_with("best: d8-h4"), "Best move still shown: " + game.status_label.text)
+	# (After the game the Top moves list names the best move, not the status line.)
+	check(game.top_moves_button.get_item_text(0).begins_with("Best: d8-h4"), "Best move still shown: " + game.top_moves_button.get_item_text(0))
 	game.view_move(2)
 	check(not game.status_label.text.contains("Blunder"), "Not on other moves: " + game.status_label.text)
 	game.eval_graph.ply_chosen.emit(4)
@@ -152,6 +153,31 @@ func test_graph_and_marks_after_the_game() -> void:
 	check(not game.eval_graph.visible, "Undo hides the graph")
 	check(game.move_marks.is_empty(), "And the marks")
 	check_eq(game.move_list.mark_signs(), PackedStringArray(["", "", ""]), "Move list unmarked")
+	game.free()
+	_finish()
+
+## On a side line Plusfish's answers are the line's positions, not the game's:
+## the graph and the marks stay the game's.
+func test_side_line_keeps_the_games_graph() -> void:
+	var game := _fools_mate_game()
+	for san in FOOLS_MATE:
+		game.play(Notation.find_move(game.state, san))
+	_hand_in(game, _result(4, -20000, "", 0, "checkmate"))
+	_hand_in(game, _result(3, -19999, "d8-h4", -1))
+	_hand_in(game, _result(2, -60, "d2-d4"))
+	_hand_in(game, _result(1, -40, "e7-e5"))
+	_hand_in(game, _result(0, 20, "e2-e4"))
+	game.view_move(3)
+	game.choose(Notation.find_move(game.board_view.state, "d6"))
+	check_eq(game.line_index, 0, "On a side line after 2. g4")
+	_hand_in(game, _result(4, 500, "f1-g2"))
+	check_eq(game.move_marks, {3: MoveQuality.Mark.BLUNDER}, "Marks unchanged")
+	check_eq(game.eval_graph.chances[4], -1.0, "The graph still ends with Black's win")
+	check_eq(game.eval_graph.current, 3, "Marking where the side line leaves the game")
+	check(not game.status_label.text.contains("Blunder"), "The side line's move isn't the blunder: " + game.status_label.text)
+	game.back_to_game()
+	check_eq(game.move_marks, {3: MoveQuality.Mark.BLUNDER}, "Back on the game: still marked")
+	check_eq(game.eval_graph.chances[4], -1.0, "And the graph is the game's")
 	game.free()
 	_finish()
 

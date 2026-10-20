@@ -24,7 +24,9 @@ extends Node
 ## One position has been evaluated. `ply` = how many moves had been played.
 ## `result`: "cp" (White's point of view, in hundredths of a point), "mate"
 ## (null, or moves to mate: + White, - Black), "best" (Move.to_text()),
-## "best_san", "outcome", "depth".
+## "best_san", "outcome", "depth"; for a position asked about with
+## prioritise(ply, true) also "lines": the top moves, best first, each
+## {"move" (Move.to_text()), "san", "cp", "mate"}.
 signal evaluated(ply: int, result: Dictionary)
 
 ## Search size per position. The web version is slower, so it searches less.
@@ -32,6 +34,11 @@ signal evaluated(ply: int, result: Dictionary)
 @export var web_nodes := 20000
 ## Seconds between positions in the web version, so the game stays responsive.
 @export var web_gap := 0.1
+## How many top moves to find for a position whose "lines" are wanted (the
+## game screen's Top moves list). The search shares its nodes between them, so
+## it gets TOP_MOVES_NODES times as many (it's only the position on screen).
+@export var top_moves := 3
+const TOP_MOVES_NODES := 2
 
 ## Off turns Plusfish off everywhere. The test runner turns it off, so tests
 ## that finish games don't start the program; the eval bar tests turn it on.
@@ -57,6 +64,9 @@ var _moves_json := "[]"
 var _line_keys: Array[String] = []
 var _queue: Array[int] = []
 var _web_wait := 0.0
+## Positions on the current line (ply -> true) whose answer must list the top
+## moves, not just the best one.
+var _need_lines := {}
 
 ## The position being worked out (_task = -1: none): its task number, ply, key
 ## and search size, and whether it's still wanted (false once the job stopped).
@@ -65,6 +75,7 @@ var _task_ply := -1
 var _task_key := ""
 var _task_nodes := 0
 var _task_wanted := false
+var _task_lines := false
 
 ## Where the Plusfish program is on this computer, or "" if it isn't there.
 ## Running from the project: a fresh cargo build if there is one, otherwise the
@@ -146,6 +157,7 @@ func _set_line(start: GameState, moves: Array) -> void:
 	for move: String in moves:
 		_line_keys.append(_line_keys.back() + " " + move)
 	results.clear()
+	_need_lines.clear()
 	for ply in _line_keys.size():
 		var known: Variant = cache.get(_line_keys[ply])
 		if known != null and int(known.get("asked", _nodes())) >= _nodes():
@@ -161,13 +173,18 @@ func _on_line(ply: int, key: String) -> bool:
 func _nodes() -> int:
 	return web_nodes if OS.has_feature("web") else desktop_nodes
 
-## Look at this position next (the one on the screen).
-func prioritise(ply: int) -> void:
-	if results.has(ply) or _line_keys.is_empty() or ply > _moves_so_far.size():
+## Look at this position next (the one on the screen). With `lines`, its
+## answer must list the top moves too (an answer without them, e.g. one the
+## Plusfish bot found, is shown meanwhile and then searched again).
+func prioritise(ply: int, lines := false) -> void:
+	if lines and top_moves > 1:
+		_need_lines[ply] = true
+	if _answered(ply) or _line_keys.is_empty() or ply > _moves_so_far.size():
 		return
 	if _task >= 0 and _task_ply == ply and _on_line(_task_ply, _task_key):
 		_task_wanted = true
-		return
+		if _task_lines or not _need_lines.has(ply):
+			return
 	if not _queue.is_empty() and _queue.front() == ply:
 		return
 	_queue.erase(ply)
@@ -180,6 +197,13 @@ func stop() -> void:
 		_task_wanted = false
 		_cancel_task()
 
+## True if the position has an answer that's enough: with the top moves if
+## they're wanted.
+func _answered(ply: int) -> bool:
+	if not results.has(ply):
+		return false
+	return not _need_lines.has(ply) or results[ply].has("lines")
+
 ## True until every position asked for has a result (or the job failed).
 func is_running() -> bool:
 	return not _queue.is_empty() or (_task >= 0 and _task_wanted)
@@ -190,9 +214,10 @@ func _exit_tree() -> void:
 		_worker.shut_down()
 		_worker = null
 
-## The request for one position: the start, the moves and the search size.
-func _request_text(ply: int, nodes: int) -> String:
-	return '%s,"moves":%s,"plies":[%d],"nodes":%d}' % [_request_start, _moves_json, ply, nodes]
+## The request for one position: the start, the moves, the search size and
+## how many top moves to find.
+func _request_text(ply: int, nodes: int, multipv := 1) -> String:
+	return '%s,"moves":%s,"plies":[%d],"nodes":%d,"multipv":%d}' % [_request_start, _moves_json, ply, nodes, multipv]
 
 ## Each frame: take the answer if it has come, then start on the next position.
 func _process(delta: float) -> void:
@@ -203,7 +228,7 @@ func _process(delta: float) -> void:
 			return  # Still working.
 		_task = -1
 		_on_answer(str(out), _task_ply, _task_key, _task_nodes)
-	while not _queue.is_empty() and results.has(_queue.front()):
+	while not _queue.is_empty() and _answered(_queue.front()):
 		_queue.pop_front()
 	if _queue.is_empty() or not available():
 		return
@@ -213,9 +238,10 @@ func _process(delta: float) -> void:
 		_web_wait = web_gap
 	_task_ply = _queue.pop_front()
 	_task_key = _line_keys[_task_ply]
-	_task_nodes = _nodes()
+	_task_lines = _need_lines.has(_task_ply)
+	_task_nodes = _nodes() * (TOP_MOVES_NODES if _task_lines else 1)
 	_task_wanted = true
-	_task = _submit(_request_text(_task_ply, _task_nodes))
+	_task = _submit(_request_text(_task_ply, _task_nodes, top_moves if _task_lines else 1))
 	if _task < 0:
 		_queue.clear()
 
@@ -235,10 +261,15 @@ func _on_answer(out: String, ply: int, key: String, nodes: int) -> void:
 		if not reply.has("ply") or int(reply["ply"]) != ply:
 			continue
 		reply["asked"] = nodes
-		cache[key] = reply
+		# A kept answer listing the top moves isn't replaced by one without them
+		# (the Plusfish bot's searches, which share the store).
+		var known: Variant = cache.get(key)
+		if known == null or not known.has("lines") or reply.has("lines"):
+			cache[key] = reply
 		if _on_line(ply, key):
 			results[ply] = reply
-			_queue.erase(ply)
+			if _answered(ply):
+				_queue.erase(ply)
 			evaluated.emit(ply, reply)
 
 ## The request Plusfish expects (see res://engine/plusfish/src/api.rs).
