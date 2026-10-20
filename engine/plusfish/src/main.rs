@@ -43,7 +43,10 @@ Balancing
   start-check How well starting-position scores predict which army wins;
               see plusfish start-check --help
   meta      Grow a pool of armies that look strongest at turn 0 against each
-              other (eval bar); see plusfish meta --help
+              other (eval bar); see plusfish meta --help (--wide: search
+              wide, games decide)
+  climb-fixed Hill-climb one army with some squares pinned;
+              see plusfish climb-fixed --help
   tournament  Round robin between armies, with Elo ratings.
               --armies \"<a>;<b>;<c>\"  or a folder of saved .tres armies
               --games N per pairing (default 20)  --nodes N
