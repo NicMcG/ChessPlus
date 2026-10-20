@@ -39,6 +39,7 @@ func test_two_players_resign_on_the_second_tap() -> void:
 	check(not game.is_over(), "Undo takes the resignation back")
 	check_eq(game.state.history.size(), 1, "...without undoing a move")
 	check(game.board_view.input_enabled, "Play on")
+	check(game.side_lines.is_empty() and game.viewing < 0, "...back in the game, its side line gone (two players: only after the game)")
 	check(SavedGame.load_saved() != null, "Saved again")
 	game.free()
 	SavedGame.delete_saved()
