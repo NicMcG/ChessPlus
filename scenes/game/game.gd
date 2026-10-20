@@ -166,10 +166,11 @@ func _ready() -> void:
 	_build_capture_rows()
 	_build_eval_bar()
 	_build_hint_toggles()
+	_build_top_moves()
 	_build_wide_layout()
 	resized.connect(fit_layout)
 	fit_layout()
-	board_view.move_chosen.connect(play)
+	board_view.move_chosen.connect(choose)
 	board_view.choice_needed.connect(_ask_which_move)
 	board_view.info_requested.connect(func(piece: Piece) -> void:
 		PieceInfo.open(self, piece.def, piece.team))
@@ -189,6 +190,8 @@ func _ready() -> void:
 	board_view.selection_changed.connect(_on_selection_changed)
 	board_view.sound_cue.connect(func(sound: int) -> void: sounds.play(sound))
 	move_list.move_tapped.connect(view_move)
+	move_list.line_tapped.connect(view_side_line)
+	move_list.line_removed.connect(remove_side_line)
 	menu_button.pressed.connect(func() -> void: menu_requested.emit())
 	menu_button.visible = not menu_requested.get_connections().is_empty()
 	if testing_position:
@@ -292,61 +295,235 @@ func view_move(moves_played: int) -> void:
 	if moves_played < 0 or moves_played >= state.history.size():
 		back_to_game()
 		return
-	# Replay the moves on a fresh copy of the starting position.
-	var copy := _create_start_state()
-	for i in moves_played:
-		var move := copy.find_move(state.history[i].to_text())
-		if move == null:
-			back_to_game()
-			return
-		copy.make_move(move)
+	var copy := _replay(moves_played, [])
+	if copy == null:
+		back_to_game()
+		return
 	viewing = moves_played
+	line_index = -1
+	line_ply = 0
 	_view_state = copy
 	board_view.show_game(copy)
 	_update_input()
 	_update_text()
+
+## A fresh copy of the game's start with its first `main_moves` moves played,
+## then `extra` (Move.to_text(), a side line's); null if one isn't legal.
+func _replay(main_moves: int, extra: Array) -> GameState:
+	var copy := _create_start_state()
+	var texts: Array = []
+	for i in main_moves:
+		texts.append(state.history[i].to_text())
+	texts.append_array(extra)
+	for text: String in texts:
+		var move := copy.find_move(text)
+		if move == null:
+			return null
+		copy.make_move(move)
+	return copy
 
 ## Stop looking back and show the game as it is now.
 func back_to_game() -> void:
 	if viewing < 0:
 		return
 	viewing = -1
+	line_index = -1
+	line_ply = 0
 	_view_state = null
 	board_view.show_game(state)
 	_update_input()
 	_update_text()
 
-## While looking back: show the position one move earlier (down to the start).
+## While looking back: show the position one move earlier (down to the start;
+## in a side line, back to where it left the game).
 func step_back() -> void:
-	if viewing > 0:
+	if line_index >= 0:
+		view_side_line(line_index, line_ply - 1)
+	elif viewing > 0:
 		view_move(viewing - 1)
 
-## While looking back: show the position one move later; past the second-to-last
-## move that's the game as it is now.
+## While looking back: show the position one move later (in a side line, up to
+## its last move); past the second-to-last move that's the game as it is now.
 func step_forward() -> void:
-	if viewing >= 0:
+	if line_index >= 0:
+		if line_ply < side_lines[line_index]["moves"].size():
+			view_side_line(line_index, line_ply + 1)
+	elif viewing >= 0:
 		view_move(viewing + 1)
 
 ## Against the bot: take the game back to the position being looked at, and
-## carry on from there.
+## carry on from there (from a side line: with its moves as the game's).
 func play_from_here() -> void:
 	if viewing < 0 or bot_thinking:
 		return
 	var target := viewing
+	var extra: Array = side_lines[line_index]["moves"].slice(0, line_ply) if line_index >= 0 else []
+	var adopted := line_index
 	back_to_game()
 	while state.history.size() > target:
 		state.undo_move(state.history.back())
+	for text: String in extra:
+		var move := state.find_move(text)
+		if move == null:
+			break
+		state.make_move(move)
+	if adopted >= 0:
+		side_lines.remove_at(adopted)
+		redo_moves.clear()
+	_drop_side_lines_after(target)
 	board_view.refresh()
 	sounds.play(GameSounds.Sound.MOVE)
 	_update_text()
 	_save_progress()
 	_start_bot_turn_if_needed()
 
-## The board takes moves only when showing the game now, it's not the bot's turn,
-## and (online) it's this player's turn.
+## The board takes moves for the game only when showing the game now, it's not
+## the bot's turn, and (online) it's this player's turn; while looking back (and
+## after the game), moves on the board go into a side line (can_branch()).
 func _update_input() -> void:
-	board_view.input_enabled = viewing < 0 and not bot_thinking and _my_online_turn() and resigned < 0
+	var playing := viewing < 0 and not is_over() and not bot_thinking and _my_online_turn()
+	board_view.input_enabled = playing or can_branch()
 	_refresh_ability_button()
+
+# --- Side lines: trying other moves from a position looked back at ------------------
+
+## Moves tried from an earlier position (or from the end of a finished game),
+## kept beside the game without changing it, so other paths can be tried
+## (Nicholas's fork, Oct 2026). Each: {"from": the game's moves before it,
+## "moves": its moves (Move.to_text()), "entries": the same for the move list
+## (Notation.numbered_moves)}. Not saved with the game.
+var side_lines: Array = []
+## The side line on the board (its index), or -1 for the game itself; and how
+## many of its moves have been played in the position shown (1 or more).
+## While in a side line, `viewing` is where it leaves the game.
+var line_index := -1
+var line_ply := 0
+
+## Moves on the board make side lines while looking back, and after the game
+## from its last position. Online only once the game has ended (no help while
+## it's on).
+func can_branch() -> bool:
+	if online and not is_over():
+		return false
+	return viewing >= 0 or is_over()
+
+## A move chosen on the board (or in the promotion / Raise Dead picker): played
+## in the game, or, while looking back or after the game, in a side line.
+func choose(move: Move) -> void:
+	if viewing >= 0 or is_over():
+		play_side_move(move)
+	else:
+		play(move)
+
+## Play a move in the position on the board without changing the game: the
+## game's own next move just steps forward along it, a side line's next move
+## steps along that line; any other move starts a new side line (or carries on
+## the one shown, from its last move).
+func play_side_move(move: Move) -> void:
+	if not can_branch():
+		return
+	var text := move.to_text()
+	var shown := board_view.state
+	if shown == state:
+		# After the game, from its last position: on a copy.
+		shown = _replay(state.history.size(), [])
+		move = shown.find_move(text) if shown else null
+		if move == null:
+			return
+	var from := viewing if viewing >= 0 else state.history.size()
+	if line_index < 0 and from < state.history.size() and state.history[from].to_text() == text:
+		_step_along_game(shown, move, from + 1)
+		return
+	var path: Array = side_lines[line_index]["moves"].slice(0, line_ply) if line_index >= 0 else []
+	path.append(text)
+	var index := _side_line_with(from, path)
+	shown.make_move(move)
+	if index < 0:
+		if line_index >= 0 and line_ply == side_lines[line_index]["moves"].size():
+			index = line_index
+		else:
+			side_lines.append({"from": from})
+			index = side_lines.size() - 1
+		side_lines[index]["moves"] = path
+		side_lines[index]["entries"] = Notation.numbered_moves(shown, from)
+	viewing = from
+	line_index = index
+	line_ply = path.size()
+	_view_state = shown
+	board_view.state = shown
+	board_view.show_move(move)
+	_update_input()
+	_update_text()
+
+## The game's own next move was played while looking back: show the position
+## after it (with the move's animation), or the game now if that's where it is.
+func _step_along_game(shown: GameState, move: Move, moves_played: int) -> void:
+	line_index = -1
+	line_ply = 0
+	if moves_played >= state.history.size():
+		viewing = -1
+		_view_state = null
+		board_view.state = state
+		board_view.show_move(state.history.back())
+	else:
+		shown.make_move(move)
+		viewing = moves_played
+		_view_state = shown
+		board_view.state = shown
+		board_view.show_move(move)
+	_update_input()
+	_update_text()
+
+## The side line leaving the game after `from` moves whose moves start with
+## `path`, or -1.
+func _side_line_with(from: int, path: Array) -> int:
+	for index in side_lines.size():
+		var line: Dictionary = side_lines[index]
+		if line["from"] == from and line["moves"].size() >= path.size() and line["moves"].slice(0, path.size()) == path:
+			return index
+	return -1
+
+## Show the position after the first `moves_played` moves of side line `index`
+## (0 = where it leaves the game).
+func view_side_line(index: int, moves_played: int) -> void:
+	if index < 0 or index >= side_lines.size():
+		return
+	var line: Dictionary = side_lines[index]
+	moves_played = clampi(moves_played, 0, line["moves"].size())
+	if moves_played == 0:
+		view_move(line["from"])
+		return
+	var copy := _replay(line["from"], line["moves"].slice(0, moves_played))
+	if copy == null:
+		return
+	viewing = line["from"]
+	line_index = index
+	line_ply = moves_played
+	_view_state = copy
+	board_view.show_game(copy)
+	_update_input()
+	_update_text()
+
+## Remove a side line (its x in the move list). If it was on the board, the
+## board goes back to where it left the game.
+func remove_side_line(index: int) -> void:
+	if index < 0 or index >= side_lines.size():
+		return
+	var from: int = side_lines[index]["from"]
+	var was_shown := line_index == index
+	side_lines.remove_at(index)
+	if was_shown:
+		line_index = -1
+		view_move(from)
+		return
+	if line_index > index:
+		line_index -= 1
+	_update_text()
+
+## Forget side lines that leave the game after more than `moves` moves (the
+## game was taken back past them).
+func _drop_side_lines_after(moves: int) -> void:
+	side_lines = side_lines.filter(func(line: Dictionary) -> bool: return line["from"] <= moves)
 
 ## The side-by-side layout for wide screens, unused (hidden) until needed.
 func _build_wide_layout() -> void:
@@ -411,9 +588,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_column], _wide_box)
 		_wide_box.move_child(_board_column, 0)
-		ScreenShape.move_to([status_label, clock_label, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _side)
+		ScreenShape.move_to([status_label, clock_label, _top_row, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _board_column, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _top_row, _board_column, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -462,6 +639,7 @@ func undo() -> void:
 	# Remember them for Redo: the move to play next goes last.
 	for move in undone:
 		redo_moves.append(move)
+	_drop_side_lines_after(state.history.size())
 	board_view.show_undo(undone)
 	_update_text()
 	_save_progress()
@@ -532,6 +710,9 @@ func _show_new_state() -> void:
 	bot_thinking = false
 	viewing = -1
 	_view_state = null
+	side_lines.clear()
+	line_index = -1
+	line_ply = 0
 	redo_moves.clear()
 	eval_bar.reset()
 	board_view.show_game(state)
@@ -681,12 +862,12 @@ func _ask_which_move(moves: Array[Move]) -> void:
 			if button.icon == null:
 				button.text = move.raised.def.display_name
 		if button.icon == null and button.text == "":
-			button.text = Notation.san(state, move)
+			button.text = Notation.san(board_view.state, move)
 		button.expand_icon = true
 		button.custom_minimum_size = Vector2(120, 120)
 		button.pressed.connect(func() -> void:
 			promotion_overlay.hide()
-			play(move))
+			choose(move))
 		promotion_choices.add_child(button)
 	promotion_overlay.show()
 
@@ -704,7 +885,8 @@ func _refresh_ability_button() -> void:
 	if not board_view.aiming and sounds.is_looping():
 		sounds.stop_loop()
 	var square := board_view.selected_square()
-	var piece: Piece = state.board.get_piece(square) if state and square != Board.NO_SQUARE else null
+	var shown := board_view.state
+	var piece: Piece = shown.board.get_piece(square) if shown and square != Board.NO_SQUARE else null
 	# The captured Ghost glows in the row of captures while its square is chosen.
 	var choosing_haunt := piece == null and board_view.aiming
 	for row: CapturedRow in [captured_top, captured_bottom]:
@@ -740,11 +922,14 @@ func _refresh_ability_button() -> void:
 ## player can move now; empty otherwise.
 func _haunt_moves() -> Array[Move]:
 	var found: Array[Move] = []
-	if state == null or not board_view.input_enabled or is_over():
+	var shown := board_view.state
+	if shown == null or not board_view.input_enabled or shown.outcome() != GameState.Outcome.NONE:
 		return found
-	if MoveGenerator.haunting_ghosts(state, state.side_to_move).is_empty():
+	if shown == state and is_over():
 		return found
-	found.assign(state.moves().filter(func(m: Move) -> bool: return m.ability == PieceDef.Ability.HAUNT))
+	if MoveGenerator.haunting_ghosts(shown, shown.side_to_move).is_empty():
+		return found
+	found.assign(shown.moves().filter(func(m: Move) -> bool: return m.ability == PieceDef.Ability.HAUNT))
 	return found
 
 ## The ability button gets the piece's gradient (lighter under the mouse,
@@ -783,7 +968,7 @@ func use_ability() -> void:
 		return
 	var moves := board_view.selected_ability_moves()
 	if moves.is_empty():
-		var piece: Piece = state.board.get_piece(board_view.selected_square())
+		var piece: Piece = board_view.state.board.get_piece(board_view.selected_square())
 		if piece and piece.ability_used:
 			show_notice("%s has already been used." % piece.def.ability_name)
 		elif piece and piece.def.ability == PieceDef.Ability.HAUNT:
@@ -795,7 +980,7 @@ func use_ability() -> void:
 	if piece.def.ability == PieceDef.Ability.RAISE_DEAD:
 		_ask_which_move(moves)
 	elif piece.def.ability == PieceDef.Ability.FULL_MOON:
-		play(moves[0])
+		choose(moves[0])
 	else:
 		board_view.aim_ability()
 		# A magical whirr while the target is chosen (Mac).
@@ -883,7 +1068,9 @@ func _update_text() -> void:
 	if resigned >= 0 and state.outcome() == GameState.Outcome.NONE:
 		var texts := result_texts()
 		status_label.text = "%s - %s" % [texts[0], texts[1]]
-	if viewing > 0:
+	if line_index >= 0:
+		status_label.text = "Side line: %s" % _move_name_in(_view_state.history, shown_ply() - 1)
+	elif viewing > 0:
 		status_label.text = "Viewing %s" % _move_name(viewing - 1)
 	elif viewing == 0:
 		status_label.text = "Viewing the start"
@@ -897,16 +1084,18 @@ func _update_text() -> void:
 	resign_button.disabled = is_over() or bot_thinking or viewing >= 0
 	if online == null:
 		new_game_button.disabled = replay_ends_at_once()
-	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result, viewing, TIP)
+	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result,
+			viewing if line_index < 0 else -1, TIP, side_lines, line_index, line_ply)
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
 		_scroll_moves_to_end.call_deferred()
-	elif viewing > 0:
+	else:
 		_scroll_to_viewed_move.call_deferred()
 	undo_button.disabled = not _can_undo()
 	redo_button.disabled = not _can_redo()
 	view_nav.visible = viewing >= 0
-	step_back_button.disabled = viewing <= 0
+	step_back_button.disabled = viewing <= 0 and line_index < 0
+	step_forward_button.disabled = line_index >= 0 and line_ply >= side_lines[line_index]["moves"].size()
 	play_from_here_button.visible = is_bot_game() and viewing >= 0
 	play_from_here_button.disabled = bot_thinking
 	if online:
@@ -946,17 +1135,23 @@ func _plusfish_knows_pieces() -> bool:
 		_plusfish_ok = PlusfishLink.supports(_create_start_state())
 	return _plusfish_ok
 
-func _start_analysis() -> void:
-	if not PlusfishLink.available() or not _plusfish_knows_pieces():
-		return
-	var moves := []
-	for move in state.history:
-		moves.append(move.to_text())
-	plusfish.analyse(_create_start_state(), moves)
-
-## The position on the board, as the number of moves played to reach it.
+## The position on the board, as the number of moves played to reach it (in a
+## side line: the game's moves before it, then its own).
 func shown_ply() -> int:
+	if line_index >= 0:
+		return viewing + line_ply
 	return viewing if viewing >= 0 else state.history.size()
+
+## The moves (Move.to_text()) of the line the board is on: the game, or the
+## side line being looked at (all of it, from the start).
+func shown_line_moves() -> Array:
+	var moves := []
+	var count: int = state.history.size() if line_index < 0 else side_lines[line_index]["from"]
+	for i in count:
+		moves.append(state.history[i].to_text())
+	if line_index >= 0:
+		moves.append_array(side_lines[line_index]["moves"])
+	return moves
 
 ## Whether the eval bar shows while the game is on (Mac's design): always
 ## against the bot; chosen when setting up a game on one device or an online one
@@ -976,17 +1171,23 @@ func live_eval() -> bool:
 		return true
 	return online != null and bool(online.row.get("eval_bar", false))
 
-## While the game is on, ask Plusfish about the newest position (once per move).
-var _live_moves := -1
+## The line Plusfish was last given (see _follow_line), so it's given once.
+var _plusfish_line := ""
 
-func _start_live_analysis() -> void:
-	if _live_moves == state.history.size():
+## Give Plusfish the line on the board: once the game is over, the whole game,
+## every position (the one on screen first); while it's on, or in a side line,
+## its newest position (and any position looked at, see _update_eval_bar).
+func _follow_line() -> void:
+	var moves := shown_line_moves()
+	var whole := is_over() and line_index < 0
+	var key := ("game " if whole else "live ") + " ".join(PackedStringArray(moves))
+	if key == _plusfish_line:
 		return
-	_live_moves = state.history.size()
-	var moves := []
-	for move in state.history:
-		moves.append(move.to_text())
-	plusfish.analyse_live(_create_start_state(), moves)
+	_plusfish_line = key
+	if whole:
+		plusfish.analyse(_create_start_state(), moves)
+	else:
+		plusfish.analyse_live(_create_start_state(), moves)
 
 ## The engine's best move is on for this game against the bot (the "Best move"
 ## switch under the board).
@@ -1014,18 +1215,25 @@ func _update_eval_bar() -> void:
 	var bar_on := usable and (is_over() or live_eval())
 	var hints_on := usable and (is_over() or live_best_move())
 	_update_hint_toggles(usable)
-	if (bar_on or hints_on) and not is_over():
-		_start_live_analysis()
+	_top_row.visible = usable and top_moves_shown()
+	if bar_on or hints_on:
+		_follow_line()
 	eval_bar.visible = bar_on
 	_board_area.ratio = 1.0 + EVAL_BAR_SHARE + 0.01 if bar_on else 1.0
 	status_label.text = _status_base
 	if not (bar_on or hints_on):
 		_show_hint("")
+		_fill_top_moves({}, false)
 		return
 	eval_bar.flipped = board_view.flipped
 	var ply := shown_ply()
-	plusfish.prioritise(ply)
+	plusfish.prioritise(ply, hints_on and _top_row.visible)
 	var found: Dictionary = plusfish.results.get(ply, {})
+	var position_key := "%d %d %d" % [line_index, viewing, ply]
+	if position_key != _top_moves_for:
+		_top_moves_for = position_key
+		_top_choice = 0
+	_fill_top_moves(found, hints_on)
 	if found.is_empty():
 		eval_bar.set_unknown()
 		_show_hint("")
@@ -1042,8 +1250,12 @@ func _update_eval_bar() -> void:
 		result = "1/2-1/2"
 	eval_bar.set_score(int(found["cp"]), found.get("mate"), result)
 	var best: String = found.get("best", "") if hints_on else ""
+	var lines: Array = found.get("lines", [])
+	if best != "" and _top_choice < lines.size():
+		best = lines[_top_choice]["move"]
 	_show_hint(best)
-	if best != "" and result == "":
+	# With the Top moves list showing, it names the move instead.
+	if best != "" and result == "" and not _top_row.visible:
 		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
 
 ## Show Plusfish's suggestion on the board ("" = none): the arrow, and for a
@@ -1087,6 +1299,82 @@ func _arrow_for(move_text: String) -> Array:
 func _on_evaluated(ply: int, _result: Dictionary) -> void:
 	if (is_over() or live_eval() or live_best_move()) and ply == shown_ply():
 		_update_eval_bar()
+
+## The Top moves list (Nicholas's fork, Oct 2026): a dropdown under the status
+## line naming Plusfish's best moves for the position on the board with their
+## scores ("Best: Nf3 (+0.4)", "2nd: ...", "3rd: ..."); choosing one shows its
+## arrow. Shown wherever the best move may be shown: after the game, in testing
+## mode, and against the bot with Best move on (greyed out on the bot's turn).
+var top_moves_button: OptionButton
+var _top_row: HBoxContainer
+## The chosen line (0 = the best), and the position it was chosen for.
+var _top_choice := 0
+var _top_moves_for := ""
+const TOP_MOVE_NAMES := ["Best", "2nd", "3rd", "4th", "5th"]
+
+func _build_top_moves() -> void:
+	_top_row = HBoxContainer.new()
+	_top_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_top_row.hide()
+	top_moves_button = OptionButton.new()
+	top_moves_button.focus_mode = Control.FOCUS_NONE
+	top_moves_button.fit_to_longest_item = false
+	top_moves_button.custom_minimum_size.x = 320
+	top_moves_button.add_theme_font_size_override("font_size", 26)
+	top_moves_button.get_popup().add_theme_font_size_override("font_size", 28)
+	top_moves_button.item_selected.connect(choose_top_move)
+	_top_row.add_child(top_moves_button)
+	_layout.add_child(_top_row)
+	_layout.move_child(_top_row, clock_label.get_index() + 1)
+
+## Whether the Top moves list has a place on the screen in this game (it stays
+## while the game is on, so the board doesn't jump as it comes and goes).
+func top_moves_shown() -> bool:
+	if is_over() or testing_position != null:
+		return true
+	return is_bot_game() and online == null and best_move_on
+
+## Show the line chosen in the Top moves list (0 = the best move).
+func choose_top_move(index: int) -> void:
+	_top_choice = index
+	_update_eval_bar()
+
+## Fill the Top moves list from Plusfish's answer for the position on the board
+## (`usable` = the best move may be shown now). Only rebuilt when it changes,
+## so an open list isn't closed by an update.
+func _fill_top_moves(found: Dictionary, usable: bool) -> void:
+	var items: Array[String] = []
+	var lines: Array = found.get("lines", []) if usable else []
+	for i in mini(lines.size(), TOP_MOVE_NAMES.size()):
+		items.append("%s: %s  (%s)" % [TOP_MOVE_NAMES[i], lines[i]["san"], score_text(int(lines[i]["cp"]), lines[i].get("mate"))])
+	var enabled := not items.is_empty()
+	if items.is_empty():
+		var best: String = found.get("best_san", "") if usable else ""
+		if best != "":
+			items.append("Best: %s  (%s)" % [best, score_text(int(found["cp"]), found.get("mate"))])
+		elif usable and found.is_empty():
+			items.append("Top moves: thinking...")
+		else:
+			items.append("Top moves")
+	var choice := clampi(_top_choice, 0, items.size() - 1)
+	var signature := "%s|%d|%s" % [enabled, choice, "|".join(PackedStringArray(items))]
+	if top_moves_button.get_meta("signature", "") == signature:
+		return
+	top_moves_button.set_meta("signature", signature)
+	top_moves_button.clear()
+	for item in items:
+		top_moves_button.add_item(item)
+	top_moves_button.select(choice)
+	top_moves_button.disabled = not enabled
+
+## A score as the eval bar writes it, with the side: "+0.4", "-1.2", "0.0",
+## "M3" (White mates in 3), "-M2" (Black mates in 2).
+static func score_text(cp: int, mate: Variant) -> String:
+	if mate != null:
+		return ("M%d" if int(mate) > 0 else "-M%d") % absi(int(mate))
+	if absi(cp) < 5:
+		return "0.0"
+	return "%+.1f" % (cp / 100.0)
 
 ## The "Eval bar" and "Best move" switches under the board (beside the moves on
 ## wide screens): against the bot, while the game is on. Each takes effect at
@@ -1147,11 +1435,9 @@ func _update_game_over() -> void:
 	elif not over:
 		game_over_panel.hide()
 		_stop_checkmate_effect()
-	if over and not _was_over:
-		_start_analysis()
-	elif not over and _was_over:
+	if not over and _was_over:
 		plusfish.stop()
-		_live_moves = -1
+		_plusfish_line = ""
 	_was_over = over
 
 ## The result screen, once the last move's animation has finished (a draw
@@ -1620,11 +1906,16 @@ func _scroll_moves_to_end() -> void:
 
 ## Keep the move being looked at in sight while stepping through the moves.
 func _scroll_to_viewed_move() -> void:
-	if not is_inside_tree() or viewing <= 0 or viewing > move_list.buttons.size():
+	var button := move_list.viewed_button
+	if not is_inside_tree() or not is_instance_valid(button):
 		return
+	# A side line's box is laid out a frame later than the main list.
+	if not move_list.buttons.has(button):
+		await get_tree().process_frame
+		if not is_instance_valid(button) or button != move_list.viewed_button:
+			return
 	# Where the move sits in the list (not ensure_control_visible: it goes by
 	# where things are on screen, which lags behind until the next frame).
-	var button: Button = move_list.buttons[viewing - 1]
 	var top := button.global_position.y - move_list.global_position.y
 	var bottom := top + button.size.y
 	if top < _moves_scroll.scroll_vertical:
@@ -1634,11 +1925,15 @@ func _scroll_to_viewed_move() -> void:
 
 ## Which move `index` (0 = the first) was, e.g. "White's move 12".
 func _move_name(index: int) -> String:
-	var move: Move = state.history[index]
+	return _move_name_in(state.history, index)
+
+## The same for move `index` of `moves` (a side line's copy of the game).
+static func _move_name_in(moves: Array[Move], index: int) -> String:
+	var move: Move = moves[index]
 	var side := "White" if move.piece.team == Piece.Team.WHITE else "Black"
 	# Count White's and Black's moves up to this one.
 	var number := 0
 	for i in range(index + 1):
-		if state.history[i].piece.team == move.piece.team:
+		if moves[i].piece.team == move.piece.team:
 			number += 1
 	return "%s's move %d" % [side, number]

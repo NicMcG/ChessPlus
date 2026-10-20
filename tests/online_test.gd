@@ -231,6 +231,33 @@ func test_online_game_between_two_screens() -> void:
 	host_screen.free()
 	guest_screen.free()
 
+func test_no_side_lines_while_the_game_is_on() -> void:
+	var pair: Array = await _started_game()
+	var host_screen := _game_screen(pair[0])
+	var guest_screen := _game_screen(pair[1])
+	host_screen.board_view.move_time = 0.0
+	host_screen.play(Notation.find_move(host_screen.state, "e4"))
+	await get_tree_frames(2)
+	await guest_screen.online.poll()
+	guest_screen.play(Notation.find_move(guest_screen.state, "e5"))
+	await get_tree_frames(2)
+	await host_screen.online.poll()
+	host_screen.view_move(1)
+	check(not host_screen.can_branch(), "No trying moves while the online game is on")
+	check(not host_screen.board_view.input_enabled, "The board takes no moves while looking back")
+	host_screen.choose(Notation.find_move(host_screen.board_view.state, "c5"))
+	check(host_screen.side_lines.is_empty(), "No side line")
+	host_screen.back_to_game()
+	host_screen.resign()
+	await host_screen.resign()
+	host_screen.view_move(1)
+	check(host_screen.can_branch(), "Once it's over, side lines can be tried")
+	host_screen.choose(Notation.find_move(host_screen.board_view.state, "c5"))
+	check_eq(host_screen.side_lines.size(), 1, "A side line")
+	check_eq(host_screen.state.history.size(), 2, "The game unchanged")
+	host_screen.free()
+	guest_screen.free()
+
 func test_your_move_notification() -> void:
 	var pair: Array = await _started_game()
 	var host_screen := _game_screen(pair[0])
