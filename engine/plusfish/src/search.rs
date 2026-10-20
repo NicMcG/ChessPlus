@@ -118,23 +118,19 @@ impl TT {
 }
 
 /// Static evaluation correction history: for positions sharing a key (the
-/// material on the board; the pawn-type pieces; each side's other pieces),
-/// how far search results have landed from the static evaluation. The
-/// corrected evaluation drives the pruning; the hash table keeps the raw one.
+/// material on the board; the pawn-type pieces; each side's other pieces;
+/// the move that led here), how far search results have landed from the
+/// static evaluation. The corrected evaluation drives the pruning and
+/// quiescence's stand-pat; the hash table keeps the raw one.
 const CORR_SIZE: usize = 16384;
 const _: () = assert!(CORR_SIZE >= MAX_SQ * MAX_SQ);
 const CORR_TABLES: usize = 5;
 /// Entries are hundredths of a point times CORR_GRAIN, at most +-CORR_MAX.
 const CORR_GRAIN: i32 = 256;
 const CORR_MAX: i32 = 64 * CORR_GRAIN;
-/// How much each table counts (64 = all of it): material, pawns, pieces.
-const CORR_WEIGHTS: [i32; CORR_TABLES] = [32, 16, 16, 16, 0];
-/// Correct quiescence's stand-pat score too.
-const CORR_QS: bool = true;
-/// Update rule: false = each entry moves towards (search - raw eval);
-/// true = Stockfish's: a bonus of (search - corrected eval) * depth / 8 with
-/// "gravity" (entries shrink as they near CORR_MAX).
-const CORR_GRAVITY: bool = false;
+/// How much each table counts (64 = all of it): material, pawns, White's
+/// pieces, Black's pieces, last move.
+const CORR_WEIGHTS: [i32; CORR_TABLES] = [32, 32, 32, 32, 32];
 
 const B_EXACT: u8 = 1;
 const B_LOWER: u8 = 2;
@@ -344,20 +340,15 @@ impl<'a> Searcher<'a> {
         (raw + sum / (64 * CORR_GRAIN)).clamp(-MATE_BOUND + 1, MATE_BOUND - 1)
     }
 
-    /// Moves each entry towards `diff` (search result - raw evaluation), more
-    /// for deeper searches.
+    /// `diff` = search result - corrected evaluation: each entry gains
+    /// diff * depth / 8 (bounded), shrinking as it nears CORR_MAX ("gravity",
+    /// as Stockfish does it).
     fn update_corr(&mut self, slots: &[usize; CORR_TABLES], diff: i32, depth: i32) {
-        let w = (depth + 1).min(16);
-        let target = (diff * CORR_GRAIN).clamp(-CORR_MAX, CORR_MAX);
         let bonus = (diff * CORR_GRAIN * depth / 8).clamp(-CORR_MAX / 4, CORR_MAX / 4);
         for t in 0..CORR_TABLES {
             if CORR_WEIGHTS[t] != 0 && slots[t] != usize::MAX {
                 let e = &mut self.corr[slots[t]];
-                let v = if CORR_GRAVITY {
-                    *e as i32 + bonus - *e as i32 * bonus.abs() / CORR_MAX
-                } else {
-                    (*e as i32 * (256 - w) + target * w) / 256
-                };
+                let v = *e as i32 + bonus - *e as i32 * bonus.abs() / CORR_MAX;
                 *e = v.clamp(-CORR_MAX, CORR_MAX) as i16;
             }
         }
@@ -958,7 +949,7 @@ impl<'a> Searcher<'a> {
             && !(bound == B_LOWER && best <= static_eval)
             && !(bound == B_UPPER && best >= static_eval)
         {
-            self.update_corr(&corr_slots, best - if CORR_GRAVITY { static_eval } else { raw_eval }, depth);
+            self.update_corr(&corr_slots, best - static_eval, depth);
         }
         let (slot, e) = self.tt.probe(p.tt_key(), self.age);
         if e.key != p.tt_key() || depth as i8 >= e.depth - 2 || e.age != self.age || bound == B_EXACT {
@@ -1015,13 +1006,7 @@ impl<'a> Searcher<'a> {
         let orig_alpha = alpha;
         let in_check = qply < Q_CHECK_PLIES && p.in_check(r, p.side);
         let raw_eval = if in_check { -INF } else if hit { e.eval as i32 } else { self.eval(p) };
-        let stand = if in_check {
-            -MATE + ply as i32
-        } else if CORR_QS {
-            self.corrected(raw_eval, &self.corr_slots(p, Move::NONE))
-        } else {
-            raw_eval
-        };
+        let stand = if in_check { -MATE + ply as i32 } else { self.corrected(raw_eval, &self.corr_slots(p, Move::NONE)) };
         if !in_check {
             if stand >= beta {
                 return stand;
