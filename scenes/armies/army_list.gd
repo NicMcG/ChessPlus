@@ -55,7 +55,8 @@ func refresh() -> void:
 	if import_button:
 		import_button.disabled = new_button.disabled
 
-## The Import army pop-up: type a friend's army code.
+## The Import army pop-up: type a friend's army code, or paste the army text
+## they copied (ArmyShare.to_text).
 func ask_import() -> void:
 	import_panel = ModalPanel.new("Import army")
 	import_panel.add_text("Type the code your friend got from Share:")
@@ -67,14 +68,23 @@ func ask_import() -> void:
 	code_edit.custom_minimum_size.y = 80
 	code_edit.add_theme_font_size_override("font_size", 40)
 	import_panel.column.add_child(code_edit)
+	var go := import_panel.add_button("Import", func() -> void: pass)
+	go.pressed.connect(func() -> void: import_code(code_edit.text))
+	import_panel.add_text("Or paste the army text your friend copied:")
+	var text_edit := LineEdit.new()
+	text_edit.name = "TextEdit"
+	text_edit.placeholder_text = ArmyShare.TEXT_START + " ..."
+	text_edit.custom_minimum_size.y = 80
+	import_panel.column.add_child(text_edit)
+	var go_text := import_panel.add_button("Import text", func() -> void: pass)
+	go_text.pressed.connect(func() -> void: import_text(text_edit.text))
 	var message := import_panel.add_text("")
 	message.name = "Message"
 	message.add_theme_color_override("font_color", Color("#ff8a80"))
-	var go := import_panel.add_button("Import", func() -> void: pass)
-	go.pressed.connect(func() -> void: import_code(code_edit.text))
 	import_panel.add_button("Cancel", import_panel.close)
 	add_child(import_panel)
 	PhoneTextInput.attach(code_edit, "Army code")
+	PhoneTextInput.attach(text_edit, "Army text")
 	code_edit.text_changed.connect(func(text: String) -> void:
 		var caret := code_edit.caret_column
 		code_edit.text = text.to_upper()
@@ -88,9 +98,18 @@ func import_code(code: String) -> void:
 		message.text = "Importing..."
 	var server := backend if backend else _real_server()
 	var error: String = await ArmyShare.import_army(server, library, code)
+	_import_done(error)
+
+## Read pasted army text and add the army to the saved armies.
+func import_text(text: String) -> void:
+	_import_done(ArmyShare.import_text(library, text))
+
+## Close the pop-up after an import, or show what went wrong.
+func _import_done(error: String) -> void:
 	if not is_instance_valid(import_panel):
 		return
 	if error != "":
+		var message: Label = import_panel.find_child("Message", true, false)
 		message.add_theme_color_override("font_color", Color("#ff8a80"))
 		message.text = error
 		return
