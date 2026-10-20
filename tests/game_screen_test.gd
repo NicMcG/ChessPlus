@@ -178,6 +178,57 @@ func test_looking_back_leaves_the_game_alone() -> void:
 	check(game.board_view.input_enabled, "Moving allowed again")
 	game.free()
 
+func test_back_and_forward_while_looking_back() -> void:
+	var game := _open()
+	for san in ["e4", "e5", "Nf3"]:
+		_play(game, san)
+	check(not game.view_nav.visible, "No Back / Forward while showing the game now")
+	game.view_move(2)
+	check(game.view_nav.visible, "Back / Forward shown while looking back")
+	game.step_back_button.pressed.emit()
+	check_eq(game.viewing, 1, "Back: one move earlier")
+	check(game.status_label.text == "Viewing White's move 1", "Status follows")
+	game.step_back()
+	check_eq(game.viewing, 0, "Back again: the start")
+	check(game.status_label.text == "Viewing the start", "Status says so")
+	check_eq(Fen.write(game.board_view.state), Fen.STANDARD_START, "Board shows the start")
+	check(game.step_back_button.disabled, "Nothing before the start")
+	game.step_back()
+	check_eq(game.viewing, 0, "Back does nothing at the start")
+	game.step_forward_button.pressed.emit()
+	check_eq(game.viewing, 1, "Forward: one move later")
+	check(not game.step_back_button.disabled, "Back works again")
+	game.step_forward()
+	check_eq(game.viewing, 2, "Forward again")
+	game.step_forward()
+	check_eq(game.viewing, -1, "Forward from the second-to-last move: the game now")
+	check(not game.view_nav.visible, "Buttons hidden again")
+	check(game.board_view.input_enabled, "Moving allowed again")
+	game.free()
+
+func test_stepping_keeps_the_viewed_move_in_sight() -> void:
+	var game := _open()
+	# A long game of random (but always the same) moves.
+	var random := RandomNumberGenerator.new()
+	random.seed = 7
+	while game.state.history.size() < 24 and not game.is_over():
+		var moves: Array = game.state.moves()
+		game.play(moves[random.randi() % moves.size()])
+	check_eq(game.state.history.size(), 24, "24 moves played")
+	var tree := Engine.get_main_loop() as SceneTree
+	var scroll: ScrollContainer = game.move_list.get_parent()
+	game.view_move(3)
+	game.step_back()
+	for i in 3:
+		await tree.process_frame
+	check_eq(scroll.scroll_vertical, 0, "Stepping back to an early move scrolls up to it")
+	game.view_move(21)
+	game.step_forward()
+	for i in 3:
+		await tree.process_frame
+	check(scroll.scroll_vertical > 0, "Stepping forward to a late move scrolls down to it")
+	game.free()
+
 func test_black_move_name() -> void:
 	var game := _open()
 	for san in ["e4", "e5", "Nf3"]:
@@ -193,6 +244,7 @@ func test_play_from_here_against_the_bot() -> void:
 	check_eq(game.state.history.size(), 4, "Two moves each")
 	game.view_move(2)
 	check(game.play_from_here_button.visible, "Button shown while looking back")
+	check(game.step_back_button.visible and game.step_forward_button.visible, "Between Back and Forward")
 	game.play_from_here()
 	check_eq(game.viewing, -1, "Back to the game")
 	check_eq(game.state.history.size(), 2, "Game taken back to that position")
