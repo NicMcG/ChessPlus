@@ -23,6 +23,17 @@ func _open_game() -> Node:
 	game.board_view.move_time = 0.0
 	return game
 
+## The best move the screen names, "" for none: in the Top moves list
+## ("Best: Nf3  (+0.4)") or, where that isn't shown, the status line ("best: Nf3").
+func _named_best(game: Node) -> String:
+	var status: String = game.status_label.text
+	if status.contains("best: "):
+		return status.get_slice("best: ", 1)
+	var top: OptionButton = game.top_moves_button
+	if game._top_row.visible and top.text.begins_with("Best: "):
+		return top.text.trim_prefix("Best: ").get_slice("  (", 0)
+	return ""
+
 func _finish() -> void:
 	PlusfishLink.enabled = false
 	PlusfishLink.pretend_available = false
@@ -116,7 +127,7 @@ func test_bar_during_the_game_only_when_chosen() -> void:
 	game._on_evaluated(1, game.plusfish.results[1])
 	check(game.eval_bar.known, "Shows the score")
 	check(game.board_view.hint_arrow.is_empty(), "But no best-move arrow while the game is on")
-	check(not game.status_label.text.contains("best:"), "...and no best move in the status line")
+	check_eq(_named_best(game), "", "...and names no best move")
 	game.free()
 	PlusfishLink.pretend_available = false
 	PlusfishLink.enabled = false
@@ -134,10 +145,10 @@ func test_best_move_live_in_testing_mode() -> void:
 	game.plusfish.results[1] = {"ply": 1, "cp": 30, "mate": null, "outcome": "none", "best": "e7-e5", "best_san": "e5"}
 	game._on_evaluated(1, game.plusfish.results[1])
 	check_eq(game.board_view.hint_arrow, [Vector2i(4, 6), Vector2i(4, 4)], "Best move arrow e7-e5")
-	check(game.status_label.text.ends_with("best: e5"), "Status names the best move: " + game.status_label.text)
+	check_eq(_named_best(game), "e5", "Names the best move")
 	_play_all(game, ["e5"])
 	check(game.board_view.hint_arrow.is_empty(), "The old arrow goes once a move is played")
-	check(not game.status_label.text.contains("best:"), "...and so does the old best move")
+	check_eq(_named_best(game), "", "...and so does the old best move")
 	game.undo()
 	check_eq(game.board_view.hint_arrow, [Vector2i(4, 6), Vector2i(4, 4)], "Undo: the known best move is back")
 	game.plusfish.results[0] = {"ply": 0, "cp": 25, "mate": null, "outcome": "none", "best": "d2-d4", "best_san": "d4"}
@@ -177,7 +188,7 @@ func test_best_move_against_the_bot_when_chosen() -> void:
 	game.plusfish.results[1] = {"ply": 1, "cp": 30, "mate": null, "outcome": "none", "best": "e7-e5", "best_san": "e5"}
 	game._on_evaluated(1, game.plusfish.results[1])
 	check(game.board_view.hint_arrow.is_empty(), "No arrow for the bot's move")
-	check(not game.status_label.text.contains("best:"), "...and none in the status line")
+	check_eq(_named_best(game), "", "...and names none")
 	var started := Time.get_ticks_msec()
 	while game.state.history.size() < 2 and Time.get_ticks_msec() - started < 5000:
 		await _frames(1)
@@ -186,7 +197,7 @@ func test_best_move_against_the_bot_when_chosen() -> void:
 	game.plusfish.results[2] = {"ply": 2, "cp": 40, "mate": null, "outcome": "none", "best": "g1-f3", "best_san": "Nf3"}
 	game._on_evaluated(2, game.plusfish.results[2])
 	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Best move arrow g1-f3")
-	check(game.status_label.text.ends_with("best: Nf3"), "Status names the best move: " + game.status_label.text)
+	check_eq(_named_best(game), "Nf3", "Names the best move")
 	game.view_move(1)
 	check(game.live_best_move(), "Looking back: shown even where the bot was to move")
 	check_eq(game.board_view.hint_arrow, [Vector2i(4, 6), Vector2i(4, 4)], "That position's best move")
@@ -204,7 +215,7 @@ func test_no_best_move_against_the_bot_unless_chosen() -> void:
 	game._on_evaluated(2, game.plusfish.results[2])
 	check(game.eval_bar.known, "The eval bar still shows against the bot")
 	check(game.board_view.hint_arrow.is_empty(), "But no arrow")
-	check(not game.status_label.text.contains("best:"), "...and no best move in the status line")
+	check_eq(_named_best(game), "", "...and names no best move")
 	game.free()
 	_finish()
 
@@ -222,7 +233,7 @@ func test_switches_during_a_bot_game() -> void:
 	game.best_move_toggle.button_pressed = true
 	check(game.best_move_on, "Best move switched on")
 	check_eq(game.board_view.hint_arrow, [Vector2i(6, 0), Vector2i(5, 2)], "Arrow straight away")
-	check(game.status_label.text.ends_with("best: Nf3"), "And in the status line: " + game.status_label.text)
+	check_eq(_named_best(game), "Nf3", "And names it")
 	game.eval_toggle.button_pressed = false
 	check(not game.eval_bar.visible, "Eval bar switched off")
 	check(is_equal_approx(game._board_area.ratio, 1.0), "Board area back to square")
@@ -231,7 +242,7 @@ func test_switches_during_a_bot_game() -> void:
 	check(saved != null and saved.best_move and saved.eval_bar_hidden, "Both switches saved with the game")
 	game.best_move_toggle.button_pressed = false
 	check(game.board_view.hint_arrow.is_empty(), "Best move switched off: arrow gone")
-	check(not game.status_label.text.contains("best:"), "...and the status line is plain")
+	check_eq(_named_best(game), "", "...and names none")
 	game.eval_toggle.button_pressed = true
 	check(game.eval_bar.visible, "Eval bar back on")
 	game.free()
@@ -359,7 +370,7 @@ func test_bar_only_after_the_game() -> void:
 	game._on_evaluated(3, game.plusfish.results[3])
 	check_eq(game.eval_bar.score_text(), "M1", "Mate in one for Black")
 	check_eq(game.board_view.hint_arrow, [Vector2i(3, 7), Vector2i(7, 3)], "Best move arrow d8-h4")
-	check(game.status_label.text.ends_with("best: Qh4#"), "Status names the best move: " + game.status_label.text)
+	check_eq(_named_best(game), "Qh4#", "Names the best move")
 	game.undo()
 	check(not game.eval_bar.visible, "Undo: game on again, bar gone")
 	check_eq(game.board_view.hint_arrow, [], "Arrow gone too")
@@ -422,7 +433,7 @@ func test_real_engine_shows_the_best_move_live_in_testing_mode() -> void:
 		await _frames(1)
 		OS.delay_msec(10)
 	check_eq(game.board_view.hint_arrow, [Vector2i(3, 7), Vector2i(7, 3)], "Arrow for Qh4# while the game is on")
-	check(game.status_label.text.ends_with("best: Qh4#"), "Status names it: " + game.status_label.text)
+	check_eq(_named_best(game), "Qh4#", "Names it")
 	game.free()
 	_finish()
 

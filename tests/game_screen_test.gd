@@ -167,7 +167,7 @@ func test_looking_back_leaves_the_game_alone() -> void:
 	check_eq(game.viewing, 1, "Looking at the position after 1. e4")
 	check_eq(Fen.write(game.board_view.state), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", "Board shows it")
 	check_eq(Fen.write(game.state), now, "The game itself is unchanged")
-	check(not game.board_view.input_enabled, "No moving while looking back")
+	check(game.board_view.input_enabled, "Moves while looking back go into a side line")
 	check(game.status_label.text == "Viewing White's move 1", "Status says so")
 	var viewed_box: StyleBoxFlat = game.move_list.buttons[0].get_theme_stylebox("normal")
 	check_eq(viewed_box.bg_color, MoveList.VIEWED_BG, "Viewed move highlighted")
