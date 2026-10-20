@@ -138,19 +138,20 @@ static func move_list(state: GameState) -> String:
 
 ## Every move played, oldest first, as [move number, notation, picture]: the
 ## number is "1." before White's moves, "" before Black's, or "1..." if Black
-## moved first; the picture is from picture().
-static func numbered_moves(state: GameState) -> Array:
-	# Step back to the first position, then replay, writing each move as we go.
+## moved first; the picture is from picture(). With `first`, only the moves
+## from that one on (a side line starting there: "12..." if Black moves first).
+static func numbered_moves(state: GameState, first := 0) -> Array:
+	# Step back to where the list starts, then replay, writing each move as we go.
 	var moves := state.history.duplicate()
-	for i in range(moves.size() - 1, -1, -1):
+	for i in range(moves.size() - 1, first - 1, -1):
 		state.undo_move(moves[i])
 	var entries := []
-	for i in range(moves.size()):
+	for i in range(first, moves.size()):
 		var move: Move = moves[i]
 		var number := ""
 		if state.side_to_move == Piece.Team.WHITE:
 			number = "%d." % state.fullmove_number
-		elif i == 0:
+		elif i == first:
 			number = "%d..." % state.fullmove_number
 		var text := san(state, move)
 		var suffix := text.substr(text.length() - 1) if text.ends_with("+") or text.ends_with("#") else ""

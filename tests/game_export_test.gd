@@ -146,3 +146,22 @@ func test_import_into_testing_mode() -> void:
 	game.menu_requested.emit()
 	check_eq(main.screen.setup.pieces.size(), 32, "Its start on the setup board")
 	main.free()
+
+## An imported game in Testing mode: try another move (a side line), then
+## Play from here carries on with it.
+func test_imported_game_side_line_play_from_here() -> void:
+	var main: Node = load("res://scenes/main/main.tscn").instantiate()
+	_root().add_child(main)
+	main.show_testing_setup()
+	main.screen.import_game("Chess Plus game: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w; captured: -; moves: f2-f3 e7-e5 g2-g4 d8-h4")
+	var game: Node = main.screen
+	game.game_over_panel.button("board").pressed.emit()
+	game.view_move(2)
+	game.choose(Notation.find_move(game.board_view.state, "d4"))
+	check_eq(game.side_lines.size(), 1, "A side line from 1. f3 e5")
+	check(game.play_from_here_button.visible, "Play from here on the side line")
+	game.play_from_here()
+	check_eq(Notation.move_list(game.state), "1. f3 e5 2. d4", "The game carries on with the side line's move")
+	check(game.side_lines.is_empty(), "It's the game's now, not a side line")
+	check(not game.is_over(), "The game is on again")
+	main.free()
