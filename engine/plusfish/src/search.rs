@@ -13,6 +13,8 @@ pub const INF: i32 = 32000;
 pub const MATE: i32 = 31000;
 pub const MATE_BOUND: i32 = MATE - 1000;
 const MAX_PLY: usize = 128;
+/// "Not worked out" in the capture gains `order` fills in.
+const NO_GAIN: i32 = i32::MIN;
 
 #[derive(Clone, Copy, Default)]
 struct TTEntry {
@@ -171,6 +173,8 @@ pub struct Searcher<'a> {
     pv: Vec<[Move; MAX_PLY + 1]>,
     pv_len: [usize; MAX_PLY + 1],
     buffers: Vec<Vec<Move>>,
+    /// Move-ordering scores and capture gains, per ply (`order`).
+    order_bufs: Vec<(Vec<i32>, Vec<i32>)>,
     keys: Vec<u64>,
     values: Vec<i32>,
     pub nodes: u64,
@@ -230,6 +234,7 @@ impl<'a> Searcher<'a> {
             pv: vec![[Move::NONE; MAX_PLY + 1]; MAX_PLY + 1],
             pv_len: [0; MAX_PLY + 1],
             buffers: (0..MAX_PLY + 2).map(|_| Vec::with_capacity(128)).collect(),
+            order_bufs: (0..MAX_PLY + 2).map(|_| (Vec::with_capacity(128), Vec::with_capacity(128))).collect(),
             keys: Vec::with_capacity(512),
             values,
             nodes: 0,
@@ -486,11 +491,17 @@ impl<'a> Searcher<'a> {
         false
     }
 
-    fn order(&self, p: &Position, moves: &mut [Move], tt_move: Move, ply: usize) -> Vec<i32> {
+    /// Fills `scores` (move ordering, higher first) and `gains` (the capture
+    /// gain, `capture_gain`, where it was worked out, else NO_GAIN) for `moves`.
+    fn order(&self, p: &Position, moves: &[Move], tt_move: Move, ply: usize, scores: &mut Vec<i32>, gains: &mut Vec<i32>) {
         let us = p.side;
-        moves
+        scores.clear();
+        gains.clear();
+        gains.resize(moves.len(), NO_GAIN);
+        scores.extend(moves
             .iter()
-            .map(|m| {
+            .enumerate()
+            .map(|(i, m)| {
                 if *m == tt_move {
                     return 10_000_000;
                 }
@@ -498,7 +509,9 @@ impl<'a> Searcher<'a> {
                 if m.flags & F_CAPTURE != 0 {
                     let victim = self.values[kind_of(p.sq[victim_square(*m) as usize])];
                     let crack = if m.flags & F_CRACK != 0 { 50 } else { 0 };
-                    if self.capture_gain(p, *m) < -50 {
+                    let gain = self.capture_gain(p, *m);
+                    gains[i] = gain;
+                    if gain < -50 {
                         // Probably loses material: after the killers.
                         return 650_000 + victim * 16 - attacker / 8;
                     }
@@ -523,8 +536,17 @@ impl<'a> Searcher<'a> {
                     return 600_000 + self.values[m.extra as usize];
                 }
                 self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize]
-            })
-            .collect()
+            }));
+    }
+
+    /// `capture_gain` of move `i`: as `order` worked it out, or now.
+    #[inline]
+    fn gain_of(&self, p: &Position, moves: &[Move], gains: &[i32], i: usize) -> i32 {
+        if gains[i] != NO_GAIN {
+            gains[i]
+        } else {
+            self.capture_gain(p, moves[i])
+        }
     }
 
     /// What a capture wins if both sides keep recapturing (static exchange
@@ -627,13 +649,15 @@ impl<'a> Searcher<'a> {
             let ex = self.root_excluded.clone();
             moves.retain(|m| !ex.contains(m));
         }
-        let mut scores = self.order(p, &mut moves, tt_move, ply);
+        let (mut scores, mut gains) = std::mem::take(&mut self.order_bufs[ply]);
+        self.order(p, &moves, tt_move, ply, &mut scores, &mut gains);
         let mut best = -INF;
         let mut best_move = Move::NONE;
         let mut legal = 0;
         let orig_alpha = alpha;
         let mut quiets_tried = [Move::NONE; 32];
         let mut n_quiets = 0;
+        let mut sens: Option<(u128, u128)> = None;
         self.keys.push(p.key);
         for i in 0..moves.len() {
             // Selection sort: the next best-ordered move.
@@ -645,10 +669,34 @@ impl<'a> Searcher<'a> {
             }
             moves.swap(i, bi);
             scores.swap(i, bi);
+            gains.swap(i, bi);
             let m = moves[i];
             // Captures that probably lose a lot, near the leaves.
-            if !is_pv && !in_check && depth <= 4 && legal > 0 && m.flags & F_CAPTURE != 0 && best > -MATE_BOUND && self.capture_gain(p, m) < -120 * depth {
+            if !is_pv && !in_check && depth <= 4 && legal > 0 && m.flags & F_CAPTURE != 0 && best > -MATE_BOUND && self.gain_of(p, &moves, &gains, i) < -120 * depth {
                 continue;
+            }
+            let quiet = !m.is_tactical() && m.flags & (F_ABILITY | F_CASTLE) == 0;
+            // Quiet moves near the leaves, unless they give check. `n`: this
+            // move's number among the legal moves, if it's legal.
+            let n = legal + 1;
+            let prune_quiet = !is_pv && !in_check && quiet && depth <= 3 && best > -MATE_BOUND && {
+                // Late move pruning.
+                let lmp_limit = if improving { 4 + depth * depth * 3 } else { 3 + depth * depth * 2 };
+                n > lmp_limit
+                    // Futility pruning: a quiet move can't lift a position
+                    // this far below alpha.
+                    || (n > 1 && static_eval + 100 + 120 * depth <= alpha && !is_mate(alpha))
+                    // Moves that put a piece where it's simply lost.
+                    || (n > 1 && p.see_quiet(r, m, &self.values) < -50 * depth * depth)
+            };
+            // Making a move and testing it costs about as much as a leaf node,
+            // so skip it if the move is surely legal and surely gives no check.
+            if prune_quiet {
+                let (checks, pins) = *sens.get_or_insert_with(|| (p.attack_sensitive(r, us, true), p.attack_sensitive(r, 1 - us, false)));
+                if p.quiet_surely_legal(r, m, pins) && !p.quiet_might_check(r, m, checks) {
+                    legal += 1;
+                    continue;
+                }
             }
             let mut child = p.clone();
             child.make(r, m);
@@ -657,22 +705,10 @@ impl<'a> Searcher<'a> {
             }
             legal += 1;
             let gives_check = child.in_check(r, child.side);
-            let quiet = !m.is_tactical() && m.flags & (F_ABILITY | F_CASTLE) == 0;
-            // Quiet moves that put a piece where it's simply lost, near the leaves.
-            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 1 && best > -MATE_BOUND && p.see_quiet(r, m, &self.values) < -50 * depth * depth {
-                continue;
-            }
-            // Late move pruning for quiet moves near the leaves.
-            let lmp_limit = if improving { 4 + depth * depth * 3 } else { 3 + depth * depth * 2 };
-            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > lmp_limit && best > -MATE_BOUND {
+            if prune_quiet && !gives_check {
                 continue;
             }
             self.played[ply] = m;
-            // Futility pruning: near the leaves, a quiet move can't lift a
-            // position this far below alpha.
-            if !is_pv && !in_check && quiet && !gives_check && depth <= 3 && legal > 1 && static_eval + 100 + 120 * depth <= alpha && !is_mate(alpha) {
-                continue;
-            }
             let ext = if gives_check && ply < 64 { 1 } else { 0 };
             let new_depth = depth - 1 + ext;
             let score;
@@ -746,6 +782,7 @@ impl<'a> Searcher<'a> {
         }
         self.keys.pop();
         self.buffers[ply] = moves;
+        self.order_bufs[ply] = (scores, gains);
         if self.stopped {
             return 0;
         }
@@ -827,7 +864,8 @@ impl<'a> Searcher<'a> {
         let mut moves = std::mem::take(&mut self.buffers[ply]);
         moves.clear();
         p.gen_pseudo(r, &mut moves, if in_check { GEN_ALL } else { GEN_TACTICAL });
-        let mut scores = self.order(p, &mut moves, tt_move, ply.min(MAX_PLY));
+        let (mut scores, mut gains) = std::mem::take(&mut self.order_bufs[ply]);
+        self.order(p, &moves, tt_move, ply.min(MAX_PLY), &mut scores, &mut gains);
         let mut best = stand;
         let mut best_move = Move::NONE;
         let mut legal = 0;
@@ -840,9 +878,10 @@ impl<'a> Searcher<'a> {
             }
             moves.swap(i, bi);
             scores.swap(i, bi);
+            gains.swap(i, bi);
             let m = moves[i];
             // Captures that probably lose material.
-            if !in_check && m.flags & F_CAPTURE != 0 && self.capture_gain(p, m) < -50 {
+            if !in_check && m.flags & F_CAPTURE != 0 && self.gain_of(p, &moves, &gains, i) < -50 {
                 continue;
             }
             // Delta pruning: even winning this piece can't lift us to alpha.
@@ -884,6 +923,7 @@ impl<'a> Searcher<'a> {
             }
         }
         self.buffers[ply] = moves;
+        self.order_bufs[ply] = (scores, gains);
         if self.stopped {
             return 0;
         }
