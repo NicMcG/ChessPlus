@@ -39,6 +39,15 @@ var _bot_timer: Timer
 var bot_thinking := false
 ## Counts bot turns, so a turn that was overtaken (New game, Menu) is dropped.
 var _bot_turn_id := 0
+## The Plusfish level's own link to the engine (separate from the eval bar's,
+## so neither stops the other's job). Made only for that level.
+var bot_engine: PlusfishLink
+## How hard Plusfish searches for each move: about 1.7 s on a PC; the web
+## version is slower (more so on phones), so it searches less.
+const PLUSFISH_BOT_NODES := 400000
+const PLUSFISH_BOT_WEB_NODES := 100000
+## If Plusfish hasn't answered after this long, the Hard bot moves instead.
+var plusfish_bot_max_seconds := 30.0
 ## A saved game to continue instead of starting a new one (set by the main scene).
 var resume: SavedGame
 ## An online game (set by the main scene before the screen opens): the session
@@ -181,6 +190,11 @@ func _ready() -> void:
 	promotion_overlay.gui_input.connect(_on_overlay_input)
 	if is_bot_game():
 		bot = PracticeBot.new(bot_level)
+		if bot_level == PracticeBot.Level.PLUSFISH:
+			bot_engine = PlusfishLink.new()
+			bot_engine.desktop_nodes = PLUSFISH_BOT_NODES
+			bot_engine.web_nodes = PLUSFISH_BOT_WEB_NODES
+			add_child(bot_engine)
 	if online:
 		_start_online()
 		return
@@ -542,7 +556,11 @@ func _start_bot_turn_if_needed() -> void:
 	if turn_id != _bot_turn_id or not bot_thinking:
 		return
 	var started := Time.get_ticks_msec()
-	var move := bot.choose_move(state)
+	var move: Move
+	if _plusfish_bot_can_play():
+		move = await _plusfish_bot_move(turn_id)
+	else:
+		move = bot.choose_move(state)
 	# Fast answers wait until the bot has "thought" for bot_min_seconds.
 	var wait := bot_min_seconds - (Time.get_ticks_msec() - started) / 1000.0
 	if bot_delay_frames > 0 and wait > 0:
@@ -550,6 +568,48 @@ func _start_bot_turn_if_needed() -> void:
 		await _bot_timer.timeout
 	if turn_id == _bot_turn_id and bot_thinking:
 		_play_bot_move(move)
+
+## True if this is a Plusfish game and Plusfish can play it. If it can't (the
+## program isn't on this computer, or a piece has a rule it doesn't know yet),
+## the Hard bot plays instead, and a note says so once.
+func _plusfish_bot_can_play() -> bool:
+	if bot_engine == null:
+		return false
+	if PlusfishLink.available() and _plusfish_knows_pieces():
+		return true
+	if not _told_plusfish_missing:
+		_told_plusfish_missing = true
+		show_notice("Plusfish can't play here, so the Hard bot is playing instead.")
+	return false
+
+var _told_plusfish_missing := false
+
+## Ask Plusfish for its best move in the position now and wait for the answer
+## (it searches on a background thread on PC, in a Web Worker on the web, so
+## the screen keeps running meanwhile). Null if the turn was dropped.
+func _plusfish_bot_move(turn_id: int) -> Move:
+	var moves := []
+	for move in state.history:
+		moves.append(move.to_text())
+	var ply := moves.size()
+	bot_engine.analyse_live(_create_start_state(), moves)
+	var give_up := Time.get_ticks_msec() + int(plusfish_bot_max_seconds * 1000.0)
+	# Checked with the screen's own timer: if the screen closes, the wait just ends.
+	while bot_engine.is_running() and turn_id == _bot_turn_id and Time.get_ticks_msec() < give_up:
+		_bot_timer.start(0.05)
+		await _bot_timer.timeout
+	if turn_id != _bot_turn_id:
+		return null
+	bot_engine.stop()
+	return engine_move_or_fallback(bot_engine.results.get(ply, {}).get("best", ""))
+
+## The move Plusfish chose (Move.to_text()), or the Hard bot's move if Plusfish
+## gave none or one that isn't legal here (it failed, or ran out of time).
+func engine_move_or_fallback(best: String) -> Move:
+	var move := state.find_move(best) if best != "" else null
+	if move == null:
+		move = bot.choose_move(state)
+	return move
 
 ## Undo is possible if there's a move to take back that you made (against the
 ## bot) or any move at all (two players), and the bot isn't thinking.
