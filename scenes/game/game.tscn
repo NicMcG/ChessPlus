@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scenes/game/game.gd" id="1_game"]
 [ext_resource type="Script" path="res://scenes/game/board_view.gd" id="2_board"]
 [ext_resource type="Script" path="res://scenes/game/move_list.gd" id="3_moves"]
+[ext_resource type="Script" path="res://scenes/game/step_button.gd" id="4_step"]
 
 [node name="Game" type="Control"]
 layout_mode = 3
@@ -69,12 +70,35 @@ layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("3_moves")
 
-[node name="PlayFromHere" type="Button" parent="Margin/Layout"]
+[node name="ViewNav" type="HBoxContainer" parent="Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="StepBack" type="Button" parent="Margin/Layout/ViewNav"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("4_step")
+step = -1
+
+[node name="PlayFromHere" type="Button" parent="Margin/Layout/ViewNav"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
 text = "Play from here"
+
+[node name="StepForward" type="Button" parent="Margin/Layout/ViewNav"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("4_step")
 
 [node name="Ability" type="Button" parent="Margin/Layout"]
 unique_name_in_owner = true

@@ -90,6 +90,10 @@ var sounds: GameSounds
 @onready var status_label: Label = %Status
 @onready var move_list: MoveList = %Moves
 @onready var play_from_here_button: Button = %PlayFromHere
+## Shown while looking back: Back / Forward a move (and Play from here, against the bot).
+@onready var view_nav: HBoxContainer = %ViewNav
+@onready var step_back_button: Button = %StepBack
+@onready var step_forward_button: Button = %StepForward
 ## Shown while a piece with an unused special ability is selected.
 @onready var ability_button: Button = %Ability
 @onready var new_game_button: Button = %NewGame
@@ -174,6 +178,8 @@ func _ready() -> void:
 	undo_button.pressed.connect(undo)
 	redo_button.pressed.connect(redo)
 	play_from_here_button.pressed.connect(play_from_here)
+	step_back_button.pressed.connect(step_back)
+	step_forward_button.pressed.connect(step_forward)
 	ability_button.pressed.connect(use_ability)
 	# The ability button floats just above the bottom row of buttons instead of
 	# taking up room in the layout: showing or hiding it mustn't resize the board.
@@ -307,6 +313,17 @@ func back_to_game() -> void:
 	_update_input()
 	_update_text()
 
+## While looking back: show the position one move earlier (down to the start).
+func step_back() -> void:
+	if viewing > 0:
+		view_move(viewing - 1)
+
+## While looking back: show the position one move later; past the second-to-last
+## move that's the game as it is now.
+func step_forward() -> void:
+	if viewing >= 0:
+		view_move(viewing + 1)
+
 ## Against the bot: take the game back to the position being looked at, and
 ## carry on from there.
 func play_from_here() -> void:
@@ -391,9 +408,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_column], _wide_box)
 		_wide_box.move_child(_board_column, 0)
-		ScreenShape.move_to([status_label, clock_label, hint_toggles, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _side)
+		ScreenShape.move_to([status_label, clock_label, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _board_column, hint_toggles, _moves_scroll, offer_bar, ability_button, play_from_here_button, _buttons], _layout)
+		ScreenShape.move_to([status_label, clock_label, _board_column, hint_toggles, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 
@@ -862,8 +879,10 @@ func _update_text() -> void:
 	if resigned >= 0 and state.outcome() == GameState.Outcome.NONE:
 		var texts := result_texts()
 		status_label.text = "%s - %s" % [texts[0], texts[1]]
-	if viewing >= 0:
+	if viewing > 0:
 		status_label.text = "Viewing %s" % _move_name(viewing - 1)
+	elif viewing == 0:
+		status_label.text = "Viewing the start"
 	_status_base = status_label.text
 	var result := state.result_text()
 	if online and result == "*":
@@ -878,8 +897,12 @@ func _update_text() -> void:
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
 		_scroll_moves_to_end.call_deferred()
+	elif viewing > 0:
+		_scroll_to_viewed_move.call_deferred()
 	undo_button.disabled = not _can_undo()
 	redo_button.disabled = not _can_redo()
+	view_nav.visible = viewing >= 0
+	step_back_button.disabled = viewing <= 0
 	play_from_here_button.visible = is_bot_game() and viewing >= 0
 	play_from_here_button.disabled = bot_thinking
 	if online:
@@ -1590,6 +1613,20 @@ func _online_result_text() -> String:
 func _scroll_moves_to_end() -> void:
 	if is_inside_tree():
 		_moves_scroll.scroll_vertical = int(_moves_scroll.get_v_scroll_bar().max_value)
+
+## Keep the move being looked at in sight while stepping through the moves.
+func _scroll_to_viewed_move() -> void:
+	if not is_inside_tree() or viewing <= 0 or viewing > move_list.buttons.size():
+		return
+	# Where the move sits in the list (not ensure_control_visible: it goes by
+	# where things are on screen, which lags behind until the next frame).
+	var button: Button = move_list.buttons[viewing - 1]
+	var top := button.global_position.y - move_list.global_position.y
+	var bottom := top + button.size.y
+	if top < _moves_scroll.scroll_vertical:
+		_moves_scroll.scroll_vertical = int(top)
+	elif bottom > _moves_scroll.scroll_vertical + _moves_scroll.size.y:
+		_moves_scroll.scroll_vertical = int(ceil(bottom - _moves_scroll.size.y))
 
 ## Which move `index` (0 = the first) was, e.g. "White's move 12".
 func _move_name(index: int) -> String:
