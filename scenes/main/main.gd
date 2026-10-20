@@ -14,10 +14,14 @@ const POSITION_SETUP := preload("res://scenes/testing/position_setup.tscn")
 var library := ArmyLibrary.new()
 ## The screen currently showing.
 var screen: Node
+## The volume button in the top-right corner, over every screen.
+var volume_control: VolumeControl
 
 func _ready() -> void:
 	SystemFonts.install()
 	fit_window_to_screen()
+	volume_control = VolumeControl.new()
+	add_child(volume_control)
 	# A local game left 2 days without a move ends; say so once (Mac).
 	var note := SavedGame.end_if_abandoned()
 	show_main_menu()
@@ -111,6 +115,9 @@ func show_main_menu() -> void:
 	menu.continue_online_pressed.connect(continue_online_game)
 	menu.armies_pressed.connect(show_army_list)
 	menu.testing_pressed.connect(show_testing_setup)
+	# The menu's Sound button and the volume button show each other's changes.
+	menu.sound_toggled.connect(volume_control.refresh)
+	volume_control.changed.connect(menu.show_sound)
 	_show(menu)
 	_update_if_ready()
 

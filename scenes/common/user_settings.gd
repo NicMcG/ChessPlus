@@ -1,7 +1,7 @@
 class_name UserSettings
 extends RefCounted
 
-## The player's own preferences (so far just sound on/off), saved on the device.
+## The player's own preferences (sound, volume, default armies, ...), saved on the device.
 ## Everything is static: there's only one set of settings.
 
 const DEFAULT_PATH := "user://settings.cfg"
@@ -15,6 +15,15 @@ static func sound_on() -> bool:
 static func set_sound_on(on: bool) -> void:
 	var file := _settings()
 	file.set_value("audio", "sound_on", on)
+	file.save(save_path)
+
+## How loud the game is, from 0 (silent) to 1 (full), set with VolumeControl.
+static func volume() -> float:
+	return clampf(_settings().get_value("audio", "volume", 1.0), 0.0, 1.0)
+
+static func set_volume(value: float) -> void:
+	var file := _settings()
+	file.set_value("audio", "volume", clampf(value, 0.0, 1.0))
 	file.save(save_path)
 
 ## A new random ID for one online game (16 hex digits). Each game gets its own,

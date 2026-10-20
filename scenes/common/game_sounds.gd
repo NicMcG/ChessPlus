@@ -193,9 +193,18 @@ var _loop_sound := -1
 var _glides := {}
 
 func _ready() -> void:
+	apply_volume()
 	_loop_player = _new_player()
 	for i in 12:
 		_players.append(_new_player())
+
+## Set the whole game's loudness (the Master sound bus) from the saved volume.
+## The slider's value is squared first so the middle of it sounds about half as
+## loud (ears hear loudness on a curve): 50% = -12 dB, 0 = silent.
+static func apply_volume() -> void:
+	var volume := UserSettings.volume()
+	AudioServer.set_bus_volume_db(0, linear_to_db(volume * volume) if volume > 0 else -80.0)
+	AudioServer.set_bus_mute(0, volume <= 0.0)
 
 ## A sound player, mixed by Godot itself: in the web version the default is to
 ## hand each sound to the browser to play, and over a session those started
