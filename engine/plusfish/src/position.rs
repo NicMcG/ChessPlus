@@ -1201,7 +1201,7 @@ impl Position {
         false
     }
 
-    /// For the search's pruning: the squares where a quiet move (no capture,
+    /// For the search: the squares where a quiet move (no capture,
     /// shield break, promotion, ability or castling; `quiet_might_check`,
     /// `quiet_surely_legal`) could change whether `by` attacks the other
     /// side's king, as `attacked` sees it: for each attack line towards that
@@ -1292,9 +1292,10 @@ impl Position {
         sens
     }
 
-    /// Is quiet move `m` (as in `attack_sensitive`) surely legal? Yes if it
-    /// isn't a king or Parapet move and neither leaves nor lands on a square
-    /// of `sens` = `attack_sensitive(r, 1 - side, false)`.
+    /// Is quiet move `m` (as in `attack_sensitive`) surely legal? Yes if the
+    /// side to move isn't in check, it isn't a king or Parapet move and it
+    /// neither leaves nor lands on a square of `sens` =
+    /// `attack_sensitive(r, 1 - side, false)`.
     #[inline]
     pub fn quiet_surely_legal(&self, r: &Rules, m: Move, sens: u128) -> bool {
         let info = &r.info[kind_of(self.sq[m.from as usize])];
