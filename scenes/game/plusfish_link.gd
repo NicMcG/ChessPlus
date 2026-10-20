@@ -106,6 +106,12 @@ static func supports(state: GameState) -> bool:
 		for piece: Piece in state.board.pieces_of(team).values():
 			if piece.def.ability > KNOWN_ABILITIES:
 				return false
+			# Mac (Oct 2026): a Squire protects Knights anywhere in its move
+			# range, even through pieces. Plusfish still has the old rule
+			# (only Knights it could move to), so it's off for Squire games
+			# until it's rebuilt with the new one.
+			if not piece.def.protects.is_empty():
+				return false
 	return true
 
 ## True if Plusfish can run here.

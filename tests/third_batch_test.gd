@@ -122,7 +122,11 @@ func test_squire_protects_knights() -> void:
 	state = _game("k7/8/8/b7/8/2N5/8/2(SQ)4K b - - 0 1")
 	check(not _has_move(state, "a5xc3"), "With a Squire 2 squares away, it can't")
 	state = _game("k7/8/8/b7/8/2N5/2P5/2(SQ)4K b - - 0 1")
-	check(_has_move(state, "a5xc3"), "Unless the Squire's way is blocked")
+	check(not _has_move(state, "a5xc3"), "...even with a piece in between (Mac: anywhere in its move range)")
+	state = _game("k7/8/8/b7/8/2N5/8/4(SQ)2K b - - 0 1")
+	check(_has_move(state, "a5xc3"), "Out of its range (e1 to c3 is no Squire move): takeable")
+	check(not PlusfishLink.supports(state), "Plusfish doesn't know this rule yet: off for Squire games")
+	check(PlusfishLink.supports(_game("k7/8/8/b7/8/2N5/8/7K b - - 0 1")), "...but on without one")
 
 func test_jester_takes_the_hit() -> void:
 	var state := _game("k7/2b5/8/4R3/3J4/8/8/7K b - - 0 1")
