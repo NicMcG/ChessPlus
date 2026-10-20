@@ -230,6 +230,8 @@ pub struct Rules {
     pub guards: u64,
     /// The Haunt kind (the Ghost), or NO_KIND.
     pub haunt_kind: u8,
+    /// Kinds that can ever be on the board in this game (forms included).
+    pub kinds_present: u64,
     ray_sq: Vec<u8>,
     rays: Vec<Ray>,
     ray_index: Vec<(u32, u32)>,
@@ -517,6 +519,7 @@ impl Rules {
             parapets,
             guards,
             haunt_kind,
+            kinds_present,
             ray_sq,
             rays,
             ray_index,
