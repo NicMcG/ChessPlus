@@ -21,4 +21,4 @@ symbol = "V"
 value = 4
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
 shield_on_capture = true
-special_rule = "Starts without a shield. Whenever it captures, it gains a shield if it doesn't have one: the next capture against it only breaks the shield."
+special_rule = "Whenever the Vampire captures a piece, if the Vampire didn't have a shield, it gains one."

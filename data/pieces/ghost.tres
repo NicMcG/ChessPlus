@@ -23,4 +23,4 @@ move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubRes
 ability = 3
 ability_colors = PackedColorArray(0.659, 0.831, 0.961, 1, 0.941, 0.973, 1, 1)
 ability_name = "Haunt"
-ability_text = "Once per game, after the Ghost has been captured: on a later turn, put it back on any empty square of the board. Uses your turn."
+ability_text = "Place the Ghost from the Graveyard onto any open square."

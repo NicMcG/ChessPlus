@@ -22,4 +22,4 @@ symbol = "RO"
 value = 3.5
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
 keywords = 1
-special_rule = "To move a second square in a direction, it must jump over one of your own pieces in the way, landing on the square just behind it."
+special_rule = "The Rogue must jump over one of your own pieces adjacent to it, to move 2 squares away in any direction."

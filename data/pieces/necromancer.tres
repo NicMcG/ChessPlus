@@ -18,4 +18,4 @@ move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1")])
 ability = 2
 ability_name = "Raise Dead"
 ability_colors = PackedColorArray(0.831, 0.42, 0.847, 1, 0.29, 0.078, 0.549, 1)
-ability_text = "Once per game: the Necromancer leaves the board and one of your lost pieces (not a pawn or a Necromancer) returns on its square, as good as new. Uses your turn."
+ability_text = "The Necromancer goes to the Graveyard and one of your pieces in the Graveyard is placed on the same square."

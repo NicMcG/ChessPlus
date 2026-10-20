@@ -41,6 +41,7 @@ Everything in the rules engine should be built so standard chess is just one con
 * Army builder (Mac's design): starts with an empty board; players name and save armies (max 10 saved); armies are edited outside games; before a match each player picks one of their saved armies.
 * Castling only with a castle partner in a corner of its owner's back rank (`GameRules.castling_partner_in_corner`). King moves 2 squares toward it, as before.
 * Promotion in army games: to any piece type on the board at the start (either army) except king and pawn types — so a queen is allowed. Most valuable listed first.
+* **Graveyard** (Mac's term, Oct 2026): the one zone holding both sides' pieces that have been captured or have left the board any other way (`GameState.lost`, both teams). Special rule/ability texts use it ("goes to the Graveyard"). The piece texts (`special_rule`, `ability_text`) are Mac's own wording (Oct 2026): change them only with his say-so.
 * Draws end the game automatically: 50-move rule, threefold repetition, and positions where checkmate is impossible (worked out from move data; custom pieces will need more thought later).
 
 ## Architecture rules

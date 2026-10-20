@@ -22,4 +22,4 @@ value = 3
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
 keywords = 2
 blocks_jumps = true
-special_rule = "Your opponent's pieces can't jump over it: their Knights, Elephants, Catapults and the Wizard's and Rogue's leaps can't pass it, and their Cannons can't use it as a screen. Your own pieces can. (A Knight counts as moving 2 squares straight, then 1 to the side.)"
+special_rule = "Enemy pieces can't jump over the Parapet."

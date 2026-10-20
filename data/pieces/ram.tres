@@ -16,4 +16,4 @@ symbol = "RM"
 value = 3.0
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1")])
 dies_on_capture = true
-special_rule = "When it captures a piece (or breaks a shield), the Ram is removed from the board too."
+special_rule = "When the Ram captures a piece or breaks a shield, it goes to the Graveyard."
