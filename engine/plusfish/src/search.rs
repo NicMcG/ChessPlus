@@ -3,6 +3,7 @@
 //! extensions, killer/history move ordering and a quiescence search over
 //! captures, shield breaks, Crack Shots and promotions.
 
+use crate::defs::MAX_KINDS;
 use crate::eval::*;
 use crate::position::*;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -169,7 +170,15 @@ pub struct SearchTables {
     age: u8,
     history: Vec<i32>,
     corr: Vec<i16>,
+    cont: Vec<Vec<i16>>,
+    cap_hist: Vec<i16>,
 }
+
+/// "No move" in `Searcher::ckeys`.
+const NO_KEY: u32 = u32::MAX;
+/// Most entries in one continuation-history table (2 bytes each, so 2 MB);
+/// with more than 16 piece kinds on 64 squares, kinds share slots.
+const MAX_CONT: usize = 1 << 20;
 
 pub struct Searcher<'a> {
     pub r: &'a Rules,
@@ -188,6 +197,21 @@ pub struct Searcher<'a> {
     history: Vec<i32>,
     /// Correction history: [table][side to move][key % CORR_SIZE].
     corr: Vec<i16>,
+    /// Compact slot of each piece kind (only the kinds in this game get one),
+    /// how many slots, and the board flipped top to bottom (squares as seen by
+    /// Black).
+    kslot: [u8; MAX_KINDS],
+    nslots: usize,
+    flip: Vec<u8>,
+    /// The move played to reach each ply as (kind slot, square from its
+    /// mover's side), or NO_KEY.
+    ckeys: [u32; MAX_PLY + 2],
+    /// Continuation history, one table per ply back (CONT_PLIES):
+    /// [that move][this move], keys as in `ckeys` (mover's view, so both
+    /// colours share it).
+    cont: Vec<Vec<i16>>,
+    /// Capture history: [mover's slot, square][captured slot], mover's view.
+    cap_hist: Vec<i16>,
     pv: Vec<[Move; MAX_PLY + 1]>,
     pv_len: [usize; MAX_PLY + 1],
     buffers: Vec<Vec<Move>>,
@@ -238,6 +262,18 @@ fn from_tt(s: i32, ply: usize) -> i32 {
 impl<'a> Searcher<'a> {
     pub fn new(r: &'a Rules, et: &'a EvalTables, params: &'a Params, tt_mb: usize) -> Searcher<'a> {
         let values = (0..r.info.len()).map(|k| piece_value(params, k)).collect();
+        let present: Vec<usize> = (0..r.info.len().min(MAX_KINDS)).filter(|&k| r.kinds_present & (1u64 << k) != 0).collect();
+        let mut nslots = present.len().max(1);
+        while nslots > 1 && (nslots * r.nsq) * (nslots * r.nsq) > MAX_CONT {
+            nslots -= 1;
+        }
+        let mut kslot = [0u8; MAX_KINDS];
+        for (i, &k) in present.iter().enumerate() {
+            kslot[k] = (i % nslots) as u8;
+        }
+        let w = r.w as usize;
+        let flip = (0..r.nsq).map(|s| ((r.h as usize - 1 - s / w) * w + s % w) as u8).collect();
+        let stride = nslots * r.nsq;
         Searcher {
             r,
             et,
@@ -250,6 +286,12 @@ impl<'a> Searcher<'a> {
             counter: vec![Move::NONE; 2 * MAX_SQ * MAX_SQ],
             history: vec![0; 2 * MAX_SQ * MAX_SQ],
             corr: vec![0; CORR_TABLES * 2 * CORR_SIZE],
+            kslot,
+            nslots,
+            flip,
+            ckeys: [NO_KEY; MAX_PLY + 2],
+            cont: (0..CONT_PLIES).map(|_| vec![0; stride * stride]).collect(),
+            cap_hist: vec![0; stride * nslots],
             pv: vec![[Move::NONE; MAX_PLY + 1]; MAX_PLY + 1],
             pv_len: [0; MAX_PLY + 1],
             buffers: (0..MAX_PLY + 2).map(|_| Vec::with_capacity(128)).collect(),
@@ -276,11 +318,15 @@ impl<'a> Searcher<'a> {
         s.age = t.age;
         s.history = t.history;
         s.corr = t.corr;
+        if t.cont.iter().map(|c| c.len()).eq(s.cont.iter().map(|c| c.len())) && t.cap_hist.len() == s.cap_hist.len() {
+            s.cont = t.cont;
+            s.cap_hist = t.cap_hist;
+        }
         s
     }
 
     pub fn into_tables(self) -> SearchTables {
-        SearchTables { tt: self.tt, age: self.age, history: self.history, corr: self.corr }
+        SearchTables { tt: self.tt, age: self.age, history: self.history, corr: self.corr, cont: self.cont, cap_hist: self.cap_hist }
     }
 
     pub fn tt_mb(t: &SearchTables) -> usize {
@@ -294,6 +340,9 @@ impl<'a> Searcher<'a> {
         }
         for c in self.corr.iter_mut() {
             *c = 0;
+        }
+        for h in self.cont.iter_mut().flatten().chain(self.cap_hist.iter_mut()) {
+            *h = 0;
         }
     }
 
@@ -613,7 +662,8 @@ impl<'a> Searcher<'a> {
                     // when it comes up.
                     let victim = self.values[kind_of(p.sq[victim_square(*m) as usize])];
                     let crack = if m.flags & F_CRACK != 0 { 50 } else { 0 };
-                    return 1_000_000 + victim * 16 - attacker / 8 + crack;
+                    let ch = self.cap_hist[self.cap_index(p, *m)] as i32 / CAP_ORDER_DIV;
+                    return 1_000_000 + victim * 16 - attacker / 8 + crack + ch;
                 }
                 if m.promo != 0 {
                     return 900_000 + self.values[m.promo as usize - 1];
@@ -633,7 +683,7 @@ impl<'a> Searcher<'a> {
                 if m.flags & (F_RAISE | F_HAUNT) != 0 {
                     return 600_000 + self.values[m.extra as usize];
                 }
-                self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize]
+                self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize] + self.cont_score(ply, self.ckey(p, *m))
             }));
     }
 
@@ -675,6 +725,39 @@ impl<'a> Searcher<'a> {
         } else {
             self.capture_gain(p, moves[i])
         }
+    }
+
+    /// `ckeys` entry for move `m` in `p`: the moving kind's slot and its
+    /// destination, seen from the mover's side.
+    #[inline]
+    fn ckey(&self, p: &Position, m: Move) -> u32 {
+        let k = if m.flags & F_HAUNT != 0 { self.r.haunt_kind as usize } else { kind_of(p.sq[m.from as usize]) };
+        let to = if p.side == BLACK { self.flip[m.to as usize] as usize } else { m.to as usize };
+        (self.kslot[k & (MAX_KINDS - 1)] as usize * self.r.nsq + to) as u32
+    }
+
+    /// Continuation-history score of a move with key `key` at `ply`.
+    #[inline]
+    fn cont_score(&self, ply: usize, key: u32) -> i32 {
+        let stride = self.nslots * self.r.nsq;
+        let mut s = 0;
+        for back in 0..CONT_PLIES {
+            if ply > back {
+                let pk = self.ckeys[ply - 1 - back];
+                if pk != NO_KEY {
+                    s += self.cont[back][pk as usize * stride + key as usize] as i32;
+                }
+            }
+        }
+        s
+    }
+
+    /// Index of capture `m` (or shield break) in `cap_hist`.
+    #[inline]
+    fn cap_index(&self, p: &Position, m: Move) -> usize {
+        let vs = if m.flags & F_CAPTURE != 0 { victim_square(m) } else { m.to };
+        let victim = self.kslot[kind_of(p.sq[vs as usize])] as usize;
+        self.ckey(p, m) as usize * self.nslots + victim
     }
 
     /// What a capture wins if both sides keep recapturing (static exchange
@@ -761,6 +844,7 @@ impl<'a> Searcher<'a> {
                 let rd = 3 + depth / 4;
                 self.keys.push(p.key);
                 self.played[ply] = Move::NONE;
+                self.ckeys[ply] = NO_KEY;
                 let s = -self.negamax(&child, depth - rd, -beta, -beta + 1, ply + 1, false, true);
                 self.keys.pop();
                 if self.stopped {
@@ -791,6 +875,8 @@ impl<'a> Searcher<'a> {
         let mut quiets_tried = [Move::NONE; 32];
         let mut n_quiets = 0;
         let mut sens: Option<(u128, u128)> = None;
+        let mut caps_tried = [Move::NONE; 16];
+        let mut n_caps = 0;
         self.keys.push(p.key);
         let mut next = 0;
         loop {
@@ -850,6 +936,8 @@ impl<'a> Searcher<'a> {
                 continue;
             }
             self.played[ply] = m;
+            let key = self.ckey(p, m);
+            self.ckeys[ply] = key;
             let ext = if gives_check && ply < 64 { 1 } else { 0 };
             let new_depth = depth - 1 + ext;
             let score;
@@ -862,7 +950,7 @@ impl<'a> Searcher<'a> {
                     if is_pv {
                         red -= 1;
                     }
-                    red -= self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize] / 6000;
+                    red -= (self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize] + self.cont_score(ply, key)) / LMR_HIST_DIV;
                     red = red.clamp(0, new_depth - 1);
                 }
                 let mut s = -self.negamax(&child, new_depth - red, -alpha - 1, -alpha, ply + 1, false, false);
@@ -881,6 +969,10 @@ impl<'a> Searcher<'a> {
                 quiets_tried[n_quiets] = m;
                 n_quiets += 1;
             }
+            if m.is_capture() && n_caps < caps_tried.len() {
+                caps_tried[n_caps] = m;
+                n_caps += 1;
+            }
             if score > best {
                 best = score;
                 best_move = m;
@@ -896,6 +988,15 @@ impl<'a> Searcher<'a> {
                     }
                     self.pv_len[ply] = n + 1;
                     if score >= beta {
+                        // Capture history: the capture that cut off gains, the
+                        // captures tried before it lose.
+                        let cbonus = (depth * depth * 16).min(1600);
+                        for (j, c) in caps_tried[..n_caps].iter().enumerate() {
+                            let b = if j + 1 == n_caps && *c == m { cbonus } else { -cbonus };
+                            let ci = self.cap_index(p, *c);
+                            let h = &mut self.cap_hist[ci];
+                            *h += (b - *h as i32 * b.abs() / 16384) as i16;
+                        }
                         if quiet {
                             if self.killers[ply][0] != m {
                                 self.killers[ply][1] = self.killers[ply][0];
@@ -914,6 +1015,17 @@ impl<'a> Searcher<'a> {
                                 let b = if j + 1 == n_quiets { bonus } else { -bonus };
                                 let h = &mut self.history[(us * MAX_SQ + q.from as usize) * MAX_SQ + q.to as usize];
                                 *h += b - *h * b.abs() / 16384;
+                                let qk = self.ckey(p, *q) as usize;
+                                let stride = self.nslots * self.r.nsq;
+                                for back in 0..CONT_PLIES {
+                                    if ply > back {
+                                        let pk = self.ckeys[ply - 1 - back];
+                                        if pk != NO_KEY {
+                                            let h = &mut self.cont[back][pk as usize * stride + qk];
+                                            *h += (b - *h as i32 * b.abs() / 16384) as i16;
+                                        }
+                                    }
+                                }
                             }
                         }
                         break;
@@ -1045,6 +1157,7 @@ impl<'a> Searcher<'a> {
                 continue;
             }
             legal += 1;
+            self.ckeys[ply] = self.ckey(p, m);
             let s = -self.quiesce(&child, -beta, -alpha, ply + 1, qply + 1);
             if self.stopped {
                 break;
@@ -1091,6 +1204,14 @@ impl<'a> Searcher<'a> {
         best
     }
 }
+
+/// Continuation history: plies back (1 = the opponent's last move; 2 was
+/// worse at 6,000 nodes/move).
+const CONT_PLIES: usize = 1;
+/// LMR: history (butterfly + continuation) per ply of reduction less.
+const LMR_HIST_DIV: i32 = 9000;
+/// Capture ordering: capture history divided by this.
+const CAP_ORDER_DIV: i32 = 8;
 
 /// Quiescence plies in which a side in check searches all its moves.
 const Q_CHECK_PLIES: usize = 6;
