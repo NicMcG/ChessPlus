@@ -25,7 +25,7 @@ church_bell.wav
 holy_choir.wav
   From "Tallis - If ye love me.ogg", sung by Coro Santa Pazienza (Cathedral of
   Pontremoli, 2017), CC BY 3.0 - credit required (shown on the main menu).
-  55.6-59.2 s: a held chord. https://creativecommons.org/licenses/by/3.0/
+  55.6-57.8 s: a held chord. https://creativecommons.org/licenses/by/3.0/
   https://commons.wikimedia.org/wiki/File:Tallis_-_If_ye_love_me.ogg
 
 sheep_baa.wav

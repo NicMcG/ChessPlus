@@ -94,11 +94,15 @@ func test_berserker_pattern() -> void:
 	# Black's Berserker goes down the board.
 	check_eq(_targets(_parse("4k3/8/8/3(br)4/8/8/8/K7 b - - 0 1"), "d5"), ["c3", "c4", "d3", "d4", "e3", "e4"], "Black: six squares below")
 
-func test_berserker_is_blocked_like_a_rook() -> void:
-	var targets := _targets(_parse("4k3/8/8/2PP4/3(BR)4/8/8/K7 w - - 0 1"), "d4")
-	check_eq(targets, ["e5", "e6"], "Own pieces on c5 and d5 block c6 and d6")
-	check(_parse("8/8/2k5/8/3(BR)4/8/8/K7 b - - 0 1").is_in_check(), "Checks through an empty c5")
-	check(not _parse("8/8/2k5/2P5/3(BR)4/8/8/K7 b - - 0 1").is_in_check(), "No check through a piece")
+## Mac (Oct 2026): its L-shaped moves are blocked like the Knight's and the
+## Cavalry's, 2 squares then 1: d4 to c6 goes d5, d6, then c6.
+func test_berserker_l_moves_go_two_then_one() -> void:
+	check_eq(_targets(_parse("4k3/8/8/2PP4/3(BR)4/8/8/K7 w - - 0 1"), "d4"), ["e5"], "Own pieces on c5 and d5: d5 blocks d6, c6 and e6")
+	check_eq(_targets(_parse("4k3/8/8/2P5/3(BR)4/8/8/K7 w - - 0 1"), "d4"), ["c6", "d5", "d6", "e5", "e6"], "c5 alone doesn't block c6 (the way is d5, d6)")
+	check_eq(_targets(_parse("4k3/8/3P4/8/3(BR)4/8/8/K7 w - - 0 1"), "d4"), ["c5", "d5", "e5"], "d6 blocks c6 and e6")
+	check(_parse("8/8/2k5/8/3(BR)4/8/8/K7 b - - 0 1").is_in_check(), "Checks c6 with d5 and d6 empty")
+	check(_parse("8/8/2k5/2P5/3(BR)4/8/8/K7 b - - 0 1").is_in_check(), "...a piece on c5 is no block")
+	check(not _parse("8/8/2k5/3p4/3(BR)4/8/8/K7 b - - 0 1").is_in_check(), "...a piece on d5 is")
 
 # --- Checking the two ways of finding attacks agree --------------------------------------
 
