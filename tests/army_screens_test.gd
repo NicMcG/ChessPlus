@@ -209,6 +209,29 @@ func test_main_starts_a_game_with_two_armies() -> void:
 	check(game.menu_button.visible, "Menu button shown")
 	main.free()
 
+func test_king_exposed_offers_other_armies_instead_of_play_again() -> void:
+	# A White rook on d1 looks straight up the open file at Black's king on d8,
+	# so the game ends before the first move, and would again with the same armies.
+	var white := _small_army("Rook")
+	white.place(preload("res://data/pieces/rook.tres"), Vector2i(3, 0))
+	var black := Army.new()
+	black.place(KING, Vector2i(4, 0))
+	var main: Node = load("res://scenes/main/main.tscn").instantiate()
+	main.library = _fresh_library()
+	_open(main)
+	main.start_game(white, black, Piece.Team.BLACK, PracticeBot.Level.EASY)
+	var game: Node = main.screen
+	check_eq(game.state.outcome(), GameState.Outcome.KING_EXPOSED, "Over before the first move")
+	check(game.game_over_panel.visible, "Result shown")
+	check_eq(game.game_over_panel.title_text(), "King exposed", "Headline")
+	check(game.game_over_panel.button("again") == null, "No Play again: it would end the same way")
+	check(game.new_game_button.disabled, "Nor the New game button")
+	check(game.game_over_panel.button("menu") != null, "Menu still offered")
+	game.game_over_panel.button("armies").pressed.emit()
+	check(main.screen != game, "Choose armies leaves the game")
+	check_eq(main.screen.scene_file_path, "res://scenes/menu/match_setup.tscn", "for the match setup")
+	main.free()
+
 # --- Default and Random armies ----------------------------------------------------
 
 func test_default_army_per_side() -> void:
