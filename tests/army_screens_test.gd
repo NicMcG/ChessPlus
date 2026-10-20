@@ -294,7 +294,7 @@ func test_share_and_import_an_army() -> void:
 	builder.backend = backend
 	_open(builder)
 	check(not builder.share_button.disabled, "A legal army can be shared")
-	await builder.share()
+	await builder.share_code()
 	var code_label: Label = builder.share_panel.find_child("Code", true, false)
 	check(code_label != null and code_label.text.length() == OnlineSession.CODE_LENGTH, "Shows a 5-letter code")
 	var code: String = code_label.text if code_label else ""
@@ -320,6 +320,83 @@ func test_share_and_import_an_army() -> void:
 	army_list.free()
 	backend.free()
 	MemoryBackend.clear()
+	_fresh_library()
+
+func test_army_text() -> void:
+	var standard := StandardSetup.army()
+	standard.army_name = "Sharer"
+	var text := ArmyShare.to_text(standard)
+	check_eq(text, 'Chess Plus army "Sharer": P P P P P P P P / R N B Q K B N R', "Front row first, then the back row")
+	var found := ArmyShare.from_text(text)
+	var back: Army = found.army
+	check(back != null, "Reads back: " + found.error)
+	if back:
+		check_eq(back.army_name, "Sharer", "Name")
+		check_eq(back.pieces.size(), 16, "16 pieces")
+		check_eq(back.def_at(Vector2i(3, 0)), QUEEN, "Queen on d1")
+		check_eq(back.def_at(Vector2i(4, 0)), KING, "King on e1")
+		check_eq(back.def_at(Vector2i(7, 1)), PAWN, "Pawn on h2")
+		check(back.mirror_for_black, "Turned round for Black like any built army")
+	# Two-letter symbols, empty squares, a name with quotes and a colon, and text
+	# written in lower case with extra spaces all read back.
+	var mixed := Army.new()
+	mixed.army_name = 'The "Wall": 2'
+	mixed.place(KING, Vector2i(4, 0))
+	mixed.place(load("res://data/pieces/paladin.tres"), Vector2i(0, 1))
+	mixed.place(ELEPHANT, Vector2i(2, 0))
+	var mixed_text := ArmyShare.to_text(mixed)
+	check_eq(mixed_text, 'Chess Plus army "The "Wall": 2": PD - - - - - - - / - - E - K - - -', "Two-letter symbols and empty squares")
+	var again: Army = ArmyShare.from_text("  " + mixed_text.to_lower().replace(" / ", "  /  ") + " ").army
+	check(again != null, "Lower case and extra spaces are fine")
+	if again:
+		check_eq(again.army_name, 'the "wall": 2', "Name kept whole")
+		check_eq(again.def_at(Vector2i(0, 1)).id, "paladin", "Paladin on a2")
+		check_eq(again.def_at(Vector2i(2, 0)), ELEPHANT, "Elephant on c1")
+		check_eq(again.pieces.size(), 3, "Nothing else")
+	# Broken text says what's wrong.
+	check(ArmyShare.from_text("hello").error.contains("isn't army text"), "Not army text")
+	check(ArmyShare.from_text('Chess Plus army "X": P P P / K').error.contains("8 squares"), "Rows too short")
+	check(ArmyShare.from_text('Chess Plus army "X": - - - - - - - - / - - - - K - - ZZ').error.contains("ZZ"), "Unknown piece letters")
+	check_eq(ArmyShare.from_text('Chess Plus army "": - - - - - - - - / - - - - K - - -').army.army_name, "Imported army", "A blank name gets one")
+
+func test_share_and_import_as_text() -> void:
+	var library := _fresh_library()
+	var mine := StandardSetup.army()
+	mine.army_name = "Sharer"
+	mine.mirror_for_black = true
+	var builder: Node = load("res://scenes/armies/army_builder.tscn").instantiate()
+	builder.setup(library, mine)
+	_open(builder)
+	# Share asks which way first; Copy as text shows the text (nothing uploaded).
+	builder.share()
+	var choices: Array = builder.share_panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	check_eq(choices, ["Get a code", "Copy as text", "Cancel"], "Share offers a code or text")
+	builder.share_panel.free()
+	builder.share_text()
+	var shown: Label = builder.share_panel.find_child("ArmyText", true, false)
+	check(shown != null and shown.text == ArmyShare.to_text(mine), "Shows the army text")
+	var text: String = shown.text if shown else ""
+	builder.free()
+	# A friend pastes it in.
+	library.save(_small_army("Sharer"))
+	var army_list: Node = load("res://scenes/armies/army_list.tscn").instantiate()
+	army_list.library = library
+	_open(army_list)
+	army_list.ask_import()
+	check(army_list.import_panel.find_child("TextEdit", true, false) != null, "Import army has a box for text")
+	army_list.import_text(text)
+	check(not is_instance_valid(army_list.import_panel) or army_list.import_panel.is_queued_for_deletion(), "Pop-up closes")
+	var names := library.armies().map(func(a: Army) -> String: return a.army_name)
+	check("Sharer (2)" in names, "Imported, renamed so names don't clash")
+	# An army breaking the rules (no king) isn't saved.
+	army_list.ask_import()
+	army_list.import_text('Chess Plus army "No king": - - - - - - - - / Q - - - - - - -')
+	var message: Label = army_list.import_panel.find_child("Message", true, false)
+	check(message.text.contains("army rules"), "Illegal army: " + message.text)
+	army_list.import_text("")
+	check(message.text.contains("Paste"), "Nothing pasted: " + message.text)
+	check_eq(library.armies().size(), 2, "Neither was saved")
+	army_list.free()
 	_fresh_library()
 
 func test_share_needs_a_legal_named_army() -> void:
