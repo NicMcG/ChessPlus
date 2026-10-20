@@ -519,8 +519,8 @@ impl<'a> Searcher<'a> {
         self.order(p, moves, tt_move, ply, scores, gains);
     }
 
-    /// Fills `scores` (move ordering, higher first) and `gains` (the capture
-    /// gain, `capture_gain`, where it was worked out, else NO_GAIN) for `moves`.
+    /// Fills `scores` (move ordering, higher first) for `moves`, and `gains`
+    /// with NO_GAIN (capture gains not worked out yet, `select`).
     fn order(&self, p: &Position, moves: &[Move], tt_move: Move, ply: usize, scores: &mut Vec<i32>, gains: &mut Vec<i32>) {
         let us = p.side;
         scores.clear();
@@ -528,21 +528,16 @@ impl<'a> Searcher<'a> {
         gains.resize(moves.len(), NO_GAIN);
         scores.extend(moves
             .iter()
-            .enumerate()
-            .map(|(i, m)| {
+            .map(|m| {
                 if *m == tt_move {
                     return 10_000_000;
                 }
                 let attacker = self.values[kind_of(p.sq[m.from as usize])];
                 if m.flags & F_CAPTURE != 0 {
+                    // As if it didn't lose material: `select` checks that
+                    // when it comes up.
                     let victim = self.values[kind_of(p.sq[victim_square(*m) as usize])];
                     let crack = if m.flags & F_CRACK != 0 { 50 } else { 0 };
-                    let gain = self.capture_gain(p, *m);
-                    gains[i] = gain;
-                    if gain < -50 {
-                        // Probably loses material: after the killers.
-                        return 650_000 + victim * 16 - attacker / 8;
-                    }
                     return 1_000_000 + victim * 16 - attacker / 8 + crack;
                 }
                 if m.promo != 0 {
@@ -567,7 +562,37 @@ impl<'a> Searcher<'a> {
             }));
     }
 
-    /// `capture_gain` of move `i`: as `order` worked it out, or now.
+    /// Selection sort step: brings the best-ordered of moves `i..` to `i`. A
+    /// capture's exchange (`capture_gain`) is only worked out when it comes up
+    /// (most nodes cut off before reaching every capture); if it probably
+    /// loses material, it goes back after the killers (650,000 instead of
+    /// 1,000,000 + crack bonus) and the next best comes up. The order is the
+    /// same as if every gain had been worked out first.
+    fn select(&self, p: &Position, moves: &mut [Move], scores: &mut [i32], gains: &mut [i32], i: usize) {
+        loop {
+            let mut bi = i;
+            for j in i + 1..moves.len() {
+                if scores[j] > scores[bi] {
+                    bi = j;
+                }
+            }
+            let m = moves[bi];
+            if m.flags & F_CAPTURE != 0 && gains[bi] == NO_GAIN && scores[bi] != 10_000_000 {
+                let gain = self.capture_gain(p, m);
+                gains[bi] = gain;
+                if gain < -50 {
+                    scores[bi] -= 350_000 + if m.flags & F_CRACK != 0 { 50 } else { 0 };
+                    continue;
+                }
+            }
+            moves.swap(i, bi);
+            scores.swap(i, bi);
+            gains.swap(i, bi);
+            return;
+        }
+    }
+
+    /// `capture_gain` of move `i`: as `select` worked it out, or now.
     #[inline]
     fn gain_of(&self, p: &Position, moves: &[Move], gains: &[i32], i: usize) -> i32 {
         if gains[i] != NO_GAIN {
@@ -704,16 +729,7 @@ impl<'a> Searcher<'a> {
             }
             let i = next;
             next += 1;
-            // Selection sort: the next best-ordered move.
-            let mut bi = i;
-            for j in i + 1..moves.len() {
-                if scores[j] > scores[bi] {
-                    bi = j;
-                }
-            }
-            moves.swap(i, bi);
-            scores.swap(i, bi);
-            gains.swap(i, bi);
+            self.select(p, &mut moves, &mut scores, &mut gains, i);
             let m = moves[i];
             // Captures that probably lose a lot, near the leaves.
             if !is_pv && !in_check && depth <= 4 && legal > 0 && m.flags & F_CAPTURE != 0 && best > -MATE_BOUND && self.gain_of(p, &moves, &gains, i) < -120 * depth {
@@ -914,15 +930,7 @@ impl<'a> Searcher<'a> {
         let mut best_move = Move::NONE;
         let mut legal = 0;
         for i in 0..moves.len() {
-            let mut bi = i;
-            for j in i + 1..moves.len() {
-                if scores[j] > scores[bi] {
-                    bi = j;
-                }
-            }
-            moves.swap(i, bi);
-            scores.swap(i, bi);
-            gains.swap(i, bi);
+            self.select(p, &mut moves, &mut scores, &mut gains, i);
             let m = moves[i];
             // Captures that probably lose material.
             if !in_check && m.flags & F_CAPTURE != 0 && self.gain_of(p, &moves, &gains, i) < -50 {
