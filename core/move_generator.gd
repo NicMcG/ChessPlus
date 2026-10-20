@@ -94,7 +94,7 @@ static func _apply_guards(state: GameState, moves: Array[Move]) -> Array[Move]:
 	for square: Vector2i in defenders:
 		var guard: Piece = defenders[square]
 		if not guard.def.protects.is_empty():
-			for reached: Vector2i in reach_squares(board, square, guard):
+			for reached: Vector2i in pattern_squares(board, square, guard):
 				var other := board.get_piece(reached)
 				if other and other.team == guard.team and other.def.id in guard.def.protects:
 					protected[reached] = true
@@ -148,6 +148,32 @@ static func reach_squares(board: Board, from: Vector2i, piece: Piece) -> Diction
 					break
 	return squares
 
+## Every square in the piece's move pattern from `from`, as if nothing stood in
+## the way (on the board, though). The Squire protects Knights anywhere in its
+## pattern, even with pieces in between (Mac, Oct 2026).
+static func pattern_squares(board: Board, from: Vector2i, piece: Piece) -> Dictionary:
+	var squares := {}
+	for rule in piece.def.move_rules:
+		if not rule.path.is_empty():
+			for steps: Array in rule.path_variants():
+				var to := from
+				for step: Vector2i in steps:
+					to += _orient(step, piece.team)
+				if board.in_bounds(to):
+					squares[to] = true
+			continue
+		var limit := _step_limit(rule, piece, board)
+		for dir in rule.directions:
+			var step := _orient(dir, piece.team)
+			var to := from
+			for i in range(limit):
+				to += step
+				if not board.in_bounds(to):
+					break
+				if i >= rule.leap_steps:
+					squares[to] = true
+	return squares
+
 ## Why the piece on `from` can't move or capture onto `to`, if it's down to a
 ## Parapet or a Squire (Mac: they react when that's tried): the square of the
 ## Squire protecting a Knight on `to`, or of a Parapet in the way (without it,
@@ -162,7 +188,7 @@ static func blocker(state: GameState, from: Vector2i, to: Vector2i) -> Vector2i:
 		var guards := board.pieces_of(target.team)
 		for square: Vector2i in guards.keys():
 			var guard: Piece = guards[square]
-			if target.def.id in guard.def.protects and reach_squares(board, square, guard).has(to):
+			if target.def.id in guard.def.protects and pattern_squares(board, square, guard).has(to):
 				return square
 	# The opponent's Parapets, each tried two ways: taken away (it was in the
 	# way of a slide), and turned into an ordinary piece (it stopped a leap, or
