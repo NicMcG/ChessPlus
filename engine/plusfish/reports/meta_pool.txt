@@ -1,13 +1,14 @@
 # Chess Plus army pool grown by `plusfish meta --wide` (wide eval-guided climbs; games decide who stays).
-# After round 8. Games = mean score against the rest of the pool (40 games per pair, 6000 nodes per move); eval = mean turn-0 advantage at 20000 nodes (cp).
+# Oct 2026, engine of PR #19: the old pool + the 10 armies of a 17-round run, the 10 best kept by games (drop the lowest against the rest).
+# Games = mean score against the rest of the pool (40 games per pair, 6000 nodes per move); eval = mean turn-0 advantage at 20000 nodes (cp).
 # army | name | cost | games (Elo) | eval | pieces
-1B(SQ)KV2(SQ)/ANB(RM)(RM)1AR | Wide 8b | 39 | 69.6% (+144) | +255 | Rook, 2 Archer, Vampire, 2 Bishop, Knight, 2 Ram, 2 Squire
-(SQ)1(NC)NK(SQ)(RM)1/PV1Q(BR)VB1 | Wide 7a | 39 | 68.9% (+138) | +138 | Queen, 2 Vampire, Necromancer, Bishop, Knight, Ram, 2 Squire, Berserker, Pawn
-1V(SQ)CKV(SQ)1/2AA(RM)(BR)(RM)(NC) | Meta C 19 | 39 | 63.5% (+96) | +123 | 2 Archer, Cannon, 2 Vampire, Necromancer, 2 Ram, 2 Squire, Berserker
-Q2KNVPA/1A(SQ)(SQ)NP1B | Wide 6a | 39 | 55.1% (+36) | +60 | Queen, 2 Archer, Vampire, Bishop, 2 Knight, 2 Squire, 2 Pawn
-(NC)VPKW2R/1(SQ)A(RM)V1(SQ)1 | Wide 6c | 39 | 54.9% (+34) | +19 | Wizard, Rook, Archer, 2 Vampire, Necromancer, Ram, 2 Squire, Pawn
-1P(NC)K1PW1/B1(SQ)(RM)VALA | Meta C 63 | 39 | 50.4% (+3) | -50 | Wizard, 2 Archer, Vampire, Lance, Necromancer, Bishop, Ram, Squire, 2 Pawn
-G1QK(NC)1PP/PN1(RM)(SQ)VAB | Wide 1a | 39 | 37.9% (-86) | -214 | Queen, Archer, Vampire, Necromancer, Bishop, Ghost, Knight, Ram, Squire, 3 Pawn
-VB(SQ)KC(CV)1(SQ)/PPB(RM)V(RM)NP | Wide 3b | 39 | 37.2% (-91) | -20 | Cannon, 2 Vampire, 2 Bishop, Cavalry, Knight, 2 Ram, 2 Squire, 3 Pawn
-PP(SQ)NK(NC)P1/Q(RM)(SQ)V(BD)B1P | Meta C 71 | 39 | 36.7% (-95) | -163 | Queen, Vampire, Bard, Necromancer, Bishop, Knight, Ram, 2 Squire, 4 Pawn
-1(NC)1(SQ)KWP1/BVVG(RO)R1P | Wide 3c | 39 | 25.8% (-183) | -149 | Wizard, Rook, 2 Vampire, Necromancer, Rogue, Bishop, Ghost, Squire, 2 Pawn
+Q2KNVPA/1A(SQ)(SQ)NP1B | Wide 6a | 39 | 56.7% (+47) | +72 | Queen, 2 Archer, Vampire, Bishop, 2 Knight, 2 Squire, 2 Pawn
+1(SQ)VK1NQ1/1N(BD)(SQ)VB1(NC) | Search 17c | 39 | 56.7% (+47) | +82 | Queen, 2 Vampire, Bard, Necromancer, Bishop, 2 Knight, 2 Squire
+1V(SQ)CKV(SQ)1/2AA(RM)(BR)(RM)(NC) | Meta C 19 | 39 | 53.6% (+25) | -12 | 2 Archer, Cannon, 2 Vampire, Necromancer, 2 Ram, 2 Squire, Berserker
+(NC)VPKW2R/1(SQ)A(RM)V1(SQ)1 | Wide 6c | 39 | 53.2% (+22) | -1 | Wizard, Rook, Archer, 2 Vampire, Necromancer, Ram, 2 Squire, Pawn
+3K1(RM)QB/B(SQ)1(SQ)VLV(NC) | Search 15a | 39 | 52.9% (+20) | -10 | Queen, 2 Vampire, Lance, Necromancer, 2 Bishop, Ram, 2 Squire
+1(BR)1K(PR)2Q/BB(CV)VV1(NC)1 | Search 15c | 39 | 51.7% (+12) | +141 | Queen, Princess, 2 Vampire, Necromancer, 2 Bishop, Cavalry, Berserker
+1B(SQ)KV1R1/AMB(RM)(RM)(SQ)1A | Search 16b | 39 | 48.6% (-10) | -4 | Rook, 2 Archer, Vampire, 2 Bishop, Man, 2 Ram, 2 Squire
+1(NC)(SQ)K4/LVAVQ1(PA)A | Search 17a | 39 | 47.8% (-15) | +52 | Queen, 2 Archer, 2 Vampire, Lance, Necromancer, Parapet, Squire
+PP(SQ)NK(NC)P1/Q(RM)(SQ)V(BD)B1P | Meta C 71 | 39 | 42.2% (-54) | -97 | Queen, Vampire, Bard, Necromancer, Bishop, Knight, Ram, 2 Squire, 4 Pawn
+1P(NC)K1PW1/B1(SQ)(RM)VALA | Meta C 63 | 39 | 36.7% (-95) | -224 | Wizard, 2 Archer, Vampire, Lance, Necromancer, Bishop, Ram, Squire, 2 Pawn

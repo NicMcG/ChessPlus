@@ -230,6 +230,8 @@ pub struct Rules {
     pub guards: u64,
     /// The Haunt kind (the Ghost), or NO_KIND.
     pub haunt_kind: u8,
+    /// Kinds that can ever be on the board in this game (forms included).
+    pub kinds_present: u64,
     ray_sq: Vec<u8>,
     rays: Vec<Ray>,
     ray_index: Vec<(u32, u32)>,
@@ -517,6 +519,7 @@ impl Rules {
             parapets,
             guards,
             haunt_kind,
+            kinds_present,
             ray_sq,
             rays,
             ray_index,
@@ -1201,6 +1204,129 @@ impl Position {
         false
     }
 
+    /// For the search: the squares where a quiet move (no capture,
+    /// shield break, promotion, ability or castling; `quiet_might_check`,
+    /// `quiet_surely_legal`) could change whether `by` attacks the other
+    /// side's king, as `attacked` sees it: for each attack line towards that
+    /// king along which one of `by`'s kinds attacks, the squares `attacked`
+    /// walks (up to and including the piece that ends the walk); and for each
+    /// of `by`'s leaping or path pieces whose capture pattern reaches the
+    /// king, its square and the squares on its way. `by_moves`: the move is
+    /// `by`'s (it may itself attack along any line); if not, only lines with
+    /// an attacker of `by` on them count, and the move mustn't be a Parapet's
+    /// (it could stop or free `by`'s leaps; the caller checks). With a
+    /// piece of the side to move asleep, every square when `by` is that side
+    /// (the sleeping piece may be attacking the king already).
+    pub fn attack_sensitive(&self, r: &Rules, by: usize, by_moves: bool) -> u128 {
+        if self.frozen != NO_SQ && by == self.side {
+            return u128::MAX;
+        }
+        let pp = r.parapets != 0;
+        let mut kinds = 0u64;
+        for s in bits(self.occ[by]) {
+            kinds |= 1u64 << kind_of(self.sq[s]);
+        }
+        let mut sens = 0u128;
+        for king in bits(self.kings[1 - by]) {
+            let (a, b) = r.rev_index[by][king];
+            for rr in &r.rev[a as usize..b as usize] {
+                let line = &r.lines[by][rr.line as usize];
+                if (line.plain_mask | line.hop_mask) & kinds == 0 {
+                    continue;
+                }
+                let hops = line.hop_mask & kinds != 0;
+                let mut screens = 0;
+                let mut walk = 0u128;
+                let mut walking = true;
+                // If the move isn't `by`'s, the line only matters with one of
+                // `by`'s attackers on it.
+                let mut attacker = by_moves;
+                for &p in &r.rev_sq[rr.start as usize..rr.start as usize + rr.len as usize] {
+                    if pp && line.big && r.leap_blocked(&self.sq, p as usize, line.dx, line.dy, by) {
+                        break;
+                    }
+                    if walking {
+                        walk |= 1u128 << p;
+                    }
+                    let c = self.sq[p as usize];
+                    if c == 0 {
+                        continue;
+                    }
+                    if team_of(c) == by && (line.plain_mask | line.hop_mask) & (1u64 << kind_of(c)) != 0 {
+                        attacker = true;
+                    }
+                    if walking {
+                        screens += 1;
+                        if screens > 1 || !hops || (pp && r.stops_jumps(c, by)) {
+                            walking = false;
+                        }
+                    }
+                    if !walking && attacker {
+                        break;
+                    }
+                }
+                if attacker {
+                    sens |= walk;
+                }
+            }
+            if r.unusual[by] & kinds != 0 {
+                for from in bits(self.occ[by]) {
+                    let k = kind_of(self.sq[from]);
+                    if r.unusual[by] & (1u64 << k) == 0 {
+                        continue;
+                    }
+                    for ray in r.rays_of(k, by, from) {
+                        if ray.mode == Mode::MoveOnly || !(ray.is_path || ray.leap > 0) {
+                            continue;
+                        }
+                        let sqs = r.ray_squares(ray);
+                        if let Some(idx) = sqs.iter().position(|&q| q as usize == king) {
+                            if !ray.is_path || idx + 1 == sqs.len() {
+                                sens |= 1u128 << from;
+                                for &q in &sqs[..=idx] {
+                                    sens |= 1u128 << q;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        sens
+    }
+
+    /// Is quiet move `m` (as in `attack_sensitive`) surely legal? Yes if the
+    /// side to move isn't in check, it isn't a king or Parapet move and it
+    /// neither leaves nor lands on a square of `sens` =
+    /// `attack_sensitive(r, 1 - side, false)`.
+    #[inline]
+    pub fn quiet_surely_legal(&self, r: &Rules, m: Move, sens: u128) -> bool {
+        let info = &r.info[kind_of(self.sq[m.from as usize])];
+        !info.is_king && !info.blocks_jumps && sens & (1u128 << m.from | 1u128 << m.to) == 0
+    }
+
+    /// Could quiet move `m` (as in `attack_sensitive`) give check? False only
+    /// if it surely doesn't: it neither leaves nor lands on a square of `sens`
+    /// = `attack_sensitive(r, side, true)`, and if the piece leaps or follows a
+    /// path, no such capture pattern from its new square reaches the king.
+    #[inline]
+    pub fn quiet_might_check(&self, r: &Rules, m: Move, sens: u128) -> bool {
+        if sens & (1u128 << m.from | 1u128 << m.to) != 0 {
+            return true;
+        }
+        let us = self.side;
+        let k = kind_of(self.sq[m.from as usize]);
+        if r.unusual[us] & (1u64 << k) != 0 {
+            let kings = self.kings[1 - us];
+            for ray in r.rays_of(k, us, m.to as usize) {
+                if ray.mode != Mode::MoveOnly && (ray.is_path || ray.leap > 0) && r.ray_squares(ray).iter().any(|&q| kings & (1u128 << q) != 0) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     #[inline(always)]
     fn push(&self, r: &Rules, kind: usize, us: usize, m: Move, out: &mut Vec<Move>) {
         if r.info[kind].can_promote && m.flags & F_SHIELD == 0 && !r.promo.is_empty() && r.rank(m.to as usize) == r.far_rank(us) {
@@ -1225,12 +1351,38 @@ impl Position {
     /// GEN_CAPTURES (captures, shield breaks, Crack Shots), or GEN_TACTICAL
     /// (those plus quiet promotions).
     pub fn gen_pseudo(&self, r: &Rules, out: &mut Vec<Move>, mode: u8) {
+        self.gen_some(r, out, mode, self.occ[self.side], true);
+    }
+
+    /// Is `m` one of the moves `gen_pseudo` gives in `mode`? For a move from
+    /// elsewhere (the hash table), so that it can be played before generating
+    /// all the moves. `buf`: scratch space.
+    pub fn is_pseudo_legal(&self, r: &Rules, m: Move, mode: u8, buf: &mut Vec<Move>) -> bool {
+        let from = m.from as usize;
+        if from >= r.nsq {
+            return false;
+        }
+        if m.flags & F_HAUNT != 0 {
+            return mode == GEN_ALL && m == Move { from: m.from, to: m.from, flags: F_HAUNT, promo: 0, extra: r.haunt_kind, steps: 0 } && self.ghosts[self.side] != 0 && self.sq[from] == 0;
+        }
+        if self.occ[self.side] & (1u128 << from) == 0 {
+            return false;
+        }
+        buf.clear();
+        self.gen_some(r, buf, mode, 1u128 << from, false);
+        buf.contains(&m)
+    }
+
+    /// `gen_pseudo` for the side to move's pieces on `pieces`, and Haunts if
+    /// `haunts`.
+    #[inline(always)]
+    fn gen_some(&self, r: &Rules, out: &mut Vec<Move>, mode: u8, pieces: u128, haunts: bool) {
         let us = self.side;
         let tactical_only = mode != GEN_ALL;
         let far = r.far_rank(us);
         let pp = r.parapets != 0;
         let first = out.len();
-        for from in bits(self.occ[us]) {
+        for from in bits(pieces) {
             // A piece put to sleep by Song of Slumber can't move this turn.
             if from == self.frozen as usize {
                 continue;
@@ -1368,7 +1520,7 @@ impl Position {
         }
         // Haunt: a lost Ghost that hasn't used it can come back onto any empty
         // square.
-        if !tactical_only && self.ghosts[us] != 0 {
+        if haunts && !tactical_only && self.ghosts[us] != 0 {
             let empty = !self.occupied();
             for s in 0..r.nsq {
                 if empty & (1u128 << s) != 0 {
