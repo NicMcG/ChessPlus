@@ -885,10 +885,17 @@ func _start_live_analysis() -> void:
 		moves.append(move.to_text())
 	plusfish.analyse_live(_create_start_state(), moves)
 
+## Whether the best-move hints (blue arrow, "best: ..." in the status line) show
+## while the game is on. Only in testing mode, which is for studying positions;
+## in real games they show only after the game, so the engine never tells anyone
+## what to play.
+func live_best_move() -> bool:
+	return testing_position != null
+
 ## Show (or hide) the bar, the best-move arrow and the eval in the status line
 ## for the position on the board. The bar shows after the game, and during it
-## if live_eval(); the best-move hints only ever after the game, so the engine
-## never tells anyone what to play.
+## if live_eval(); the best-move hints after the game, and during it if
+## live_best_move().
 func _update_eval_bar() -> void:
 	var on := (is_over() or live_eval()) and PlusfishLink.available() and _plusfish_knows_pieces()
 	if on and not is_over():
@@ -918,7 +925,7 @@ func _update_eval_bar() -> void:
 	elif found.get("outcome", "none") != "none":
 		result = "1/2-1/2"
 	eval_bar.set_score(int(found["cp"]), found.get("mate"), result)
-	var best: String = found.get("best", "") if is_over() else ""
+	var best: String = found.get("best", "") if is_over() or live_best_move() else ""
 	board_view.hint_arrow = _arrow_for(best)
 	if best != "" and result == "":
 		status_label.text = "%s  ·  best: %s" % [_status_base, found.get("best_san", best)]
