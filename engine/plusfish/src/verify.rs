@@ -241,10 +241,19 @@ impl Coverage {
             let shielded_by_squire = p.squares(them).any(|s| {
                 let c = p.sq[s];
                 let prot = r.info[kind_of(c)].protects;
-                prot != 0 && bits128(p.reach(r, s, c) & p.occ[them]).any(|q| prot & (1u64 << kind_of(p.sq[q])) != 0 && p.attacked(r, q, p.side))
+                prot != 0 && bits128(p.pattern(r, s, c) & p.occ[them]).any(|q| prot & (1u64 << kind_of(p.sq[q])) != 0 && p.attacked(r, q, p.side))
             });
             if shielded_by_squire {
                 self.add("positions where a Squire protects an attacked piece");
+            }
+            // ...one it couldn't move to (pieces in between: Mac's Oct 2026 rule).
+            let through = p.squares(them).any(|s| {
+                let c = p.sq[s];
+                let prot = r.info[kind_of(c)].protects;
+                prot != 0 && bits128(p.pattern(r, s, c) & !p.reach(r, s, c) & p.occ[them]).any(|q| prot & (1u64 << kind_of(p.sq[q])) != 0 && p.attacked(r, q, p.side))
+            });
+            if through {
+                self.add("...with a piece in the Squire's way");
             }
         }
         legal.retain(|m| m.flags & F_HAUNT != 0);
