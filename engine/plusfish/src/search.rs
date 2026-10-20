@@ -129,13 +129,152 @@ const CORR_TABLES: usize = 5;
 /// Entries are hundredths of a point times CORR_GRAIN, at most +-CORR_MAX.
 const CORR_GRAIN: i32 = 256;
 const CORR_MAX: i32 = 64 * CORR_GRAIN;
-/// How much each table counts (64 = all of it): material, pawns, White's
-/// pieces, Black's pieces, last move.
-const CORR_WEIGHTS: [i32; CORR_TABLES] = [32, 32, 32, 32, 32];
 
 const B_EXACT: u8 = 1;
 const B_LOWER: u8 = 2;
 const B_UPPER: u8 = 3;
+
+/// One tunable search constant: its name (also the UCI option name), the
+/// default, the range it may take, and SPSA's perturbation size (`c`, roughly
+/// a change that costs a few Elo).
+#[derive(Clone, Copy, Debug)]
+pub struct ParamSpec {
+    pub name: &'static str,
+    pub default: i32,
+    pub min: i32,
+    pub max: i32,
+    pub c: f64,
+}
+
+macro_rules! search_params {
+    ($($(#[$doc:meta])* $name:ident = $def:expr, $min:expr, $max:expr, $c:expr;)*) => {
+        /// The search's margins and limits as plain fields (read in the hot
+        /// path like constants). Defaults are the hand-set values; UCI
+        /// `setoption name <field> value <n>` and `plusfish spsa` change them.
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        pub struct SearchParams {
+            $($(#[$doc])* pub $name: i32,)*
+            /// From lmr_base / lmr_div (hundredths), worked out once.
+            pub lmr_base_f: f32,
+            pub lmr_div_f: f32,
+        }
+
+        pub const SEARCH_PARAM_SPECS: &[ParamSpec] = &[$(ParamSpec { name: stringify!($name), default: $def, min: $min, max: $max, c: $c },)*];
+
+        impl Default for SearchParams {
+            fn default() -> Self {
+                let mut p = SearchParams { $($name: $def,)* lmr_base_f: 0.0, lmr_div_f: 1.0 };
+                p.derive();
+                p
+            }
+        }
+
+        impl SearchParams {
+            pub fn get(&self, name: &str) -> Option<i32> {
+                match name {
+                    $(stringify!($name) => Some(self.$name),)*
+                    _ => None,
+                }
+            }
+
+            /// Sets one constant by name (clamped to its range); false if
+            /// there's no such name.
+            pub fn set(&mut self, name: &str, v: i32) -> bool {
+                let spec = match SEARCH_PARAM_SPECS.iter().find(|s| s.name == name) {
+                    Some(s) => s,
+                    None => return false,
+                };
+                let v = v.clamp(spec.min, spec.max);
+                match name {
+                    $(stringify!($name) => self.$name = v,)*
+                    _ => return false,
+                }
+                self.derive();
+                true
+            }
+        }
+    };
+}
+
+search_params! {
+    /// Reverse futility: margin per depth, bonus when improving, max depth.
+    rfp_margin = 90, 20, 250, 10.0;
+    rfp_improving = 45, 0, 150, 10.0;
+    rfp_depth = 6, 1, 12, 0.6;
+    /// Null move: min depth; reduction = (nmp_base + depth * nmp_depth_mul) / 256.
+    nmp_depth = 3, 1, 8, 0.6;
+    nmp_base = 768, 256, 1536, 64.0;
+    nmp_depth_mul = 64, 0, 192, 12.0;
+    /// Quiet moves with SEE < -see_quiet * depth^2, depth <= see_quiet_depth.
+    see_quiet = 50, 5, 200, 8.0;
+    see_quiet_depth = 3, 0, 8, 0.6;
+    /// Captures with SEE < -see_capture * depth, depth <= see_capture_depth.
+    see_capture = 120, 10, 400, 15.0;
+    see_capture_depth = 4, 0, 10, 0.6;
+    /// Late-move pruning: more than (base + depth^2 * mul) / 100 quiet moves,
+    /// depth <= lmp_depth (the _imp pair when improving).
+    lmp_base = 300, 0, 1000, 50.0;
+    lmp_mul = 200, 50, 600, 30.0;
+    lmp_base_imp = 400, 0, 1000, 50.0;
+    lmp_mul_imp = 300, 50, 800, 40.0;
+    lmp_depth = 3, 0, 8, 0.6;
+    /// Futility: static eval + fut_base + fut_mul * depth <= alpha, depth <= fut_depth.
+    fut_base = 100, 0, 400, 15.0;
+    fut_mul = 120, 20, 400, 15.0;
+    fut_depth = 3, 0, 8, 0.6;
+    /// LMR: (lmr_base + ln depth * ln moves / lmr_div) in hundredths, -lmr_pv
+    /// on PV nodes, -history / lmr_history; from lmr_depth and after
+    /// lmr_moves (lmr_moves_pv) moves.
+    lmr_base = 75, -100, 300, 10.0;
+    lmr_div = 220, 100, 500, 20.0;
+    lmr_pv = 1, 0, 3, 0.6;
+    lmr_history = 9000, 1000, 30000, 1200.0;
+    lmr_depth = 3, 1, 8, 0.6;
+    lmr_moves = 2, 1, 8, 0.6;
+    lmr_moves_pv = 4, 1, 10, 0.6;
+    /// History bonus: depth^2 * hist_mul, at most hist_max.
+    hist_mul = 16, 2, 64, 2.0;
+    hist_max = 1600, 200, 6000, 200.0;
+    /// Aspiration window: first half-width.
+    asp_delta = 30, 5, 150, 5.0;
+    /// Quiescence: delta margin; captures with SEE below -q_see are skipped.
+    q_delta = 150, 0, 600, 20.0;
+    q_see = 50, 0, 300, 10.0;
+    /// Move ordering: captures with SEE below -order_see go after the killers.
+    order_see = 50, 0, 300, 10.0;
+    /// Capture ordering: capture history divided by this.
+    cap_order_div = 8, 1, 64, 1.5;
+    /// Singular extensions: least depth; margin per depth (hundredths of a
+    /// centipawn) below the hash move's score that the other moves must stay under.
+    se_depth = 7, 4, 14, 0.6;
+    se_margin = 200, 25, 1000, 40.0;
+    /// Correction history: weight of the material, pawn, per-side pieces and
+    /// last-move tables (64 = all of it); update = diff * depth / corr_bonus_div.
+    corr_w_mat = 32, 0, 128, 6.0;
+    corr_w_pawn = 32, 0, 128, 6.0;
+    corr_w_pieces = 32, 0, 128, 6.0;
+    corr_w_last = 32, 0, 128, 6.0;
+    corr_bonus_div = 8, 2, 32, 1.5;
+}
+
+impl SearchParams {
+    fn derive(&mut self) {
+        self.lmr_base_f = self.lmr_base as f32 / 100.0;
+        self.lmr_div_f = self.lmr_div as f32 / 100.0;
+    }
+
+    /// "name=value;name=value" (as enginematch's --uci-a takes) for the
+    /// constants that differ from the defaults.
+    pub fn changed_text(&self) -> String {
+        let d = SearchParams::default();
+        SEARCH_PARAM_SPECS
+            .iter()
+            .filter(|s| self.get(s.name) != d.get(s.name))
+            .map(|s| format!("{}={}", s.name, self.get(s.name).unwrap()))
+            .collect::<Vec<_>>()
+            .join(";")
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Limits {
@@ -184,6 +323,8 @@ pub struct Searcher<'a> {
     pub r: &'a Rules,
     pub et: &'a EvalTables,
     pub params: &'a Params,
+    /// Search margins and limits (defaults unless tuning).
+    pub sp: SearchParams,
     tt: Arc<TT>,
     age: u8,
     killers: [[Move; 2]; MAX_PLY + 2],
@@ -284,6 +425,7 @@ impl<'a> Searcher<'a> {
             r,
             et,
             params,
+            sp: SearchParams::default(),
             tt: Arc::new(TT::new(tt_mb)),
             age: 0,
             killers: [[Move::NONE; 2]; MAX_PLY + 2],
@@ -388,22 +530,26 @@ impl<'a> Searcher<'a> {
 
     /// The static evaluation plus what the correction history has learned.
     fn corrected(&self, raw: i32, slots: &[usize; CORR_TABLES]) -> i32 {
+        // How much each table counts (64 = all of it): material, pawns,
+        // White's pieces, Black's pieces, last move.
+        let sp = &self.sp;
+        let weights = [sp.corr_w_mat, sp.corr_w_pawn, sp.corr_w_pieces, sp.corr_w_pieces, sp.corr_w_last];
         let mut sum = 0;
         for t in 0..CORR_TABLES {
-            if CORR_WEIGHTS[t] != 0 && slots[t] != usize::MAX {
-                sum += self.corr[slots[t]] as i32 * CORR_WEIGHTS[t];
+            if weights[t] != 0 && slots[t] != usize::MAX {
+                sum += self.corr[slots[t]] as i32 * weights[t];
             }
         }
         (raw + sum / (64 * CORR_GRAIN)).clamp(-MATE_BOUND + 1, MATE_BOUND - 1)
     }
 
     /// `diff` = search result - corrected evaluation: each entry gains
-    /// diff * depth / 8 (bounded), shrinking as it nears CORR_MAX ("gravity",
+    /// diff * depth / corr_bonus_div (bounded), shrinking as it nears CORR_MAX ("gravity",
     /// as Stockfish does it).
     fn update_corr(&mut self, slots: &[usize; CORR_TABLES], diff: i32, depth: i32) {
-        let bonus = (diff * CORR_GRAIN * depth / 8).clamp(-CORR_MAX / 4, CORR_MAX / 4);
+        let bonus = (diff * CORR_GRAIN * depth / self.sp.corr_bonus_div).clamp(-CORR_MAX / 4, CORR_MAX / 4);
         for t in 0..CORR_TABLES {
-            if CORR_WEIGHTS[t] != 0 && slots[t] != usize::MAX {
+            if slots[t] != usize::MAX {
                 let e = &mut self.corr[slots[t]];
                 let v = *e as i32 + bonus - *e as i32 * bonus.abs() / CORR_MAX;
                 *e = v.clamp(-CORR_MAX, CORR_MAX) as i16;
@@ -477,7 +623,7 @@ impl<'a> Searcher<'a> {
             let mut lines: Vec<Line> = Vec::new();
             self.root_excluded.clear();
             for idx in 0..multipv {
-                let mut delta = 30;
+                let mut delta = self.sp.asp_delta;
                 let mut alpha = -INF;
                 let mut beta = INF;
                 if depth >= 4 && !is_mate(prev_scores[idx]) {
@@ -582,6 +728,7 @@ impl<'a> Searcher<'a> {
         let helper_stop = Arc::new(AtomicBool::new(false));
         let (r, et, params) = (self.r, self.et, self.params);
         let age = self.age;
+        let sp = self.sp;
         std::thread::scope(|sc| {
             let mut handles = Vec::new();
             for i in 1..threads {
@@ -590,6 +737,7 @@ impl<'a> Searcher<'a> {
                 handles.push(sc.spawn(move || {
                     let mut h = Searcher::new(r, et, params, 1);
                     h.tt = tt;
+                    h.sp = sp;
                     h.age = age;
                     h.stop = hs;
                     h.depth_offset = (i % 2) as i32;
@@ -671,7 +819,7 @@ impl<'a> Searcher<'a> {
                     // when it comes up.
                     let victim = self.values[kind_of(p.sq[victim_square(*m) as usize])];
                     let crack = if m.flags & F_CRACK != 0 { 50 } else { 0 };
-                    let ch = self.cap_hist[self.cap_index(p, *m)] as i32 / CAP_ORDER_DIV;
+                    let ch = self.cap_hist[self.cap_index(p, *m)] as i32 / self.sp.cap_order_div;
                     return 1_000_000 + victim * 16 - attacker / 8 + crack + ch;
                 }
                 if m.promo != 0 {
@@ -714,7 +862,7 @@ impl<'a> Searcher<'a> {
             if m.flags & F_CAPTURE != 0 && gains[bi] == NO_GAIN && scores[bi] != 10_000_000 {
                 let gain = self.capture_gain(p, m);
                 gains[bi] = gain;
-                if gain < -50 {
+                if gain < -self.sp.order_see {
                     scores[bi] -= 350_000 + if m.flags & F_CRACK != 0 { 50 } else { 0 };
                     continue;
                 }
@@ -839,11 +987,11 @@ impl<'a> Searcher<'a> {
 
         if !is_pv && !in_check && !root && excluded == Move::NONE {
             // Reverse futility pruning.
-            if depth <= 6 && static_eval - 90 * depth + if improving { 45 } else { 0 } >= beta && !is_mate(beta) {
+            if depth <= self.sp.rfp_depth && static_eval - self.sp.rfp_margin * depth + if improving { self.sp.rfp_improving } else { 0 } >= beta && !is_mate(beta) {
                 return static_eval;
             }
             // Null move: if passing still beats beta, a real move surely will.
-            if !was_null && depth >= 3 && static_eval >= beta && self.has_pieces(p, us) {
+            if !was_null && depth >= self.sp.nmp_depth && static_eval >= beta && self.has_pieces(p, us) {
                 let mut child = p.clone();
                 child.ep = 0;
                 child.ep_victim = NO_SQ;
@@ -851,7 +999,7 @@ impl<'a> Searcher<'a> {
                 child.halfmove += 1;
                 child.set_side(r, 1 - us);
                 child.update_key(r);
-                let rd = 3 + depth / 4;
+                let rd = (self.sp.nmp_base + depth * self.sp.nmp_depth_mul) / 256;
                 self.keys.push(p.key);
                 self.played[ply] = Move::NONE;
                 self.ckeys[ply] = NO_KEY;
@@ -871,10 +1019,10 @@ impl<'a> Searcher<'a> {
         // extended. If even the others beat beta, cut off (multi-cut); if the
         // hash move beats beta without being singular, search it shallower.
         let mut se_ext = 0;
-        if !root && depth >= SE_DEPTH && (ply as i32) < 2 * self.root_depth && tt_move != Move::NONE && excluded == Move::NONE && e.key == p.tt_key() && (e.bound == B_LOWER || e.bound == B_EXACT) && e.depth as i32 >= depth - 3 {
+        if !root && depth >= self.sp.se_depth && (ply as i32) < 2 * self.root_depth && tt_move != Move::NONE && excluded == Move::NONE && e.key == p.tt_key() && (e.bound == B_LOWER || e.bound == B_EXACT) && e.depth as i32 >= depth - 3 {
             let tt_score = from_tt(e.score as i32, ply);
             if !is_mate(tt_score) {
-                let sbeta = tt_score - SE_MARGIN * depth;
+                let sbeta = tt_score - self.sp.se_margin * depth / 100;
                 self.excluded[ply] = tt_move;
                 let s = self.negamax(p, (depth - 1) / 2, sbeta - 1, sbeta, ply, false, false);
                 self.excluded[ply] = Move::NONE;
@@ -935,22 +1083,23 @@ impl<'a> Searcher<'a> {
             self.select(p, &mut moves, &mut scores, &mut gains, i);
             let m = moves[i];
             // Captures that probably lose a lot, near the leaves.
-            if !is_pv && !in_check && depth <= 4 && legal > 0 && m.flags & F_CAPTURE != 0 && best > -MATE_BOUND && self.gain_of(p, &moves, &gains, i) < -120 * depth {
+            if !is_pv && !in_check && depth <= self.sp.see_capture_depth && legal > 0 && m.flags & F_CAPTURE != 0 && best > -MATE_BOUND && self.gain_of(p, &moves, &gains, i) < -self.sp.see_capture * depth {
                 continue;
             }
             let quiet = !m.is_tactical() && m.flags & (F_ABILITY | F_CASTLE) == 0;
             // Quiet moves near the leaves, unless they give check. `n`: this
             // move's number among the legal moves, if it's legal.
             let n = legal + 1;
-            let prune_quiet = !is_pv && !in_check && quiet && depth <= 3 && best > -MATE_BOUND && {
+            let sp = &self.sp;
+            let prune_quiet = !is_pv && !in_check && quiet && best > -MATE_BOUND && {
                 // Late move pruning.
-                let lmp_limit = if improving { 4 + depth * depth * 3 } else { 3 + depth * depth * 2 };
-                n > lmp_limit
+                let lmp_limit = if improving { (sp.lmp_base_imp + depth * depth * sp.lmp_mul_imp) / 100 } else { (sp.lmp_base + depth * depth * sp.lmp_mul) / 100 };
+                (depth <= sp.lmp_depth && n > lmp_limit)
                     // Futility pruning: a quiet move can't lift a position
                     // this far below alpha.
-                    || (n > 1 && static_eval + 100 + 120 * depth <= alpha && !is_mate(alpha))
+                    || (depth <= sp.fut_depth && n > 1 && static_eval + sp.fut_base + sp.fut_mul * depth <= alpha && !is_mate(alpha))
                     // Moves that put a piece where it's simply lost.
-                    || (n > 1 && p.see_quiet(r, m, &self.values) < -50 * depth * depth)
+                    || (depth <= sp.see_quiet_depth && n > 1 && p.see_quiet(r, m, &self.values) < -sp.see_quiet * depth * depth)
             };
             // Making a move and testing it costs about as much as a leaf node,
             // so skip it if the move is surely legal and surely gives no check;
@@ -986,12 +1135,12 @@ impl<'a> Searcher<'a> {
                 score = -self.negamax(&child, new_depth, -beta, -alpha, ply + 1, is_pv, false);
             } else {
                 let mut red = 0;
-                if depth >= 3 && quiet && !in_check && !gives_check && legal > if is_pv { 4 } else { 2 } {
-                    red = (0.75 + (depth as f32).ln() * (legal as f32).ln() / 2.2) as i32;
+                if depth >= self.sp.lmr_depth && quiet && !in_check && !gives_check && legal > if is_pv { self.sp.lmr_moves_pv } else { self.sp.lmr_moves } {
+                    red = (self.sp.lmr_base_f + (depth as f32).ln() * (legal as f32).ln() / self.sp.lmr_div_f) as i32;
                     if is_pv {
-                        red -= 1;
+                        red -= self.sp.lmr_pv;
                     }
-                    red -= (self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize] + self.cont_score(ply, key)) / LMR_HIST_DIV;
+                    red -= (self.history[(us * MAX_SQ + m.from as usize) * MAX_SQ + m.to as usize] + self.cont_score(ply, key)) / self.sp.lmr_history;
                     red = red.clamp(0, new_depth - 1);
                 }
                 let mut s = -self.negamax(&child, new_depth - red, -alpha - 1, -alpha, ply + 1, false, false);
@@ -1031,7 +1180,7 @@ impl<'a> Searcher<'a> {
                     if score >= beta {
                         // Capture history: the capture that cut off gains, the
                         // captures tried before it lose.
-                        let cbonus = (depth * depth * 16).min(1600);
+                        let cbonus = (depth * depth * self.sp.hist_mul).min(self.sp.hist_max);
                         for (j, c) in caps_tried[..n_caps].iter().enumerate() {
                             let b = if j + 1 == n_caps && *c == m { cbonus } else { -cbonus };
                             let ci = self.cap_index(p, *c);
@@ -1051,7 +1200,7 @@ impl<'a> Searcher<'a> {
                             }
                             // The move that cut off gains; the quiet moves tried
                             // before it lose (bounded "gravity" updates).
-                            let bonus = (depth * depth * 16).min(1600);
+                            let bonus = (depth * depth * self.sp.hist_mul).min(self.sp.hist_max);
                             for (j, q) in quiets_tried[..n_quiets].iter().enumerate() {
                                 let b = if j + 1 == n_quiets { bonus } else { -bonus };
                                 let h = &mut self.history[(us * MAX_SQ + q.from as usize) * MAX_SQ + q.to as usize];
@@ -1187,7 +1336,7 @@ impl<'a> Searcher<'a> {
             self.select(p, &mut moves, &mut scores, &mut gains, i);
             let m = moves[i];
             // Captures that probably lose material.
-            if !in_check && m.flags & F_CAPTURE != 0 && self.gain_of(p, &moves, &gains, i) < -50 {
+            if !in_check && m.flags & F_CAPTURE != 0 && self.gain_of(p, &moves, &gains, i) < -self.sp.q_see {
                 continue;
             }
             // Delta pruning: even winning this piece can't lift us to alpha.
@@ -1197,7 +1346,7 @@ impl<'a> Searcher<'a> {
                 } else {
                     self.values[kind_of(p.sq[m.to as usize])] / 2
                 };
-                if stand + gain + 150 < alpha {
+                if stand + gain + self.sp.q_delta < alpha {
                     continue;
                 }
             }
@@ -1258,14 +1407,6 @@ impl<'a> Searcher<'a> {
 /// Continuation history: plies back (1 = the opponent's last move; 2 was
 /// worse at 6,000 nodes/move).
 const CONT_PLIES: usize = 1;
-/// LMR: history (butterfly + continuation) per ply of reduction less.
-const LMR_HIST_DIV: i32 = 9000;
-/// Capture ordering: capture history divided by this.
-const CAP_ORDER_DIV: i32 = 8;
-/// Singular extensions: least depth, and the margin per depth below the hash
-/// move's score that the other moves must stay under.
-const SE_DEPTH: i32 = 7;
-const SE_MARGIN: i32 = 2;
 
 /// Quiescence plies in which a side in check searches all its moves.
 const Q_CHECK_PLIES: usize = 6;
