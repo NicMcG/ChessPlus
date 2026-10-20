@@ -439,6 +439,7 @@ func test_real_engine_follows_the_new_abilities() -> void:
 		var move := replay.find_move(text)
 		check(move != null, "The game allows " + text)
 		replay.make_move(move)
+	PlusfishLink.enabled = true
 	var link := PlusfishLink.new()
 	_root().add_child(link)
 	link.desktop_nodes = 5000
@@ -451,6 +452,7 @@ func test_real_engine_follows_the_new_abilities() -> void:
 	check_eq(link.results.size(), moves.size() + 1, "Every position evaluated")
 	check(str(link.results.get(0, {}).get("best", "")) != "", "A best move at the start")
 	link.free()
+	_finish()
 
 func test_real_engine_knows_the_parapet_rule() -> void:
 	if PlusfishLink.program_path() == "" or OS.has_feature("web"):
@@ -461,6 +463,7 @@ func test_real_engine_knows_the_parapet_rule() -> void:
 	var start := Fen.parse("k7/8/8/8/8/8/1(PA)6/1N5K w - - 0 1", PieceCatalog.all_defs(), StandardSetup.create_rules())
 	check(PlusfishLink.supports(start), "The eval bar works with Parapets")
 	var moves := ["b1-c3", "a8-b8"]
+	PlusfishLink.enabled = true
 	var link := PlusfishLink.new()
 	_root().add_child(link)
 	link.desktop_nodes = 5000
@@ -472,3 +475,85 @@ func test_real_engine_knows_the_parapet_rule() -> void:
 		OS.delay_msec(10)
 	check_eq(link.results.size(), moves.size() + 1, "Plusfish follows a Knight over its own Parapet")
 	link.free()
+	_finish()
+
+# --- Plusfish never holds up the game ----------------------------------------------
+
+func test_bar_holds_its_place_while_waiting() -> void:
+	var bar := EvalBar.new()
+	bar.set_score(300, null)
+	bar.shown = bar.target()
+	bar.set_unknown()
+	check_eq(bar.score_text(), "...", "Waiting for the new position")
+	check_eq(bar.target(), bar.shown, "The bar stays where it was instead of jumping to the middle")
+	bar.reset()
+	check_eq(bar.target(), 0.5, "A new game: back to the middle")
+	check(not bar.known, "And unknown")
+	bar.free()
+
+func test_answers_are_kept_for_every_position() -> void:
+	var start := StandardSetup.create_game()
+	var link := PlusfishLink.new()
+	link.desktop_nodes = 20000
+	link.web_nodes = 20000
+	link.analyse_live(start, ["e2-e4"])
+	link.results[1] = {"ply": 1, "cp": 30, "best": "e7-e5", "asked": 20000}
+	link.analyse_live(start, [])
+	check(not link.results.has(1), "Taken back: not part of this line")
+	link.analyse_live(start, ["d2-d4"])
+	check(not link.results.has(1), "A different move: a different position")
+	link.analyse_live(start, ["e2-e4"])
+	check_eq(link.results.get(1, {}).get("best"), "e7-e5", "e4 again: the answer comes straight back")
+	check(not link.is_running(), "Nothing to ask Plusfish")
+	link.analyse(start, ["e2-e4"])
+	check_eq(link._queue, [0], "Looking over the game: only the unknown position is asked about")
+	link.desktop_nodes = 400000
+	link.web_nodes = 400000
+	link.analyse_live(start, ["e2-e4"])
+	check(not link.results.has(1), "A smaller search doesn't do for a bigger one")
+	link.free()
+
+func test_the_plusfish_bot_and_the_eval_bar_share_answers() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.white_army = StandardSetup.army()
+	game.black_army = StandardSetup.army()
+	game.bot_team = Piece.Team.BLACK
+	game.bot_level = PracticeBot.Level.PLUSFISH
+	_root().add_child(game)
+	check(is_same(game.bot_engine.cache, game.plusfish.cache), "One store of answers")
+	game.free()
+	_finish()
+
+func test_real_engine_never_holds_up_the_screen() -> void:
+	if PlusfishLink.program_path() == "" or OS.has_feature("web"):
+		print("    (Plusfish not built: cargo build --release in engine/plusfish to run this test)")
+		return
+	PlusfishLink.enabled = true
+	var start := StandardSetup.create_game()
+	var link := PlusfishLink.new()
+	_root().add_child(link)
+	# A long search (several seconds), so it's still going below.
+	link.desktop_nodes = 3000000
+	link.analyse_live(start, [])
+	var started := Time.get_ticks_usec()
+	link.analyse_live(start, ["e2-e4"])
+	check(Time.get_ticks_usec() - started < 10000, "Asking takes no time on the screen's side")
+	started = Time.get_ticks_msec()
+	await _frames(10)
+	check(Time.get_ticks_msec() - started < 1000, "Frames keep coming while it searches")
+	check(link.is_running(), "Still searching")
+	# Taking the move back drops that search: the start is answered at once.
+	link.desktop_nodes = 5000
+	link.analyse_live(start, [])
+	for i in 300:
+		if link.results.has(0):
+			break
+		await _frames(1)
+		OS.delay_msec(10)
+	check(link.results.has(0), "The new position answered without waiting for the old search")
+	started = Time.get_ticks_msec()
+	link.free()
+	check(Time.get_ticks_msec() - started < 500, "Closing stops Plusfish straight away")
+	_finish()
