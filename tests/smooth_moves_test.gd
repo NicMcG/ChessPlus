@@ -180,3 +180,9 @@ func test_closing_the_screen_while_the_bot_thinks() -> void:
 	game.free()
 	SavedGame.delete_saved()
 	check(true, "Closing the screen stops the bot's thread without errors")
+
+func test_recordings_are_loaded_once() -> void:
+	var names: Array = GameSounds.LAYERS[GameSounds.Sound.CAPTURE][0][0]
+	var first := GameSounds.recording(names[0])
+	check(first != null, "The recording loads")
+	check(GameSounds.recording(names[0]) == first, "The second time it's the same one, not read again")
