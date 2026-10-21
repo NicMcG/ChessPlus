@@ -189,10 +189,18 @@ pub fn value_report(cat: &Arc<Catalog>, games: &[StoredGame], samples: &[Sample]
             if d.has_shield() {
                 cols.push(k * PER_KIND + FE_SHIELD);
             }
-            // A Necromancer leaves the board when it uses Raise Dead, so "on the
-            // board" already means "ability unused": no separate column.
-            if d.ability != Ability::None && d.ability != Ability::RaiseDead {
+            // A Necromancer leaves the board when it uses Raise Dead, and a
+            // Werewolf becomes its wolf form (another kind) with Full Moon, so
+            // "on the board" already means "ability unused": no separate column.
+            if d.ability != Ability::None && d.ability != Ability::RaiseDead && d.transforms_into.is_none() {
                 cols.push(k * PER_KIND + FE_ABIL);
+            }
+        }
+        // Forms (the wolf) never start a game but are on the board after a
+        // transformation: their own material column, shown with the extras.
+        for &k in &used {
+            if let Some(form) = cat.defs[k].transforms_into.as_deref().and_then(|f| cat.kind_by_id(f)) {
+                cols.push(form * PER_KIND + FE_MAT);
             }
         }
         cols.push(G_RAISE);
