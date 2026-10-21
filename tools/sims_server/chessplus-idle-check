@@ -1,0 +1,16 @@
+#!/bin/sh
+# Chess Plus sims server: stop the server after 20 minutes with no Plusfish job
+# (or Plusfish build) running, so a forgotten server does not keep costing money.
+# Run every 5 minutes by chessplus-idle.timer; the count lives in /run, so it
+# starts again from 0 after every boot.
+STATE=/run/chessplus-idle-minutes
+if pgrep -x plusfish >/dev/null || pgrep -x cargo >/dev/null || pgrep -x rustc >/dev/null; then
+	echo 0 > "$STATE"
+	exit 0
+fi
+minutes=$(( $(cat "$STATE" 2>/dev/null || echo 0) + 5 ))
+echo "$minutes" > "$STATE"
+if [ "$minutes" -ge 20 ]; then
+	logger "chessplus-idle: no Plusfish job for $minutes minutes, stopping the server"
+	shutdown -h now
+fi

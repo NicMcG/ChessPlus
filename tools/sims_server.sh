@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# The Chess Plus sims server on AWS (Mac's project, us-east-2): a c7a.16xlarge
-# (64 cores) named "chessplus-sims", kept stopped between runs (Mac's choice).
+# The Chess Plus sims server on AWS (Mac's project, us-east-2): a c8g.16xlarge
+# (64 Graviton4 cores, Arm) named "chessplus-sims", kept stopped between runs
+# (Mac's choice). It stops itself after 20 minutes without a Plusfish job (the
+# timer in tools/sims_server/, installed on it).
 # Its address changes every time it starts, so "start" looks it up and points
 # the SSH shortcut "chessplus-sims" (in ~/.ssh/config) at it.
 #
@@ -19,7 +21,9 @@ NAME=chessplus-sims
 KEY="~/.ssh/chessplus-key.pem"
 GROUP_NAME=chessplus-sims
 AWS_EXE="${AWS_EXE:-$(cygpath -u "$LOCALAPPDATA")/Programs/Amazon/AWSCLIV2/aws.exe}"
-export PYTHONIOENCODING=utf-8
+# MSYS_NO_PATHCONV: stop Git Bash turning AWS arguments that start with / into
+# Windows paths.
+export PYTHONIOENCODING=utf-8 MSYS_NO_PATHCONV=1
 
 aws() { "$AWS_EXE" --profile "$PROFILE" --region us-east-2 "$@" | tr -d '\r'; }
 
