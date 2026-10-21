@@ -38,7 +38,7 @@ theme_override_constants/separation = 16
 
 [node name="GuideBoard" type="Control" parent="Body"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(220, 220)
+custom_minimum_size = Vector2(280, 280)
 layout_mode = 2
 script = ExtResource("2_board")
 

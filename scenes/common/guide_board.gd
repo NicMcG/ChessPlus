@@ -21,15 +21,19 @@ const JUMP_MARK := Color("#F5BE0B")
 
 ## The legend: kind -> text (Mac's wording), in his order. Every card shows all of it.
 const LEGEND := {
-	"both": "Moves to this square",
-	"slide": "Moves to any square in this direction",
-	"move": "Moves to this square (but can't capture)",
-	"slide_move": "Moves to any square in this direction (but can't capture)",
-	"capture": "Must capture to move here",
-	"jump": "Jumps here",
-	"jump_move": "Jumps here but can't capture here",
-	"jump_capture": "Must capture to move here",
+	"both": "Moves or captures",
+	"slide": "Slides",
+	"move": "Moves, can't capture",
+	"slide_move": "Slides, can't capture",
+	"capture": "Captures only",
+	"jump": "Jumps",
+	"jump_move": "Jumps, can't capture",
+	"jump_capture": "Jumps, captures only",
 }
+
+## The plain dot and arrow explain themselves, so the card's legend leaves them
+## out (Mac, Oct 2026).
+const NOT_IN_LEGEND: Array[String] = ["both", "slide"]
 
 var def: PieceDef
 var team := Piece.Team.WHITE

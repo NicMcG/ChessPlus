@@ -60,7 +60,7 @@ func test_card_zoom_scales_the_mini_board() -> void:
 	(Engine.get_main_loop() as SceneTree).root.add_child(card)
 	card.show_piece(load("res://data/pieces/knight.tres"))
 	card.set_zoom(2.0)
-	check_eq(card.get_node("%GuideBoard").custom_minimum_size, Vector2(440, 440), "Mini board twice the size")
+	check_eq(card.get_node("%GuideBoard").custom_minimum_size, Vector2(PieceCard.BOARD_SIZE * 2, PieceCard.BOARD_SIZE * 2), "Mini board twice the size")
 	card.free()
 
 func test_builder_card_is_one_size_for_every_piece() -> void:

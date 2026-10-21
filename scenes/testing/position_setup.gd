@@ -205,7 +205,7 @@ func _tray_button(def: PieceDef) -> Button:
 	button.custom_minimum_size = Vector2(76, 76)
 	button.expand_icon = true
 	button.focus_mode = Control.FOCUS_NONE
-	_show_selection(button)
+	UiStyle.picture_button(button)
 	button.tooltip_text = def.display_name if def else "Take pieces off"
 	button.pressed.connect(func() -> void: choose(def))
 	if def:
@@ -225,14 +225,6 @@ func _tray_button(def: PieceDef) -> Button:
 	_tray_buttons[def] = button
 	tray.add_child(button)
 	return button
-
-## A chosen toggle button gets a gold border, so it's clear which one is on.
-static func _show_selection(button: Button) -> void:
-	var on := UiStyle.box(UiStyle.SURFACE_HOVER, UiStyle.RADIUS, 6, 6)
-	on.border_color = UiStyle.ACCENT
-	on.set_border_width_all(4)
-	button.add_theme_stylebox_override("pressed", on)
-	button.add_theme_stylebox_override("hover_pressed", on)
 
 ## `look`: the theme style (compact, as these rows hold several buttons).
 func _button(text: String, on_pressed: Callable, look := &"CompactButton") -> Button:

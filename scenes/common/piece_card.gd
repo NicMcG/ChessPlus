@@ -155,13 +155,18 @@ static func tallest_height(host: Node, defs: Array, width: float, p_zoom := 1.0)
 	return tallest
 
 ## A size at the current zoom.
+## The mini board's size and the legend's text at zoom 1 (Mac: bigger; were
+## 220 and 19 while the legend had eight long entries).
+const BOARD_SIZE := 280
+const LEGEND_FONT_SIZE := 24
+
 func _z(value: float) -> int:
 	return roundi(value * zoom)
 
 ## Sizes of the parts that come from the scene file.
 func _apply_zoom() -> void:
 	%Name.add_theme_font_size_override("font_size", _z(40))
-	%GuideBoard.custom_minimum_size = Vector2(_z(220), _z(220))
+	%GuideBoard.custom_minimum_size = Vector2(_z(BOARD_SIZE), _z(BOARD_SIZE))
 	$Special/SpecialTitle.add_theme_font_size_override("font_size", _z(26))
 	%SpecialText.add_theme_font_size_override("font_size", _z(22))
 	%MoveNote.add_theme_font_size_override("font_size", _z(22))
@@ -337,21 +342,24 @@ func _fill_move_note() -> void:
 	%MoveNote.text = moves_def.move_note
 	%MoveNote.visible = moves_def.move_note != ""
 
-## The whole legend, the same on every card (Mac), whichever marks this piece uses.
+## The legend, the same on every card (Mac), whichever marks this piece uses;
+## the plain dot and arrow aren't in it (PieceGuideBoard.NOT_IN_LEGEND).
 func _fill_legend() -> void:
 	for child in %Legend.get_children():
 		child.queue_free()
-	%Legend.add_theme_constant_override("separation", _z(2))
+	%Legend.add_theme_constant_override("separation", _z(8))
 	for kind in PieceGuideBoard.LEGEND:
+		if kind in PieceGuideBoard.NOT_IN_LEGEND:
+			continue
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", _z(10))
 		var icon := LegendIcon.new()
 		icon.kind = kind
-		icon.custom_minimum_size = Vector2(_z(28), _z(28))
+		icon.custom_minimum_size = Vector2(_z(34), _z(34))
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var label := Label.new()
 		label.text = PieceGuideBoard.LEGEND[kind]
-		label.add_theme_font_size_override("font_size", _z(19))
+		label.add_theme_font_size_override("font_size", _z(LEGEND_FONT_SIZE))
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

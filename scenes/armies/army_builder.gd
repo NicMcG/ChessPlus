@@ -378,12 +378,9 @@ func _build_tray() -> void:
 		# Kings on gold, royal pieces on royal purple, pawn types on green (Mac's
 		# design); the chosen type gets a bright border, so it's obvious what
 		# you're placing.
-		# The chosen type gets a gold border, so it's obvious what you're placing.
-		var chosen := UiStyle.box(UiStyle.SURFACE_HOVER)
-		chosen.set_border_width_all(4)
-		chosen.border_color = UiStyle.ACCENT
-		button.add_theme_stylebox_override("pressed", chosen)
-		button.add_theme_stylebox_override("hover_pressed", chosen)
+		# The chosen type gets a gold border, so it's obvious what you're placing;
+		# little room inside, so the picture is as big as it can be (Mac).
+		UiStyle.picture_button(button)
 		button.set_drag_forwarding(func(_at: Vector2) -> Variant: return _tray_drag(def, button), Callable(), Callable())
 		button.icon = tray_texture(def, team)
 		button.expand_icon = true
