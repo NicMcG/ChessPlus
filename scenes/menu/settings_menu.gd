@@ -185,8 +185,11 @@ func set_key(action: String, code: int) -> void:
 
 # --- Credits and reset ---------------------------------------------------------------
 
+## Credits and Reset with no title over them (Mac: "More" looked like a button).
 func _build_other() -> void:
-	_heading("More")
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 12
+	sections.add_child(gap)
 	_wide_button("Credits", show_credits)
 	_wide_button("Reset to defaults", ask_reset)
 
@@ -232,25 +235,13 @@ func refresh() -> void:
 
 # --- Building blocks ---------------------------------------------------------------
 
-## A section's title: small grey capitals over a thin line, so it reads as a
-## title and not as a button (Mac tapped the old gold "More").
 func _heading(text: String) -> void:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var label := Label.new()
 	label.text = text
-	label.uppercase = true
-	label.theme_type_variation = &"HeadingLabel"
-	label.custom_minimum_size.y = 52
-	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	box.add_child(label)
-	var line := ColorRect.new()
-	line.color = UiStyle.BORDER
-	line.custom_minimum_size.y = 1
-	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(line)
-	sections.add_child(box)
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_font_override("font", UiStyle.bold())
+	label.add_theme_color_override("font_color", UiStyle.ACCENT_TEXT)
+	sections.add_child(label)
 
 ## A row: the setting's name on the left, its control on the right.
 func _row(text: String, control: Control) -> HBoxContainer:
