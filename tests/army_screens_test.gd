@@ -202,6 +202,33 @@ func test_match_setup_offers_standard_and_saved() -> void:
 		check_eq(started[0][1].army_name, "Mine", "Black: mine")
 	setup.free()
 
+## Mac (Oct 2026): armies that break the rules (e.g. over budget after a price
+## change) are shown greyed out with the reason, not left out.
+func test_match_setup_shows_broken_armies_greyed_out() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("Mine"))
+	library.save(_over_budget_army("Bats"))
+	var setup: Node = load("res://scenes/menu/match_setup.tscn").instantiate()
+	setup.library = library
+	_open(setup)
+	var pick: OptionButton = setup.first_pick
+	check_eq(pick.item_count, 5, "Default, Random, Standard, Mine, Bats")
+	check_eq(pick.get_item_text(4), "Bats  (44.5 pts) – over budget", "Last, with the reason")
+	check(pick.is_item_disabled(4), "...greyed out: it can't be picked")
+	check(pick.get_item_tooltip(4).contains("the budget is 39"), "...and says what's wrong")
+	check(not pick.is_item_disabled(3), "Legal armies can be picked")
+	check(not setup.choices.saved.has(setup.choices.entries[4].army), "Random never picks it")
+	setup.free()
+	var picker := ArmyPicker.new(library, "Rematch")
+	_open(picker)
+	var bats: Button = null
+	for button: Button in picker.find_children("*", "Button", true, false):
+		if button.text.begins_with("Bats"):
+			bats = button
+	check(bats != null and bats.disabled, "The rematch list greys it out too")
+	picker.free()
+	_fresh_library()
+
 # --- The whole flow --------------------------------------------------------------
 
 func test_main_starts_a_game_with_two_armies() -> void:
