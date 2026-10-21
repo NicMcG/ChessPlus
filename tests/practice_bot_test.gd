@@ -96,3 +96,35 @@ func test_wins_material_with_a_fork() -> void:
 	# Nc7+ forks the king and the rook on a8.
 	var state := _parse("r3k3/8/8/1N6/8/8/8/4K3 w - - 0 1")
 	check_eq(_bot(PracticeBot.Level.HARD).choose_move(state).to_text(), "b5-c7", "Hard finds the knight fork")
+
+func test_searching_in_steps_finds_the_same_move() -> void:
+	# The web searches a little at a time (begin_search / continue_search) so the
+	# screen can draw in between; it must choose exactly what one go would.
+	for fen in ["r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+			"6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1"]:
+		# Medium (2 deep, with its randomness), and 3 deep with time to finish
+		# (only in the endgame: the opening takes seconds).
+		for deep in ([false, true] if fen.begins_with("6k1") else [false]):
+			var state := StandardSetup.from_fen(fen)
+			var whole := PracticeBot.new(PracticeBot.Level.MEDIUM, 7)
+			var stepped := PracticeBot.new(PracticeBot.Level.MEDIUM, 7)
+			if deep:
+				whole.settings_override = {"depth": 3, "noise": 0, "time_ms": 100000}
+				stepped.settings_override = whole.settings_override
+			var expected := whole.choose_move(StandardSetup.from_fen(fen))
+			var search := stepped.begin_search(state)
+			var steps := 1
+			while not stepped.continue_search(state, search, 0):
+				steps += 1
+			check(steps > search.moves.size(), "It took more steps than there are moves")
+			check_eq(search.best.to_text(), expected.to_text(), "Same move")
+			check_eq(stepped.depth_reached, whole.depth_reached, "Same depth")
+			check_eq(stepped.nodes, whole.nodes, "Same positions looked at")
+			check_eq(Fen.write(state), fen, "The position is left as it was")
+
+func test_no_moves_in_steps_means_null() -> void:
+	var state := StandardSetup.from_fen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")
+	var bot := PracticeBot.new(PracticeBot.Level.HARD)
+	var search := bot.begin_search(state)
+	check(bot.continue_search(state, search, 0), "Done at once")
+	check(search.best == null, "No move")
