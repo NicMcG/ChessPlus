@@ -53,12 +53,47 @@ func test_alternate_pictures() -> void:
 	check_eq(PieceArt.all_textures(_def("paladin"), Piece.Team.WHITE).size(), 2, "Paladin with and without shield")
 	check_eq(PieceArt.all_textures(_def("knight"), Piece.Team.WHITE).size(), 1, "Knight: one picture")
 
-func test_legend_lists_only_what_is_shown() -> void:
-	check_eq(PieceGuideBoard.legend_kinds(PieceGuide.guide(_def("pawn"))), ["move", "capture", "first"] as Array[String], "Pawn")
-	check_eq(PieceGuideBoard.legend_kinds(PieceGuide.guide(_def("knight"))), ["jump"] as Array[String], "Knight")
-	check_eq(PieceGuideBoard.legend_kinds(PieceGuide.guide(_def("rook"))), ["slide"] as Array[String], "Rook")
-	check_eq(PieceGuideBoard.legend_kinds(PieceGuide.guide(_def("cannon"))), ["slide_move"] as Array[String], "Cannon")
-	check_eq(PieceGuideBoard.legend_kinds(PieceGuide.guide(_def("man"))), ["both"] as Array[String], "Man")
+func _marks(id: String) -> Array[String]:
+	return PieceGuideBoard.kinds_used(PieceGuide.guide(_def(id)))
+
+func test_each_piece_gets_the_right_marks() -> void:
+	check_eq(_marks("pawn"), ["move", "capture", "first"] as Array[String], "Pawn")
+	check_eq(_marks("knight"), ["jump"] as Array[String], "Knight")
+	check_eq(_marks("rook"), ["slide"] as Array[String], "Rook")
+	check_eq(_marks("cannon"), ["slide_move"] as Array[String], "Cannon")
+	check_eq(_marks("man"), ["both"] as Array[String], "Man")
+	check_eq(_marks("galleon"), ["slide_move", "capture"] as Array[String], "Galleon")
+	# Steps it can't capture with, and leaps 2 away that must capture: a yellow X.
+	check_eq(_marks("catapult"), ["move", "jump_capture"] as Array[String], "Catapult")
+	check_eq(_marks("wizard"), ["slide", "jump"] as Array[String], "Wizard")
+
+func test_jumps_get_yellow_versions_of_the_marks() -> void:
+	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.CAPTURE | PieceGuide.JUMP), "jump", "Yellow dot")
+	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.JUMP), "jump_move", "Yellow empty circle")
+	check_eq(PieceGuideBoard._kind(PieceGuide.CAPTURE | PieceGuide.JUMP), "jump_capture", "Yellow X")
+	# First move only: the same mark, paler.
+	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.FIRST_MOVE), "move", "Pale empty circle")
+
+func test_every_card_shows_the_whole_legend() -> void:
+	# Mac's wording, in his order.
+	var texts := ["Moves to this square", "Moves to any square in this direction",
+		"Moves to this square (but can't capture)", "Moves to any square in this direction (but can't capture)",
+		"Must capture to move here", "Jumps here", "Jumps here but can't capture here",
+		"Must capture to move here", "Only on its first move"]
+	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
+	_root().add_child(card)
+	for id in ["man", "knight", "pawn", "werewolf"]:
+		card.show_piece(_def(id))
+		check_eq(_legend_texts(card), texts, id + ": the whole legend")
+	# Turning the Werewolf over changes the mini board, not the legend.
+	card.turn_over()
+	check_eq(_legend_texts(card), texts, "Still the whole legend after Wolf moves")
+	card.free()
+
+## The legend's texts as shown (old rows are freed at the end of the frame).
+func _legend_texts(card: PieceCard) -> Array:
+	var rows := card.get_node("%Legend").get_children().filter(func(row: Node) -> bool: return not row.is_queued_for_deletion())
+	return rows.map(func(row: Node) -> String: return (row.get_child(1) as Label).text)
 
 func test_card_fills_in() -> void:
 	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()

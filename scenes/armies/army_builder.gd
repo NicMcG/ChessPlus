@@ -17,7 +17,10 @@ const NAME_MAX_LENGTH := 20
 var _scroll_at_press := 0
 
 ## How big the piece card is drawn (see PieceCard.zoom) on wide and tall screens.
+## Wide: as big as its column allows, keeping the in-game pop-up's proportions
+## (the whole legend needs room beside the mini board), within these limits.
 const CARD_ZOOM_WIDE := 1.5
+const CARD_ZOOM_WIDE_MIN := 0.7
 const CARD_ZOOM_TALL := 0.95
 ## The range of widths for the piece-type buttons in the tray.
 const TRAY_BUTTON_MIN := 100.0
@@ -285,8 +288,24 @@ func fit_layout() -> void:
 		_wide_box.visible = wide
 	_fit_card()
 	# The piece card: bigger beside the board (there's room), a little bigger below it.
-	card.set_zoom(CARD_ZOOM_WIDE if wide else CARD_ZOOM_TALL)
+	card.set_zoom(_wide_card_zoom() if wide else CARD_ZOOM_TALL)
 	_fit_tray()
+
+## The card's zoom in its own column on a wide screen: shaped like the in-game
+## pop-up (PieceInfo.CARD_WIDTH wide at zoom 1), in steps of 0.05 so resizing
+## the window doesn't re-measure the card for every pixel.
+func _wide_card_zoom() -> float:
+	return clampf(snappedf(_column_width() / PieceInfo.CARD_WIDTH, 0.05), CARD_ZOOM_WIDE_MIN, CARD_ZOOM_WIDE)
+
+## The width of one column: the whole screen inside the margins, or half of it
+## on a wide screen. Measured from the screen, not from what's inside (that
+## grows with the tray buttons and the card, so it would feed back on itself).
+func _column_width() -> float:
+	var margin: MarginContainer = _wide_box.get_parent()
+	var column := size.x - margin.get_theme_constant("margin_left") - margin.get_theme_constant("margin_right")
+	if wide:
+		column = (column - _wide_box.get_theme_constant("separation")) / 2
+	return column
 
 ## The army board's squares are sized by the space it's given: make it tall
 ## enough for square squares across the full width (within limits).
@@ -327,15 +346,10 @@ func _measure_card() -> void:
 		_card_scroll.custom_minimum_size.y = maxf(_card_height, card.get_combined_minimum_size().y)
 
 ## The piece-type buttons share the column's width equally (within limits), so
-## they're as big as the space allows. Measured from the whole screen, not the
-## tray (the tray grows with its buttons, so that would feed back on itself).
+## they're as big as the space allows.
 func _fit_tray() -> void:
-	var margin: MarginContainer = _wide_box.get_parent()
-	var column := size.x - margin.get_theme_constant("margin_left") - margin.get_theme_constant("margin_right")
-	if wide:
-		column = (column - _wide_box.get_theme_constant("separation")) / 2
 	# Leave room for the tray's scroll bar.
-	column -= _tray_scroll.get_v_scroll_bar().get_combined_minimum_size().x + 4
+	var column := _column_width() - _tray_scroll.get_v_scroll_bar().get_combined_minimum_size().x - 4
 	var gap := tray.get_theme_constant("h_separation")
 	var width := floorf((column - gap * (tray.columns - 1)) / tray.columns)
 	width = clampf(width, TRAY_BUTTON_MIN, TRAY_BUTTON_MAX)

@@ -74,7 +74,6 @@ func turn_over() -> void:
 	moves_def = forms[1] if moves_def == forms[0] else forms[0]
 	_update_form_button()
 	%GuideBoard.show_piece(moves_def, team)
-	_fill_legend()
 	_fill_move_note()
 
 var _form_button: Button
@@ -338,18 +337,21 @@ func _fill_move_note() -> void:
 	%MoveNote.text = moves_def.move_note
 	%MoveNote.visible = moves_def.move_note != ""
 
+## The whole legend, the same on every card (Mac), whichever marks this piece uses.
 func _fill_legend() -> void:
 	for child in %Legend.get_children():
 		child.queue_free()
-	for kind in PieceGuideBoard.legend_kinds(PieceGuide.guide(moves_def)):
+	%Legend.add_theme_constant_override("separation", _z(2))
+	for kind in PieceGuideBoard.LEGEND:
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", _z(10))
 		var icon := LegendIcon.new()
 		icon.kind = kind
-		icon.custom_minimum_size = Vector2(_z(36), _z(36))
+		icon.custom_minimum_size = Vector2(_z(28), _z(28))
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var label := Label.new()
 		label.text = PieceGuideBoard.LEGEND[kind]
-		label.add_theme_font_size_override("font_size", _z(20))
+		label.add_theme_font_size_override("font_size", _z(19))
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
