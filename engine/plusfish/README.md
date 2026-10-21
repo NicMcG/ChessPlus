@@ -17,6 +17,9 @@ What it's for:
   (`selfplay`, `values`), plus head-to-head army tests with Elo and error bars
   (`match`).
 
+To re-run the piece values, train the engine or grow the meta pool, follow
+the step-by-step recipes in [HOW_TO.md](HOW_TO.md).
+
 ## Inside the game: the eval bar
 
 When a game is over, the game screen shows an eval bar beside the board, a
