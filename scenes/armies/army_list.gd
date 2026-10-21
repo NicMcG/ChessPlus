@@ -3,7 +3,10 @@ extends Control
 ## "My armies": every saved army with its cost. Tap one to edit it, "Delete" to
 ## remove it (after asking), or "New army" to build one (up to the limit). The
 ## White / Black buttons mark an army as the default for that side (Mac's
-## design): used when a player leaves the army choice on "Default".
+## design): used when a player leaves the army choice on "Default". An army
+## that breaks the rules (e.g. it went over the budget when piece prices
+## changed) has a warning sign before its name: it can't be picked for a game
+## until it's edited (the builder lists what's wrong).
 
 signal closed
 ## `army` is null for a brand-new army.
@@ -15,7 +18,11 @@ signal edit_requested(army: Army)
 @onready var back_button: Button = %Back
 @onready var confirm_delete: ConfirmationDialog = %ConfirmDelete
 
+## The warning sign before armies that break the rules (the move list's check icon).
+const WARNING_ICON = preload("res://art/icons/check.png")
+
 var library: ArmyLibrary
+var rules := StandardSetup.create_rules()
 var _pending_delete: Army
 ## Where shared armies come from (null = the real server; tests use a MemoryBackend).
 var backend: OnlineBackend
@@ -144,6 +151,11 @@ func _row_for(army: Army) -> Control:
 	open.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	open.custom_minimum_size = Vector2(0, 90)
 	open.clip_text = true
+	var problems := army.problems(rules, 8)
+	if not problems.is_empty():
+		open.icon = WARNING_ICON
+		open.add_theme_constant_override("icon_max_width", 44)
+		open.tooltip_text = "Can't be used in games until it's fixed:\n" + "\n".join(problems)
 	open.pressed.connect(func() -> void: edit_requested.emit(army))
 	var delete := Button.new()
 	delete.text = "Delete"

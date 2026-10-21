@@ -9,6 +9,7 @@ const QUEEN = preload("res://data/pieces/queen.tres")
 const KNIGHT = preload("res://data/pieces/knight.tres")
 const PAWN = preload("res://data/pieces/pawn.tres")
 const ELEPHANT = preload("res://data/pieces/elephant.tres")
+const VAMPIRE = preload("res://data/pieces/vampire.tres")
 
 func _fresh_library() -> ArmyLibrary:
 	if DirAccess.dir_exists_absolute(TEST_DIR):
@@ -268,6 +269,37 @@ func test_random_army_is_one_of_mine() -> void:
 		seen[choices.army_for(1, Piece.Team.WHITE).army_name] = true
 	check_eq(seen.keys().size(), 2, "Picks among my armies")
 	check(not seen.has("Standard"), "Never Standard")
+	_fresh_library()
+
+# An army saved when it was legal that a price change pushed over the budget
+# (the match setup leaves it out until it's fixed): the Standard set with a
+# Vampire (6.5) in place of a pawn costs 44.5.
+func _over_budget_army(army_name: String) -> Army:
+	var army := StandardSetup.army().copy()
+	army.army_name = army_name
+	army.mirror_for_black = true
+	army.place(VAMPIRE, Vector2i(0, 1))
+	return army
+
+func test_army_list_warns_about_armies_that_break_the_rules() -> void:
+	var library := _fresh_library()
+	library.save(_small_army("Mine"))
+	library.save(_over_budget_army("Bats"))
+	var army_list: Node = load("res://scenes/armies/army_list.tscn").instantiate()
+	army_list.library = library
+	_open(army_list)
+	var names := {}
+	for button: Button in army_list.list.find_children("*", "Button", true, false):
+		if button.text.contains("pts"):
+			names[button.text] = button
+	var bats: Button = names.get("Bats  (44.5 pts)")
+	var mine: Button = names.get("Mine  (4 pts)")
+	check(bats != null and mine != null, "Both listed: %s" % [names.keys()])
+	if bats and mine:
+		check(bats.icon != null, "Warning sign on the over-budget army")
+		check(bats.tooltip_text.contains("the budget is 39"), "Its tooltip says why")
+		check(mine.icon == null, "None on a legal army")
+	army_list.free()
 	_fresh_library()
 
 func test_army_list_marks_defaults() -> void:
