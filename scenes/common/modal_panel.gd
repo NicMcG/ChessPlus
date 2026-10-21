@@ -11,7 +11,7 @@ var column: VBoxContainer
 var heading: Label
 
 func _init(title: String) -> void:
-	color = Color(0, 0, 0, 0.6)
+	color = UiStyle.SCRIM
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 20
@@ -19,11 +19,6 @@ func _init(title: String) -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.13, 0.13, 0.14)
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(24)
-	panel.add_theme_stylebox_override("panel", style)
 	panel.custom_minimum_size.x = 520
 	center.add_child(panel)
 	column = VBoxContainer.new()
@@ -32,7 +27,8 @@ func _init(title: String) -> void:
 	heading = Label.new()
 	heading.text = title
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_font_size_override("font_size", 40)
+	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.theme_type_variation = &"DialogTitle"
 	column.add_child(heading)
 
 ## A label for messages, wrapped to the panel's width.
@@ -46,9 +42,12 @@ func add_text(text: String, font_size := 26) -> Label:
 	column.add_child(label)
 	return label
 
-func add_button(text: String, on_pressed: Callable) -> Button:
+## `look` is a theme style for the button, e.g. &"AccentButton" for the main
+## one, &"GhostButton" for Cancel (none = a plain button).
+func add_button(text: String, on_pressed: Callable, look := &"") -> Button:
 	var button := Button.new()
 	button.text = text
+	button.theme_type_variation = look
 	button.custom_minimum_size.y = 80
 	button.pressed.connect(on_pressed)
 	column.add_child(button)
