@@ -102,6 +102,18 @@ var _position_ids: Array[int] = [0]
 var _board_changes: Array[int] = []
 static var _last_position_id := 0
 
+## For stepping back through the game and playing the same moves again (to
+## look at earlier positions): call this first, then same_position_again() once
+## they're all made again, so the position counts as the same one it was (and
+## outcome() keeps its answer).
+func position_marks() -> Array:
+	return [_position_ids.duplicate(), _board_changes.duplicate(), board.changes]
+
+func same_position_again(marks: Array) -> void:
+	_position_ids = marks[0]
+	_board_changes = marks[1]
+	board.changes = marks[2]
+
 func _work_out_outcome() -> Outcome:
 	if history.is_empty() and MoveGenerator.is_in_check(board, Piece.other_team(side_to_move)):
 		return Outcome.KING_EXPOSED
@@ -313,6 +325,7 @@ func _undo_decoy(move: Move) -> void:
 ## to look, then replaying them).
 func _repetition_count() -> int:
 	var key := _position_key()
+	var marks := position_marks()
 	var count := 1
 	var undone: Array[Move] = []
 	for i in range(mini(halfmove_clock, history.size())):
@@ -323,6 +336,7 @@ func _repetition_count() -> int:
 			count += 1
 	for i in range(undone.size() - 1, -1, -1):
 		make_move(undone[i])
+	same_position_again(marks)
 	return count
 
 ## Text that is identical for two positions exactly when they count as the same

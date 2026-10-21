@@ -143,6 +143,7 @@ static func move_list(state: GameState) -> String:
 static func numbered_moves(state: GameState, first := 0) -> Array:
 	# Step back to where the list starts, then replay, writing each move as we go.
 	var moves := state.history.duplicate()
+	var marks := state.position_marks()
 	for i in range(moves.size() - 1, first - 1, -1):
 		state.undo_move(moves[i])
 	var entries := []
@@ -157,6 +158,7 @@ static func numbered_moves(state: GameState, first := 0) -> Array:
 		var suffix := text.substr(text.length() - 1) if text.ends_with("+") or text.ends_with("#") else ""
 		entries.append([number, text, _picture(state, move, suffix)])
 		state.make_move(move)
+	state.same_position_again(marks)
 	return entries
 
 ## Extra file and/or rank needed when another piece of the same type could also
