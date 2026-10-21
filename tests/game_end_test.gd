@@ -93,3 +93,30 @@ func test_capture_into_bare_kings() -> void:
 	var state := StandardSetup.from_fen("4k3/8/8/8/8/8/3q4/4K3 w - - 0 1")
 	_play(state, ["e1xd2"])
 	check_eq(state.outcome(), Outcome.INSUFFICIENT_MATERIAL, "Only kings left")
+
+func test_threefold_repetition_asked_after_every_move() -> void:
+	# The game screen asks after every move, so each position's key is kept and
+	# the count is made from those instead of stepping back.
+	var state := StandardSetup.create_game()
+	var outcomes := []
+	for i in 2:
+		for text in ["g1-f3", "g8-f6", "f3-g1", "f6-g8"]:
+			_play(state, [text])
+			outcomes.append(state.outcome())
+	check_eq(outcomes.count(Outcome.REPETITION), 1, "Only the last position is the third time")
+	check_eq(outcomes.back(), Outcome.REPETITION, "Start position seen three times")
+	# Undo and play it again: still the third time.
+	var last: Move = state.history.back()
+	state.undo_move(last)
+	check_eq(state.outcome(), Outcome.NONE, "Taken back")
+	_play(state, ["f6-g8"])
+	check_eq(state.outcome(), Outcome.REPETITION, "Played again")
+
+func test_a_board_changed_by_hand_is_a_new_position() -> void:
+	var state := StandardSetup.create_game()
+	_play(state, ["g1-f3", "g8-f6", "f3-g1", "f6-g8"])
+	check_eq(state.outcome(), Outcome.NONE, "Seen twice")
+	# Take a pawn off where nothing was captured: earlier positions had it.
+	state.board.set_piece(Board.parse_square("a2"), null)
+	_play(state, ["g1-f3", "g8-f6", "f3-g1", "f6-g8"])
+	check_eq(state.outcome(), Outcome.NONE, "Not the same as before the pawn went")

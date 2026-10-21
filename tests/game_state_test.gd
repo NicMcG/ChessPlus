@@ -75,3 +75,20 @@ func test_piece_lists_with_shields() -> void:
 	_check_piece_lists(state, "After the shield break")
 	state.undo_move(hit)
 	_check_piece_lists(state, "After undo")
+
+func test_moves_are_kept_but_handed_out_fresh() -> void:
+	var state := StandardSetup.create_game()
+	var first := state.moves()
+	check_eq(first.size(), 20, "Twenty moves")
+	first.clear()
+	check_eq(state.moves().size(), 20, "Changing the list handed out doesn't change the next one")
+	var move := state.find_move("e2-e4")
+	state.make_move(move)
+	check_eq(state.moves().size(), 20, "Black's twenty replies")
+	check(state.moves().all(func(m: Move) -> bool: return m.piece.team == Piece.Team.BLACK), "All Black's")
+	state.undo_move(move)
+	check(state.moves().all(func(m: Move) -> bool: return m.piece.team == Piece.Team.WHITE), "White's again after undo")
+	# A piece put on the board by hand changes the moves too.
+	state.board.set_piece(Board.parse_square("e3"), Piece.new(load("res://data/pieces/knight.tres"), Piece.Team.BLACK))
+	check(state.find_move("e2-e4") == null, "The e-pawn is blocked now")
+	check(state.find_move("d2xe3") != null, "The d-pawn can take the knight")

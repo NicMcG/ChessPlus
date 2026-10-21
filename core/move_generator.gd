@@ -7,30 +7,41 @@ extends RefCounted
 ## The moves the side to move can actually play: pseudo-legal moves that don't
 ## leave any of its royal pieces attacked.
 static func legal_moves(state: GameState) -> Array[Move]:
-	var board := state.board
-	var team := state.side_to_move
-	var enemy := Piece.other_team(team)
+	var enemy := Piece.other_team(state.side_to_move)
 	var table := state.attack_table(enemy)
-	var royals := _royal_squares(board, team)
+	var royals := _royal_squares(state.board, state.side_to_move)
 	var legal: Array[Move] = []
 	for move in pseudo_legal_moves(state):
-		state.make_move(move)
-		# A piece put to sleep can't capture next turn, so its attacks don't count
-		# (Mac): it's lifted off the board while looking.
-		if move.frozen:
-			board.set_piece(move.to, null)
-		var safe := true
-		for square in royals:
-			var now_at := move.lands_on() if square == move.from else square
-			if attacked_with(board, now_at, enemy, table):
-				safe = false
-				break
-		if move.frozen:
-			board.set_piece(move.to, move.frozen)
-		state.undo_move(move)
-		if safe:
+		if _keeps_royals_safe(state, move, royals, enemy, table):
 			legal.append(move)
 	return legal
+
+## True if `move`, one of the side to move's pseudo-legal moves, is legal (it
+## doesn't leave a royal piece attacked). Quicker than looking for it among
+## legal_moves when only a few moves need checking.
+static func is_legal(state: GameState, move: Move) -> bool:
+	var enemy := Piece.other_team(state.side_to_move)
+	return _keeps_royals_safe(state, move, _royal_squares(state.board, state.side_to_move), enemy, state.attack_table(enemy))
+
+## Try `move`: true if none of the mover's royal pieces (on `royals` before it)
+## is attacked afterwards.
+static func _keeps_royals_safe(state: GameState, move: Move, royals: Array[Vector2i], enemy: Piece.Team, table: Array) -> bool:
+	var board := state.board
+	state.make_move(move)
+	# A piece put to sleep can't capture next turn, so its attacks don't count
+	# (Mac): it's lifted off the board while looking.
+	if move.frozen:
+		board.set_piece(move.to, null)
+	var safe := true
+	for square in royals:
+		var now_at := move.lands_on() if square == move.from else square
+		if attacked_with(board, now_at, enemy, table):
+			safe = false
+			break
+	if move.frozen:
+		board.set_piece(move.to, move.frozen)
+	state.undo_move(move)
+	return safe
 
 ## Every move the side to move's pieces can make by their movement rules,
 ## without checking whether it leaves their royal piece attacked. With
