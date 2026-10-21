@@ -298,9 +298,7 @@ func _refresh() -> void:
 	# The name in a box like the keywords', filled with the piece's gradient.
 	%AbilityName.text = def.ability_name.to_upper()
 	%AbilityName.add_theme_color_override("font_color", def.ability_label_color())
-	var chip := GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4))
-	chip.craters = def.ability_craters
-	%AbilityChip.add_theme_stylebox_override("panel", chip)
+	%AbilityChip.add_theme_stylebox_override("panel", GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4)))
 	%AbilityText.text = def.ability_text
 
 ## "3 points" followed by the types in italics, e.g. "Free · King, Royal".

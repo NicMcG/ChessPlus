@@ -46,10 +46,6 @@ enum Ability { NONE, CRACK_SHOT, RAISE_DEAD, HAUNT, SONG_OF_SLUMBER, FULL_MOON }
 ## res://data/pieces/forms/ so it isn't offered in the army builder).
 @export var transforms_into: PieceDef
 
-## Dark specks like the moon's craters over the ability's colours (on its
-## button, its box on the piece card and its glow on the board).
-@export var ability_craters := false
-
 ## For a piece with two forms (the Werewolf): what its piece card's button calls
 ## this form's moves ("Human" -> "Human moves", Mac).
 @export var form_name := ""
@@ -97,6 +93,17 @@ func ability_gradient() -> PackedColorArray:
 	if ability_colors.size() >= 2:
 		return ability_colors
 	return PackedColorArray([Color("#4a4a4a"), Color("#9a9a9a")])
+
+## The colours of the faint glow round a piece whose ability is still unused,
+## when they aren't its ability's colours (Mac: the Werewolf's white -> silver
+## didn't show on the board, so its glow is blue while its button stays white).
+@export var glow_colors := PackedColorArray()
+
+## glow_colors, or the ability's colours.
+func glow_gradient() -> PackedColorArray:
+	if glow_colors.size() >= 2:
+		return glow_colors
+	return ability_gradient()
 
 ## The colour for writing the ability's name on its gradient: white, or dark
 ## grey on a pale gradient (the Ghost's and Werewolf's).

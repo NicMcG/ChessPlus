@@ -124,12 +124,20 @@ func select(def: PieceDef) -> void:
 		card.show_piece(def, team)
 	_refresh()
 
+## The picture on a piece's tray button: a piece that changes form shows the
+## form it changes into (Mac: the Werewolf's button shows the wolf); the board
+## still shows the piece as it starts.
+static func tray_texture(def: PieceDef, team: Piece.Team) -> Texture2D:
+	if def.transforms_into:
+		return PieceArt.texture_for(def.transforms_into, team)
+	return PieceArt.texture_for(def, team)
+
 ## Switch the pictures between White and Black.
 func toggle_team() -> void:
 	team = Piece.Team.BLACK if team == Piece.Team.WHITE else Piece.Team.WHITE
 	team_button.text = "White" if team == Piece.Team.WHITE else "Black"
 	for def in _tray_buttons:
-		_tray_buttons[def].icon = PieceArt.texture_for(def, team)
+		_tray_buttons[def].icon = tray_texture(def, team)
 		var frame: KingFrame = _tray_buttons[def].get_node_or_null("KingFrame")
 		if frame:
 			frame.team = team
@@ -168,7 +176,7 @@ func _tray_drag(def: PieceDef, button: Button) -> Variant:
 	# The piece's picture follows the pointer, centred on it.
 	var holder := Control.new()
 	var picture := TextureRect.new()
-	picture.texture = PieceArt.texture_for(def, team)
+	picture.texture = tray_texture(def, team)
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var side := army_board.size.y / army_board.rows
@@ -364,7 +372,7 @@ func _build_tray() -> void:
 		button.add_theme_stylebox_override("pressed", chosen)
 		button.add_theme_stylebox_override("hover_pressed", chosen)
 		button.set_drag_forwarding(func(_at: Vector2) -> Variant: return _tray_drag(def, button), Callable(), Callable())
-		button.icon = PieceArt.texture_for(def, team)
+		button.icon = tray_texture(def, team)
 		button.expand_icon = true
 		# The text never makes the button wider than the size it's given.
 		button.clip_text = true

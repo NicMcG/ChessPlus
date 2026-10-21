@@ -20,7 +20,7 @@ mirror_files = true
 [resource]
 script = ExtResource("2_def")
 id = "berserker"
-display_name = "Berserker"
+display_name = "Barbarian"
 symbol = "BR"
 value = 2.5
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2"), SubResource("Resource_rule3")])

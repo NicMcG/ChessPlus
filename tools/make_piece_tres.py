@@ -63,7 +63,7 @@ PIECES = {
     "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
-    ], ability=5, ability_name="Full Moon", colors=["#789EFF", "#283199"], transforms_into="forms/werewolf_wolf",
+    ], ability=5, ability_name="Full Moon", colors=["#F5F2E3", "#8E959E"], glow=["#789EFF", "#283199"], transforms_into="forms/werewolf_wolf",
         extra={"form_name": '"Human"'},
         ability_text="The Werewolf transforms from human form into wolf form."),
     # The Werewolf after Full Moon. Kept in forms/ so the army builder doesn't offer it.
@@ -123,6 +123,8 @@ def write(piece_id, spec):
         lines.append('transforms_into = ExtResource("3_form")')
     if spec.get("colors"):
         lines.append("ability_colors = " + color_list(spec["colors"]))
+    if spec.get("glow"):
+        lines.append("glow_colors = " + color_list(spec["glow"]))
     for key in ("special_rule", "ability_name", "ability_text"):
         if spec.get(key):
             lines.append('%s = "%s"' % (key, spec[key].replace('"', '\\"')))
