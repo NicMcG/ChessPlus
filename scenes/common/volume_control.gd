@@ -67,8 +67,8 @@ func _build_button() -> void:
 
 func _build_panel() -> void:
 	panel = PanelContainer.new()
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color(0.11, 0.11, 0.12)
+	var box := UiStyle.dialog_box(0)
+	box.shadow_size = 12
 	box.set_corner_radius_all(int(BUTTON_SIZE / 2))
 	box.content_margin_left = 26
 	box.content_margin_right = 18
@@ -101,12 +101,12 @@ func _build_panel() -> void:
 ## slider is too thin to drag with a finger.
 static func style_slider(target: HSlider) -> void:
 	var track := StyleBoxFlat.new()
-	track.bg_color = Color(0.32, 0.32, 0.34)
+	track.bg_color = Color("#4D4D54")
 	track.set_corner_radius_all(5)
 	track.content_margin_top = 5
 	track.content_margin_bottom = 5
 	var filled := track.duplicate() as StyleBoxFlat
-	filled.bg_color = Color(0.94, 0.78, 0.36)
+	filled.bg_color = UiStyle.ACCENT
 	target.add_theme_stylebox_override("slider", track)
 	target.add_theme_stylebox_override("grabber_area", filled)
 	target.add_theme_stylebox_override("grabber_area_highlight", filled)

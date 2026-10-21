@@ -1,9 +1,8 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scenes/common/backdrop.gd" id="99_backdrop"]
-
 [ext_resource type="Script" path="res://scenes/common/width_limit.gd" id="9_width"]
-
+[ext_resource type="Script" path="res://scenes/common/back_button.gd" id="8_back"]
 [ext_resource type="Script" path="res://scenes/menu/match_setup.gd" id="1_setup"]
 
 [node name="MatchSetup" type="Control"]
@@ -35,13 +34,13 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 24
+theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 24
 
 [node name="Layout" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 16
 
 [node name="TopBar" type="HBoxContainer" parent="Margin/Layout"]
 layout_mode = 2
@@ -51,74 +50,124 @@ theme_override_constants/separation = 12
 unique_name_in_owner = true
 custom_minimum_size = Vector2(140, 70)
 layout_mode = 2
+script = ExtResource("8_back")
 text = "Back"
 
 [node name="Title" type="Label" parent="Margin/Layout/TopBar"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 40
+theme_type_variation = &"TitleLabel"
 text = "New match"
 horizontal_alignment = 1
 
-[node name="OpponentLabel" type="Label" parent="Margin/Layout"]
-layout_mode = 2
-text = "Opponent"
-
-[node name="Opponent" type="OptionButton" parent="Margin/Layout"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 90)
+[node name="Balance" type="Control" parent="Margin/Layout/TopBar"]
+custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 
-[node name="BotOptions" type="VBoxContainer" parent="Margin/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 14
-
-[node name="DifficultyLabel" type="Label" parent="Margin/Layout/BotOptions"]
-layout_mode = 2
-text = "Difficulty"
-
-[node name="Difficulty" type="OptionButton" parent="Margin/Layout/BotOptions"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 90)
-layout_mode = 2
-
-[node name="SideLabel" type="Label" parent="Margin/Layout/BotOptions"]
-layout_mode = 2
-text = "You play"
-
-[node name="Side" type="OptionButton" parent="Margin/Layout/BotOptions"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 90)
-layout_mode = 2
-
-[node name="FirstLabel" type="Label" parent="Margin/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "White plays with"
-
-[node name="FirstArmy" type="OptionButton" parent="Margin/Layout"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 90)
-layout_mode = 2
-
-[node name="SecondLabel" type="Label" parent="Margin/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Black plays with"
-
-[node name="SecondArmy" type="OptionButton" parent="Margin/Layout"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 90)
-layout_mode = 2
-
-[node name="Spacer" type="Control" parent="Margin/Layout"]
+[node name="Scroll" type="ScrollContainer" parent="Margin/Layout"]
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Cards" type="BoxContainer" parent="Margin/Layout/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+vertical = true
+
+[node name="OpponentCard" type="PanelContainer" parent="Margin/Layout/Scroll/Cards"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_type_variation = &"CardPanel"
+
+[node name="Box" type="VBoxContainer" parent="Margin/Layout/Scroll/Cards/OpponentCard"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="OpponentLabel" type="Label" parent="Margin/Layout/Scroll/Cards/OpponentCard/Box"]
+layout_mode = 2
+theme_type_variation = &"HeadingLabel"
+text = "Opponent"
+
+[node name="Opponent" type="OptionButton" parent="Margin/Layout/Scroll/Cards/OpponentCard/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+fit_to_longest_item = false
+
+[node name="BotOptions" type="VBoxContainer" parent="Margin/Layout/Scroll/Cards/OpponentCard/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DifficultyLabel" type="Label" parent="Margin/Layout/Scroll/Cards/OpponentCard/Box/BotOptions"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+vertical_alignment = 2
+theme_type_variation = &"HeadingLabel"
+text = "Difficulty"
+
+[node name="Difficulty" type="OptionButton" parent="Margin/Layout/Scroll/Cards/OpponentCard/Box/BotOptions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+fit_to_longest_item = false
+
+[node name="SideLabel" type="Label" parent="Margin/Layout/Scroll/Cards/OpponentCard/Box/BotOptions"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+vertical_alignment = 2
+theme_type_variation = &"HeadingLabel"
+text = "You play"
+
+[node name="Side" type="OptionButton" parent="Margin/Layout/Scroll/Cards/OpponentCard/Box/BotOptions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+fit_to_longest_item = false
+
+[node name="ArmiesCard" type="PanelContainer" parent="Margin/Layout/Scroll/Cards"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 0
+theme_type_variation = &"CardPanel"
+
+[node name="Box" type="VBoxContainer" parent="Margin/Layout/Scroll/Cards/ArmiesCard"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="FirstLabel" type="Label" parent="Margin/Layout/Scroll/Cards/ArmiesCard/Box"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"HeadingLabel"
+text = "White plays with"
+
+[node name="FirstArmy" type="OptionButton" parent="Margin/Layout/Scroll/Cards/ArmiesCard/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+fit_to_longest_item = false
+
+[node name="SecondLabel" type="Label" parent="Margin/Layout/Scroll/Cards/ArmiesCard/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+vertical_alignment = 2
+theme_type_variation = &"HeadingLabel"
+text = "Black plays with"
+
+[node name="SecondArmy" type="OptionButton" parent="Margin/Layout/Scroll/Cards/ArmiesCard/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+fit_to_longest_item = false
 
 [node name="Start" type="Button" parent="Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
+theme_type_variation = &"AccentButton"
 theme_override_font_sizes/font_size = 36
 text = "Start"

@@ -154,6 +154,8 @@ func _ready() -> void:
 	KeyBinds.install()
 	sounds = GameSounds.new()
 	add_child(sounds)
+	# The moves sit in a box of their own.
+	_moves_scroll.add_theme_stylebox_override("panel", UiStyle.box(UiStyle.CARD, UiStyle.RADIUS, 14, 8))
 	_build_status_row()
 	clock_label = Label.new()
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1247,12 +1249,9 @@ var last_notice := ""
 func show_notice(text: String) -> void:
 	last_notice = text
 	var notice := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.1, 0.11, 0.95)
-	style.border_color = Color("#8a8a8a")
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(14)
+	var style := UiStyle.dialog_box(14)
+	style.set_corner_radius_all(12)
+	style.shadow_size = 12
 	notice.add_theme_stylebox_override("panel", style)
 	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var label := Label.new()
@@ -1943,9 +1942,9 @@ func show_export() -> void:
 	shown.name = "GameText"
 	shown.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	shown.reparent(scroll)
-	var copy_button := export_panel.add_button("Copy text", func() -> void: DisplayServer.clipboard_set(text))
+	var copy_button := export_panel.add_button("Copy text", func() -> void: DisplayServer.clipboard_set(text), &"AccentButton")
 	copy_button.pressed.connect(func() -> void: copy_button.text = "Copied!")
-	export_panel.add_button("Done", export_panel.close)
+	export_panel.add_button("Done", export_panel.close, &"GhostButton")
 	add_child(export_panel)
 	# A scroll box doesn't grow with what's in it: as tall as the wrapped text
 	# (known once it's laid out), up to EXPORT_TEXT_MAX_HEIGHT.
@@ -1975,6 +1974,7 @@ func _build_offer_bar() -> void:
 		var button := Button.new()
 		button.name = entry[0]
 		button.text = entry[0]
+		button.theme_type_variation = &"AccentButton" if entry[1] else &"CompactButton"
 		button.custom_minimum_size = Vector2(150, 70)
 		var accept: bool = entry[1]
 		button.pressed.connect(func() -> void: answer_draw(accept))
@@ -1986,14 +1986,16 @@ func _build_offer_bar() -> void:
 func _build_online_extras() -> void:
 	chat_button = Button.new()
 	chat_button.text = "Chat"
-	chat_button.custom_minimum_size = Vector2(0, 80)
+	chat_button.theme_type_variation = &"CompactButton"
+	chat_button.custom_minimum_size = Vector2(0, 78)
 	chat_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	chat_button.pressed.connect(open_chat)
 	_buttons.add_child(chat_button)
 	_buttons.move_child(chat_button, new_game_button.get_index())
 	draw_button = Button.new()
 	draw_button.text = "Draw"
-	draw_button.custom_minimum_size = Vector2(0, 80)
+	draw_button.theme_type_variation = &"CompactButton"
+	draw_button.custom_minimum_size = Vector2(0, 78)
 	draw_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	draw_button.pressed.connect(offer_draw)
 	_buttons.add_child(draw_button)

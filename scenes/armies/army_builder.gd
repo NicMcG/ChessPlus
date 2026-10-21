@@ -226,7 +226,7 @@ func share() -> void:
 	share_panel.add_button("Copy as text", func() -> void:
 		share_panel.close()
 		share_text())
-	share_panel.add_button("Cancel", share_panel.close)
+	share_panel.add_button("Cancel", share_panel.close, &"GhostButton")
 	add_child(share_panel)
 
 ## The army as it is now, named as it will be saved.
@@ -242,9 +242,9 @@ func share_text() -> void:
 	var text := ArmyShare.to_text(_army_to_share(), rules, BOARD_WIDTH)
 	var shown := share_panel.add_text(text, 24)
 	shown.name = "ArmyText"
-	var copy_button := share_panel.add_button("Copy text", func() -> void: DisplayServer.clipboard_set(text))
+	var copy_button := share_panel.add_button("Copy text", func() -> void: DisplayServer.clipboard_set(text), &"AccentButton")
 	copy_button.pressed.connect(func() -> void: copy_button.text = "Copied!")
-	share_panel.add_button("Done", share_panel.close)
+	share_panel.add_button("Done", share_panel.close, &"GhostButton")
 	add_child(share_panel)
 
 ## Upload the army as it is now and show its code, for a friend to import.
@@ -258,14 +258,14 @@ func share_code() -> void:
 		return
 	if not result.ok:
 		message.text = "Couldn't share the army: " + result.error
-		share_panel.add_button("Close", share_panel.close)
+		share_panel.add_button("Close", share_panel.close, &"GhostButton")
 		return
 	message.text = "Your friend taps Import army in My armies and types this code:"
 	var code := share_panel.add_text(result.code, 64)
 	code.name = "Code"
-	var copy_button := share_panel.add_button("Copy code", func() -> void: DisplayServer.clipboard_set(result.code))
+	var copy_button := share_panel.add_button("Copy code", func() -> void: DisplayServer.clipboard_set(result.code), &"AccentButton")
 	copy_button.pressed.connect(func() -> void: copy_button.text = "Copied!")
-	share_panel.add_button("Done", share_panel.close)
+	share_panel.add_button("Done", share_panel.close, &"GhostButton")
 
 func _real_server() -> OnlineBackend:
 	var server := SupabaseBackend.new()
@@ -379,10 +379,9 @@ func _build_tray() -> void:
 		# design); the chosen type gets a bright border, so it's obvious what
 		# you're placing.
 		# The chosen type gets a gold border, so it's obvious what you're placing.
-		var chosen := StyleBoxFlat.new()
-		chosen.bg_color = Color(0.25, 0.25, 0.27)
+		var chosen := UiStyle.box(UiStyle.SURFACE_HOVER)
 		chosen.set_border_width_all(4)
-		chosen.border_color = Color(0.95, 0.75, 0.2)
+		chosen.border_color = UiStyle.ACCENT
 		button.add_theme_stylebox_override("pressed", chosen)
 		button.add_theme_stylebox_override("hover_pressed", chosen)
 		button.set_drag_forwarding(func(_at: Vector2) -> Variant: return _tray_drag(def, button), Callable(), Callable())

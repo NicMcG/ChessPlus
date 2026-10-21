@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scenes/armies/army_builder.gd" id="1_builder"]
 [ext_resource type="Script" path="res://scenes/armies/army_board.gd" id="2_board"]
 [ext_resource type="PackedScene" path="res://scenes/common/piece_card.tscn" id="3_card"]
+[ext_resource type="Script" path="res://scenes/common/back_button.gd" id="8_back"]
 
 [node name="ArmyBuilder" type="Control"]
 layout_mode = 3
@@ -48,8 +49,9 @@ theme_override_constants/separation = 10
 
 [node name="Back" type="Button" parent="Margin/Layout/TopBar"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 70)
+custom_minimum_size = Vector2(130, 70)
 layout_mode = 2
+script = ExtResource("8_back")
 text = "Back"
 
 [node name="NameEdit" type="LineEdit" parent="Margin/Layout/TopBar"]
@@ -68,6 +70,7 @@ text = "White"
 [node name="Points" type="Label" parent="Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_type_variation = &"StrongLabel"
 theme_override_font_sizes/font_size = 32
 text = "Points: 0 / 39"
 horizontal_alignment = 1
@@ -81,7 +84,7 @@ script = ExtResource("2_board")
 [node name="Problems" type="Label" parent="Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.45, 0.4, 1)
+theme_override_colors/font_color = Color(1, 0.5411765, 0.5019608, 1)
 theme_override_font_sizes/font_size = 22
 autowrap_mode = 3
 
@@ -111,4 +114,5 @@ size_flags_horizontal = 3
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
+theme_type_variation = &"AccentButton"
 text = "Save army"

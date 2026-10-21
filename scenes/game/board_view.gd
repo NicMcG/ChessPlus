@@ -524,6 +524,8 @@ func _draw() -> void:
 	if state == null:
 		return
 	var board := state.board
+	# A soft shadow under the board lifts it off the background.
+	draw_style_box(_board_shadow(), Rect2(_origin(), Vector2(board.width, board.height) * _square_size()))
 	for rank in range(board.height):
 		for file in range(board.width):
 			var square := Vector2i(file, rank)
@@ -747,9 +749,11 @@ static func silhouette(texture: Texture2D) -> Texture2D:
 		if image.is_compressed():
 			image.decompress()
 		image.convert(Image.FORMAT_RGBA8)
-		for y in image.get_height():
-			for x in image.get_width():
-				image.set_pixel(x, y, Color(1, 1, 1, image.get_pixel(x, y).a))
+		# Every pixel's colour made white, its see-through-ness kept: brightness 0
+		# makes it black, then contrast -1 turns black into white. Done by Godot
+		# itself, it's much quicker than going pixel by pixel in GDScript, which
+		# held up the first frame each new piece glowed or flashed (worst on phones).
+		image.adjust_bcs(0.0, -1.0, 1.0)
 		image.generate_mipmaps()
 		_silhouettes[texture] = ImageTexture.create_from_image(image)
 	return _silhouettes[texture]
@@ -1182,6 +1186,17 @@ func _square_size() -> float:
 	return minf(size.x / state.board.width, size.y / state.board.height)
 
 ## Where the board's top-left corner is inside this control.
+var _shadow: StyleBoxFlat
+
+func _board_shadow() -> StyleBoxFlat:
+	if _shadow == null:
+		_shadow = StyleBoxFlat.new()
+		_shadow.bg_color = DARK_SQUARE
+		_shadow.shadow_color = Color(0, 0, 0, 0.45)
+		_shadow.shadow_size = 22
+		_shadow.shadow_offset = Vector2(0, 8)
+	return _shadow
+
 func board_origin() -> Vector2:
 	return _origin() if state else Vector2.ZERO
 

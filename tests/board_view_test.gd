@@ -305,3 +305,20 @@ func test_pieces_with_an_unused_ability_glow() -> void:
 	check(not BoardView.has_ability_ready(archer), "Not once it's used")
 	var knight := Piece.new(load("res://data/pieces/knight.tres"), Piece.Team.WHITE)
 	check(not BoardView.has_ability_ready(knight), "Pieces without abilities don't")
+
+func test_silhouette_is_the_picture_in_white() -> void:
+	for def: PieceDef in [load("res://data/pieces/knight.tres"), load("res://data/pieces/vampire.tres")]:
+		for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+			var picture := PieceArt.texture_for(def, team, "standard").get_image()
+			picture.decompress()
+			picture.convert(Image.FORMAT_RGBA8)
+			var white := BoardView.silhouette(PieceArt.texture_for(def, team, "standard")).get_image()
+			check_eq(white.get_size(), picture.get_size(), "Same size")
+			var wrong := 0
+			for y in range(0, picture.get_height(), 7):
+				for x in range(0, picture.get_width(), 7):
+					var c := white.get_pixel(x, y)
+					if c.r8 != 255 or c.g8 != 255 or c.b8 != 255 or c.a8 != picture.get_pixel(x, y).a8:
+						wrong += 1
+			check_eq(wrong, 0, "Every pixel white, as see-through as the picture: %s" % def.id)
+	BoardView.clear_cache()

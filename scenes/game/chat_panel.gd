@@ -18,7 +18,7 @@ var _web_rect := Rect2()
 var _web_shown := false
 
 func _init() -> void:
-	color = Color(0, 0, 0, 0.55)
+	color = UiStyle.SCRIM
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 15
@@ -29,11 +29,7 @@ func _init() -> void:
 		margin.add_theme_constant_override("margin_" + side, 40)
 	add_child(margin)
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.13, 0.13, 0.14)
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(20)
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", UiStyle.dialog_box(20))
 	margin.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
@@ -42,10 +38,11 @@ func _init() -> void:
 	var heading := Label.new()
 	heading.text = "Chat"
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	heading.add_theme_font_size_override("font_size", 40)
+	heading.theme_type_variation = &"DialogTitle"
 	top.add_child(heading)
 	var close := Button.new()
 	close.text = "Close"
+	close.theme_type_variation = &"GhostButton"
 	close.custom_minimum_size = Vector2(140, 70)
 	close.pressed.connect(hide)
 	top.add_child(close)
@@ -103,12 +100,12 @@ func show_messages(messages: Array, my_side: String) -> void:
 		_show_in_browser(messages, my_side)
 		return
 	if messages.is_empty():
-		_messages.add_child(_message_label("No messages yet. Say hello!", Color(0.6, 0.6, 0.6)))
+		_messages.add_child(_message_label("No messages yet. Say hello!", UiStyle.TEXT_MUTED))
 	for message: Dictionary in messages:
 		var mine: bool = message.get("from", "") == my_side
 		var who := "You" if mine else "Opponent"
 		_messages.add_child(_message_label("%s: %s" % [who, message.get("text", "")],
-				Color("#FFD75E") if mine else Color.WHITE))
+				UiStyle.ACCENT_TEXT if mine else UiStyle.TEXT))
 	_scroll_to_end.call_deferred()
 
 func _show_in_browser(messages: Array, my_side: String) -> void:

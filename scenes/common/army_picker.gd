@@ -20,7 +20,7 @@ var side_pick: OptionButton
 
 ## `library` holds the saved armies (null = only Standard).
 func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side := false) -> void:
-	color = Color(0, 0, 0, 0.6)
+	color = UiStyle.SCRIM
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 20
@@ -29,11 +29,6 @@ func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side :=
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.13, 0.13, 0.14)
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(24)
-	panel.add_theme_stylebox_override("panel", style)
 	panel.custom_minimum_size.x = 520
 	center.add_child(panel)
 	var column := VBoxContainer.new()
@@ -42,11 +37,12 @@ func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side :=
 	var heading := Label.new()
 	heading.text = title
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_font_size_override("font_size", 40)
+	heading.theme_type_variation = &"DialogTitle"
 	column.add_child(heading)
 	if ask_side:
 		var side_label := Label.new()
 		side_label.text = "You play"
+		side_label.theme_type_variation = &"HeadingLabel"
 		column.add_child(side_label)
 		side_pick = OptionButton.new()
 		for side in ["White", "Black", "Random"]:
@@ -55,6 +51,7 @@ func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side :=
 		column.add_child(side_pick)
 		var army_label := Label.new()
 		army_label.text = "With"
+		army_label.theme_type_variation = &"HeadingLabel"
 		column.add_child(army_label)
 	for index in choices.entries.size():
 		var entry: Dictionary = choices.entries[index]
@@ -74,6 +71,7 @@ Fix it in My armies."
 		column.add_child(button)
 	var cancel := Button.new()
 	cancel.text = "Cancel"
+	cancel.theme_type_variation = &"GhostButton"
 	cancel.custom_minimum_size.y = 70
 	cancel.pressed.connect(func() -> void:
 		cancelled.emit()

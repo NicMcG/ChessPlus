@@ -75,7 +75,7 @@ func ask_import() -> void:
 	code_edit.custom_minimum_size.y = 80
 	code_edit.add_theme_font_size_override("font_size", 40)
 	import_panel.column.add_child(code_edit)
-	var go := import_panel.add_button("Import", func() -> void: pass)
+	var go := import_panel.add_button("Import", func() -> void: pass, &"AccentButton")
 	go.pressed.connect(func() -> void: import_code(code_edit.text))
 	import_panel.add_text("Or paste the army text your friend copied:")
 	var text_edit := LineEdit.new()
@@ -88,7 +88,7 @@ func ask_import() -> void:
 	var message := import_panel.add_text("")
 	message.name = "Message"
 	message.add_theme_color_override("font_color", Color("#ff8a80"))
-	import_panel.add_button("Cancel", import_panel.close)
+	import_panel.add_button("Cancel", import_panel.close, &"GhostButton")
 	add_child(import_panel)
 	PhoneTextInput.attach(code_edit, "Army code")
 	PhoneTextInput.attach(text_edit, "Army text")
@@ -142,47 +142,72 @@ func _delete_pending() -> void:
 		_pending_delete = null
 		refresh()
 
+## One army's card: its name and cost (tap to edit), the White / Black default
+## toggles, and Delete.
 func _row_for(army: Army) -> Control:
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"CardPanel"
+	card.add_theme_stylebox_override("panel", _card_box())
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 8)
+	card.add_child(row)
 	var open := Button.new()
-	open.text = "%s  (%s pts)" % [army.army_name, Army.format_points(army.cost())]
-	open.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	open.theme_type_variation = &"GhostButton"
 	open.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	open.custom_minimum_size = Vector2(0, 90)
-	open.clip_text = true
+	open.custom_minimum_size = Vector2(0, 84)
+	open.set_meta("army_name", army.army_name)
 	var problems := army.problems(rules, 8)
 	if not problems.is_empty():
 		open.icon = WARNING_ICON
 		open.add_theme_constant_override("icon_max_width", 44)
 		open.tooltip_text = "Can't be used in games until it's fixed:\n" + "\n".join(problems)
 	open.pressed.connect(func() -> void: edit_requested.emit(army))
+	# The name over its cost, drawn on top of the button (taps go to the button).
+	var words := VBoxContainer.new()
+	words.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	words.offset_left = 18 + (56 if open.icon else 0)
+	words.offset_right = -8
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.add_theme_constant_override("separation", 0)
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	open.add_child(words)
+	var name_label := Label.new()
+	name_label.text = army.army_name
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_label.add_theme_font_override("font", UiStyle.font(UiStyle.SEMIBOLD))
+	words.add_child(name_label)
+	var cost_label := Label.new()
+	cost_label.text = "%s pts" % Army.format_points(army.cost())
+	cost_label.theme_type_variation = &"MutedLabel"
+	words.add_child(cost_label)
 	var delete := Button.new()
 	delete.text = "Delete"
-	delete.custom_minimum_size = Vector2(150, 90)
+	delete.theme_type_variation = &"DangerButton"
+	delete.custom_minimum_size = Vector2(124, 84)
+	delete.add_theme_font_size_override("font_size", 26)
 	delete.pressed.connect(func() -> void: ask_delete(army))
 	row.add_child(open)
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		row.add_child(_default_button(army, team))
 	row.add_child(delete)
-	return row
+	return card
+
+## A card with less room inside than usual, so the buttons fill it.
+func _card_box() -> StyleBoxFlat:
+	var box := get_theme_stylebox("panel", "CardPanel").duplicate() as StyleBoxFlat
+	box.set_content_margin_all(8)
+	return box
 
 ## A toggle marking `army` as the default for `team`; gold while it is.
 func _default_button(army: Army, team: Piece.Team) -> Button:
 	var button := Button.new()
 	button.toggle_mode = true
+	button.theme_type_variation = &"ChoiceButton"
 	button.text = "White" if team == Piece.Team.WHITE else "Black"
 	button.tooltip_text = "Use this army by default when playing %s" % button.text
-	button.custom_minimum_size = Vector2(110, 90)
+	button.custom_minimum_size = Vector2(104, 84)
 	button.add_theme_font_size_override("font_size", 24)
 	button.button_pressed = UserSettings.default_army(team) == army.library_path
-	var on := StyleBoxFlat.new()
-	on.bg_color = Color("#8a6d1f")
-	on.border_color = Color("#FFD75E")
-	on.set_border_width_all(3)
-	on.set_corner_radius_all(6)
-	button.add_theme_stylebox_override("pressed", on)
-	button.add_theme_stylebox_override("hover_pressed", on)
 	button.toggled.connect(func(pressed: bool) -> void:
 		set_default(army, team, pressed))
 	return button

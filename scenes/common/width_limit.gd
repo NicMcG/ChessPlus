@@ -17,6 +17,15 @@ func _ready() -> void:
 	_fit()
 
 func _fit() -> void:
-	var extra := maxi(0, int((size.x - _base_left - _base_right - max_width) / 2))
+	# The room the parent gives it (its own size can be pushed wider by wide
+	# contents, which would make the margins grow without end).
+	var room := minf(size.x, get_parent_area_size().x)
+	var extra := maxi(0, int((room - _base_left - _base_right - max_width) / 2))
+	# Never squeeze the contents below the width they need.
+	var needed := 0.0
+	for child in get_children():
+		if child is Control and (child as Control).visible:
+			needed = maxf(needed, (child as Control).get_combined_minimum_size().x)
+	extra = mini(extra, maxi(0, int((room - _base_left - _base_right - needed) / 2)))
 	add_theme_constant_override("margin_left", _base_left + extra)
 	add_theme_constant_override("margin_right", _base_right + extra)
