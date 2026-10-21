@@ -1,4 +1,26 @@
-# The meta pool (October 2026, second search)
+# The meta pool (October 2026, third search: Mac's new prices)
+
+Regrown on 21 October 2026 after Mac's price changes (Vampire 6.5, Princess
+8.5, Squire 4, Galleon 3, Elephant 1, Paladin 1.5, Assassin 0.5; Queen 9).
+Every army in the previous pool was over the 39 budget at the new prices, so
+the search started from Standard alone:
+
+```
+plusfish meta --wide 64 --pool engine/plusfish/reports/meta_pool.txt --out meta_pool.txt --game-climb --king-exposed reject --rounds 15 --threads 64 --seed 1
+```
+
+(game version 1c9f93f, on the AWS sims server: c8g.16xlarge, 64 cores; 27
+minutes). The full log and both balance reports from the same day are in
+`balance/results/run2/`.
+
+What it shows: no Vampire, Squire or Princess in any army now (they were in
+nearly every strong army before the price rise). Cheap pieces fill the
+armies instead: Assassin in all ten, Paladin in nine, Queen, Knight and
+Barbarian in eight, Elephant, Bishop and Pawn in seven. The top army (Wide
+15b) scores 58.9% against the rest; the pool still hadn't settled after 15
+rounds (members kept changing), as with the earlier searches.
+
+# Earlier: the second search
 
 Ten armies that hold up best **in games** against each other, played by the
 stronger Plusfish of PR #19 (its search work). File: `reports/meta_pool.txt`
