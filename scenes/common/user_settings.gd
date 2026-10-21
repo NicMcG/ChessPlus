@@ -45,6 +45,38 @@ static func notifications_on() -> bool:
 static func set_notifications_on(on: bool) -> void:
 	_store("notify", "your_move", on)
 
+## How fast move and ability animations play (Mac's Settings): each choice
+## and what it multiplies their length by ("off" = no animation, moves appear
+## at once). In the order shown.
+const ANIMATION_SPEEDS := {"off": 0.0, "fast": 0.6, "normal": 1.0, "slow": 1.5}
+
+static func animation_speed() -> String:
+	var speed: String = _settings().get_value("visual", "animation_speed", "normal")
+	return speed if ANIMATION_SPEEDS.has(speed) else "normal"
+
+static func set_animation_speed(speed: String) -> void:
+	_store("visual", "animation_speed", speed)
+
+## The board helpers that can be switched off (Mac's Settings), all on to
+## start with: "coordinates", "move_dots" (where the chosen piece can go),
+## "last_move" (the last move's squares tinted) and "ability_glow" (the glow
+## round a piece whose ability is unused).
+const BOARD_HELPERS: Array[String] = ["coordinates", "move_dots", "last_move", "ability_glow"]
+
+static func board_helper(helper: String) -> bool:
+	return _settings().get_value("visual", helper, true)
+
+static func set_board_helper(helper: String, on: bool) -> void:
+	_store("visual", helper, on)
+
+## Tone down flashes and shaking (Mac's Settings): no white impact frames, no
+## flickering lightning, no trembling king or flaring border in check.
+static func reduce_effects() -> bool:
+	return _settings().get_value("visual", "reduce_effects", false)
+
+static func set_reduce_effects(on: bool) -> void:
+	_store("visual", "reduce_effects", on)
+
 ## Settings' "Reset to defaults": every setting back to how it started (sound,
 ## notifications, visual, keys). The online game in progress and the default
 ## armies (set in My armies) are kept.

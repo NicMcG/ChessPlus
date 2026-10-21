@@ -82,3 +82,41 @@ func test_main_menu_opens_settings_and_back() -> void:
 	(main.screen as SettingsMenu).close()
 	check(main.screen.scene_file_path == "res://scenes/menu/main_menu.tscn", "Back returns to the main menu")
 	main.free()
+
+func _board() -> BoardView:
+	var view := BoardView.new()
+	view.size = Vector2(640, 640)
+	_root().add_child(view)
+	view.show_game(StandardSetup.create_game())
+	return view
+
+func test_animation_speed() -> void:
+	var settings := _open()
+	settings.speed_buttons["slow"].pressed.emit()
+	check_eq(UserSettings.animation_speed(), "slow", "Saved")
+	var view := _board()
+	check(is_equal_approx(view.move_time, BoardView.BASE_MOVE_TIME * 1.5), "The board plays animations 1.5x as long")
+	settings.speed_buttons["off"].pressed.emit()
+	view.apply_settings()
+	check_eq(view.move_time, 0.0, "Off: no animation")
+	settings.reset_to_defaults()
+	view.apply_settings()
+	check(is_equal_approx(view.move_time, BoardView.BASE_MOVE_TIME), "Reset: normal again")
+	check(settings.speed_buttons["normal"].button_pressed, "...and the screen shows Normal")
+	view.free()
+	settings.free()
+	_finish()
+
+func test_board_helpers_and_reduced_effects() -> void:
+	var settings := _open()
+	settings.helper_toggles["coordinates"].button_pressed = false
+	settings.helper_toggles["move_dots"].button_pressed = false
+	settings.reduce_toggle.button_pressed = true
+	var view := _board()
+	check(not view.helpers.coordinates and not view.helpers.move_dots, "The board takes the switches")
+	check(view.helpers.last_move and view.helpers.ability_glow, "...and leaves the others on")
+	check(view.reduce_effects, "Reduce flashing and shaking")
+	check(UserSettings.board_helper("last_move"), "Saved per helper")
+	view.free()
+	settings.free()
+	_finish()

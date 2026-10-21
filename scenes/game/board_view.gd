@@ -54,7 +54,22 @@ const SHAKE_TIME := 0.3
 ## Which folder in res://art/pieces/ the piece images come from.
 @export var piece_style := "standard"
 ## How long (seconds) a move takes to slide across the board. 0 = no animation.
-@export var move_time := 0.22
+## Set from the Animation speed setting (apply_settings); tests set it directly.
+@export var move_time := BASE_MOVE_TIME
+const BASE_MOVE_TIME := 0.22
+## The board helpers (UserSettings.BOARD_HELPERS) that are switched on.
+var helpers := {"coordinates": true, "move_dots": true, "last_move": true, "ability_glow": true}
+## Settings' "Reduce flashing and shaking".
+var reduce_effects := false
+
+## Take the visual settings from UserSettings (when the board is made, and
+## again when Settings change them during a game).
+func apply_settings() -> void:
+	move_time = BASE_MOVE_TIME * UserSettings.ANIMATION_SPEEDS[UserSettings.animation_speed()]
+	for helper in UserSettings.BOARD_HELPERS:
+		helpers[helper] = UserSettings.board_helper(helper)
+	reduce_effects = UserSettings.reduce_effects()
+	queue_redraw()
 ## Black's side at the bottom (the board turned round; pieces still upright).
 ## Set when this player is Black, online or against the bot.
 var flipped := false:
@@ -131,6 +146,7 @@ static var _silhouettes := {}
 func _ready() -> void:
 	# Smooth edges when the piece images are shrunk to fit the squares.
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	apply_settings()
 
 ## Start showing a game.
 func show_game(p_state: GameState) -> void:
@@ -514,8 +530,9 @@ func _draw() -> void:
 			draw_rect(_square_rect(square), LIGHT_SQUARE if (file + rank) % 2 == 1 else DARK_SQUARE)
 	if not state.history.is_empty():
 		var last: Move = state.history.back()
-		draw_rect(_square_rect(last.from), LAST_MOVE_TINT)
-		draw_rect(_square_rect(last.to), LAST_MOVE_TINT)
+		if helpers.last_move:
+			draw_rect(_square_rect(last.from), LAST_MOVE_TINT)
+			draw_rect(_square_rect(last.to), LAST_MOVE_TINT)
 	if _selected != Board.NO_SQUARE:
 		draw_rect(_square_rect(_selected), SELECTED_TINT)
 	# Squares marked red with a right-click, for planning (Mac).
@@ -539,7 +556,8 @@ func _draw() -> void:
 	for extra: Dictionary in extras:
 		if extra.kind == "red_flash":
 			var t: float = extra.t
-			_check_flash = maxf(_check_flash, absf(sin(t * TAU)) * (1.0 - 0.4 * t))
+			if not reduce_effects:
+				_check_flash = maxf(_check_flash, absf(sin(t * TAU)) * (1.0 - 0.4 * t))
 	_draw_extras(extras, 0)
 	for rank in range(board.height):
 		for file in range(board.width):
@@ -553,7 +571,7 @@ func _draw() -> void:
 				rect.position.x += _shake_offset(rect.size.x)
 			if shaking.has(square):
 				rect.position.x += MoveAnimation.shake_offset(shaking[square]) * rect.size.x
-			if square in _check_squares:
+			if square in _check_squares and not reduce_effects:
 				rect.position += tremble(Time.get_ticks_msec() / 1000.0) * rect.size.x
 			if _pulses.has(square):
 				var grow := pulse_scale(square)
@@ -575,8 +593,11 @@ func _draw() -> void:
 			_draw_posed(piece, poses[piece])
 	_draw_extras(extras, 2)
 	# On top of the pieces, so a piece on an edge square doesn't hide its label.
-	_draw_coordinates()
-	if not (aiming and _aim_unmarked):
+	if helpers.coordinates:
+		_draw_coordinates()
+	# Where the chosen piece can go (Board helpers: Move dots); an ability's
+	# targets always show while aiming, as they're needed to use it.
+	if not (aiming and _aim_unmarked) and (helpers.move_dots or aiming):
 		for move in _selected_moves:
 			_draw_target(move)
 	if hint_arrow.size() == 2 and hint_arrow[0] != hint_arrow[1]:
@@ -915,7 +936,7 @@ func _draw_extras(extras: Array, layer: int) -> void:
 				# flashing twice.
 				var strike := _point(extra.at)
 				var top := Vector2(strike.x + s * 0.6, _origin().y - s * 0.2)
-				var flash := (1.0 - t) * (0.6 + 0.4 * absf(sin(t * TAU * 2.0)))
+				var flash := (1.0 - t) * (1.0 if reduce_effects else 0.6 + 0.4 * absf(sin(t * TAU * 2.0)))
 				var points := PackedVector2Array([top])
 				var pieces := 8
 				for i in range(1, pieces):
@@ -967,7 +988,10 @@ func _draw_extras(extras: Array, layer: int) -> void:
 					_draw_note(pos, s * 0.34, Color(1.0, 0.82, 0.3, sin(PI * k)))
 			"impact_frame":
 				# An anime impact frame: for an instant the board goes stark white,
-				# with black lines bursting out from the hit.
+				# with black lines bursting out from the hit. Not with Reduce
+				# flashing and shaking.
+				if reduce_effects:
+					continue
 				var center := _point(extra.at)
 				var strength := 1.0 - t
 				var board_rect := Rect2(_origin(), Vector2(state.board.width, state.board.height) * s)
@@ -1112,7 +1136,7 @@ func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0
 	if texture and _is_checked_king(piece):
 		_draw_check_border(texture, rect, alpha)
 	if texture:
-		if has_ability_ready(piece) and as_def == null:
+		if has_ability_ready(piece) and as_def == null and helpers.ability_glow:
 			_draw_ability_glow(texture, rect, piece.def.glow_gradient(), alpha)
 		draw_texture_rect(texture, rect, false, Color(1, 1, 1, alpha))
 		var strength := maxf(flash.r, maxf(flash.g, flash.b))
