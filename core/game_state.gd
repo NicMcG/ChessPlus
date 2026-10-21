@@ -80,6 +80,29 @@ func is_in_check() -> bool:
 ## every other outcome is a draw. Checkmate counts even if the mating move was
 ## also the 50th move.
 func outcome() -> Outcome:
+	var key := [_position_ids.back(), board.changes, side_to_move, halfmove_clock, lost[0].size(), lost[1].size()]
+	if key == _outcome_key:
+		return _outcome
+	_outcome = _work_out_outcome()
+	_outcome_key = key
+	return _outcome
+
+## outcome() is slow (it works out every legal move and looks back for
+## repetitions) and the game screen asks for it many times after each move, so
+## the answer is kept until the position changes: a move made or undone, a
+## piece put on or taken off the board, or one added to the lost pieces.
+var _outcome := Outcome.NONE
+var _outcome_key := []
+## A number for each position reached by make_move (the start's first): a new
+## one for every move made, and undoing a move goes back to the one before, so
+## trying moves (make, then undo) doesn't lose the outcome worked out for the
+## position. With board.changes put back on undo too, any other change to the
+## board still counts as a new position.
+var _position_ids: Array[int] = [0]
+var _board_changes: Array[int] = []
+static var _last_position_id := 0
+
+func _work_out_outcome() -> Outcome:
 	if history.is_empty() and MoveGenerator.is_in_check(board, Piece.other_team(side_to_move)):
 		return Outcome.KING_EXPOSED
 	if moves().is_empty():
@@ -104,6 +127,9 @@ func result_text() -> String:
 	return "1/2-1/2"
 
 func make_move(move: Move) -> void:
+	_last_position_id += 1
+	_position_ids.append(_last_position_id)
+	_board_changes.append(board.changes)
 	move.piece_had_moved = move.piece.has_moved
 	move.prev_en_passant_squares = en_passant_squares
 	move.prev_en_passant_victim = en_passant_victim
@@ -214,6 +240,11 @@ func _next_turn() -> void:
 
 func undo_move(move: Move) -> void:
 	assert(not history.is_empty() and history.back() == move, "Moves must be undone last-first")
+	_position_ids.pop_back()
+	_take_back(move)
+	board.changes = _board_changes.pop_back()
+
+func _take_back(move: Move) -> void:
 	history.pop_back()
 	halfmove_clock = move.prev_halfmove_clock
 	side_to_move = Piece.other_team(side_to_move)
