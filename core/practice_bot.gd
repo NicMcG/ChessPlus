@@ -64,50 +64,177 @@ func _init(p_level := Level.MEDIUM, seed := -1) -> void:
 ## The move to play, or null if there are no legal moves. The state is used to
 ## try moves out, but is exactly as it was when this returns.
 func choose_move(state: GameState) -> Move:
+	var search := begin_search(state)
+	continue_search(state, search, INFINITY)
+	return search.best
+
+## A search in progress (see begin_search): it looks 1 move deep, then 2, and so
+## on, trying each of the moves it could play now in turn ("root" moves).
+class Search:
+	var moves: Array[Move] = []
+	## The move to play: the best found at the deepest depth finished so far.
+	var best: Move
+	var done := false
+	var max_depth := 0
+	var noise := 0
+	## The depth being searched now, and which root move is next.
+	var depth := 1
+	var next := 0
+	var depth_best: Move
+	var depth_best_score := -PracticeBot.INFINITY
+	## When it last stopped to let the screen draw (0: it hasn't).
+	var paused_at := 0
+	## From 2 moves deep, each root move's replies are tried one per step too
+	## (one root move can take a second in a busy position), with the root move
+	## left made on the board in between. This is _search's work for that
+	## position (ply 1), kept between steps.
+	var in_root_move := false
+	var replies: Array[Move] = []
+	var next_reply := 0
+	var reply_alpha := 0
+	var reply_beta := 0
+	var reply_mover := Piece.Team.WHITE
+	var any_legal_reply := false
+	## The root move's position's score (for its mover), once worked out.
+	var reply_score := 0
+
+## Start choosing a move in steps (continue_search does the work), for the web,
+## which has no threads: the screen can draw between steps instead of freezing
+## while the bot thinks. choose_move does it all in one go.
+func begin_search(state: GameState) -> Search:
 	var settings: Dictionary = settings_override if not settings_override.is_empty() else SETTINGS[level]
-	var moves := _ordered(state.moves())
-	if moves.is_empty():
-		return null
+	var search := Search.new()
+	search.moves = _ordered(state.moves())
 	nodes = 0
 	depth_reached = 0
 	_killers.clear()
 	_out_of_time = false
 	_deadline = Time.get_ticks_msec() + settings.time_ms
-	var noise: int = settings.noise
-	var best: Move = moves[0]
-	# Look 1 move deep, then 2, and so on, keeping the best move from the last
-	# depth that finished in time.
-	for depth in range(1, settings.depth + 1):
-		var depth_best: Move = null
-		var depth_best_score := -INFINITY
-		for move in moves:
+	search.noise = settings.noise
+	search.max_depth = settings.depth
+	search.done = search.moves.is_empty() or search.max_depth < 1
+	if not search.moves.is_empty():
+		search.best = search.moves[0]
+	return search
+
+## Search on for about `for_ms` milliseconds (at least one root move, and it
+## only stops between them, so a step can take longer). Returns true once the
+## search has finished: the move to play is then search.best. Time spent away
+## between steps (the screen drawing) doesn't count against the bot's thinking
+## time.
+func continue_search(state: GameState, search: Search, for_ms: int) -> bool:
+	var now := Time.get_ticks_msec()
+	if search.paused_at > 0 and _deadline > 0:
+		_deadline += now - search.paused_at
+	var until := now + for_ms
+	while not search.done:
+		_search_next_root_move(state, search)
+		if Time.get_ticks_msec() >= until:
+			break
+	search.paused_at = Time.get_ticks_msec()
+	return search.done
+
+## Try the next root move at the current depth (or finish the depth, once
+## they've all been tried), keeping the best move from the last depth that
+## finished in time.
+func _search_next_root_move(state: GameState, search: Search) -> void:
+	if search.next < search.moves.size():
+		var move := search.moves[search.next]
+		var score := 0
+		if search.depth < 2:
 			state.make_move(move)
 			# With randomness, every move needs its own true score, so don't prune at the root.
-			var alpha := -INFINITY if noise > 0 else depth_best_score
-			var score := -_search(state, depth - 1, -INFINITY, -alpha, 1)
+			var alpha := -INFINITY if search.noise > 0 else search.depth_best_score
+			score = -_search(state, search.depth - 1, -INFINITY, -alpha, 1)
 			state.undo_move(move)
-			if _out_of_time:
-				break
-			if noise > 0:
-				score += _rng.randi_range(-noise, noise)
-			if score > depth_best_score:
-				depth_best_score = score
-				depth_best = move
-		if _out_of_time and depth > 1:
-			break
-		if depth_best:
-			best = depth_best
-			if not _out_of_time:
-				depth_reached = depth
-			# Try the best move first next time: it makes the deeper search faster.
-			moves.erase(best)
-			moves.push_front(best)
+		else:
+			if not search.in_root_move:
+				state.make_move(move)
+				search.in_root_move = true
+				_begin_replies(state, search)
+			if not _next_reply(state, search):
+				return  # More replies to try next step.
+			state.undo_move(move)
+			search.in_root_move = false
+			score = -search.reply_score
+		if not _out_of_time:
+			if search.noise > 0:
+				score += _rng.randi_range(-search.noise, search.noise)
+			if score > search.depth_best_score:
+				search.depth_best_score = score
+				search.depth_best = move
+			search.next += 1
+			return
+	# Every root move tried at this depth (or out of time).
+	if _out_of_time and search.depth > 1:
+		search.done = true
+		return
+	if search.depth_best:
+		search.best = search.depth_best
+		if not _out_of_time:
+			depth_reached = search.depth
+		# Try the best move first next time: it makes the deeper search faster.
+		search.moves.erase(search.best)
+		search.moves.push_front(search.best)
+	# Out of time, as deep as allowed, or a forced checkmate found: no need to
+	# look any deeper.
+	if _out_of_time or search.depth >= search.max_depth or search.depth_best_score >= MATE - 100:
+		search.done = true
+		return
+	search.depth += 1
+	search.next = 0
+	search.depth_best = null
+	search.depth_best_score = -INFINITY
+
+## Start on the replies to the root move just made: what _search(state,
+## search.depth - 1, -INFINITY, -alpha, 1) does before its loop (see
+## _search_next_root_move for alpha).
+func _begin_replies(state: GameState, search: Search) -> void:
+	var alpha := -INFINITY if search.noise > 0 else search.depth_best_score
+	search.reply_alpha = -INFINITY
+	search.reply_beta = -alpha
+	search.reply_mover = state.side_to_move
+	search.any_legal_reply = false
+	search.next_reply = 0
+	search.replies = []
+	if _tick():
+		search.next_reply = -1  # Out of time: the score is 0.
+		return
+	search.replies = _ordered(MoveGenerator.pseudo_legal_moves(state), _killers_at(1))
+
+## Try the next legal reply (one round of _search's loop at ply 1). Returns true
+## once the position's score is known (search.reply_score), false if there are
+## more replies to try.
+func _next_reply(state: GameState, search: Search) -> bool:
+	if search.next_reply < 0:
+		search.reply_score = 0
+		return true
+	while search.next_reply < search.replies.size():
+		var reply := search.replies[search.next_reply]
+		search.next_reply += 1
+		state.make_move(reply)
+		if MoveGenerator.in_check(state, search.reply_mover):
+			state.undo_move(reply)
+			continue
+		search.any_legal_reply = true
+		var score := -_search(state, search.depth - 2, -search.reply_beta, -search.reply_alpha, 2)
+		state.undo_move(reply)
 		if _out_of_time:
-			break
-		# Found a forced checkmate: no need to look any deeper.
-		if depth_best_score >= MATE - 100:
-			break
-	return best
+			search.reply_score = 0
+			return true
+		if score >= search.reply_beta:
+			if not reply.is_capture():
+				_remember_killer(reply, 1)
+			search.reply_score = score
+			return true
+		search.reply_alpha = maxi(search.reply_alpha, score)
+		return false
+	if not search.any_legal_reply:
+		# Checkmate (sooner is worse for the loser) or stalemate (a draw).
+		search.reply_score = -MATE + 1 if MoveGenerator.in_check(state, search.reply_mover) else 0
+	else:
+		search.reply_score = search.reply_alpha
+	return true
 
 ## How good the position is for the side to move (positive = good), in
 ## hundredths of a point. Made of:

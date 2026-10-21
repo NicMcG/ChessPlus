@@ -26,7 +26,7 @@ var black_army: Army
 var bot_team := -1
 var bot_level := PracticeBot.Level.MEDIUM
 ## Frames to wait before the bot thinks, so the screen can show the player's move
-## and "Bot is thinking..." first (thinking freezes the screen briefly). Tests use 0.
+## and "Bot is thinking..." first. Tests use 0.
 var bot_delay_frames := 2
 var bot: PracticeBot
 ## The bot always takes at least this long (seconds) over a move, so its replies
@@ -978,13 +978,14 @@ func _start_bot_turn_if_needed() -> void:
 	if turn_id == _bot_turn_id and bot_thinking:
 		_play_bot_move(move)
 
-## The practice bot's move. On PC it searches a copy of the game on its own
-## thread, so the screen keeps going while it thinks (searching here froze it
-## for 0.6-1.5 s every move in army games). On the web, which has no threads,
-## and in tests (bot_delay_frames = 0), it searches here. Null if the turn was
-## dropped meanwhile.
+## The practice bot's move. It searches a copy of the game, so the screen
+## keeps going while it thinks (searching here froze it for 0.6-1.5 s every move
+## in army games): on PC on its own thread; on the web, which has no threads, in
+## steps of BOT_STEP_MS with a frame drawn between them (bot_in_steps). In tests
+## (bot_delay_frames = 0) it searches the game itself, all at once. Null if the
+## turn was dropped meanwhile.
 func _practice_bot_move(turn_id: int) -> Move:
-	if bot_delay_frames == 0 or OS.has_feature("web"):
+	if bot_delay_frames == 0:
 		return bot.choose_move(state)
 	_stop_bot_thread()
 	# The bot's copy from its last turn, two moves on (or a new one).
@@ -993,6 +994,11 @@ func _practice_bot_move(turn_id: int) -> Move:
 	_bot_copy_of = state if copy else null
 	if copy == null:
 		return bot.choose_move(state)
+	if bot_in_steps:
+		var best: Move = await _search_in_steps(copy)
+		if best == null or turn_id != _bot_turn_id:
+			return null
+		return state.find_played_move(best.to_text())
 	var thread := Thread.new()
 	_bot_thread = thread
 	thread.start(bot.choose_move.bind(copy))
@@ -1015,8 +1021,30 @@ var _bot_thread: Thread
 var _bot_copy: GameState
 var _bot_copy_of: GameState
 
+## The web's way (see _practice_bot_move): search `copy` a step at a time,
+## letting the screen draw a frame between steps. Null if it was stopped.
+func _search_in_steps(copy: GameState) -> Move:
+	_bot_steps_id += 1
+	var id := _bot_steps_id
+	var search := bot.begin_search(copy)
+	while not bot.continue_search(copy, search, BOT_STEP_MS):
+		# The screen's own timer: if the screen closes, the wait just ends.
+		_bot_timer.start(0.001)
+		await _bot_timer.timeout
+		if id != _bot_steps_id:
+			return null
+	return search.best
+
+## Search in steps instead of on a thread (the web has none; tests set it too).
+var bot_in_steps := OS.has_feature("web")
+## About how long each step of the search lasts, in milliseconds.
+const BOT_STEP_MS := 40
+## Goes up when a search in steps starts or is stopped, so an old one knows to end.
+var _bot_steps_id := 0
+
 ## Stop the practice bot's search (if one is running) and wait for its thread.
 func _stop_bot_thread() -> void:
+	_bot_steps_id += 1
 	if _bot_thread == null:
 		return
 	bot.stop()

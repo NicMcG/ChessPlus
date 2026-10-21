@@ -190,3 +190,44 @@ func test_recordings_are_loaded_once() -> void:
 	var first := GameSounds.recording(names[0])
 	check(first != null, "The recording loads")
 	check(GameSounds.recording(names[0]) == first, "The second time it's the same one, not read again")
+
+func test_bot_thinks_in_steps_on_the_web() -> void:
+	# The web has no threads: the bot searches a copy a step at a time and the
+	# screen keeps drawing frames in between.
+	var game := _open_threaded_bot_game()
+	game.bot_in_steps = true
+	game.bot.level = PracticeBot.Level.HARD
+	_play(game, "e4")
+	check(game.bot_thinking, "The bot thinks")
+	var tree := Engine.get_main_loop() as SceneTree
+	var frames := 0
+	var give_up := Time.get_ticks_msec() + 5000
+	while game.bot_thinking and Time.get_ticks_msec() < give_up:
+		await tree.process_frame
+		frames += 1
+	check(not game.bot_thinking, "The bot has replied")
+	check(frames > 10, "Frames kept coming while it thought (%d)" % frames)
+	var reply: Move = game.state.history.back()
+	check(reply.piece.team == Piece.Team.BLACK, "The bot's move is in the game")
+	check(game.state.board.get_piece(reply.to) == reply.piece, "It moved the game's own piece, not the copy's")
+	check(game._bot_copy != null and game._bot_copy != game.state, "The bot searched a copy")
+	game.free()
+	SavedGame.delete_saved()
+
+func test_new_game_while_the_bot_thinks_in_steps() -> void:
+	var game := _open_threaded_bot_game()
+	game.bot_in_steps = true
+	game.bot.level = PracticeBot.Level.HARD
+	_play(game, "e4")
+	var tree := Engine.get_main_loop() as SceneTree
+	for i in 5:
+		await tree.process_frame
+	game.new_game()
+	_play(game, "d4")
+	var give_up := Time.get_ticks_msec() + 5000
+	while game.bot_thinking and Time.get_ticks_msec() < give_up:
+		await tree.process_frame
+	check_eq(game.state.history.size(), 2, "Only the new game's moves: d4 and the bot's reply")
+	check_eq(game.state.history[0].to_text(), "d2-d4", "The new game's first move")
+	game.free()
+	SavedGame.delete_saved()
