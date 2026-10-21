@@ -18,6 +18,7 @@ var screen: Node
 var volume_control: VolumeControl
 
 func _ready() -> void:
+	UiStyle.apply_font_smoothing()
 	SystemFonts.install()
 	KeyBinds.install()
 	fit_window_to_screen()
