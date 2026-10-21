@@ -162,12 +162,18 @@ func test_phone_text_input_does_nothing_outside_browsers() -> void:
 	edit.free()
 
 func test_pc_borrows_system_fonts_for_emoji_and_other_alphabets() -> void:
+	# (Through a variable: GDScript would read UiStyle.INTER.fallbacks once, when
+	# this file is compiled.)
+	var inter: Font = UiStyle.INTER
 	SystemFonts.install()
-	var system_fonts := ThemeDB.fallback_font.fallbacks.filter(func(f: Font) -> bool: return f is SystemFont)
+	var system_fonts := inter.fallbacks.filter(func(f: Font) -> bool: return f is SystemFont)
 	check_eq(system_fonts.size(), SystemFonts.FALLBACKS.size(), "Fallback fonts added")
 	SystemFonts.install()
-	check_eq(ThemeDB.fallback_font.fallbacks.filter(func(f: Font) -> bool: return f is SystemFont).size(),
+	check_eq(inter.fallbacks.filter(func(f: Font) -> bool: return f is SystemFont).size(),
 			SystemFonts.FALLBACKS.size(), "Only once")
+	# The theme's text is all Inter, so it all gets them.
+	var theme_font := ThemeDB.get_project_theme().default_font as FontVariation
+	check(theme_font != null and theme_font.base_font == inter, "The app's text uses Inter")
 
 # --- Army list and match setup -------------------------------------------------
 

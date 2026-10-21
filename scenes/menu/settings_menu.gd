@@ -18,7 +18,7 @@ const ROW_LABEL_WIDTH := 300
 ## The credits the pictures, font and some of the sounds need (their licences).
 const CREDITS: Array[String] = [
 	"Chess pieces by Cburnett (CC BY-SA 3.0)",
-	"Open Sans Italic font (SIL OFL 1.1)",
+	"Inter and Open Sans Italic fonts (SIL OFL 1.1)",
 	"Sounds: giggle by Lomond (CC BY 3.0), thunder by Jud McCranie (CC BY-SA 4.0), church bell by Pete w. View (CC BY-SA 4.0), choir: Coro Santa Pazienza (CC BY 3.0)",
 ]
 

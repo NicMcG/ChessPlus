@@ -1,7 +1,7 @@
 class_name SystemFonts
 extends RefCounted
 
-## The game's own font only has Western letters. In the PC app, let it borrow
+## The game's own font (Inter) only has Western, Greek and Cyrillic letters. In the PC app, let it borrow
 ## the computer's fonts for anything else: emoji, symbols, Chinese, Japanese,
 ## Korean, Indian scripts... (The web version can't use the computer's fonts;
 ## there, typed text and chat are shown by the browser instead: see WebOverlay.)
@@ -17,11 +17,12 @@ const FALLBACKS := [
 	["Nirmala UI", "Kohinoor Devanagari", "Noto Sans Devanagari"],
 ]
 
-## Add the computer's fonts as fallbacks to the game's default font (once).
+## Add the computer's fonts as fallbacks to the game's font (once). Every
+## weight of Inter (UiStyle.font) shares the one font file, so all get them.
 static func install() -> void:
 	if OS.has_feature("web"):
 		return
-	var base := ThemeDB.fallback_font
+	var base: Font = UiStyle.INTER
 	var fallbacks := base.fallbacks.duplicate()
 	if fallbacks.any(func(f: Font) -> bool: return f is SystemFont):
 		return

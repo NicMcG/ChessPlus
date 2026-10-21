@@ -87,6 +87,7 @@ func _run_all() -> void:
 	PracticeBot.clear_cache()
 	GameSounds.clear_cache()
 	BoardView.clear_cache()
+	UiStyle.clear_cache()
 	MemoryBackend.clear()
 	get_tree().quit(1 if failed > 0 else 0)
 

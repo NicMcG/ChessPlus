@@ -103,11 +103,11 @@ func _draw() -> void:
 		if texture:
 			draw_texture_rect(texture, Rect2(x, top, icon, icon), false)
 		else:
-			draw_string(ThemeDB.fallback_font, Vector2(x, top + icon * 0.8), piece.def.symbol, HORIZONTAL_ALIGNMENT_LEFT, -1, int(icon * 0.7), Color.WHITE)
+			draw_string(UiStyle.bold(), Vector2(x, top + icon * 0.8), piece.def.symbol, HORIZONTAL_ALIGNMENT_LEFT, -1, int(icon * 0.7), Color.WHITE)
 	if not pieces.is_empty():
 		x += icon + 14
 	var text := advantage_text()
 	if text != "":
-		var font := ThemeDB.fallback_font
+		var font := UiStyle.font(UiStyle.SEMIBOLD)
 		var font_size := int(size.y * 0.62)
 		draw_string(font, Vector2(x, size.y / 2 + font_size * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color("#e6e6e6"))

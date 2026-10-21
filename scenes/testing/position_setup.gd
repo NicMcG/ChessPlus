@@ -51,8 +51,7 @@ var _board_area: AspectRatioContainer
 var _top: HBoxContainer
 
 func _ready() -> void:
-	var background := ColorRect.new()
-	background.color = Color(0.17, 0.17, 0.18)
+	var background := Backdrop.new()
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 	var margin := MarginContainer.new()
