@@ -2,28 +2,34 @@ class_name PieceGuideBoard
 extends Control
 
 ## A small board (5 x 5, bigger only if a jump needs it) with one piece in the
-## middle, showing how it moves (worked out by PieceGuide):
-##   filled circle = moves or captures    empty circle = moves only
-##   red X = captures only                pale = first move only
-##   yellow circle = jumps there          arrow line = moves any distance that way
-##   dashed arrow line = moves any distance that way, but can't capture that way
+## middle, showing how it moves (worked out by PieceGuide). The marks (Mac's
+## design, Oct 2026):
+##   dot = moves here                     line with an arrow = any square that way
+##   empty circle = moves here, can't capture
+##   dotted arrow = any square that way, can't capture
+##   red X = must capture to move here    yellow dot = jumps here
+##   yellow empty circle = jumps here, can't capture
+##   yellow X = jumps here, must capture  pale = first move only
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
 const MARK := Color(0.1, 0.1, 0.1, 0.75)
-const FIRST_MOVE_MARK := Color(0.1, 0.1, 0.1, 0.35)
 const CAPTURE_MARK := Color("#D42A1F")
 const JUMP_MARK := Color("#F5BE0B")
+## How see-through a first-move-only mark is drawn, compared with a normal one.
+const FIRST_MOVE_FADE := 0.45
 
-## Legend entries: kind -> text. Only the kinds a piece uses are listed.
+## The legend: kind -> text (Mac's wording), in his order. Every card shows all of it.
 const LEGEND := {
-	"both": "Moves or captures here",
-	"move": "Moves here (can't capture)",
-	"capture": "Captures here only",
-	"first": "Only on its first move",
+	"both": "Moves to this square",
+	"slide": "Moves to any square in this direction",
+	"move": "Moves to this square (but can't capture)",
+	"slide_move": "Moves to any square in this direction (but can't capture)",
+	"capture": "Must capture to move here",
 	"jump": "Jumps here",
-	"slide": "Moves any distance this way",
-	"slide_move": "Moves any distance this way (can't capture)",
+	"jump_move": "Jumps here but can't capture here",
+	"jump_capture": "Must capture to move here",
+	"first": "Only on its first move",
 }
 
 var def: PieceDef
@@ -37,11 +43,14 @@ func show_piece(p_def: PieceDef, p_team: Piece.Team) -> void:
 	team = p_team
 	queue_redraw()
 
-## The legend kinds this piece's picture uses, in LEGEND order.
-static func legend_kinds(guide: Dictionary) -> Array[String]:
+## The legend kinds this piece's picture uses, in LEGEND order (the card lists
+## them all; tests use this to check each piece gets the right marks).
+static func kinds_used(guide: Dictionary) -> Array[String]:
 	var used := {}
 	for flags in guide.squares.values():
 		used[_kind(flags)] = true
+		if flags & PieceGuide.FIRST_MOVE:
+			used["first"] = true
 	for slide in guide.slides:
 		used["slide" if slide[1] & PieceGuide.CAPTURE else "slide_move"] = true
 	var kinds: Array[String] = []
@@ -50,36 +59,48 @@ static func legend_kinds(guide: Dictionary) -> Array[String]:
 			kinds.append(kind)
 	return kinds
 
+## Which mark a square gets (a first-move-only square gets the same mark, paler).
 static func _kind(flags: int) -> String:
-	if flags & PieceGuide.FIRST_MOVE:
-		return "first"
-	if flags & PieceGuide.JUMP:
-		return "jump"
 	var moves := flags & PieceGuide.MOVE != 0
 	var captures := flags & PieceGuide.CAPTURE != 0
-	if moves and captures:
-		return "both"
-	return "move" if moves else "capture"
+	var kind := "both" if moves and captures else ("move" if moves else "capture")
+	if flags & PieceGuide.JUMP:
+		return {"both": "jump", "move": "jump_move", "capture": "jump_capture"}[kind]
+	return kind
 
 ## Draw the marker for one square, `rect`, with PieceGuide `flags`.
 static func draw_square_marker(canvas: CanvasItem, rect: Rect2, flags: int) -> void:
-	var color := FIRST_MOVE_MARK if flags & PieceGuide.FIRST_MOVE else MARK
+	var fade := FIRST_MOVE_FADE if flags & PieceGuide.FIRST_MOVE else 1.0
+	var dark := Color(MARK, MARK.a * fade)
+	var red := Color(CAPTURE_MARK, fade)
+	var yellow := Color(JUMP_MARK, fade)
 	var c := rect.get_center()
 	var s := rect.size.x
 	match _kind(flags):
-		"jump":
-			canvas.draw_circle(c, s * 0.2, JUMP_MARK)
-			canvas.draw_arc(c, s * 0.2, 0, TAU, 24, MARK, s * 0.04, true)
 		"both":
-			canvas.draw_circle(c, s * 0.18, color)
+			canvas.draw_circle(c, s * 0.18, dark)
+		"move":
+			canvas.draw_arc(c, s * 0.16, 0, TAU, 24, dark, s * 0.07, true)
 		"capture":
-			var d := s * 0.17
-			canvas.draw_line(c + Vector2(-d, -d), c + Vector2(d, d), CAPTURE_MARK, s * 0.09, true)
-			canvas.draw_line(c + Vector2(-d, d), c + Vector2(d, -d), CAPTURE_MARK, s * 0.09, true)
-		_:  # "move" and "first": an empty circle
-			canvas.draw_arc(c, s * 0.16, 0, TAU, 24, color, s * 0.07, true)
+			_draw_x(canvas, c, s * 0.17, red, s * 0.09)
+		"jump":
+			canvas.draw_circle(c, s * 0.2, yellow)
+			canvas.draw_arc(c, s * 0.2, 0, TAU, 24, dark, s * 0.04, true)
+		"jump_move":
+			# A yellow ring with a thin dark edge each side, so it shows on light squares.
+			canvas.draw_arc(c, s * 0.17, 0, TAU, 24, dark, s * 0.12, true)
+			canvas.draw_arc(c, s * 0.17, 0, TAU, 24, yellow, s * 0.065, true)
+		"jump_capture":
+			# A yellow X with a thin dark edge (the line ends too).
+			_draw_x(canvas, c, s * 0.18, dark, s * 0.14)
+			_draw_x(canvas, c, s * 0.17, yellow, s * 0.085)
 
-## Draw a slide: a line from `from` to `to` ending in an arrowhead. Dashed if the
+## An X centred on `c`, its arms reaching `d` across and down each way.
+static func _draw_x(canvas: CanvasItem, c: Vector2, d: float, color: Color, width: float) -> void:
+	canvas.draw_line(c + Vector2(-d, -d), c + Vector2(d, d), color, width, true)
+	canvas.draw_line(c + Vector2(-d, d), c + Vector2(d, -d), color, width, true)
+
+## Draw a slide: a line from `from` to `to` ending in an arrowhead. Dotted if the
 ## piece can't capture along it.
 static func draw_slide(canvas: CanvasItem, from: Vector2, to: Vector2, can_capture: bool, square_size: float) -> void:
 	var width := square_size * 0.08
@@ -88,7 +109,12 @@ static func draw_slide(canvas: CanvasItem, from: Vector2, to: Vector2, can_captu
 	if can_capture:
 		canvas.draw_line(from, tip_back, MARK, width, true)
 	else:
-		canvas.draw_dashed_line(from, tip_back, MARK, width, square_size * 0.16, true, true)
+		# Round dots, evenly spaced, the last one just before the arrowhead.
+		var length := from.distance_to(tip_back)
+		var gap := square_size * 0.2
+		var count := maxi(1, roundi(length / gap))
+		for i in range(count):
+			canvas.draw_circle(tip_back - direction * (gap * 0.6 + length * i / count), width * 0.7, MARK)
 	var side := direction.orthogonal() * square_size * 0.16
 	canvas.draw_colored_polygon(PackedVector2Array([to, tip_back + side, tip_back - side]), MARK)
 
@@ -99,8 +125,10 @@ static func draw_legend_icon(canvas: CanvasItem, rect: Rect2, kind: String) -> v
 		"both": PieceGuide.MOVE | PieceGuide.CAPTURE,
 		"move": PieceGuide.MOVE,
 		"capture": PieceGuide.CAPTURE,
-		"first": PieceGuide.MOVE | PieceGuide.FIRST_MOVE,
 		"jump": PieceGuide.MOVE | PieceGuide.CAPTURE | PieceGuide.JUMP,
+		"jump_move": PieceGuide.MOVE | PieceGuide.JUMP,
+		"jump_capture": PieceGuide.CAPTURE | PieceGuide.JUMP,
+		"first": PieceGuide.MOVE | PieceGuide.FIRST_MOVE,
 	}
 	if flags.has(kind):
 		draw_square_marker(canvas, rect, flags[kind])

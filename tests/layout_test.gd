@@ -45,6 +45,13 @@ func test_builder_card_and_tray_grow_to_fit() -> void:
 	builder.size = Vector2(2048, 1280)
 	check_eq(builder.card.zoom, builder.CARD_ZOOM_WIDE, "Card bigger on a wide screen")
 	check(button.custom_minimum_size.x > builder.TRAY_BUTTON_MIN, "Tray buttons bigger too")
+	# A smaller wide window: the card shrinks to keep the pop-up's shape in its
+	# column, so the whole legend still fits beside the mini board.
+	builder.size = Vector2(1280, 800)
+	check(builder.wide, "1280 x 800 is wide")
+	check(builder.card.zoom < builder.CARD_ZOOM_WIDE, "Card smaller in a smaller window")
+	check(absf(PieceInfo.CARD_WIDTH * builder.card.zoom - builder._column_width()) <= PieceInfo.CARD_WIDTH * 0.03,
+		"Card shaped like the pop-up in its column")
 	builder.free()
 
 func test_card_zoom_scales_the_mini_board() -> void:
