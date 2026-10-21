@@ -13,8 +13,8 @@ ALL8 = ORTHO + DIAG
 TWO_AWAY = [(2 * x, 2 * y) for x, y in ALL8]
 
 PIECES = {
-    "princess": dict(name="Princess", symbol="PR", value=7, rules=[(ALL8, 4, 0, {})]),
-    "galleon": dict(name="Galleon", symbol="GA", value=4.5, rules=[
+    "princess": dict(name="Princess", symbol="PR", value=8.5, rules=[(ALL8, 4, 0, {})]),
+    "galleon": dict(name="Galleon", symbol="GA", value=3, rules=[
         (ALL8, 0, 1, {}),
         (DIAG + [(1, 0), (-1, 0)], 1, 2, {}),
     ]),
@@ -22,7 +22,7 @@ PIECES = {
         (ALL8, 1, 1, {}),
         (TWO_AWAY, 1, 2, {}),
     ]),
-    "assassin": dict(name="Assassin", symbol="AS", value=2, rules=[
+    "assassin": dict(name="Assassin", symbol="AS", value=0.5, rules=[
         ([(0, 1)], 2, 1, {}),
         ([(1, 1), (-1, 1)], 1, 1, {}),
         ([(0, -1), (1, -1), (-1, -1)], 1, 2, {}),
@@ -34,12 +34,12 @@ PIECES = {
         (DIAG, 1, 0, {}),
     ], extra={"blocks_jumps": "true"},
         special_rule="Enemy pieces can't jump over the Parapet."),
-    "vampire": dict(name="Vampire", symbol="V", value=4, rules=[
+    "vampire": dict(name="Vampire", symbol="V", value=6.5, rules=[
         ([(1, 0), (-1, 0), (0, -1)], 0, 0, {}),
         ([(1, 1), (-1, 1)], 1, 0, {}),
     ], extra={"shield_on_capture": "true"},
         special_rule="Whenever the Vampire captures a piece, if the Vampire didn't have one, it gains SHIELD."),
-    "squire": dict(name="Squire", symbol="SQ", value=3, rules=[
+    "squire": dict(name="Squire", symbol="SQ", value=4, rules=[
         (ORTHO, 2, 0, {}),
         (DIAG, 1, 0, {}),
     ], extra={"protects": 'Array[String](["knight"])'},

@@ -19,7 +19,7 @@ func _def(id: String) -> PieceDef:
 	return PieceCatalog.all_defs().filter(func(d: PieceDef) -> bool: return d.id == id)[0]
 
 func test_costs_and_symbols() -> void:
-	check_eq([_def("princess").value, _def("galleon").value, _def("catapult").value, _def("assassin").value], [7.0, 4.5, 3.0, 2.0], "Costs")
+	check_eq([_def("princess").value, _def("galleon").value, _def("catapult").value, _def("assassin").value], [8.5, 3.0, 3.0, 0.5], "Costs (Mac, Oct 2026: Princess 8.5, was 7; Galleon 3, was 4.5; Assassin 0.5, was 2)")
 	var symbols := PieceCatalog.all_defs().map(func(d: PieceDef) -> String: return d.symbol)
 	for symbol: String in symbols:
 		check_eq(symbols.count(symbol), 1, "Symbol %s is unique" % symbol)

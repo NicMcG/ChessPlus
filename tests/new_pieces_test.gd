@@ -26,7 +26,7 @@ func _sans(state: GameState) -> Array:
 	return state.moves().map(func(m: Move) -> String: return Notation.san(state, m))
 
 func test_costs_and_tags() -> void:
-	check_eq([MAN.value, CANNON.value, LANCE.value, PALADIN.value], [3.0, 4.0, 3.5, 2.0], "Costs")
+	check_eq([MAN.value, CANNON.value, LANCE.value, PALADIN.value], [3.0, 4.0, 3.5, 1.5], "Costs (Paladin 1.5, was 2: Mac, Oct 2026)")
 	check(not CANNON.has_castle(), "Cannon has no Castle keyword")
 	check(LANCE.has_promote() and LANCE.can_promote() and not LANCE.is_pawn_type(), "Lance: Promote, not a pawn")
 	check(PALADIN.has_shield(), "Paladin: Shield")

@@ -16,7 +16,9 @@ func _root() -> Node:
 func test_cost_and_types() -> void:
 	check_eq(PieceCard.cost_text(_def("king")), "Free", "King cost")
 	check_eq(PieceCard.cost_text(_def("pawn")), "1 point", "Pawn cost")
-	check_eq(PieceCard.cost_text(_def("elephant")), "1.5 points", "Elephant cost")
+	check_eq(PieceCard.cost_text(_def("paladin")), "1.5 points", "Paladin cost")
+	check_eq(PieceCard.cost_text(_def("elephant")), "1 point", "Elephant cost")
+	check_eq(PieceCard.cost_text(_def("assassin")), "0.5 points", "Assassin cost")
 	check_eq(PieceCard.type_names(_def("king")), PackedStringArray(["King", "Royal"]), "King types")
 	check_eq(PieceCard.type_names(_def("queen")), PackedStringArray(["Royal"]), "Queen types")
 	check_eq(PieceCard.type_names(_def("cannon")), PackedStringArray(), "Cannon: no types")
