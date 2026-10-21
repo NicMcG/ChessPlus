@@ -185,8 +185,11 @@ func set_key(action: String, code: int) -> void:
 
 # --- Credits and reset ---------------------------------------------------------------
 
+## Credits and Reset with no title over them (Mac: "More" looked like a button).
 func _build_other() -> void:
-	_heading("More")
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 12
+	sections.add_child(gap)
 	_wide_button("Credits", show_credits)
 	_wide_button("Reset to defaults", ask_reset)
 
