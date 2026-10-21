@@ -424,6 +424,21 @@ static func _stays_on_one_color(def: PieceDef) -> bool:
 				return false
 	return true
 
+## The same as find_move, for a move already known to be legal here (it was
+## played in this position before: replaying a game or a side line). Much
+## quicker: it doesn't check every move for leaving the king attacked (each a
+## make, attack test and undo), which made looking back through a long game
+## take a quarter of a second per step. If two moves have the text, it asks
+## find_move to be sure.
+func find_played_move(text: String) -> Move:
+	var found: Move = null
+	for move in MoveGenerator.pseudo_legal_moves(self):
+		if move.to_text() == text:
+			if found:
+				return find_move(text)
+			found = move
+	return found
+
 ## The available move whose to_text() matches, e.g. "e2-e4" or "e7-e8=Q", or null.
 ## For tests.
 func find_move(text: String) -> Move:

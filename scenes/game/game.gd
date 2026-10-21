@@ -323,7 +323,7 @@ func view_move(moves_played: int) -> void:
 	if moves_played < 0 or moves_played >= state.history.size():
 		back_to_game()
 		return
-	var copy := _replay(moves_played, [])
+	var copy := _game_copy_at(moves_played)
 	if copy == null:
 		back_to_game()
 		return
@@ -344,11 +344,48 @@ func _replay(main_moves: int, extra: Array) -> GameState:
 		texts.append(state.history[i].to_text())
 	texts.append_array(extra)
 	for text: String in texts:
-		var move := copy.find_move(text)
+		var move := copy.find_played_move(text)
 		if move == null:
 			return null
 		copy.make_move(move)
 	return copy
+
+## A copy of the game after its first `moves_played` moves, for looking back.
+## The copy already on the board is moved there if it's on the game's own
+## moves (stepping back or forward is then one move, not the whole game again).
+func _game_copy_at(moves_played: int) -> GameState:
+	var copy := _view_state
+	if copy == null and _spare_copy_of == state:
+		copy = _spare_copy
+	_keep_copy(null)
+	if copy == null or copy == state or not _on_game_moves(copy):
+		return _replay(moves_played, [])
+	while copy.history.size() > moves_played:
+		copy.undo_move(copy.history.back())
+	while copy.history.size() < moves_played:
+		var move := copy.find_played_move(state.history[copy.history.size()].to_text())
+		if move == null:
+			return _replay(moves_played, [])
+		copy.make_move(move)
+	return copy
+
+## The last copy looked at, kept after going back to the game so looking back
+## again starts from it, and the game it's a copy of.
+var _spare_copy: GameState
+var _spare_copy_of: GameState
+
+func _keep_copy(copy: GameState) -> void:
+	_spare_copy = copy
+	_spare_copy_of = state if copy else null
+
+## Whether every move played in `copy` is the game's move at that point.
+func _on_game_moves(copy: GameState) -> bool:
+	if copy.history.size() > state.history.size():
+		return false
+	for i in copy.history.size():
+		if copy.history[i].to_text() != state.history[i].to_text():
+			return false
+	return true
 
 ## Stop looking back and show the game as it is now.
 func back_to_game() -> void:
@@ -357,6 +394,7 @@ func back_to_game() -> void:
 	viewing = -1
 	line_index = -1
 	line_ply = 0
+	_keep_copy(_view_state)
 	_view_state = null
 	board_view.show_game(state)
 	_update_input()

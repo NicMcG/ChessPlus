@@ -98,3 +98,40 @@ func test_outcome_follows_the_position() -> void:
 	for square in ["f7", "g7", "h7"]:
 		state.board.set_piece(Board.parse_square(square), null)
 	check_eq(state.outcome(), GameState.Outcome.INSUFFICIENT_MATERIAL, "Only kings left")
+
+## The position shown while looking back, as a fresh replay of the game would give.
+func _fresh_fen(game: Node, moves_played: int) -> String:
+	var copy := StandardSetup.create_game()
+	for i in moves_played:
+		copy.make_move(copy.find_move(game.state.history[i].to_text()))
+	return Fen.write(copy)
+
+func test_looking_back_shows_the_right_positions() -> void:
+	var game := _open()
+	for san in ["e4", "d5", "exd5", "Qxd5", "Nc3", "Qa5", "d4", "c6", "Nf3", "Bg4"]:
+		_play(game, san)
+	for target in [3, 2, 1, 0, 1, 5, 9, 4, 8]:
+		game.view_move(target)
+		check_eq(Fen.write(game.board_view.state), _fresh_fen(game, target), "Looking at move %d" % target)
+	game.step_back()
+	check_eq(Fen.write(game.board_view.state), _fresh_fen(game, 7), "Back one")
+	game.step_forward()
+	check_eq(Fen.write(game.board_view.state), _fresh_fen(game, 8), "Forward one")
+	game.back_to_game()
+	check(game.board_view.state == game.state, "Back to the game")
+	game.undo()
+	game.undo()
+	_play(game, "Be2")
+	game.view_move(8)
+	check_eq(Fen.write(game.board_view.state), _fresh_fen(game, 8), "After the game changed")
+	check(game.board_view.state != game.state, "Looking at a copy")
+	check_eq(game.state.history.size(), 9, "The game itself is untouched")
+	game.free()
+
+func test_find_played_move_matches_find_move() -> void:
+	var state := StandardSetup.create_game()
+	for text in ["e2-e4", "d7-d5", "e4xd5", "d8xd5", "b1-c3"]:
+		var move := state.find_played_move(text)
+		check(move != null and move.to_text() == text, "Found " + text)
+		state.make_move(move)
+	check(state.find_played_move("e1-e2") == null, "Not a move here")
