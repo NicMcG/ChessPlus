@@ -80,11 +80,9 @@ func test_jumps_get_yellow_versions_of_the_marks() -> void:
 	check(PieceGuideBoard.shown_squares(pawn).has(Vector2i(0, 1)), "The single step is marked")
 
 func test_every_card_shows_the_whole_legend() -> void:
-	# Mac's wording, in his order.
-	var texts := ["Moves to this square", "Moves to any square in this direction",
-		"Moves to this square (but can't capture)", "Moves to any square in this direction (but can't capture)",
-		"Must capture to move here", "Jumps here", "Jumps here but can't capture here",
-		"Must capture to move here"]
+	# In Mac's order, shortened (Mac); no plain dot or arrow (Mac).
+	var texts := ["Moves, can't capture", "Slides, can't capture", "Captures only",
+		"Jumps", "Jumps, can't capture", "Jumps, captures only"]
 	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
 	_root().add_child(card)
 	for id in ["man", "knight", "pawn", "werewolf"]:

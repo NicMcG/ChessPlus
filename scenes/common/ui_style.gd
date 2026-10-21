@@ -98,6 +98,22 @@ static func box(color: Color, radius := RADIUS, margin_x := 20.0, margin_y := 12
 	style.anti_aliasing = true
 	return style
 
+## The boxes for a button that shows a piece's picture (the army builder's and
+## testing mode's trays): little room inside, so the picture fills it.
+## The chosen one gets a gold outline.
+static func picture_button(button: Button) -> void:
+	var looks := {"normal": SURFACE, "hover": SURFACE_HOVER, "disabled": SURFACE_DISABLED}
+	for state: String in looks:
+		var box := box(looks[state], RADIUS, 4, 4)
+		box.border_color = BORDER_SOFT
+		box.set_border_width_all(1)
+		button.add_theme_stylebox_override(state, box)
+	var chosen := box(SURFACE_HOVER, RADIUS, 4, 4)
+	chosen.border_color = ACCENT
+	chosen.set_border_width_all(4)
+	button.add_theme_stylebox_override("pressed", chosen)
+	button.add_theme_stylebox_override("hover_pressed", chosen)
+
 ## A pop-up's box: lighter than the screen, a thin edge and a soft shadow.
 static func dialog_box(margin := 28.0) -> StyleBoxFlat:
 	var style := box(DIALOG, RADIUS_LARGE, margin, margin)
