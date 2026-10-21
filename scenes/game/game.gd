@@ -323,7 +323,7 @@ func view_move(moves_played: int) -> void:
 	if moves_played < 0 or moves_played >= state.history.size():
 		back_to_game()
 		return
-	var copy := _replay(moves_played, [])
+	var copy := _game_copy_at(moves_played)
 	if copy == null:
 		back_to_game()
 		return
@@ -344,11 +344,53 @@ func _replay(main_moves: int, extra: Array) -> GameState:
 		texts.append(state.history[i].to_text())
 	texts.append_array(extra)
 	for text: String in texts:
-		var move := copy.find_move(text)
+		var move := copy.find_played_move(text)
 		if move == null:
 			return null
 		copy.make_move(move)
 	return copy
+
+## A copy of the game after its first `moves_played` moves, for looking back.
+## The copy already on the board is moved there if it's on the game's own
+## moves (stepping back or forward is then one move, not the whole game again).
+func _game_copy_at(moves_played: int) -> GameState:
+	var copy := _view_state
+	if copy == null and _spare_copy_of == state:
+		copy = _spare_copy
+	_keep_copy(null)
+	return _step_copy(copy, moves_played)
+
+## `copy` (a copy of this game, or null) moved to the position after the game's
+## first `moves_played` moves; a fresh copy if it isn't on the game's moves.
+func _step_copy(copy: GameState, moves_played: int) -> GameState:
+	if copy == null or copy == state or not _on_game_moves(copy):
+		return _replay(moves_played, [])
+	while copy.history.size() > moves_played:
+		copy.undo_move(copy.history.back())
+	while copy.history.size() < moves_played:
+		var move := copy.find_played_move(state.history[copy.history.size()].to_text())
+		if move == null:
+			return _replay(moves_played, [])
+		copy.make_move(move)
+	return copy
+
+## The last copy looked at, kept after going back to the game so looking back
+## again starts from it, and the game it's a copy of.
+var _spare_copy: GameState
+var _spare_copy_of: GameState
+
+func _keep_copy(copy: GameState) -> void:
+	_spare_copy = copy
+	_spare_copy_of = state if copy else null
+
+## Whether every move played in `copy` is the game's move at that point.
+func _on_game_moves(copy: GameState) -> bool:
+	if copy.history.size() > state.history.size():
+		return false
+	for i in copy.history.size():
+		if copy.history[i].to_text() != state.history[i].to_text():
+			return false
+	return true
 
 ## Stop looking back and show the game as it is now.
 func back_to_game() -> void:
@@ -357,6 +399,7 @@ func back_to_game() -> void:
 	viewing = -1
 	line_index = -1
 	line_ply = 0
+	_keep_copy(_view_state)
 	_view_state = null
 	board_view.show_game(state)
 	_update_input()
@@ -799,7 +842,7 @@ func _start_bot_turn_if_needed() -> void:
 	if _plusfish_bot_can_play():
 		move = await _plusfish_bot_move(turn_id)
 	else:
-		move = bot.choose_move(state)
+		move = await _practice_bot_move(turn_id)
 	# Fast answers wait until the bot has "thought" for bot_min_seconds.
 	var wait := bot_min_seconds - (Time.get_ticks_msec() - started) / 1000.0
 	if bot_delay_frames > 0 and wait > 0:
@@ -807,6 +850,54 @@ func _start_bot_turn_if_needed() -> void:
 		await _bot_timer.timeout
 	if turn_id == _bot_turn_id and bot_thinking:
 		_play_bot_move(move)
+
+## The practice bot's move. On PC it searches a copy of the game on its own
+## thread, so the screen keeps going while it thinks (searching here froze it
+## for 0.6-1.5 s every move in army games). On the web, which has no threads,
+## and in tests (bot_delay_frames = 0), it searches here. Null if the turn was
+## dropped meanwhile.
+func _practice_bot_move(turn_id: int) -> Move:
+	if bot_delay_frames == 0 or OS.has_feature("web"):
+		return bot.choose_move(state)
+	_stop_bot_thread()
+	# The bot's copy from its last turn, two moves on (or a new one).
+	var copy := _step_copy(_bot_copy if _bot_copy_of == state else null, state.history.size())
+	_bot_copy = copy
+	_bot_copy_of = state if copy else null
+	if copy == null:
+		return bot.choose_move(state)
+	var thread := Thread.new()
+	_bot_thread = thread
+	thread.start(bot.choose_move.bind(copy))
+	# Checked with the screen's own timer: if the screen closes, the wait just ends.
+	while thread.is_alive() and thread == _bot_thread:
+		_bot_timer.start(0.02)
+		await _bot_timer.timeout
+	# Another turn started meanwhile and has already stopped this search.
+	if thread != _bot_thread:
+		return null
+	var found: Move = thread.wait_to_finish()
+	_bot_thread = null
+	if found == null or turn_id != _bot_turn_id:
+		return null
+	return state.find_played_move(found.to_text())
+
+## The practice bot's search on its own thread, while it runs; the copy of
+## the game it searches (kept for its next turn), and the game it's a copy of.
+var _bot_thread: Thread
+var _bot_copy: GameState
+var _bot_copy_of: GameState
+
+## Stop the practice bot's search (if one is running) and wait for its thread.
+func _stop_bot_thread() -> void:
+	if _bot_thread == null:
+		return
+	bot.stop()
+	_bot_thread.wait_to_finish()
+	_bot_thread = null
+
+func _exit_tree() -> void:
+	_stop_bot_thread()
 
 ## True if this is a Plusfish game and Plusfish can play it. If it can't (the
 ## program isn't on this computer, or a piece has a rule it doesn't know yet),
@@ -960,11 +1051,12 @@ func _refresh_ability_button() -> void:
 func _haunt_moves() -> Array[Move]:
 	var found: Array[Move] = []
 	var shown := board_view.state
-	if shown == null or not board_view.input_enabled or shown.outcome() != GameState.Outcome.NONE:
+	if shown == null or not board_view.input_enabled:
 		return found
-	if shown == state and is_over():
-		return found
+	# (The quick check first: there's rarely a Ghost to bring back.)
 	if MoveGenerator.haunting_ghosts(shown, shown.side_to_move).is_empty():
+		return found
+	if shown.outcome() != GameState.Outcome.NONE or (shown == state and is_over()):
 		return found
 	found.assign(shown.moves().filter(func(m: Move) -> bool: return m.ability == PieceDef.Ability.HAUNT))
 	return found
@@ -1124,7 +1216,7 @@ func _update_text() -> void:
 	resign_button.disabled = not is_over() and (bot_thinking or viewing >= 0)
 	if online == null:
 		new_game_button.disabled = replay_ends_at_once()
-	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result,
+	move_list.show_moves(_numbered_moves(), "" if result == "*" else result,
 			viewing if line_index < 0 else -1, TIP, side_lines, line_index, line_ply)
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
@@ -1143,6 +1235,37 @@ func _update_text() -> void:
 	_update_game_over()
 	_update_eval_bar()
 	_update_captures()
+
+## The move list's entries (Notation.numbered_moves) for the game so far, and
+## the moves they were written for. Writing a move is slow (it works out every
+## legal move, to see whether it needs a file or rank and whether it gives
+## check), and a move's entry only depends on the moves before it, so after a
+## new move only that one is written. Writing them all every time froze the
+## screen for up to half a second per move late in a long game.
+var _list_entries: Array = []
+var _list_moves: Array[Move] = []
+var _list_state: GameState
+
+func _numbered_moves() -> Array:
+	if _list_state != state:
+		_list_state = state
+		_list_entries.clear()
+		_list_moves.clear()
+	# Keep the entries of the moves still the same (Undo and Redo make new ones).
+	var same := 0
+	var limit := mini(_list_moves.size(), state.history.size())
+	while same < limit and _list_moves[same] == state.history[same]:
+		same += 1
+	_list_entries.resize(same)
+	_list_moves.resize(same)
+	if same < state.history.size():
+		var added := Notation.numbered_moves(state, same)
+		# Carrying on a turn: Black's move after White's has no number.
+		if same > 0:
+			added[0][0] = "" if added[0][0].ends_with("...") else added[0][0]
+		_list_entries.append_array(added)
+		_list_moves.append_array(state.history.slice(same))
+	return _list_entries.duplicate()
 
 # --- Looking over a finished game with Plusfish ----------------------------------
 

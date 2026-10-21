@@ -28,8 +28,13 @@ func get_piece(pos: Vector2i) -> Piece:
 		return null
 	return _squares[_index(pos)]
 
+## Goes up every time set_piece is called, so others can tell that the board
+## changed since they last looked (GameState.outcome() keeps its answer until then).
+var changes := 0
+
 func set_piece(pos: Vector2i, piece: Piece) -> void:
 	assert(in_bounds(pos), "Tried to place a piece off the board")
+	changes += 1
 	var index := _index(pos)
 	var old := _squares[index]
 	if old:

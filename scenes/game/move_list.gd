@@ -84,14 +84,77 @@ func show_moves(entries: Array, result: String, viewing: int, tip: String,
 		side_lines: Array = [], shown_line := -1, shown_line_ply := 0) -> void:
 	_tip.text = tip
 	_tip.visible = entries.is_empty() and side_lines.is_empty()
+	if side_lines.is_empty():
+		_show_main_line(entries, viewing)
+	else:
+		_rebuild(entries, viewing, side_lines, shown_line, shown_line_ply)
+	set_marks(marks)
+	_result.text = result
+	_result.visible = result != ""
+
+## The entries the list shows (main line only, see _show_main_line), and each
+## one's controls (its turn number and a spacer if it starts a turn, then its
+## button). Empty after a rebuild with side lines.
+var _shown_entries: Array = []
+var _entry_nodes: Array = []
+
+## Without side lines: keep the buttons of the moves that are still the same,
+## and only add (or take off) the ones at the end. Rebuilding the whole list
+## after every move made hundreds of controls each time, which stalled the
+## screen late in a long game.
+func _show_main_line(entries: Array, viewing: int) -> void:
+	if _shown_entries.is_empty():
+		_clear()
+	var same := 0
+	var limit := mini(_shown_entries.size(), entries.size())
+	while same < limit and _shown_entries[same] == entries[same]:
+		same += 1
+	if viewed_button:
+		_style_button(viewed_button, false)
+		viewed_button = null
+	for i in range(_entry_nodes.size() - 1, same - 1, -1):
+		for node: Node in _entry_nodes[i]:
+			node.get_parent().remove_child(node)
+			node.queue_free()
+	_entry_nodes.resize(same)
+	buttons.resize(same)
+	var grid := _grids[0] if not _grids.is_empty() else _new_grid()
+	for i in range(same, entries.size()):
+		var nodes: Array[Control] = []
+		var number: String = entries[i][0]
+		# A turn starts with a number. If Black moved first, White's cell is empty.
+		if number != "":
+			nodes.append(_number_label(number))
+			if number.ends_with("..."):
+				nodes.append(Control.new())
+		var moves_played := i + 1
+		var button := _move_button(entries[i][2], entries[i][1], false, func() -> void: move_tapped.emit(moves_played))
+		nodes.append(button)
+		for node in nodes:
+			grid.add_child(node)
+		buttons.append(button)
+		_entry_nodes.append(nodes)
+	_shown_entries = entries
+	if viewing > 0 and viewing <= buttons.size():
+		viewed_button = buttons[viewing - 1]
+		_style_button(viewed_button, true)
+
+## Take everything out of the list.
+func _clear() -> void:
 	for child in _body.get_children():
 		_body.remove_child(child)
 		child.queue_free()
 	_grids.clear()
 	buttons.clear()
 	side_buttons.clear()
-	side_buttons.resize(side_lines.size())
 	viewed_button = null
+	_shown_entries = []
+	_entry_nodes.clear()
+
+## With side lines: build the whole list again.
+func _rebuild(entries: Array, viewing: int, side_lines: Array, shown_line: int, shown_line_ply: int) -> void:
+	_clear()
+	side_buttons.resize(side_lines.size())
 	# Each side line's box goes after the turn holding the move it replaces
 	# (the last turn for one from the end of the game).
 	var after_entry := {}
@@ -131,9 +194,6 @@ func show_moves(entries: Array, result: String, viewing: int, tip: String,
 		for index: int in boxes:
 			_body.add_child(_side_line_box(side_lines[index], index, shown_line_ply if index == shown_line else -1))
 		grid = _new_grid()
-	set_marks(marks)
-	_result.text = result
-	_result.visible = result != ""
 
 ## Mark mistakes and blunders (moves played -> MoveQuality.Mark; {} for none).
 func set_marks(p_marks: Dictionary) -> void:
@@ -299,8 +359,7 @@ func _move_button(parts: Array, text: String, viewed: bool, on_tap: Callable, sm
 			button.custom_minimum_size.x = row.get_combined_minimum_size().x + 14)
 	button.mouse_entered.connect(func() -> void: _tint(row, HOVER_TEXT))
 	button.mouse_exited.connect(func() -> void: _tint(row, Color.WHITE))
-	button.add_theme_stylebox_override("normal", _box(VIEWED_BG if viewed else Color.TRANSPARENT))
-	button.add_theme_stylebox_override("hover", _box(VIEWED_BG if viewed else HOVER_BG))
+	_style_button(button, viewed)
 	button.add_theme_stylebox_override("pressed", _box(HOVER_BG))
 	button.add_theme_stylebox_override("hover_pressed", _box(HOVER_BG))
 	button.add_theme_color_override("font_color", Color.WHITE)
@@ -316,6 +375,11 @@ func _move_button(parts: Array, text: String, viewed: bool, on_tap: Callable, sm
 			return
 		on_tap.call())
 	return button
+
+## A move button's background: highlighted if it's the move being looked at.
+func _style_button(button: Button, viewed: bool) -> void:
+	button.add_theme_stylebox_override("normal", _box(VIEWED_BG if viewed else Color.TRANSPARENT))
+	button.add_theme_stylebox_override("hover", _box(VIEWED_BG if viewed else HOVER_BG))
 
 ## Where the list was scrolled to when a move was pressed.
 var _scroll_at_press := 0

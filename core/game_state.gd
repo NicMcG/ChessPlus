@@ -80,6 +80,41 @@ func is_in_check() -> bool:
 ## every other outcome is a draw. Checkmate counts even if the mating move was
 ## also the 50th move.
 func outcome() -> Outcome:
+	var key := [_position_ids.back(), board.changes, side_to_move, halfmove_clock, lost[0].size(), lost[1].size()]
+	if key == _outcome_key:
+		return _outcome
+	_outcome = _work_out_outcome()
+	_outcome_key = key
+	return _outcome
+
+## outcome() is slow (it works out every legal move and looks back for
+## repetitions) and the game screen asks for it many times after each move, so
+## the answer is kept until the position changes: a move made or undone, a
+## piece put on or taken off the board, or one added to the lost pieces.
+var _outcome := Outcome.NONE
+var _outcome_key := []
+## A number for each position reached by make_move (the start's first): a new
+## one for every move made, and undoing a move goes back to the one before, so
+## trying moves (make, then undo) doesn't lose the outcome worked out for the
+## position. With board.changes put back on undo too, any other change to the
+## board still counts as a new position.
+var _position_ids: Array[int] = [0]
+var _board_changes: Array[int] = []
+var _last_position_id := 0
+
+## For stepping back through the game and playing the same moves again (to
+## look at earlier positions): call this first, then same_position_again() once
+## they're all made again, so the position counts as the same one it was (and
+## outcome() keeps its answer).
+func position_marks() -> Array:
+	return [_position_ids.duplicate(), _board_changes.duplicate(), board.changes]
+
+func same_position_again(marks: Array) -> void:
+	_position_ids = marks[0]
+	_board_changes = marks[1]
+	board.changes = marks[2]
+
+func _work_out_outcome() -> Outcome:
 	if history.is_empty() and MoveGenerator.is_in_check(board, Piece.other_team(side_to_move)):
 		return Outcome.KING_EXPOSED
 	if moves().is_empty():
@@ -104,6 +139,9 @@ func result_text() -> String:
 	return "1/2-1/2"
 
 func make_move(move: Move) -> void:
+	_last_position_id += 1
+	_position_ids.append(_last_position_id)
+	_board_changes.append(board.changes)
 	move.piece_had_moved = move.piece.has_moved
 	move.prev_en_passant_squares = en_passant_squares
 	move.prev_en_passant_victim = en_passant_victim
@@ -214,6 +252,11 @@ func _next_turn() -> void:
 
 func undo_move(move: Move) -> void:
 	assert(not history.is_empty() and history.back() == move, "Moves must be undone last-first")
+	_position_ids.pop_back()
+	_take_back(move)
+	board.changes = _board_changes.pop_back()
+
+func _take_back(move: Move) -> void:
 	history.pop_back()
 	halfmove_clock = move.prev_halfmove_clock
 	side_to_move = Piece.other_team(side_to_move)
@@ -282,6 +325,7 @@ func _undo_decoy(move: Move) -> void:
 ## to look, then replaying them).
 func _repetition_count() -> int:
 	var key := _position_key()
+	var marks := position_marks()
 	var count := 1
 	var undone: Array[Move] = []
 	for i in range(mini(halfmove_clock, history.size())):
@@ -292,6 +336,7 @@ func _repetition_count() -> int:
 			count += 1
 	for i in range(undone.size() - 1, -1, -1):
 		make_move(undone[i])
+	same_position_again(marks)
 	return count
 
 ## Text that is identical for two positions exactly when they count as the same
@@ -378,6 +423,21 @@ static func _stays_on_one_color(def: PieceDef) -> bool:
 			if (dir.x + dir.y) % 2 != 0:
 				return false
 	return true
+
+## The same as find_move, for a move already known to be legal here (it was
+## played in this position before: replaying a game or a side line). Much
+## quicker: it doesn't check every move for leaving the king attacked (each a
+## make, attack test and undo), which made looking back through a long game
+## take a quarter of a second per step. If two moves have the text, it asks
+## find_move to be sure.
+func find_played_move(text: String) -> Move:
+	var found: Move = null
+	for move in MoveGenerator.pseudo_legal_moves(self):
+		if move.to_text() == text:
+			if found:
+				return find_move(text)
+			found = move
+	return found
 
 ## The available move whose to_text() matches, e.g. "e2-e4" or "e7-e8=Q", or null.
 ## For tests.
