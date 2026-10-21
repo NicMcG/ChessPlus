@@ -1,0 +1,37 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StartAndStopTheSimsServer",
+      "Effect": "Allow",
+      "Action": ["ec2:StartInstances", "ec2:StopInstances"],
+      "Resource": "arn:aws:ec2:us-east-2:*:instance/i-07e42b3b04c8bc394"
+    },
+    {
+      "Sid": "SeeWhetherItIsRunning",
+      "Effect": "Allow",
+      "Action": ["ec2:DescribeInstances", "ec2:DescribeInstanceStatus"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RunCommandsOnTheSimsServerOnly",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": [
+        "arn:aws:ec2:us-east-2:*:instance/i-07e42b3b04c8bc394",
+        "arn:aws:ssm:us-east-2::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "ReadCommandResults",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations",
+        "ssm:DescribeInstanceInformation",
+        "ssm:CancelCommand"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
