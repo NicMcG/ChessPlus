@@ -951,9 +951,9 @@ func _refresh_ability_button() -> void:
 		_style_ability_button(PackedColorArray([Color("#555555"), Color("#555555")]), Color("#a0a0a0"), false)
 	elif board_view.selected_ability_moves().is_empty():
 		var dark := GradientStyleBox.new(piece.def.ability_gradient()).shaded(-0.55).colors
-		_style_ability_button(dark, Color("#9a9a9a"), false, piece.def.ability_craters)
+		_style_ability_button(dark, Color("#9a9a9a"), false)
 	else:
-		_style_ability_button(piece.def.ability_gradient(), piece.def.ability_label_color(), true, piece.def.ability_craters)
+		_style_ability_button(piece.def.ability_gradient(), piece.def.ability_label_color(), true)
 
 ## The ways a captured Ghost of the side to move can come back (Haunt), when the
 ## player can move now; empty otherwise.
@@ -980,9 +980,8 @@ func _place_ability_button() -> void:
 	ability_button.size = button_size
 	ability_button.global_position = Vector2(row.get_center().x - button_size.x / 2, row.position.y - button_size.y - 14)
 
-func _style_ability_button(colors: PackedColorArray, text_color: Color, usable: bool, craters := false) -> void:
+func _style_ability_button(colors: PackedColorArray, text_color: Color, usable: bool) -> void:
 	var style := GradientStyleBox.new(colors, 12, 16, 8)
-	style.craters = craters
 	ability_button.add_theme_stylebox_override("normal", style)
 	ability_button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	ability_button.add_theme_stylebox_override("hover", style.shaded(0.15) if usable else style)

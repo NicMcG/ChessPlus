@@ -98,6 +98,13 @@ func test_builder_starts_empty_and_places_pieces() -> void:
 	check(not builder.save_button.disabled, "Ready to save")
 	builder.free()
 
+func test_builder_tray_shows_the_wolf() -> void:
+	var werewolf: PieceDef = load("res://data/pieces/werewolf.tres")
+	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+		check_eq(load("res://scenes/armies/army_builder.gd").tray_texture(werewolf, team), PieceArt.texture_for(werewolf.transforms_into, team), "The Werewolf's tray button shows the wolf (Mac)")
+	check_eq(load("res://scenes/armies/army_builder.gd").tray_texture(KNIGHT, Piece.Team.WHITE), PieceArt.texture_for(KNIGHT, Piece.Team.WHITE), "Other pieces show themselves")
+	check_eq(load("res://data/pieces/berserker.tres").display_name, "Barbarian", "The Berserker is now the Barbarian (Mac); its id stays berserker")
+
 func test_builder_tap_removes_and_swaps() -> void:
 	var builder := _builder(_fresh_library())
 	builder.select(KNIGHT)

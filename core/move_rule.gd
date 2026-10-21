@@ -34,7 +34,7 @@ enum LeapOver { ANYTHING, OWN_PIECE }
 ## must hold one of the mover's own pieces, like the Rogue hopping a friend).
 @export var leap_over: LeapOver = LeapOver.ANYTHING
 
-## A bent route instead of straight lines (the Cavalry's L, the Berserker's outer
+## A bent route instead of straight lines (the Cavalry's L, the Barbarian's outer
 ## squares): one-square steps from the owner's point of view, e.g. [(1,0), (1,0),
 ## (0,1)] = two right then one forward. Every square on the way must be empty;
 ## the last one is where it lands. When set, `directions` isn't used.
