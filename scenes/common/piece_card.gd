@@ -337,12 +337,15 @@ func _fill_move_note() -> void:
 	%MoveNote.text = moves_def.move_note
 	%MoveNote.visible = moves_def.move_note != ""
 
-## The whole legend, the same on every card (Mac), whichever marks this piece uses.
+## The legend, the same on every card (Mac), whichever marks this piece uses;
+## the plain dot and arrow aren't in it (PieceGuideBoard.NOT_IN_LEGEND).
 func _fill_legend() -> void:
 	for child in %Legend.get_children():
 		child.queue_free()
 	%Legend.add_theme_constant_override("separation", _z(2))
 	for kind in PieceGuideBoard.LEGEND:
+		if kind in PieceGuideBoard.NOT_IN_LEGEND:
+			continue
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", _z(10))
 		var icon := LegendIcon.new()
