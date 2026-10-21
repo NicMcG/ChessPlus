@@ -323,10 +323,10 @@ func test_army_list_warns_about_armies_that_break_the_rules() -> void:
 	_open(army_list)
 	var names := {}
 	for button: Button in army_list.list.find_children("*", "Button", true, false):
-		if button.text.contains("pts"):
-			names[button.text] = button
-	var bats: Button = names.get("Bats  (44.5 pts)")
-	var mine: Button = names.get("Mine  (4 pts)")
+		if button.has_meta("army_name"):
+			names[button.get_meta("army_name")] = button
+	var bats: Button = names.get("Bats")
+	var mine: Button = names.get("Mine")
 	check(bats != null and mine != null, "Both listed: %s" % [names.keys()])
 	if bats and mine:
 		check(bats.icon != null, "Warning sign on the over-budget army")

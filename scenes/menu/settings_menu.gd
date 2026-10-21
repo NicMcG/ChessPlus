@@ -13,7 +13,6 @@ signal sound_changed
 ## Any setting changed (an open game redraws with it).
 signal settings_changed
 
-const BACKGROUND := Color(0.17, 0.17, 0.18)
 const ROW_LABEL_WIDTH := 300
 ## The credits the pictures, font and some of the sounds need (their licences).
 const CREDITS: Array[String] = [
@@ -43,8 +42,7 @@ var popup: ModalPanel
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var background := ColorRect.new()
-	background.color = BACKGROUND
+	var background := Backdrop.new()
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 	var margin := MarginContainer.new()
@@ -79,20 +77,18 @@ func _ready() -> void:
 func _top_bar() -> HBoxContainer:
 	var bar := HBoxContainer.new()
 	bar.add_theme_constant_override("separation", 12)
-	var back := Button.new()
-	back.text = "Back"
-	back.custom_minimum_size = Vector2(130, 70)
+	var back := BackButton.new()
 	back.pressed.connect(close)
 	bar.add_child(back)
 	var title := Label.new()
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_font_size_override("font_size", 40)
+	title.theme_type_variation = &"TitleLabel"
 	bar.add_child(title)
 	# As wide as Back, so the title stays centred; then room for the volume button.
 	var balance := Control.new()
-	balance.custom_minimum_size.x = 130
+	balance.custom_minimum_size.x = back.custom_minimum_size.x
 	bar.add_child(balance)
 	bar.add_child(VolumeControl.make_room())
 	return bar
@@ -239,8 +235,9 @@ func refresh() -> void:
 func _heading(text: String) -> void:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 34)
-	label.add_theme_color_override("font_color", Color(0.94, 0.78, 0.36))
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_font_override("font", UiStyle.bold())
+	label.add_theme_color_override("font_color", UiStyle.ACCENT_TEXT)
 	sections.add_child(label)
 
 ## A row: the setting's name on the left, its control on the right.
@@ -295,15 +292,9 @@ func _choice_row(text: String, choices: Dictionary, on_chosen: Callable) -> Dict
 func _gold_toggle() -> Button:
 	var button := Button.new()
 	button.toggle_mode = true
+	button.theme_type_variation = &"ChoiceButton"
 	button.custom_minimum_size = Vector2(150, 64)
 	button.focus_mode = Control.FOCUS_NONE
-	var on_style := StyleBoxFlat.new()
-	on_style.bg_color = Color(0.94, 0.78, 0.36)
-	on_style.set_corner_radius_all(8)
-	button.add_theme_stylebox_override("pressed", on_style)
-	button.add_theme_stylebox_override("hover_pressed", on_style)
-	for color in ["font_pressed_color", "font_hover_pressed_color"]:
-		button.add_theme_color_override(color, Color(0.12, 0.12, 0.12))
 	return button
 
 func _show_toggle(button: Button, on: bool) -> void:

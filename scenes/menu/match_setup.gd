@@ -56,6 +56,12 @@ func _ready() -> void:
 	start_button.pressed.connect(start)
 	back_button.pressed.connect(func() -> void: closed.emit())
 	_update_labels()
+	resized.connect(fit_layout)
+	fit_layout()
+
+## On a wide screen the two boxes (opponent, armies) sit side by side.
+func fit_layout() -> void:
+	(%Cards as BoxContainer).vertical = not ScreenShape.is_wide(size)
 
 ## The Plusfish level can only be picked where Plusfish runs (on PC, if the
 ## program is there; on the web, once plusfish.wasm has loaded, which may be a
