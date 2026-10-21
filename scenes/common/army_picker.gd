@@ -2,7 +2,8 @@ class_name ArmyPicker
 extends ColorRect
 
 ## A pop-up list of armies to choose from (see ArmyChoices: Default, Random,
-## Standard and every saved army that's legal), and (if asked for) which side to
+## Standard, every saved army that's legal, then the ones that break the rules,
+## greyed out), and (if asked for) which side to
 ## play: White, Black or Random. Emits `chosen` with the army (an Army, or a
 ## Callable(team) -> Army for Default/Random, as the side may not be known yet)
 ## and side (an OnlineSession.SIDE_* value; SIDE_RANDOM when no side was asked
@@ -61,6 +62,11 @@ func _init(library: ArmyLibrary = null, title := "Choose your army", ask_side :=
 		button.text = entry.label
 		button.clip_text = true
 		button.custom_minimum_size.y = 80
+		if not choices.can_pick(index):
+			button.disabled = true
+			button.tooltip_text = "
+".join(entry.problems) + "
+Fix it in My armies."
 		button.pressed.connect(func() -> void:
 			var army: Variant = entry.army if entry.kind == ArmyChoices.ARMY else choices.resolver(index)
 			chosen.emit(army, side_pick.selected if side_pick else OnlineSession.SIDE_RANDOM)
