@@ -10,8 +10,8 @@ extends Control
 ##   red X = must capture to move here    yellow dot = jumps here
 ##   yellow empty circle = jumps here, can't capture
 ##   yellow X = jumps here, must capture
-## A square it reaches only on its first move (the pawn's double step) gets the
-## same mark as any other; the piece's Special Rule says so (Mac).
+## Squares it reaches only on its first move (the pawn's double step) aren't
+## shown: the piece's Special Rule says so instead (Mac).
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
@@ -46,7 +46,7 @@ func show_piece(p_def: PieceDef, p_team: Piece.Team) -> void:
 ## them all; tests use this to check each piece gets the right marks).
 static func kinds_used(guide: Dictionary) -> Array[String]:
 	var used := {}
-	for flags in guide.squares.values():
+	for flags in shown_squares(guide).values():
 		used[_kind(flags)] = true
 	for slide in guide.slides:
 		used["slide" if slide[1] & PieceGuide.CAPTURE else "slide_move"] = true
@@ -55,6 +55,14 @@ static func kinds_used(guide: Dictionary) -> Array[String]:
 		if used.has(kind):
 			kinds.append(kind)
 	return kinds
+
+## The guide's squares that get a mark: all but the first-move-only ones.
+static func shown_squares(guide: Dictionary) -> Dictionary:
+	var shown := {}
+	for offset in guide.squares:
+		if guide.squares[offset] & PieceGuide.FIRST_MOVE == 0:
+			shown[offset] = guide.squares[offset]
+	return shown
 
 ## Which mark a square gets.
 static func _kind(flags: int) -> String:
@@ -154,9 +162,10 @@ func _draw() -> void:
 		var first_step: int = slide[2]
 		var start := center + screen_dir * s * (first_step - 1) + screen_dir.normalized() * s * 0.5
 		draw_slide(self, start, center + screen_dir * s * steps, slide[1] & PieceGuide.CAPTURE != 0, s)
-	for offset in guide.squares:
+	var shown := shown_squares(guide)
+	for offset in shown:
 		var cell := Vector2(radius + offset.x, radius + offset.y * forward)
-		draw_square_marker(self, Rect2(origin + cell * s, Vector2(s, s)), guide.squares[offset])
+		draw_square_marker(self, Rect2(origin + cell * s, Vector2(s, s)), shown[offset])
 	var texture := PieceArt.texture_for(def, team)
 	var piece_rect := Rect2(origin + Vector2(radius, radius) * s, Vector2(s, s))
 	if texture:

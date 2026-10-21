@@ -73,8 +73,11 @@ func test_jumps_get_yellow_versions_of_the_marks() -> void:
 	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.CAPTURE | PieceGuide.JUMP), "jump", "Yellow dot")
 	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.JUMP), "jump_move", "Yellow empty circle")
 	check_eq(PieceGuideBoard._kind(PieceGuide.CAPTURE | PieceGuide.JUMP), "jump_capture", "Yellow X")
-	# First move only (the pawn's double step): the same mark as any other.
-	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.FIRST_MOVE), "move", "Double step: empty circle")
+	# First move only (the pawn's double step): no mark; its Special Rule says it (Mac).
+	var pawn := PieceGuide.guide(_def("pawn"))
+	check(pawn.squares.has(Vector2i(0, 2)), "The guide still knows the double step")
+	check(not PieceGuideBoard.shown_squares(pawn).has(Vector2i(0, 2)), "No mark for the double step")
+	check(PieceGuideBoard.shown_squares(pawn).has(Vector2i(0, 1)), "The single step is marked")
 
 func test_every_card_shows_the_whole_legend() -> void:
 	# Mac's wording, in his order.
