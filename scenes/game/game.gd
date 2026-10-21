@@ -151,6 +151,7 @@ static func tip_text(touchscreen: bool) -> String:
 	return "Tip: %s any piece to see how it moves." % ("hold" if touchscreen else "middle-click")
 
 func _ready() -> void:
+	KeyBinds.install()
 	sounds = GameSounds.new()
 	add_child(sounds)
 	clock_label = Label.new()
@@ -404,6 +405,86 @@ func back_to_game() -> void:
 	board_view.show_game(state)
 	_update_input()
 	_update_text()
+
+## Keyboard shortcuts (KeyBinds; Mac's Settings, PC). Taken before the buttons
+## see the key, so Space can't also press a button clicked earlier; not while
+## typing (chat) or while a pop-up such as Settings is open.
+func _input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or not is_visible_in_tree() or settings_open:
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit:
+		return
+	var action := KeyBinds.action_for(key)
+	# Holding Left or Right keeps stepping; other keys act once per press.
+	if action == "" or (key.echo and action not in ["step_back", "step_forward"]):
+		return
+	if run_shortcut(action):
+		get_viewport().set_input_as_handled()
+
+## True while the Settings pop-up is open over the game (no shortcuts then).
+var settings_open := false
+
+## Do what shortcut `action` stands for, if it can be done now (the same rules
+## as its button). Returns whether it did anything.
+func run_shortcut(action: String) -> bool:
+	match action:
+		"step_back":
+			if viewing >= 0 or line_index >= 0:
+				step_back()
+			elif not state.history.is_empty():
+				view_move(state.history.size() - 1)
+			else:
+				return false
+		"step_forward":
+			if viewing < 0:
+				return false
+			step_forward()
+		"step_start":
+			if state.history.is_empty():
+				return false
+			view_move(0)
+		"step_end":
+			if viewing < 0:
+				return false
+			back_to_game()
+		"undo":
+			if not undo_button.is_visible_in_tree() or undo_button.disabled:
+				return false
+			undo()
+		"redo":
+			if not redo_button.is_visible_in_tree() or redo_button.disabled:
+				return false
+			redo()
+		"flip_board":
+			flip_board()
+		"use_ability":
+			if not ability_button.visible:
+				return false
+			use_ability()
+		"cancel":
+			if board_view.selected_square() == Board.NO_SQUARE and not board_view.aiming:
+				return false
+			board_view.cancel_selection()
+		"piece_card":
+			var square := board_view.selected_square()
+			var piece: Piece = board_view.state.board.get_piece(square) if square != Board.NO_SQUARE else null
+			if piece == null:
+				return false
+			PieceInfo.open(self, piece.def, piece.team)
+		_:
+			return false
+	return true
+
+## Turn the board round to see it from the other side (the Flip the board
+## shortcut). Only the view changes; the captures rows, eval bar and graph
+## follow it. A new game puts it back the usual way.
+func flip_board() -> void:
+	board_view.flipped = not board_view.flipped
+	board_view.queue_redraw()
+	_update_captures()
+	_update_eval_bar()
 
 ## While looking back: show the position one move earlier (down to the start;
 ## in a side line, back to where it left the game).

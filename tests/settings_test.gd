@@ -120,3 +120,70 @@ func test_board_helpers_and_reduced_effects() -> void:
 	view.free()
 	settings.free()
 	_finish()
+
+func _key(code: int) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = code & KEY_CODE_MASK
+	event.ctrl_pressed = code & KEY_MASK_CTRL != 0
+	event.pressed = true
+	return event
+
+func test_keys_can_be_changed_and_swap() -> void:
+	var settings := _open()
+	check_eq(settings.key_buttons["flip_board"].text, "F", "Flip starts on F")
+	settings.key_buttons["flip_board"].pressed.emit()
+	check_eq(settings.key_buttons["flip_board"].text, "Press a key...", "Waiting for a key")
+	settings._input(_key(KEY_B))
+	check_eq(KeyBinds.key("flip_board"), KEY_B, "Now on B")
+	check_eq(KeyBinds.action_for(_key(KEY_B)), "flip_board", "The InputMap follows")
+	check_eq(KeyBinds.action_for(_key(KEY_F)), "", "F does nothing now")
+	settings.listen_for_key("piece_card")
+	settings._input(_key(KEY_B))
+	check_eq(KeyBinds.key("piece_card"), KEY_B, "The piece card takes B...")
+	check_eq(KeyBinds.key("flip_board"), KEY_I, "...and flip gets its old key (I): no key does two things")
+	check_eq(KeyBinds.text(KeyBinds.key("undo")), "Ctrl+Z", "Undo shows Ctrl+Z")
+	settings.reset_to_defaults()
+	check_eq(KeyBinds.key("flip_board"), KEY_F, "Reset: back to F")
+	check_eq(KeyBinds.action_for(_key(KEY_F)), "flip_board", "...in the InputMap too")
+	settings.free()
+	_finish()
+
+func test_shortcuts_in_a_game() -> void:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	_root().add_child(game)
+	game.board_view.move_time = 0.0
+	for san in ["e4", "e5", "Nf3"]:
+		game.play(Notation.find_move(game.state, san))
+	check(game.run_shortcut("step_back"), "Left: look back a move")
+	check_eq(game.viewing, 2, "...at the position after 1. e4 e5")
+	game.run_shortcut("step_start")
+	check_eq(game.viewing, 0, "Home: the start")
+	game.run_shortcut("step_forward")
+	check_eq(game.viewing, 1, "Right: a move on")
+	game.run_shortcut("step_end")
+	check_eq(game.viewing, -1, "End: back to the game")
+	game.run_shortcut("undo")
+	check_eq(game.state.history.size(), 2, "Ctrl+Z: undo")
+	game.run_shortcut("redo")
+	check_eq(game.state.history.size(), 3, "Ctrl+Y: redo")
+	game.run_shortcut("flip_board")
+	check(game.board_view.flipped, "F: the board turns round")
+	game.run_shortcut("flip_board")
+	check(not game.board_view.flipped, "...and back")
+	check(not game.run_shortcut("cancel"), "Esc with nothing selected does nothing")
+	game.board_view.tap(Board.parse_square("e5"))
+	check(game.board_view.selected_square() != Board.NO_SQUARE, "Black's pawn chosen")
+	check(game.run_shortcut("cancel"), "Esc...")
+	check_eq(game.board_view.selected_square(), Board.NO_SQUARE, "...lets go of it")
+	game.board_view.tap(Board.parse_square("e5"))
+	check(game.run_shortcut("piece_card"), "I opens the chosen piece's card")
+	var cards := game.find_children("*", "PieceInfo", false, false)
+	check_eq(cards.size(), 1, "One card")
+	for card in cards:
+		card.free()
+	game.settings_open = true
+	var key := _key(KEY_F)
+	game._input(key)
+	check(not game.board_view.flipped, "No shortcuts while Settings is open")
+	game.free()
+	_finish()

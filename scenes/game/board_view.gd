@@ -1215,6 +1215,12 @@ func _royal_squares(team: Piece.Team) -> Array[Vector2i]:
 				squares.append(Vector2i(file, rank))
 	return squares
 
+## Let go of the chosen piece (the Cancel selection shortcut), also when aiming
+## an ability.
+func cancel_selection() -> void:
+	_clear_selection()
+	queue_redraw()
+
 func _clear_selection() -> void:
 	var had_selection := _selected != Board.NO_SQUARE or aiming
 	_selected = Board.NO_SQUARE

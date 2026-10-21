@@ -34,6 +34,10 @@ var speed_buttons := {}
 ## One switch per board helper (UserSettings.BOARD_HELPERS).
 var helper_toggles := {}
 var reduce_toggle: Button
+## The key button of each keyboard shortcut (KeyBinds.ACTIONS), PC only.
+var key_buttons := {}
+## The shortcut waiting for its new key ("" when none).
+var listening := ""
 ## The Credits or Reset pop-up while it's showing.
 var popup: ModalPanel
 
@@ -64,6 +68,8 @@ func _ready() -> void:
 	limit.add_child(sections)
 	_build_sound()
 	_build_visual()
+	if KeyBinds.has_keyboard():
+		_build_keys()
 	_build_other()
 	refresh()
 
@@ -137,6 +143,46 @@ func _build_visual() -> void:
 		UserSettings.set_reduce_effects(on)
 		settings_changed.emit())
 
+# --- Keyboard -----------------------------------------------------------------------
+
+func _build_keys() -> void:
+	_heading("Keyboard")
+	var hint := Label.new()
+	hint.text = "Press a key's button, then the new key."
+	hint.add_theme_font_size_override("font_size", 22)
+	hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	sections.add_child(hint)
+	for action: String in KeyBinds.ACTIONS:
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(220, 60)
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(func() -> void: listen_for_key(action))
+		_row(KeyBinds.ACTIONS[action][0], button)
+		key_buttons[action] = button
+
+## Wait for the next key, for shortcut `action`.
+func listen_for_key(action: String) -> void:
+	listening = action
+	refresh()
+
+## While waiting for a key: that key becomes the shortcut (any key, with Ctrl,
+## Shift or Alt if held; pressing only one of those waits on).
+func _input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if listening == "" or key == null or not key.pressed or key.echo:
+		return
+	if key.keycode in [KEY_CTRL, KEY_SHIFT, KEY_ALT, KEY_META]:
+		return
+	get_viewport().set_input_as_handled()
+	set_key(listening, key.get_keycode_with_modifiers())
+
+## Put shortcut `action` on `code` (two shortcuts on one key swap).
+func set_key(action: String, code: int) -> void:
+	KeyBinds.set_key(action, code)
+	listening = ""
+	refresh()
+	settings_changed.emit()
+
 # --- Credits and reset ---------------------------------------------------------------
 
 func _build_other() -> void:
@@ -162,6 +208,8 @@ func ask_reset() -> void:
 
 func reset_to_defaults() -> void:
 	UserSettings.reset_to_defaults()
+	KeyBinds.install()
+	listening = ""
 	_sound_changed()
 
 ## Show the saved settings (after a change here, or elsewhere such as the volume
@@ -179,6 +227,8 @@ func refresh() -> void:
 	for helper in helper_toggles:
 		_show_toggle(helper_toggles[helper], UserSettings.board_helper(helper))
 	_show_toggle(reduce_toggle, UserSettings.reduce_effects())
+	for action in key_buttons:
+		(key_buttons[action] as Button).text = "Press a key..." if action == listening else KeyBinds.text(KeyBinds.key(action))
 
 # --- Building blocks ---------------------------------------------------------------
 
