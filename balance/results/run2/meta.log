@@ -1,0 +1,181 @@
+left out Wide 6a (Q2KNVPA/1A(SQ)(SQ)NP1B): Costs 43.5 points; the budget is 39.
+left out Search 17c (1(SQ)VK1NQ1/1N(BD)(SQ)VB1(NC)): Costs 46 points; the budget is 39.
+left out Meta C 19 (1V(SQ)CKV(SQ)1/2AA(RM)(BR)(RM)(NC)): Costs 46 points; the budget is 39.
+left out Wide 6c ((NC)VPKW2R/1(SQ)A(RM)V1(SQ)1): Costs 46 points; the budget is 39.
+left out Search 15a (3K1(RM)QB/B(SQ)1(SQ)VLV(NC)): Costs 46 points; the budget is 39.
+left out Search 15c (1(BR)1K(PR)2Q/BB(CV)VV1(NC)1): Costs 45.5 points; the budget is 39.
+left out Search 16b (1B(SQ)KV1R1/AMB(RM)(RM)(SQ)1A): Costs 43.5 points; the budget is 39.
+left out Search 17a (1(NC)(SQ)K4/LVAVQ1(PA)A): Costs 45 points; the budget is 39.
+left out Meta C 71 (PP(SQ)NK(NC)P1/Q(RM)(SQ)V(BD)B1P): Costs 43.5 points; the budget is 39.
+left out Meta C 63 (1P(NC)K1PW1/B1(SQ)(RM)VALA): Costs 42.5 points; the budget is 39.
+wide meta: 64 climbers a round (4 from members), 6 tries a step at 3000 nodes; shortlist 3; games 40 per pair at 6000 nodes; game climb on; king exposed at the start = rejected
+starting pool played out (0s)
+  pool (game Elo): Standard +0
+round 1: 64 climbs (4s); best by eval: +1095 (SQ)RC1KA(PR)1/(CV)(CT)C3B1, +1076 PPWCKM(CH)1/P1(BD)(PR)(CV)(AS)(AS)P, +1036 APCEKEJP/(GA)1C(NC)(NC)PAB
+    game climb step 1: no tweak beat 100.0% (best 100.0%)
+    game climb step 2: no tweak beat 100.0% (best 100.0%)
+    game climb step 3: no tweak beat 100.0% (best 100.0%)
+  (SQ)RC1KA(PR)1/(CV)(CT)C3B1 scores 100.0% (+1200 Elo) against the pool in games, 10 pieces from the nearest (Standard): joins as Wide 1a
+  PPWCKM(CH)1/P1(BD)(PR)(CV)(AS)(AS)P scores 91.3% (+407 Elo) against the pool in games, 8 pieces from the nearest (Wide 1a): joins as Wide 1b
+  APCEKEJP/(GA)1C(NC)(NC)PAB scores 72.9% (+172 Elo) against the pool in games, 8 pieces from the nearest (Wide 1a): joins as Wide 1c
+  round 1 took 18s
+  pool (game Elo): Standard -759, Wide 1a -41, Wide 1b +260, Wide 1c +172
+round 2: 64 climbs (20s); best by eval: +1012 PPRKC2(AS)/(PD)RQ1(GA)BNB, +922 1(BR)1K1(RO)(CV)1/QBA(BD)(WW)L(AS)B, +895 P1(RM)(RM)K(BD)(CV)E/1(AS)Q(NC)(RO)(AS)AB
+    game climb step 1: no tweak beat 100.0% (best 100.0%)
+    game climb step 2: no tweak beat 100.0% (best 100.0%)
+    game climb step 3: no tweak beat 100.0% (best 96.9%)
+  PPRKC2(AS)/(PD)RQ1(GA)BNB scores 99.7% (+1002 Elo) against the pool in games, 6 pieces from the nearest (Standard): joins as Wide 2a
+  1(BR)1K1(RO)(CV)1/QBA(BD)(WW)L(AS)B scores 92.2% (+430 Elo) against the pool in games, 7 pieces from the nearest (Wide 1a): joins as Wide 2b
+  P1(RM)(RM)K(BD)(CV)E/1(AS)Q(NC)(RO)(AS)AB scores 89.2% (+366 Elo) against the pool in games, 5 pieces from the nearest (Wide 2b): joins as Wide 2c
+  round 2 took 54s
+  pool (game Elo): Standard -669, Wide 1a -219, Wide 1b -53, Wide 1c -80, Wide 2a +161, Wide 2b +285, Wide 2c +366
+round 3: 64 climbs (23s); best by eval: +666 (CV)Q1K2NN/A(AS)A(BD)(RO)(AS)PB, +621 (BR)Q(BR)K(PA)L1N/B1A(AS)(PA)1A1, +596 Q(NC)1K(BD)P(BR)E/B1(PD)(GA)(BD)C(AS)B
+    game climb step 1: no tweak beat 80.4% (best 83.0%)
+    game climb step 2: 73.2% -> 82.1% with (CV)Q1K2NN/A1A(BD)(RO)(AS)PB
+    game climb step 3: 80.4% -> 83.9% with (CV)Q1K2NN/A(AS)A(BD)(RO)(AS)PB
+    game climb step 4: 77.7% -> 86.6% with (CV)Q1K2NN/A(AS)A(BD)(RO)BP(AS)
+    game climb step 5: 72.3% -> 76.8% with (CV)Q1K1NN1/A(AS)A(BD)(RO)BP(AS)
+    game climb step 6: 71.4% -> 89.3% with 1Q1K(CV)NN1/A(AS)A(BD)(RO)BP(AS)
+    game climb step 7: 84.8% -> 88.4% with 1Q1KPNN1/A(AS)A(BD)(RO)B(CV)(AS)
+    game climb step 8: no tweak beat 83.9% (best 84.8%)
+    game climb step 9: 80.4% -> 88.4% with 1Q1KPN(CV)1/A(AS)A(BD)(RO)BN(AS)
+    game climb step 10: 75.9% -> 79.5% with 1Q1KPN(CV)1/A(AS)A(BD)(RO)B(RM)(AS)
+  1Q1KPN(CV)1/A(AS)A(BD)(RO)B(RM)(AS) scores 80.0% (+241 Elo) against the pool in games, 3 pieces from the nearest (Wide 2c): joins as Wide 3a
+  (CV)Q1K2NN/A(AS)A(BD)(RO)(AS)PB is only 1 pieces from Wide 3a and doesn't score better against the rest in games (79.5% vs 80.0%): thrown away
+  (BR)Q(BR)K(PA)L1N/B1A(AS)(PA)1A1 scores 68.3% (+133 Elo) against the pool in games, 5 pieces from the nearest (Wide 2b): joins as Wide 3c
+  round 3 took 152s
+  pool (game Elo): Standard -485, Wide 1a -243, Wide 1b -56, Wide 1c -132, Wide 2a +44, Wide 2b +150, Wide 2c +243, Wide 3a +195, Wide 3c +133
+round 4: 64 climbs (30s); best by eval: +563 1Q1(GA)KPPC/B1B(BR)M(BR)L(NC), +490 1E1K1(NC)1Q/A(CV)(GA)(BD)(NC)R(GA)1, +462 (BR)Q1(BR)K(CV)PP/AP(AS)B(RO)(PD)B(RM)
+    game climb step 1: no tweak beat 87.5% (best 86.1%)
+    game climb step 2: no tweak beat 88.9% (best 88.2%)
+    game climb step 3: no tweak beat 92.4% (best 91.0%)
+  1Q1(GA)KPPC/B1B(BR)M(BR)L(NC) scores 88.5% (+354 Elo) against the pool in games, 5 pieces from the nearest (Wide 2a): joins as Wide 4a
+  1E1K1(NC)1Q/A(CV)(GA)(BD)(NC)R(GA)1 scores 69.2% (+141 Elo) against the pool in games, 6 pieces from the nearest (Wide 2c): joins as Wide 4b
+  pool over 10: drops Standard (5.4%)
+  (BR)Q1(BR)K(CV)PP/AP(AS)B(RO)(PD)B(RM) scores 74.5% (+186 Elo) against the pool in games, 5 pieces from the nearest (Wide 3a): joins as Wide 4c
+  pool over 10: drops Wide 1a (10.1%)
+  round 4 took 82s
+  pool (game Elo): Wide 1b -255, Wide 1c -332, Wide 2a -129, Wide 2b -38, Wide 2c +115, Wide 3a +53, Wide 3c +5, Wide 4a +264, Wide 4b +85, Wide 4c +176
+round 5: 64 climbs (32s); best by eval: +364 (NC)(GA)PK(BR)1BQ/B(AS)(RO)PP(RM)(PD)L, +336 Q2(GA)KPPC/B1(CV)(BR)M(BR)L(NC), +332 (BR)Q1(BR)K(CV)PP/A(AS)PB(RO)(PD)B(RM)
+    game climb step 1: no tweak beat 85.0% (best 85.0%)
+    game climb step 2: no tweak beat 87.5% (best 83.8%)
+    game climb step 3: no tweak beat 82.5% (best 80.6%)
+  (NC)(GA)PK(BR)1BQ/B(AS)(RO)PP(RM)(PD)L scores 84.0% (+288 Elo) against the pool in games, 3 pieces from the nearest (Wide 4c): joins as Wide 5a
+  pool over 10: drops Wide 1c (11.6%)
+  Q2(GA)KPPC/B1(CV)(BR)M(BR)L(NC) is only 1 pieces from Wide 4a and doesn't score better against the rest in games (64.9% vs 71.2%): thrown away
+  (BR)Q1(BR)K(CV)PP/A(AS)PB(RO)(PD)B(RM) is only 0 pieces from Wide 4c and scores better against the rest in games (72.5% vs 69.4%): replaces it as Wide 5c
+  round 5 took 90s
+  pool (game Elo): Wide 1b -349, Wide 2a -213, Wide 2b -132, Wide 2c +52, Wide 3a -16, Wide 3c -22, Wide 4a +149, Wide 4b +31, Wide 5c +168, Wide 5a +298
+round 6: 64 climbs (34s); best by eval: +306 Q(BR)1(BR)K(CV)PP/A(AS)PB(RO)(PD)B(RM), +291 (CH)N(BR)PK(AS)1Q/B(AS)(BR)EB(PD)A(RM), +286 (BR)Q1(BR)K(CV)PP/A(AS)PB(RO)(PD)B(RM)
+    game climb step 1: 68.8% -> 73.1% with Q(BR)1(BR)K(CV)PP/(RM)(AS)PB(RO)(PD)BA
+    game climb step 2: 57.5% -> 68.8% with Q(BR)1(BR)K(CV)PP/(RM)(AS)PBA(PD)B(RO)
+    game climb step 3: 63.1% -> 67.5% with Q(BR)P(BR)K(CV)P1/(RM)(AS)PBA(PD)B(RO)
+    game climb step 4: no tweak beat 71.2% (best 65.0%)
+    game climb step 5: no tweak beat 70.0% (best 67.5%)
+    game climb step 6: no tweak beat 70.6% (best 66.9%)
+  Q(BR)P(BR)K(CV)P1/(RM)(AS)PBA(PD)B(RO) is only 0 pieces from Wide 5c and doesn't score better against the rest in games (71.5% vs 72.5%): thrown away
+  Q(BR)1(BR)K(CV)PP/A(AS)PB(RO)(PD)B(RM) is only 0 pieces from Wide 5c and doesn't score better against the rest in games (71.1% vs 72.5%): thrown away
+  (CH)N(BR)PK(AS)1Q/B(AS)(BR)EB(PD)A(RM) scores 50.5% (+3 Elo) against the pool in games, 4 pieces from the nearest (Wide 5c): joins as Wide 6c
+  pool over 10: drops Wide 1b (17.2%)
+  round 6 took 150s
+  pool (game Elo): Wide 2a -323, Wide 2b -218, Wide 2c +14, Wide 3a -44, Wide 3c -7, Wide 4a +123, Wide 4b -11, Wide 5c +155, Wide 5a +248, Wide 6c +16
+round 7: 64 climbs (45s); best by eval: +332 1P1(RM)K(PA)(BR)(NC)/B(AS)EQN(PD)AB, +293 (NC)WN1KP(AS)B/B(AS)E(GA)(RO)A(RM)(PD), +241 (NC)BPNK(BR)(GA)(RM)/P(AS)BA(PD)(WW)(RM)L
+    game climb step 1: 66.9% -> 76.9% with 1P1(RM)K(RM)(BR)(NC)/B(AS)EQN(PD)AB
+    game climb step 2: no tweak beat 66.2% (best 66.2%)
+    game climb step 3: 68.1% -> 74.4% with (AS)P1(RM)K(RM)(BR)(NC)/B(AS)EQN(PD)AB
+    game climb step 4: no tweak beat 78.8% (best 71.2%)
+    game climb step 5: no tweak beat 72.5% (best 73.1%)
+    game climb step 6: no tweak beat 73.8% (best 68.1%)
+  (AS)P1(RM)K(RM)(BR)(NC)/B(AS)EQN(PD)AB is only 2 pieces from Wide 6c and scores better against the rest in games (75.1% vs 52.4%): replaces it as Wide 7a
+  1P1(RM)K(PA)(BR)(NC)/B(AS)EQN(PD)AB is only 2 pieces from Wide 7a and doesn't score better against the rest in games (69.0% vs 75.1%): thrown away
+  (NC)WN1KP(AS)B/B(AS)E(GA)(RO)A(RM)(PD) scores 52.0% (+14 Elo) against the pool in games, 3 pieces from the nearest (Wide 7a): joins as Wide 7c
+  pool over 10: drops Wide 2a (14.4%)
+  round 7 took 153s
+  pool (game Elo): Wide 2b -205, Wide 2c -42, Wide 3a -93, Wide 3c -130, Wide 4a +55, Wide 4b -46, Wide 5c +72, Wide 5a +211, Wide 7a +199, Wide 7c -8
+round 8: 64 climbs (50s); best by eval: +394 (AS)P(BR)(RM)K(RM)1(NC)/B(AS)EQN(PD)AB, +232 1(BR)1K(RM)B(RO)P/(PD)(AS)GQL(PD)CN, +200 (BR)P(BR)NK1PQ/B(AS)PB(RO)(PD)A(RM)
+    game climb step 1: no tweak beat 72.5% (best 72.5%)
+    game climb step 2: no tweak beat 78.8% (best 78.1%)
+    game climb step 3: no tweak beat 78.1% (best 71.9%)
+  (AS)P(BR)(RM)K(RM)1(NC)/B(AS)EQN(PD)AB is only 0 pieces from Wide 7a and scores better against the rest in games (79.3% vs 75.8%): replaces it as Wide 8a
+  1(BR)1K(RM)B(RO)P/(PD)(AS)GQL(PD)CN scores 46.4% (-25 Elo) against the pool in games, 5 pieces from the nearest (Wide 5a): joins as Wide 8b
+  pool over 10: drops Wide 2b (23.8%)
+  (BR)P(BR)NK1PQ/B(AS)PB(RO)(PD)A(RM) is only 1 pieces from Wide 5c and scores better against the rest in games (57.1% vs 53.2%): replaces it as Wide 8c
+  round 8 took 120s
+  pool (game Elo): Wide 2c -15, Wide 3a -124, Wide 3c -125, Wide 4a -6, Wide 4b -70, Wide 8c +50, Wide 5a +173, Wide 8a +256, Wide 7c -30, Wide 8b -69
+round 9: 64 climbs (45s); best by eval: +274 1(NC)1K(BD)(AS)1B/L(GA)(AS)(RM)LQB(GA), +139 (BR)P(BR)NK1PQ/B(AS)BP(RO)(PD)A(RM), +113 NB(CV)KQPA(AS)/EMBN(AS)1(PD)M
+    game climb step 1: no tweak beat 67.5% (best 60.6%)
+    game climb step 2: 59.4% -> 65.0% with 1(NC)1K(RM)(AS)QB/L(GA)(AS)(BD)L1B(GA)
+    game climb step 3: 56.9% -> 66.2% with 1(NC)1K(RM)(AS)QB/L(PA)(AS)(BD)L1B(GA)
+    game climb step 4: no tweak beat 63.1% (best 65.0%)
+    game climb step 5: no tweak beat 70.0% (best 60.0%)
+    game climb step 6: no tweak beat 65.6% (best 61.3%)
+  1(NC)1K(RM)(AS)QB/L(PA)(AS)(BD)L1B(GA) scores 63.2% (+94 Elo) against the pool in games, 5 pieces from the nearest (Wide 5a): joins as Wide 9a
+  pool over 10: drops Wide 3c (31.1%)
+  1(NC)1K(BD)(AS)1B/L(GA)(AS)(RM)LQB(GA) is only 1 pieces from Wide 9a and scores better against the rest in games (63.7% vs 61.0%): replaces it as Wide 9b
+  (BR)P(BR)NK1PQ/B(AS)BP(RO)(PD)A(RM) is only 0 pieces from Wide 8c and scores better against the rest in games (60.7% vs 52.9%): replaces it as Wide 9c
+  round 9 took 151s
+  pool (game Elo): Wide 2c -27, Wide 3a -130, Wide 4a -38, Wide 4b -76, Wide 9c +75, Wide 5a +191, Wide 8a +141, Wide 7c -109, Wide 8b -98, Wide 9b +85
+round 10: 64 climbs (35s); best by eval: +206 (AS)P(BR)(RM)K(RM)1(NC)/B(AS)EQN(PD)AB, +203 1(NC)1K(BD)(AS)1B/L(GA)(AS)(RM)LQB(GA), +181 (NC)(GA)EK(BR)1BQ/B(AS)(RO)PP(CV)(PD)L
+    game climb step 1: no tweak beat 67.5% (best 57.5%)
+    game climb step 2: no tweak beat 71.2% (best 65.0%)
+    game climb step 3: no tweak beat 69.4% (best 66.9%)
+  (AS)P(BR)(RM)K(RM)1(NC)/B(AS)EQN(PD)AB is only 0 pieces from Wide 8a and doesn't score better against the rest in games (69.3% vs 69.3%): thrown away
+  1(NC)1K(BD)(AS)1B/L(GA)(AS)(RM)LQB(GA) is only 0 pieces from Wide 9b and doesn't score better against the rest in games (61.9% vs 61.9%): thrown away
+  (NC)(GA)EK(BR)1BQ/B(AS)(RO)PP(CV)(PD)L is only 2 pieces from Wide 5a and doesn't score better against the rest in games (69.2% vs 75.0%): thrown away
+  round 10 took 92s
+  pool (game Elo): Wide 2c -27, Wide 3a -130, Wide 4a -38, Wide 4b -76, Wide 9c +75, Wide 5a +191, Wide 8a +141, Wide 7c -109, Wide 8b -98, Wide 9b +85
+round 11: 64 climbs (33s); best by eval: +106 (CV)(NC)1(CV)K(RO)(BR)Q/(AS)(GA)(PD)(AS)NEPL, +90 2(BR)K(RM)N(RO)P/(PD)(AS)GQL(PD)CB, +90 (NC)P1KR2Q/(GA)(CV)(GA)(AS)L(RM)A1
+    game climb step 1: no tweak beat 62.5% (best 55.6%)
+    game climb step 2: no tweak beat 62.5% (best 61.9%)
+    game climb step 3: no tweak beat 63.7% (best 56.2%)
+  (CV)(NC)1(CV)K(RO)(BR)Q/(AS)(GA)(PD)(AS)NEPL scores 64.8% (+106 Elo) against the pool in games, 5 pieces from the nearest (Wide 5a): joins as Wide 11a
+  pool over 10: drops Wide 3a (31.8%)
+  2(BR)K(RM)N(RO)P/(PD)(AS)GQL(PD)CB is only 0 pieces from Wide 8b and scores better against the rest in games (42.1% vs 33.9%): replaces it as Wide 11b
+  (NC)P1KR2Q/(GA)(CV)(GA)(AS)L(RM)A1 scores 57.5% (+53 Elo) against the pool in games, 4 pieces from the nearest (Wide 4b): joins as Wide 11c
+  pool over 10: drops Wide 7c (29.0%)
+  round 11 took 107s
+  pool (game Elo): Wide 2c -58, Wide 4a -98, Wide 4b -171, Wide 9c +46, Wide 5a +119, Wide 8a +96, Wide 11b -126, Wide 9b +61, Wide 11a +93, Wide 11c +27
+round 12: 64 climbs (38s); best by eval: +277 1(NC)1K(BD)(GA)1B/L(GA)(AS)(RM)LQB(AS), +150 M(RO)1KN2Q/EN(BR)G(PD)A(AS)A, +147 (BR)P(BR)1KNP(AS)/BQBP(NC)(PD)A(RM)
+    game climb step 1: no tweak beat 62.5% (best 58.8%)
+    game climb step 2: no tweak beat 63.1% (best 63.1%)
+    game climb step 3: no tweak beat 65.6% (best 63.7%)
+  1(NC)1K(BD)(GA)1B/L(GA)(AS)(RM)LQB(AS) is only 0 pieces from Wide 9b and doesn't score better against the rest in games (60.3% vs 58.7%): thrown away
+  M(RO)1KN2Q/EN(BR)G(PD)A(AS)A scores 55.0% (+35 Elo) against the pool in games, 6 pieces from the nearest (Wide 9c): joins as Wide 12b
+  pool over 10: drops Wide 4b (31.4%)
+  (BR)P(BR)1KNP(AS)/BQBP(NC)(PD)A(RM) is only 1 pieces from Wide 9c and doesn't score better against the rest in games (50.0% vs 53.3%): thrown away
+  round 12 took 99s
+  pool (game Elo): Wide 2c -80, Wide 4a -129, Wide 9c +23, Wide 5a +68, Wide 8a +61, Wide 11b -114, Wide 9b +52, Wide 11a +71, Wide 11c -14, Wide 12b +53
+round 13: 64 climbs (31s); best by eval: +271 1(BR)P(BR)KN1Q/C(AS)(RO)EB(PD)AB, +181 1(GA)(CV)PKE(BR)(NC)/CAB(AS)Q(AS)(BR)P, +178 C1(BR)K(RM)N(BR)P/BQG(AS)(RO)(PD)E(PD)
+    game climb step 1: no tweak beat 63.1% (best 56.9%)
+    game climb step 2: no tweak beat 57.5% (best 56.2%)
+    game climb step 3: no tweak beat 60.0% (best 51.9%)
+  1(BR)P(BR)KN1Q/C(AS)(RO)EB(PD)AB scores 55.4% (+37 Elo) against the pool in games, 3 pieces from the nearest (Wide 9c): joins as Wide 13a
+  pool over 10: drops Wide 11b (33.5%)
+  1(GA)(CV)PKE(BR)(NC)/CAB(AS)Q(AS)(BR)P scores 49.8% (-2 Elo) against the pool in games, 4 pieces from the nearest (Wide 4a): joins as Wide 13b
+  pool over 10: drops Wide 4a (36.5%)
+  C1(BR)K(RM)N(BR)P/BQG(AS)(RO)(PD)E(PD) scores 57.4% (+52 Elo) against the pool in games, 3 pieces from the nearest (Wide 13a): joins as Wide 13c
+  pool over 10: drops Wide 11c (40.1%)
+  round 13 took 103s
+  pool (game Elo): Wide 2c -49, Wide 9c -28, Wide 5a -21, Wide 8a +40, Wide 9b +5, Wide 11a +30, Wide 12b -23, Wide 13a -12, Wide 13b +18, Wide 13c +40
+round 14: 64 climbs (38s); best by eval: +266 1(BR)ENK1Q(BR)/C(AS)(RO)EB(PD)AB, +142 (PD)Q(BR)NK(BR)(CV)P/A(GA)(RM)EGE(AS)(AS), +128 QP(BR)NK(BR)P1/(AS)(AS)BB(RO)(PD)A(GA)
+    game climb step 1: no tweak beat 58.8% (best 57.5%)
+    game climb step 2: no tweak beat 58.1% (best 55.6%)
+    game climb step 3: no tweak beat 53.1% (best 55.6%)
+  1(BR)ENK1Q(BR)/C(AS)(RO)EB(PD)AB is only 1 pieces from Wide 13a and scores better against the rest in games (56.0% vs 48.3%): replaces it as Wide 14a
+  (PD)Q(BR)NK(BR)(CV)P/A(GA)(RM)EGE(AS)(AS) scores 57.4% (+52 Elo) against the pool in games, 5 pieces from the nearest (Wide 8a): joins as Wide 14b
+  pool over 10: drops Wide 2c (44.0%)
+  QP(BR)NK(BR)P1/(AS)(AS)BB(RO)(PD)A(GA) is only 2 pieces from Wide 9c and scores better against the rest in games (53.9% vs 46.4%): replaces it as Wide 14c
+  round 14 took 113s
+  pool (game Elo): Wide 14c +27, Wide 5a -91, Wide 8a +54, Wide 9b +4, Wide 11a -25, Wide 12b -44, Wide 14a +8, Wide 13b -6, Wide 13c +19, Wide 14b +52
+round 15: 64 climbs (31s); best by eval: +167 (RM)(BR)(GA)K(BD)PWP/PB(PD)(RM)BA(AS)(AS), +161 (AS)P(BR)NKN(NC)1/B(AS)EQ(RM)(PD)AB, +125 B(CV)(GA)CKNW(AS)/NB(NC)(PD)EPP(AS)
+    game climb step 1: no tweak beat 55.6% (best 49.4%)
+    game climb step 2: no tweak beat 48.1% (best 47.5%)
+    game climb step 3: no tweak beat 48.1% (best 50.6%)
+  (RM)(BR)(GA)K(BD)PWP/PB(PD)(RM)BA(AS)(AS) scores 46.8% (-23 Elo) against the pool in games, 5 pieces from the nearest (Wide 14c): joins as Wide 15a
+  pool over 10: drops Wide 5a (40.4%)
+  (AS)P(BR)NKN(NC)1/B(AS)EQ(RM)(PD)AB is only 1 pieces from Wide 8a and scores better against the rest in games (59.0% vs 56.7%): replaces it as Wide 15b
+  B(CV)(GA)CKNW(AS)/NB(NC)(PD)EPP(AS) scores 55.4% (+37 Elo) against the pool in games, 5 pieces from the nearest (Wide 15b): joins as Wide 15c
+  pool over 10: drops Wide 13b (42.4%)
+  round 15 took 108s
+  pool (game Elo): Wide 14c +16, Wide 15b +62, Wide 9b -6, Wide 11a -55, Wide 12b -22, Wide 14a +2, Wide 13c -10, Wide 14b +26, Wide 15a -36, Wide 15c +22
+wrote /home/ubuntu/plusfish-work/run2/meta_pool.txt

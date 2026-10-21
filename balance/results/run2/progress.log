@@ -1,0 +1,10 @@
+[2026-10-21 05:34:58 UTC] start; game version 1c9f93f; 64 cores
+[2026-10-21 05:34:58 UTC] selfplay 20000 games, 8000 nodes, seed 101
+[2026-10-21 05:43:08 UTC] selfplay 8k finished (exit 0)
+[2026-10-21 05:43:10 UTC] report 8k written (exit 0)
+[2026-10-21 05:43:10 UTC] selfplay 20000 games, 32000 nodes, seed 202
+[2026-10-21 06:16:15 UTC] selfplay 32k finished (exit 0)
+[2026-10-21 06:16:17 UTC] report 32k written (exit 0)
+[2026-10-21 06:16:17 UTC] meta pool: 15 rounds, wide 64, seed 1
+[2026-10-21 06:42:52 UTC] meta finished (exit 0)
+[2026-10-21 06:42:52 UTC] all done; switching off
