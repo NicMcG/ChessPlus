@@ -488,6 +488,32 @@ func test_real_engine_knows_the_parapet_rule() -> void:
 	link.free()
 	_finish()
 
+func test_real_engine_knows_the_squire_and_berserker_rules() -> void:
+	if PlusfishLink.program_path() == "" or OS.has_feature("web"):
+		print("    (Plusfish not built: cargo build --release in engine/plusfish to run this test)")
+		return
+	# Mac (Oct 2026): a Squire protects Knights anywhere in its move pattern,
+	# even with a piece in between (c2 here), so the free-looking Knight on
+	# c3 can't be taken. And the Berserker's L-moves go 2 straight then 1
+	# sideways: d4 to c6 passes d5 and d6, so the pawn on c5 is no block.
+	var start := Fen.parse("k7/8/8/b1P5/3(BR)4/2N5/2P5/2(SQ)4K b - - 0 1", PieceCatalog.all_defs(), StandardSetup.create_rules())
+	check(start.find_move("a5xc3") == null, "The game doesn't allow a5xc3")
+	var moves := ["a8-b8", "d4-c6"]
+	PlusfishLink.enabled = true
+	var link := PlusfishLink.new()
+	_root().add_child(link)
+	link.desktop_nodes = 5000
+	link.analyse(start, moves)
+	for i in 2000:
+		if link.results.size() == moves.size() + 1:
+			break
+		await _frames(1)
+		OS.delay_msec(10)
+	check_eq(link.results.size(), moves.size() + 1, "Plusfish follows the Berserker's d4-c6")
+	check(str(link.results.get(0, {}).get("best", "")) not in ["", "a5xc3"], "Plusfish doesn't take the protected Knight")
+	link.free()
+	_finish()
+
 # --- Plusfish never holds up the game ----------------------------------------------
 
 func test_bar_holds_its_place_while_waiting() -> void:
