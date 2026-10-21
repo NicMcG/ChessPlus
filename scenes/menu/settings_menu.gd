@@ -29,6 +29,11 @@ var volume_slider: HSlider
 ## One slider per sound group (UserSettings.SOUND_GROUPS).
 var group_sliders := {}
 var notifications_toggle: Button
+## Animation speed choices, by UserSettings.ANIMATION_SPEEDS key.
+var speed_buttons := {}
+## One switch per board helper (UserSettings.BOARD_HELPERS).
+var helper_toggles := {}
+var reduce_toggle: Button
 ## The Credits or Reset pop-up while it's showing.
 var popup: ModalPanel
 
@@ -58,6 +63,7 @@ func _ready() -> void:
 	sections.add_theme_constant_override("separation", 16)
 	limit.add_child(sections)
 	_build_sound()
+	_build_visual()
 	_build_other()
 	refresh()
 
@@ -113,6 +119,24 @@ func _sound_changed() -> void:
 	sound_changed.emit()
 	settings_changed.emit()
 
+# --- Visual -------------------------------------------------------------------------
+
+func _build_visual() -> void:
+	_heading("Visual")
+	var names := {"off": "Off", "fast": "Fast", "normal": "Normal", "slow": "Slow"}
+	speed_buttons = _choice_row("Animation speed", names, func(speed: String) -> void:
+		UserSettings.set_animation_speed(speed)
+		settings_changed.emit())
+	var helper_names := {"coordinates": "Board coordinates", "move_dots": "Legal-move dots",
+		"last_move": "Last-move highlight", "ability_glow": "Glow round unused abilities"}
+	for helper in UserSettings.BOARD_HELPERS:
+		helper_toggles[helper] = _toggle_row(helper_names[helper], func(on: bool) -> void:
+			UserSettings.set_board_helper(helper, on)
+			settings_changed.emit())
+	reduce_toggle = _toggle_row("Reduce flashing and shaking", func(on: bool) -> void:
+		UserSettings.set_reduce_effects(on)
+		settings_changed.emit())
+
 # --- Credits and reset ---------------------------------------------------------------
 
 func _build_other() -> void:
@@ -150,6 +174,11 @@ func refresh() -> void:
 	for group in group_sliders:
 		_show_slider(group_sliders[group], UserSettings.group_volume(group))
 	_show_toggle(notifications_toggle, UserSettings.notifications_on())
+	for speed in speed_buttons:
+		(speed_buttons[speed] as Button).set_pressed_no_signal(speed == UserSettings.animation_speed())
+	for helper in helper_toggles:
+		_show_toggle(helper_toggles[helper], UserSettings.board_helper(helper))
+	_show_toggle(reduce_toggle, UserSettings.reduce_effects())
 
 # --- Building blocks ---------------------------------------------------------------
 
@@ -178,6 +207,38 @@ func _row(text: String, control: Control) -> HBoxContainer:
 
 ## An On/Off switch (gold when on, like the default-army buttons).
 func _toggle_row(text: String, on_toggled: Callable) -> Button:
+	var button := _gold_toggle()
+	button.toggled.connect(func(on: bool) -> void:
+		button.text = "On" if on else "Off"
+		on_toggled.call(on))
+	_row(text, button)
+	return button
+
+## A choice of several (only one on at a time), on its own line under its
+## name so it fits a phone; `choices` maps each value to its button text, and
+## `on_chosen` gets the value. Returns value -> button.
+func _choice_row(text: String, choices: Dictionary, on_chosen: Callable) -> Dictionary:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 28)
+	sections.add_child(label)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	sections.add_child(row)
+	var group := ButtonGroup.new()
+	var buttons := {}
+	for value: String in choices:
+		var button := _gold_toggle()
+		button.text = choices[value]
+		button.button_group = group
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.pressed.connect(func() -> void: on_chosen.call(value))
+		row.add_child(button)
+		buttons[value] = button
+	return buttons
+
+## A toggle button that goes gold when on.
+func _gold_toggle() -> Button:
 	var button := Button.new()
 	button.toggle_mode = true
 	button.custom_minimum_size = Vector2(150, 64)
@@ -189,10 +250,6 @@ func _toggle_row(text: String, on_toggled: Callable) -> Button:
 	button.add_theme_stylebox_override("hover_pressed", on_style)
 	for color in ["font_pressed_color", "font_hover_pressed_color"]:
 		button.add_theme_color_override(color, Color(0.12, 0.12, 0.12))
-	button.toggled.connect(func(on: bool) -> void:
-		button.text = "On" if on else "Off"
-		on_toggled.call(on))
-	_row(text, button)
 	return button
 
 func _show_toggle(button: Button, on: bool) -> void:
