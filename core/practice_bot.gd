@@ -307,6 +307,12 @@ func _remember_killer(move: Move, ply: int) -> void:
 	if list.size() > 2:
 		list.pop_back()
 
+## Stop searching as soon as possible (from another thread: the game screen
+## searches on one, and stops it if the screen closes). choose_move then
+## returns the best move found so far.
+func stop() -> void:
+	_deadline = 0
+
 ## Count a position; true once the time limit has passed.
 func _tick() -> bool:
 	nodes += 1
