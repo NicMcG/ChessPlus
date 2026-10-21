@@ -165,11 +165,12 @@ static func numbered_moves(state: GameState, first := 0) -> Array:
 ## move to the same square: file if that's enough (Nbd2), otherwise rank (R1a2),
 ## otherwise both (Qa1b2).
 static func _disambiguation(state: GameState, move: Move) -> String:
-	var rivals: Array[Vector2i] = []
-	for other in state.moves():
-		if other.to == move.to and other.from != move.from and other.piece.def == move.piece.def:
-			if not rivals.has(other.from):
-				rivals.append(other.from)
+	# Usually no other piece of the type can get there at all: checking that
+	# among the moves the pieces can make is quick, and the legal moves (each
+	# checked for leaving the king attacked) are only needed if one can.
+	if _rivals(MoveGenerator.pseudo_legal_moves(state), move).is_empty():
+		return ""
+	var rivals := _rivals(state.moves(), move)
 	if rivals.is_empty():
 		return ""
 	var file_clash := rivals.any(func(pos: Vector2i) -> bool: return pos.x == move.from.x)
@@ -181,6 +182,15 @@ static func _disambiguation(state: GameState, move: Move) -> String:
 	if not rank_clash:
 		return rank_text
 	return file_text + rank_text
+
+## Where other pieces of `move`'s type among `moves` could move to the same square from.
+static func _rivals(moves: Array[Move], move: Move) -> Array[Vector2i]:
+	var rivals: Array[Vector2i] = []
+	for other in moves:
+		if other.to == move.to and other.from != move.from and other.piece.def == move.piece.def:
+			if not rivals.has(other.from):
+				rivals.append(other.from)
+	return rivals
 
 ## "+" if the move gives check, "#" if it's checkmate, otherwise "".
 static func _check_suffix(state: GameState, move: Move) -> String:
