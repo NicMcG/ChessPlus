@@ -62,9 +62,7 @@ var viewed_button: Button
 var marks := {}
 
 func _init() -> void:
-	_bold = FontVariation.new()
-	_bold.base_font = ThemeDB.fallback_font
-	_bold.variation_embolden = 0.9
+	_bold = UiStyle.bold()
 	_tip = _make_label("")
 	_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_tip)

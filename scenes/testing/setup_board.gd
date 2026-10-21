@@ -70,7 +70,7 @@ func _draw() -> void:
 	# Nothing to draw before the board has a size.
 	if position_shown == null or _square_size() < 4:
 		return
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.font(UiStyle.SEMIBOLD)
 	var s := _square_size()
 	for rank in range(position_shown.height):
 		for file in range(position_shown.width):

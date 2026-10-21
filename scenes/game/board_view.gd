@@ -671,7 +671,7 @@ func _draw_coordinates() -> void:
 	var font_size := int(s * 0.24)
 	if font_size < 6:
 		return
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.font(UiStyle.SEMIBOLD)
 	for label: Array in edge_labels():
 		var square: Vector2i = label[0]
 		var text: String = label[1]
@@ -824,7 +824,7 @@ func _draw_note(at: Vector2, height: float, color: Color) -> void:
 ## the top-right corner of its square, in the Bard's gold, gently bobbing.
 func _draw_asleep(rect: Rect2) -> void:
 	var s := rect.size.x
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.bold()
 	var bob := sin(Time.get_ticks_msec() / 1000.0 * 2.5) * s * 0.025
 	for i in 2:
 		var size_px := int(s * (0.34 if i == 0 else 0.25))
@@ -1146,7 +1146,7 @@ func _draw_piece(piece: Piece, rect: Rect2, alpha := 1.0, flash := Color(0, 0, 0
 		return
 	# No image for this piece yet: draw its letter(s) instead, outlined so they
 	# show on both square colours.
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.bold()
 	var font_size := int(rect.size.y * (0.6 if (as_def if as_def else piece.def).symbol.length() == 1 else 0.45))
 	if font_size <= 0:
 		return  # The board has no size yet.
