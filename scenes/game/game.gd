@@ -960,11 +960,12 @@ func _refresh_ability_button() -> void:
 func _haunt_moves() -> Array[Move]:
 	var found: Array[Move] = []
 	var shown := board_view.state
-	if shown == null or not board_view.input_enabled or shown.outcome() != GameState.Outcome.NONE:
+	if shown == null or not board_view.input_enabled:
 		return found
-	if shown == state and is_over():
-		return found
+	# (The quick check first: there's rarely a Ghost to bring back.)
 	if MoveGenerator.haunting_ghosts(shown, shown.side_to_move).is_empty():
+		return found
+	if shown.outcome() != GameState.Outcome.NONE or (shown == state and is_over()):
 		return found
 	found.assign(shown.moves().filter(func(m: Move) -> bool: return m.ability == PieceDef.Ability.HAUNT))
 	return found
@@ -1124,7 +1125,7 @@ func _update_text() -> void:
 	resign_button.disabled = not is_over() and (bot_thinking or viewing >= 0)
 	if online == null:
 		new_game_button.disabled = replay_ends_at_once()
-	move_list.show_moves(Notation.numbered_moves(state), "" if result == "*" else result,
+	move_list.show_moves(_numbered_moves(), "" if result == "*" else result,
 			viewing if line_index < 0 else -1, TIP, side_lines, line_index, line_ply)
 	# Keep the latest move in sight (not while looking back at an older one).
 	if viewing < 0:
@@ -1143,6 +1144,37 @@ func _update_text() -> void:
 	_update_game_over()
 	_update_eval_bar()
 	_update_captures()
+
+## The move list's entries (Notation.numbered_moves) for the game so far, and
+## the moves they were written for. Writing a move is slow (it works out every
+## legal move, to see whether it needs a file or rank and whether it gives
+## check), and a move's entry only depends on the moves before it, so after a
+## new move only that one is written. Writing them all every time froze the
+## screen for up to half a second per move late in a long game.
+var _list_entries: Array = []
+var _list_moves: Array[Move] = []
+var _list_state: GameState
+
+func _numbered_moves() -> Array:
+	if _list_state != state:
+		_list_state = state
+		_list_entries.clear()
+		_list_moves.clear()
+	# Keep the entries of the moves still the same (Undo and Redo make new ones).
+	var same := 0
+	var limit := mini(_list_moves.size(), state.history.size())
+	while same < limit and _list_moves[same] == state.history[same]:
+		same += 1
+	_list_entries.resize(same)
+	_list_moves.resize(same)
+	if same < state.history.size():
+		var added := Notation.numbered_moves(state, same)
+		# Carrying on a turn: Black's move after White's has no number.
+		if same > 0:
+			added[0][0] = "" if added[0][0].ends_with("...") else added[0][0]
+		_list_entries.append_array(added)
+		_list_moves.append_array(state.history.slice(same))
+	return _list_entries.duplicate()
 
 # --- Looking over a finished game with Plusfish ----------------------------------
 
