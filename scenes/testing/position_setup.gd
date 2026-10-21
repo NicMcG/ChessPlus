@@ -94,16 +94,19 @@ func _ready() -> void:
 func _build_top_bar() -> void:
 	_top = HBoxContainer.new()
 	_top.add_theme_constant_override("separation", 12)
-	var back := _button("Back", func() -> void: back_pressed.emit())
+	var back := BackButton.new()
+	back.focus_mode = Control.FOCUS_NONE
+	back.pressed.connect(func() -> void: back_pressed.emit())
 	_top.add_child(back)
 	var title := Label.new()
 	title.text = "Testing mode"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_theme_font_size_override("font_size", 36)
+	title.theme_type_variation = &"TitleLabel"
+	title.add_theme_font_size_override("font_size", 34)
 	_top.add_child(title)
 	colour_button = _button("", toggle_tray_team)
-	colour_button.custom_minimum_size.x = 210
+	colour_button.custom_minimum_size.x = 170
 	_top.add_child(colour_button)
 	_top.add_child(VolumeControl.make_room())
 	_layout.add_child(_top)
@@ -114,6 +117,7 @@ func _build_controls() -> void:
 	row.add_theme_constant_override("separation", 10)
 	var to_move := Label.new()
 	to_move.text = "To move:"
+	to_move.theme_type_variation = &"HeadingLabel"
 	row.add_child(to_move)
 	var first_group := ButtonGroup.new()
 	white_first = _button("White", func() -> void: set_side_to_move(Piece.Team.WHITE))
@@ -121,8 +125,9 @@ func _build_controls() -> void:
 	for button in [white_first, black_first]:
 		button.toggle_mode = true
 		button.button_group = first_group
-		button.custom_minimum_size.x = 120
-		_show_selection(button)
+		button.theme_type_variation = &"ChoiceButton"
+		button.add_theme_font_size_override("font_size", 26)
+		button.custom_minimum_size.x = 104
 		row.add_child(button)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -138,9 +143,11 @@ func _build_controls() -> void:
 	captured_row.add_theme_constant_override("separation", 10)
 	var captured_label := Label.new()
 	captured_label.text = "Captured:"
+	captured_label.theme_type_variation = &"HeadingLabel"
 	captured_row.add_child(captured_label)
 	captured_box = HFlowContainer.new()
 	captured_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	captured_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	captured_row.add_child(captured_box)
 	add_captured_button = _button("Add", add_captured)
 	captured_row.add_child(add_captured_button)
@@ -153,7 +160,7 @@ func _build_controls() -> void:
 	_side.add_child(tray)
 	_build_tray()
 	problems_label = Label.new()
-	problems_label.add_theme_color_override("font_color", Color("#ff6b6b"))
+	problems_label.add_theme_color_override("font_color", UiStyle.DANGER_TEXT)
 	problems_label.add_theme_font_size_override("font_size", 24)
 	problems_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_side.add_child(problems_label)
@@ -166,7 +173,7 @@ func _build_controls() -> void:
 	import_button = _button("Import game", ask_import_game)
 	import_button.custom_minimum_size = Vector2(200, 90)
 	start_row.add_child(import_button)
-	start_button = _button("Start game", func() -> void: start_pressed.emit(setup.copy()))
+	start_button = _button("Start game", func() -> void: start_pressed.emit(setup.copy()), &"AccentButton")
 	start_button.custom_minimum_size.y = 90
 	start_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	start_row.add_child(start_button)
@@ -221,18 +228,17 @@ func _tray_button(def: PieceDef) -> Button:
 
 ## A chosen toggle button gets a gold border, so it's clear which one is on.
 static func _show_selection(button: Button) -> void:
-	var on := StyleBoxFlat.new()
-	on.bg_color = Color(0.25, 0.25, 0.27)
-	on.border_color = Color("#E8B83A")
+	var on := UiStyle.box(UiStyle.SURFACE_HOVER, UiStyle.RADIUS, 6, 6)
+	on.border_color = UiStyle.ACCENT
 	on.set_border_width_all(4)
-	on.set_corner_radius_all(6)
-	on.set_content_margin_all(6)
 	button.add_theme_stylebox_override("pressed", on)
 	button.add_theme_stylebox_override("hover_pressed", on)
 
-func _button(text: String, on_pressed: Callable) -> Button:
+## `look`: the theme style (compact, as these rows hold several buttons).
+func _button(text: String, on_pressed: Callable, look := &"CompactButton") -> Button:
 	var button := Button.new()
 	button.text = text
+	button.theme_type_variation = look
 	button.custom_minimum_size.y = 70
 	button.focus_mode = Control.FOCUS_NONE
 	button.pressed.connect(on_pressed)
@@ -358,8 +364,8 @@ func ask_load_armies() -> void:
 	var message := load_panel.add_text("")
 	message.name = "Message"
 	message.add_theme_color_override("font_color", Color("#ff8a80"))
-	load_panel.add_button("Load", load_chosen_armies)
-	load_panel.add_button("Cancel", load_panel.close)
+	load_panel.add_button("Load", load_chosen_armies, &"AccentButton")
+	load_panel.add_button("Cancel", load_panel.close, &"GhostButton")
 	add_child(load_panel)
 	for team_name in ["White", "Black"]:
 		PhoneTextInput.attach(load_panel.find_child(team_name + "Text", true, false), "%s's army" % team_name)
@@ -404,8 +410,8 @@ func ask_import_game() -> void:
 	var message := import_panel.add_text("")
 	message.name = "Message"
 	message.add_theme_color_override("font_color", Color("#ff8a80"))
-	import_panel.add_button("Import", func() -> void: import_game(text_edit.text))
-	import_panel.add_button("Cancel", import_panel.close)
+	import_panel.add_button("Import", func() -> void: import_game(text_edit.text), &"AccentButton")
+	import_panel.add_button("Cancel", import_panel.close, &"GhostButton")
 	add_child(import_panel)
 	PhoneTextInput.attach(text_edit, "Game text")
 
