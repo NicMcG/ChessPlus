@@ -74,7 +74,7 @@ func test_lone_elephant_cannot_checkmate() -> void:
 
 func test_value() -> void:
 	var elephant: PieceDef = load("res://data/pieces/elephant.tres")
-	check_eq(elephant.value, 1.5, "Elephant value")
+	check_eq(elephant.value, 1.0, "Elephant value (Mac, Oct 2026: was 1.5)")
 
 func test_has_a_picture() -> void:
 	var view := BoardView.new()

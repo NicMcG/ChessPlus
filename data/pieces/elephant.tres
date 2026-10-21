@@ -12,6 +12,6 @@ script = ExtResource("2_def")
 id = "elephant"
 display_name = "Elephant"
 symbol = "E"
-value = 1.5
+value = 1
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_jump")])
 keywords = 1

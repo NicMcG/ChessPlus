@@ -9,6 +9,7 @@ const ROOK = preload("res://data/pieces/rook.tres")
 const QUEEN = preload("res://data/pieces/queen.tres")
 const KING = preload("res://data/pieces/king.tres")
 const ELEPHANT = preload("res://data/pieces/elephant.tres")
+const PALADIN = preload("res://data/pieces/paladin.tres")
 
 var rules := StandardSetup.create_rules()
 
@@ -49,16 +50,16 @@ func test_promotion_includes_opponents_pieces() -> void:
 	check(rules.promotion_options.size() == 4, "The shared rules weren't changed")
 
 func test_over_budget() -> void:
-	# The standard army (39) with two pawns swapped for two elephants: 40.
+	# The standard army (39) with two pawns swapped for two Paladins (1.5 each): 40.
 	var army := StandardSetup.army()
-	army.place(ELEPHANT, Vector2i(0, 1))
-	army.place(ELEPHANT, Vector2i(7, 1))
+	army.place(PALADIN, Vector2i(0, 1))
+	army.place(PALADIN, Vector2i(7, 1))
 	check_eq(army.cost(), 40.0, "Cost")
 	check_eq(army.problems(rules, 8), PackedStringArray(["Costs 40 points; the budget is 39."]), "Problems")
 
 func test_fractional_costs() -> void:
-	var army := _army([[KING, Vector2i(4, 0)], [ELEPHANT, Vector2i(2, 0)], [ELEPHANT, Vector2i(5, 0)]])
-	check_eq(army.cost(), 3.0, "Two elephants cost 3")
+	var army := _army([[KING, Vector2i(4, 0)], [PALADIN, Vector2i(2, 0)], [PALADIN, Vector2i(5, 0)]])
+	check_eq(army.cost(), 3.0, "Two Paladins (1.5 each) cost 3")
 	rules.army_budget = 2.5
 	check_eq(army.problems(rules, 8), PackedStringArray(["Costs 3 points; the budget is 2.5."]), "Problems")
 

@@ -26,5 +26,5 @@ script = ExtResource("2_def")
 id = "assassin"
 display_name = "Assassin"
 symbol = "AS"
-value = 2
+value = 0.5
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2"), SubResource("Resource_rule3")])
