@@ -100,7 +100,7 @@ var _outcome_key := []
 ## board still counts as a new position.
 var _position_ids: Array[int] = [0]
 var _board_changes: Array[int] = []
-static var _last_position_id := 0
+var _last_position_id := 0
 
 ## For stepping back through the game and playing the same moves again (to
 ## look at earlier positions): call this first, then same_position_again() once

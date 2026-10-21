@@ -358,6 +358,11 @@ func _game_copy_at(moves_played: int) -> GameState:
 	if copy == null and _spare_copy_of == state:
 		copy = _spare_copy
 	_keep_copy(null)
+	return _step_copy(copy, moves_played)
+
+## `copy` (a copy of this game, or null) moved to the position after the game's
+## first `moves_played` moves; a fresh copy if it isn't on the game's moves.
+func _step_copy(copy: GameState, moves_played: int) -> GameState:
 	if copy == null or copy == state or not _on_game_moves(copy):
 		return _replay(moves_played, [])
 	while copy.history.size() > moves_played:
@@ -837,7 +842,7 @@ func _start_bot_turn_if_needed() -> void:
 	if _plusfish_bot_can_play():
 		move = await _plusfish_bot_move(turn_id)
 	else:
-		move = bot.choose_move(state)
+		move = await _practice_bot_move(turn_id)
 	# Fast answers wait until the bot has "thought" for bot_min_seconds.
 	var wait := bot_min_seconds - (Time.get_ticks_msec() - started) / 1000.0
 	if bot_delay_frames > 0 and wait > 0:
@@ -845,6 +850,54 @@ func _start_bot_turn_if_needed() -> void:
 		await _bot_timer.timeout
 	if turn_id == _bot_turn_id and bot_thinking:
 		_play_bot_move(move)
+
+## The practice bot's move. On PC it searches a copy of the game on its own
+## thread, so the screen keeps going while it thinks (searching here froze it
+## for 0.6-1.5 s every move in army games). On the web, which has no threads,
+## and in tests (bot_delay_frames = 0), it searches here. Null if the turn was
+## dropped meanwhile.
+func _practice_bot_move(turn_id: int) -> Move:
+	if bot_delay_frames == 0 or OS.has_feature("web"):
+		return bot.choose_move(state)
+	_stop_bot_thread()
+	# The bot's copy from its last turn, two moves on (or a new one).
+	var copy := _step_copy(_bot_copy if _bot_copy_of == state else null, state.history.size())
+	_bot_copy = copy
+	_bot_copy_of = state if copy else null
+	if copy == null:
+		return bot.choose_move(state)
+	var thread := Thread.new()
+	_bot_thread = thread
+	thread.start(bot.choose_move.bind(copy))
+	# Checked with the screen's own timer: if the screen closes, the wait just ends.
+	while thread.is_alive() and thread == _bot_thread:
+		_bot_timer.start(0.02)
+		await _bot_timer.timeout
+	# Another turn started meanwhile and has already stopped this search.
+	if thread != _bot_thread:
+		return null
+	var found: Move = thread.wait_to_finish()
+	_bot_thread = null
+	if found == null or turn_id != _bot_turn_id:
+		return null
+	return state.find_played_move(found.to_text())
+
+## The practice bot's search on its own thread, while it runs; the copy of
+## the game it searches (kept for its next turn), and the game it's a copy of.
+var _bot_thread: Thread
+var _bot_copy: GameState
+var _bot_copy_of: GameState
+
+## Stop the practice bot's search (if one is running) and wait for its thread.
+func _stop_bot_thread() -> void:
+	if _bot_thread == null:
+		return
+	bot.stop()
+	_bot_thread.wait_to_finish()
+	_bot_thread = null
+
+func _exit_tree() -> void:
+	_stop_bot_thread()
 
 ## True if this is a Plusfish game and Plusfish can play it. If it can't (the
 ## program isn't on this computer, or a piece has a rule it doesn't know yet),
