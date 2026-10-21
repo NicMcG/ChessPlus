@@ -9,15 +9,15 @@ extends Control
 ##   dotted arrow = any square that way, can't capture
 ##   red X = must capture to move here    yellow dot = jumps here
 ##   yellow empty circle = jumps here, can't capture
-##   yellow X = jumps here, must capture  pale = first move only
+##   yellow X = jumps here, must capture
+## A square it reaches only on its first move (the pawn's double step) gets the
+## same mark as any other; the piece's Special Rule says so (Mac).
 
 const LIGHT_SQUARE := Color("#F0D9B5")
 const DARK_SQUARE := Color("#B58863")
 const MARK := Color(0.1, 0.1, 0.1, 0.75)
 const CAPTURE_MARK := Color("#D42A1F")
 const JUMP_MARK := Color("#F5BE0B")
-## How see-through a first-move-only mark is drawn, compared with a normal one.
-const FIRST_MOVE_FADE := 0.45
 
 ## The legend: kind -> text (Mac's wording), in his order. Every card shows all of it.
 const LEGEND := {
@@ -29,7 +29,6 @@ const LEGEND := {
 	"jump": "Jumps here",
 	"jump_move": "Jumps here but can't capture here",
 	"jump_capture": "Must capture to move here",
-	"first": "Only on its first move",
 }
 
 var def: PieceDef
@@ -49,8 +48,6 @@ static func kinds_used(guide: Dictionary) -> Array[String]:
 	var used := {}
 	for flags in guide.squares.values():
 		used[_kind(flags)] = true
-		if flags & PieceGuide.FIRST_MOVE:
-			used["first"] = true
 	for slide in guide.slides:
 		used["slide" if slide[1] & PieceGuide.CAPTURE else "slide_move"] = true
 	var kinds: Array[String] = []
@@ -59,7 +56,7 @@ static func kinds_used(guide: Dictionary) -> Array[String]:
 			kinds.append(kind)
 	return kinds
 
-## Which mark a square gets (a first-move-only square gets the same mark, paler).
+## Which mark a square gets.
 static func _kind(flags: int) -> String:
 	var moves := flags & PieceGuide.MOVE != 0
 	var captures := flags & PieceGuide.CAPTURE != 0
@@ -70,30 +67,26 @@ static func _kind(flags: int) -> String:
 
 ## Draw the marker for one square, `rect`, with PieceGuide `flags`.
 static func draw_square_marker(canvas: CanvasItem, rect: Rect2, flags: int) -> void:
-	var fade := FIRST_MOVE_FADE if flags & PieceGuide.FIRST_MOVE else 1.0
-	var dark := Color(MARK, MARK.a * fade)
-	var red := Color(CAPTURE_MARK, fade)
-	var yellow := Color(JUMP_MARK, fade)
 	var c := rect.get_center()
 	var s := rect.size.x
 	match _kind(flags):
 		"both":
-			canvas.draw_circle(c, s * 0.18, dark)
+			canvas.draw_circle(c, s * 0.18, MARK)
 		"move":
-			canvas.draw_arc(c, s * 0.16, 0, TAU, 24, dark, s * 0.07, true)
+			canvas.draw_arc(c, s * 0.16, 0, TAU, 24, MARK, s * 0.07, true)
 		"capture":
-			_draw_x(canvas, c, s * 0.17, red, s * 0.09)
+			_draw_x(canvas, c, s * 0.17, CAPTURE_MARK, s * 0.09)
 		"jump":
-			canvas.draw_circle(c, s * 0.2, yellow)
-			canvas.draw_arc(c, s * 0.2, 0, TAU, 24, dark, s * 0.04, true)
+			canvas.draw_circle(c, s * 0.2, JUMP_MARK)
+			canvas.draw_arc(c, s * 0.2, 0, TAU, 24, MARK, s * 0.04, true)
 		"jump_move":
 			# A yellow ring with a thin dark edge each side, so it shows on light squares.
-			canvas.draw_arc(c, s * 0.17, 0, TAU, 24, dark, s * 0.12, true)
-			canvas.draw_arc(c, s * 0.17, 0, TAU, 24, yellow, s * 0.065, true)
+			canvas.draw_arc(c, s * 0.17, 0, TAU, 24, MARK, s * 0.12, true)
+			canvas.draw_arc(c, s * 0.17, 0, TAU, 24, JUMP_MARK, s * 0.065, true)
 		"jump_capture":
 			# A yellow X with a thin dark edge (the line ends too).
-			_draw_x(canvas, c, s * 0.18, dark, s * 0.14)
-			_draw_x(canvas, c, s * 0.17, yellow, s * 0.085)
+			_draw_x(canvas, c, s * 0.18, MARK, s * 0.14)
+			_draw_x(canvas, c, s * 0.17, JUMP_MARK, s * 0.085)
 
 ## An X centred on `c`, its arms reaching `d` across and down each way.
 static func _draw_x(canvas: CanvasItem, c: Vector2, d: float, color: Color, width: float) -> void:
@@ -128,7 +121,6 @@ static func draw_legend_icon(canvas: CanvasItem, rect: Rect2, kind: String) -> v
 		"jump": PieceGuide.MOVE | PieceGuide.CAPTURE | PieceGuide.JUMP,
 		"jump_move": PieceGuide.MOVE | PieceGuide.JUMP,
 		"jump_capture": PieceGuide.CAPTURE | PieceGuide.JUMP,
-		"first": PieceGuide.MOVE | PieceGuide.FIRST_MOVE,
 	}
 	if flags.has(kind):
 		draw_square_marker(canvas, rect, flags[kind])

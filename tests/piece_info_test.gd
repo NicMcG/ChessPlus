@@ -40,7 +40,9 @@ func test_keywords() -> void:
 func test_special_rules_come_from_the_data() -> void:
 	check(PieceCard.special_rules(_def("cannon"))[0].begins_with("Captures by jumping"), "Cannon")
 	check_eq(PieceCard.special_rules(_def("rogue")).size(), 1, "Rogue has a special rule")
-	for id in ["king", "queen", "pawn", "knight", "wizard", "chariot", "cavalry", "berserker"]:
+	# The double step isn't in the legend, so the Pawn's card says it here (Mac).
+	check_eq(PieceCard.special_rules(_def("pawn")), PackedStringArray(["On its first move, the Pawn can move 2 squares forward."]), "Pawn")
+	for id in ["king", "queen", "knight", "wizard", "chariot", "cavalry", "berserker"]:
 		check(PieceCard.special_rules(_def(id)).is_empty(), id + " has nothing special")
 
 func test_pawn_types_show_promote() -> void:
@@ -57,7 +59,7 @@ func _marks(id: String) -> Array[String]:
 	return PieceGuideBoard.kinds_used(PieceGuide.guide(_def(id)))
 
 func test_each_piece_gets_the_right_marks() -> void:
-	check_eq(_marks("pawn"), ["move", "capture", "first"] as Array[String], "Pawn")
+	check_eq(_marks("pawn"), ["move", "capture"] as Array[String], "Pawn")
 	check_eq(_marks("knight"), ["jump"] as Array[String], "Knight")
 	check_eq(_marks("rook"), ["slide"] as Array[String], "Rook")
 	check_eq(_marks("cannon"), ["slide_move"] as Array[String], "Cannon")
@@ -71,15 +73,15 @@ func test_jumps_get_yellow_versions_of_the_marks() -> void:
 	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.CAPTURE | PieceGuide.JUMP), "jump", "Yellow dot")
 	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.JUMP), "jump_move", "Yellow empty circle")
 	check_eq(PieceGuideBoard._kind(PieceGuide.CAPTURE | PieceGuide.JUMP), "jump_capture", "Yellow X")
-	# First move only: the same mark, paler.
-	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.FIRST_MOVE), "move", "Pale empty circle")
+	# First move only (the pawn's double step): the same mark as any other.
+	check_eq(PieceGuideBoard._kind(PieceGuide.MOVE | PieceGuide.FIRST_MOVE), "move", "Double step: empty circle")
 
 func test_every_card_shows_the_whole_legend() -> void:
 	# Mac's wording, in his order.
 	var texts := ["Moves to this square", "Moves to any square in this direction",
 		"Moves to this square (but can't capture)", "Moves to any square in this direction (but can't capture)",
 		"Must capture to move here", "Jumps here", "Jumps here but can't capture here",
-		"Must capture to move here", "Only on its first move"]
+		"Must capture to move here"]
 	var card: PieceCard = load("res://scenes/common/piece_card.tscn").instantiate()
 	_root().add_child(card)
 	for id in ["man", "knight", "pawn", "werewolf"]:
