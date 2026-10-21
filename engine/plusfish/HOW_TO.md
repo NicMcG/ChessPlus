@@ -9,7 +9,7 @@ to run, in what order, and how to read what comes out.
 | Job | When | Needs Rust? | Time (19 cores) |
 |---|---|---|---|
 | [1. Piece values](#1-piece-values-the-balance-report) | after changing costs, moves or rules, or adding a piece | no | ~40 min |
-| [2. Train Plusfish's judgement](#2-train-plusfishs-judgement-tuning) | after adding a piece or changing its rules | only to put the result in the game | ~1 min + a test match |
+| [2. Train Plusfish's judgement](#2-train-plusfishs-judgement-tuning) | after adding a piece or changing its rules | only to put the result in the game | ~1 min + a 5 min test match |
 | [3. The meta pool](#3-the-meta-pool) | after cost or rule changes, new pieces, or a stronger engine | no | 2-4 hours |
 | [4. Quick questions](#4-quick-questions) | any time | no | seconds to minutes |
 | [5. After changing a piece's rules](#5-after-changing-a-pieces-rules) | before 1-3 | sometimes | minutes |
@@ -169,7 +169,7 @@ made the pawn weights jagged (ELO_LOG #25).
 middlegame and 176 in the endgame, where a Pawn is about 80. These are
 Plusfish's own units, learned from games; they don't have to match the costs.
 
-**3. Check it's actually stronger** (about 10 minutes). The new weights play
+**3. Check it's actually stronger** (about 5 minutes). The new weights play
 the old ones over 1,000 pairs of games:
 
 ```
