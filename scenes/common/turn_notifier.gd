@@ -32,7 +32,8 @@ static func in_background() -> bool:
 ## It's the player's turn now: notify them if the app is in the background.
 ## `text` says what happened, e.g. "Your opponent played Nf3."
 static func your_turn(text: String) -> void:
-	if in_background():
+	# Switched off in Settings (Mac): nothing.
+	if in_background() and UserSettings.notifications_on():
 		notify("Chess Plus: your move", text)
 
 static func notify(title: String, text: String) -> void:

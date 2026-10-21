@@ -219,13 +219,43 @@ func _process(_delta: float) -> void:
 	if not _to_load.is_empty():
 		recording(_to_load.pop_back())
 
-## Set the whole game's loudness (the Master sound bus) from the saved volume.
-## The slider's value is squared first so the middle of it sounds about half as
-## loud (ears hear loudness on a curve): 50% = -12 dB, 0 = silent.
+## Set the game's loudness from the saved settings: the main volume on the
+## Master sound bus, and each sound group's (UserSettings.SOUND_GROUPS) on a bus
+## of its own that feeds into Master. Each slider's value is squared first so
+## the middle of it sounds about half as loud (ears hear loudness on a curve):
+## 50% = -12 dB, 0 = silent.
 static func apply_volume() -> void:
-	var volume := UserSettings.volume()
-	AudioServer.set_bus_volume_db(0, linear_to_db(volume * volume) if volume > 0 else -80.0)
-	AudioServer.set_bus_mute(0, volume <= 0.0)
+	_set_bus_volume(0, UserSettings.volume())
+	for group in UserSettings.SOUND_GROUPS:
+		_set_bus_volume(bus_index(group), UserSettings.group_volume(group))
+
+static func _set_bus_volume(index: int, volume: float) -> void:
+	AudioServer.set_bus_volume_db(index, linear_to_db(volume * volume) if volume > 0 else -80.0)
+	AudioServer.set_bus_mute(index, volume <= 0.0)
+
+## The sound bus for a sound group, made the first time it's needed.
+static func bus_index(group: String) -> int:
+	var bus_name := "Sounds: " + group
+	var index := AudioServer.get_bus_index(bus_name)
+	if index == -1:
+		index = AudioServer.bus_count
+		AudioServer.add_bus(index)
+		AudioServer.set_bus_name(index, bus_name)
+		AudioServer.set_bus_send(index, "Master")
+	return index
+
+## Which volume slider a sound follows (Mac's Settings): warnings, ordinary
+## moves and captures, or special effects (everything else).
+const WARNING_SOUNDS: Array[Sound] = [Sound.CHECK, Sound.ILLEGAL, Sound.BLOCKED]
+const MOVE_SOUNDS: Array[Sound] = [Sound.MOVE, Sound.SCRAPE, Sound.CAPTURE, Sound.SLAM, Sound.LAND,
+	Sound.CASTLE, Sound.CASTLE_SLAM, Sound.SWIPE, Sound.FALL, Sound.CANNON_FIRE, Sound.CANNON_HIT]
+
+static func group_of(sound: Sound) -> String:
+	if sound in WARNING_SOUNDS:
+		return "warnings"
+	if sound in MOVE_SOUNDS:
+		return "moves"
+	return "effects"
 
 ## A sound player, mixed by Godot itself: in the web version the default is to
 ## hand each sound to the browser to play, and over a session those started
@@ -258,6 +288,7 @@ func play(sound: Sound) -> void:
 		player.play()
 
 func _set_up(player: AudioStreamPlayer, sound: Sound, layer: Array) -> void:
+	player.bus = AudioServer.get_bus_name(bus_index(group_of(sound)))
 	if _glides.has(player):
 		(_glides[player] as Tween).kill()
 		_glides.erase(player)
@@ -291,6 +322,7 @@ func start_loop(sound: Sound) -> void:
 	if stream is AudioStreamOggVorbis:
 		(stream as AudioStreamOggVorbis).loop = true
 	_loop_player.stream = stream
+	_loop_player.bus = AudioServer.get_bus_name(bus_index(group_of(sound)))
 	_loop_player.pitch_scale = layer[1]
 	_loop_player.volume_db = layer[2]
 	_loop_player.play()

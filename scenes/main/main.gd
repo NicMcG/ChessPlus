@@ -115,9 +115,7 @@ func show_main_menu() -> void:
 	menu.continue_online_pressed.connect(continue_online_game)
 	menu.armies_pressed.connect(show_army_list)
 	menu.testing_pressed.connect(show_testing_setup)
-	# The menu's Sound button and the volume button show each other's changes.
-	menu.sound_toggled.connect(volume_control.refresh)
-	volume_control.changed.connect(menu.show_sound)
+	menu.settings_pressed.connect(show_settings)
 	_show(menu)
 	_update_if_ready()
 
@@ -160,6 +158,18 @@ func _update_if_ready() -> void:
 		return
 	if JavaScriptBridge.eval("!!(window.cpUpdate && window.cpUpdate.ready)", true):
 		JavaScriptBridge.eval("window.cpUpdate.ready = false; window.cpUpdate.apply();", true)
+
+## The Settings screen (Back returns to the main menu).
+func show_settings() -> void:
+	var settings := SettingsMenu.new()
+	settings.closed.connect(show_main_menu)
+	connect_settings(settings)
+	_show(settings)
+
+## Keep a Settings screen and the volume button in the corner in step.
+func connect_settings(settings: SettingsMenu) -> void:
+	settings.sound_changed.connect(volume_control.refresh)
+	volume_control.changed.connect(settings.refresh)
 
 func show_army_list() -> void:
 	var army_list := ARMY_LIST.instantiate()

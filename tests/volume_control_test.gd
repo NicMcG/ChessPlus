@@ -98,17 +98,21 @@ func test_on_every_screen_of_the_app() -> void:
 	main.free()
 	SavedGame.delete_saved()
 
-func test_menu_sound_button_and_volume_button_agree() -> void:
+func test_settings_sound_and_volume_button_agree() -> void:
 	var main: Node = load("res://scenes/main/main.tscn").instantiate()
 	main.library = ArmyLibrary.new("user://test_armies/")
 	_root().add_child(main)
 	UserSettings.set_sound_on(true)
 	main.volume_control.refresh()
-	var menu: Node = main.screen
-	menu.toggle_sound()
-	check(main.volume_control.is_muted(), "Sound off on the menu: the button shows muted")
+	main.show_settings()
+	var settings: SettingsMenu = main.screen
+	settings.sound_toggle.button_pressed = false
+	check(main.volume_control.is_muted(), "Sound off in Settings: the button shows muted")
 	main.volume_control.slider.value = 60
-	check_eq(menu.get_node("%Sound").text, "Sound: on", "Turning the volume up shows on the menu too")
+	check_eq(settings.sound_toggle.text, "On", "Turning the volume up shows in Settings too")
+	check_eq(settings.volume_slider.value, 60.0, "...with the same volume")
+	settings.volume_slider.value = 30
+	check_eq(main.volume_control.slider.value, 30.0, "And the other way round")
 	main.free()
 	_reset()
 
