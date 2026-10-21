@@ -135,3 +135,48 @@ func test_find_played_move_matches_find_move() -> void:
 		check(move != null and move.to_text() == text, "Found " + text)
 		state.make_move(move)
 	check(state.find_played_move("e1-e2") == null, "Not a move here")
+
+# --- The practice bot thinking on its own thread -------------------------------------
+
+func _open_threaded_bot_game() -> Node:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	game.white_army = StandardSetup.army()
+	game.black_army = StandardSetup.army()
+	game.bot_team = Piece.Team.BLACK
+	game.bot_level = PracticeBot.Level.EASY
+	game.bot_delay_frames = 1
+	game.bot_min_seconds = 0.0
+	(Engine.get_main_loop() as SceneTree).root.add_child(game)
+	return game
+
+## Wait (up to 5 s) until the bot has replied.
+func _wait_for_bot(game: Node) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var give_up := Time.get_ticks_msec() + 5000
+	while game.bot_thinking and Time.get_ticks_msec() < give_up:
+		await tree.process_frame
+
+func test_bot_thinks_on_its_own_thread() -> void:
+	var game := _open_threaded_bot_game()
+	for san in ["e4", "d4", "Nf3"]:
+		_play(game, san)
+		check(game.bot_thinking, "The bot thinks after " + san)
+		await _wait_for_bot(game)
+		check(not game.bot_thinking, "The bot has replied to " + san)
+		check_eq(game.state.side_to_move, Piece.Team.WHITE, "Your turn again")
+		check(game.state.history.back().piece.team == Piece.Team.BLACK, "The bot's move is in the game")
+		var reply: Move = game.state.history.back()
+		check(game.state.board.get_piece(reply.to) == reply.piece, "It moved the game's own piece, not the copy's")
+	check(game._bot_copy != null and game._bot_copy != game.state, "The bot searched a copy")
+	game.free()
+	SavedGame.delete_saved()
+
+func test_closing_the_screen_while_the_bot_thinks() -> void:
+	var game := _open_threaded_bot_game()
+	_play(game, "e4")
+	var tree := Engine.get_main_loop() as SceneTree
+	for i in 3:
+		await tree.process_frame
+	game.free()
+	SavedGame.delete_saved()
+	check(true, "Closing the screen stops the bot's thread without errors")

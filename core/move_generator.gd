@@ -221,11 +221,23 @@ static func blocker(state: GameState, from: Vector2i, to: Vector2i) -> Vector2i:
 ## offsets from where it starts: none for a one-square step; for a straight or
 ## diagonal leap, the squares in between; for a Knight-like leap (Mac's rule),
 ## the long leg first, then the short one: (1, 2) passes (0, 1) and (0, 2).
-static var _passed_cache := {}
+## Worked out for every step up to 16 squares when the script loads (not as
+## needed: the practice bot searches on another thread at the same time).
+static var _passed_cache := _all_passed_offsets()
 
 static func passed_offsets(step: Vector2i) -> Array:
 	if _passed_cache.has(step):
 		return _passed_cache[step]
+	return _work_out_passed(step)
+
+static func _all_passed_offsets() -> Dictionary:
+	var all := {}
+	for x in range(-16, 17):
+		for y in range(-16, 17):
+			all[Vector2i(x, y)] = _work_out_passed(Vector2i(x, y))
+	return all
+
+static func _work_out_passed(step: Vector2i) -> Array:
 	var passed := []
 	var ax := absi(step.x)
 	var ay := absi(step.y)
@@ -244,7 +256,6 @@ static func passed_offsets(step: Vector2i) -> Array:
 			passed.append(Vector2i(sx * k, 0))
 		for k in range(1, ay):
 			passed.append(Vector2i(step.x, sy * k))
-	_passed_cache[step] = passed
 	return passed
 
 ## True if a leap of `step` from `from`, by a piece of `team`, would pass over
