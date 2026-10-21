@@ -13,14 +13,15 @@ func test_game_puts_the_board_beside_the_rest_when_wide() -> void:
 	var game := _open("res://scenes/game/game.tscn")
 	game.size = Vector2(720, 1280)
 	check(not game.wide, "Tall: one column")
-	check(game.status_label.get_parent() == game._board_column.get_parent(), "Status above the board")
+	# The status line sits in its own row with the Settings gear (Mac).
+	check(game._status_row.get_parent() == game._board_column.get_parent(), "Status above the board")
 	game.size = Vector2(2048, 1280)
 	check(game.wide, "Wide: side by side")
-	check(game.status_label.get_parent() != game._board_column.get_parent(), "Status beside the board")
+	check(game._status_row.get_parent() != game._board_column.get_parent(), "Status beside the board")
 	check(game.status_label.is_visible_in_tree() and game.board_view.is_visible_in_tree(), "Both shown")
 	game.size = Vector2(720, 1280)
 	check(not game.wide, "Back to one column")
-	check(game.status_label.get_index() == 0, "Status back on top")
+	check(game._status_row.get_index() == 0, "Status back on top")
 	check(game.status_label.is_visible_in_tree() and game.board_view.is_visible_in_tree(), "Both shown again")
 	game.free()
 

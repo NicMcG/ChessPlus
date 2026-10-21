@@ -164,13 +164,7 @@ func _update_if_ready() -> void:
 func show_settings() -> void:
 	var settings := SettingsMenu.new()
 	settings.closed.connect(show_main_menu)
-	connect_settings(settings)
 	_show(settings)
-
-## Keep a Settings screen and the volume button in the corner in step.
-func connect_settings(settings: SettingsMenu) -> void:
-	settings.sound_changed.connect(volume_control.refresh)
-	volume_control.changed.connect(settings.refresh)
 
 func show_army_list() -> void:
 	var army_list := ARMY_LIST.instantiate()

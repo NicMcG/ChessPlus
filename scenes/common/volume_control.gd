@@ -41,6 +41,8 @@ static func make_room() -> Control:
 
 func _ready() -> void:
 	layer = 10  # Above every screen.
+	# Settings finds it here to keep the two in step.
+	add_to_group("volume_control")
 	_sounds = GameSounds.new()
 	add_child(_sounds)
 	closer = Control.new()
