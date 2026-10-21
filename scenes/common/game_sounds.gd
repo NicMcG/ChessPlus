@@ -197,6 +197,27 @@ func _ready() -> void:
 	_loop_player = _new_player()
 	for i in 12:
 		_players.append(_new_player())
+	_load_recordings()
+
+## Load every recording ahead of time, one a frame (in _process), so a
+## sound's first play doesn't hold up the screen while it's read (worst on
+## phones).
+func _load_recordings() -> void:
+	if not UserSettings.sound_on():
+		return
+	for sound: Sound in LAYERS:
+		for layer: Array in LAYERS[sound]:
+			if layer[0] is Array:
+				for file_name: String in layer[0]:
+					if not _recordings.has(file_name) and not _to_load.has(file_name):
+						_to_load.append(file_name)
+
+## Recordings still to load ahead of time.
+var _to_load: Array[String] = []
+
+func _process(_delta: float) -> void:
+	if not _to_load.is_empty():
+		recording(_to_load.pop_back())
 
 ## Set the whole game's loudness (the Master sound bus) from the saved volume.
 ## The slider's value is squared first so the middle of it sounds about half as
@@ -295,11 +316,17 @@ static func streams_for(sound: Sound) -> Array[AudioStream]:
 
 ## A recording in res://audio/sfx/ by name: the .ogg file, or the .wav if
 ## there's no .ogg (the wolf's howl).
+## Kept once loaded: nothing else holds on to a recording after it has played,
+## so it was read and unpacked again every time (several ms a capture on PC).
 static func recording(file_name: String) -> AudioStream:
-	var path := "res://audio/sfx/%s.ogg" % file_name
-	if not ResourceLoader.exists(path):
-		path = "res://audio/sfx/%s.wav" % file_name
-	return load(path)
+	if not _recordings.has(file_name):
+		var path := "res://audio/sfx/%s.ogg" % file_name
+		if not ResourceLoader.exists(path):
+			path = "res://audio/sfx/%s.wav" % file_name
+		_recordings[file_name] = load(path)
+	return _recordings[file_name]
+
+static var _recordings := {}
 
 static func made_stream(sound: Sound) -> AudioStreamWAV:
 	if not _made.has(sound):
@@ -308,6 +335,7 @@ static func made_stream(sound: Sound) -> AudioStreamWAV:
 
 static func clear_cache() -> void:
 	_made.clear()
+	_recordings.clear()
 
 ## Build one of the made-by-code sounds, sample by sample.
 static func make_stream(sound: Sound) -> AudioStreamWAV:
