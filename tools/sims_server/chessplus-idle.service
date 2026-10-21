@@ -1,0 +1,6 @@
+[Unit]
+Description=Stop the Chess Plus sims server when it has been idle for 20 minutes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/chessplus-idle-check
