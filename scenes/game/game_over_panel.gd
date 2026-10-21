@@ -14,7 +14,7 @@ var _note: Label
 var _buttons: VBoxContainer
 
 func _init() -> void:
-	color = Color(0, 0, 0, 0.55)
+	color = UiStyle.SCRIM
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 10
@@ -23,22 +23,18 @@ func _init() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.13, 0.13, 0.14)
-	style.border_color = Color(0.55, 0.55, 0.55)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(28)
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", UiStyle.dialog_box(32))
 	panel.custom_minimum_size.x = 520
 	center.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
 	panel.add_child(column)
 	_title = _label(56)
-	_detail = _label(32)
+	_title.theme_type_variation = &"TitleLabel"
+	_detail = _label(30)
+	_detail.add_theme_color_override("font_color", UiStyle.TEXT_MUTED)
 	_note = _label(26)
-	_note.add_theme_color_override("font_color", Color("#FFD75E"))
+	_note.add_theme_color_override("font_color", UiStyle.ACCENT_TEXT)
 	column.add_child(_title)
 	column.add_child(_detail)
 	column.add_child(_note)
@@ -59,6 +55,8 @@ func show_result(title: String, detail: String, buttons: Array) -> void:
 		var button := Button.new()
 		button.name = entry[0]
 		button.text = entry[1]
+		# The first choice (play again, rematch...) is the gold one.
+		button.theme_type_variation = &"AccentButton" if _buttons.get_child_count() == 0 else &""
 		button.custom_minimum_size.y = 84
 		button.pressed.connect(func() -> void: chosen.emit(entry[0]))
 		_buttons.add_child(button)

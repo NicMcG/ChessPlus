@@ -15,6 +15,7 @@ script = ExtResource("1_menu")
 
 [node name="Background" type="ColorRect" parent="."]
 script = ExtResource("99_backdrop")
+checkers = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -45,68 +46,93 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="Layout" type="VBoxContainer" parent="Scroll/Page/Center"]
-custom_minimum_size = Vector2(480, 0)
+custom_minimum_size = Vector2(520, 0)
 layout_mode = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 16
 
-[node name="Title" type="Label" parent="Scroll/Page/Center/Layout"]
+[node name="Title" type="HBoxContainer" parent="Scroll/Page/Center/Layout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 72
-text = "Chess Plus"
-horizontal_alignment = 1
+alignment = 1
+theme_override_constants/separation = 20
+
+[node name="Chess" type="Label" parent="Scroll/Page/Center/Layout/Title"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_font_sizes/font_size = 84
+text = "Chess"
+
+[node name="Plus" type="Label" parent="Scroll/Page/Center/Layout/Title"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_colors/font_color = Color(0.9490196, 0.75686276, 0.30588236, 1)
+theme_override_font_sizes/font_size = 84
+text = "Plus"
+
+[node name="Underline" type="ColorRect" parent="Scroll/Page/Center/Layout"]
+custom_minimum_size = Vector2(72, 5)
+layout_mode = 2
+size_flags_horizontal = 4
+mouse_filter = 2
+color = Color(0.9490196, 0.75686276, 0.30588236, 1)
 
 [node name="Gap" type="Control" parent="Scroll/Page/Center/Layout"]
-custom_minimum_size = Vector2(0, 60)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 
 [node name="Continue" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 36
 text = "Continue game"
 
 [node name="Play" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 36
 text = "Play local"
 
 [node name="ContinueOnline" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
-theme_override_font_sizes/font_size = 34
+theme_override_font_sizes/font_size = 32
 text = "Continue online game"
 
 [node name="Online" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 36
 text = "Play online"
+
+[node name="Gap2" type="Control" parent="Scroll/Page/Center/Layout"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
 
 [node name="Armies" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 96)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 34
 text = "My armies"
 
 [node name="Testing" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 96)
 layout_mode = 2
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 34
 text = "Testing mode"
 
 [node name="Settings" type="Button" parent="Scroll/Page/Center/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 84)
 layout_mode = 2
+theme_type_variation = &"GhostButton"
 text = "Settings"
 
 [node name="BottomGap" type="Control" parent="Scroll/Page"]

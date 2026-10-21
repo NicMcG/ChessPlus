@@ -37,7 +37,7 @@ func _ready() -> void:
 func show_note(title: String, text: String) -> ModalPanel:
 	var panel := ModalPanel.new(title)
 	panel.add_text(text)
-	panel.add_button("OK", panel.close)
+	panel.add_button("OK", panel.close, &"AccentButton")
 	add_child(panel)
 	return panel
 

@@ -10,9 +10,12 @@ extends SceneTree
 ## ("type variations") that a control asks for with theme_type_variation:
 ##   AccentButton  the gold main button of a screen (Start, Save army...)
 ##   DangerButton  red text, for things that can't be undone (Delete)
-##   GhostButton   no box until hovered (Back, Sound)
+##   ChoiceButton  a toggle that turns gold when on (On/Off, White/Black...)
+##   CompactButton smaller, for rows of many buttons (the game screen)
+##   GhostButton   no box until hovered (Back, Settings)
 ##   TitleLabel    a screen's title
 ##   HeadingLabel  the small grey label over a choice ("Opponent")
+##   StrongLabel   semi-bold text (the game's status line)
 ##   MutedLabel    small grey text (counts, tips, credits)
 ##   DialogTitle   a pop-up's heading
 ##   CardPanel     a box grouping things on a screen
@@ -58,6 +61,21 @@ func _buttons() -> void:
 	_button_look("DangerButton", UiStyle.SURFACE, UiStyle.DANGER.darkened(0.35), UiStyle.DANGER.darkened(0.5), UiStyle.DANGER_TEXT)
 	for state in ["font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
 		theme.set_color(state, "DangerButton", UiStyle.TEXT)
+	# A toggle that turns gold when on (a choice of several, or On/Off).
+	_variation("ChoiceButton", "Button")
+	_button_look("ChoiceButton", UiStyle.SURFACE, UiStyle.SURFACE_HOVER, UiStyle.ACCENT, UiStyle.TEXT)
+	theme.set_stylebox("hover_pressed", "ChoiceButton", _box(UiStyle.ACCENT_HOVER, true))
+	theme.set_stylebox("disabled", "ChoiceButton", _box(UiStyle.SURFACE_DISABLED))
+	for state in ["font_pressed_color", "font_hover_pressed_color"]:
+		theme.set_color(state, "ChoiceButton", UiStyle.ON_ACCENT)
+	# Smaller, for rows of many buttons (the game screen's).
+	_variation("CompactButton", "Button")
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var box := theme.get_stylebox(state, "Button").duplicate() as StyleBoxFlat
+		box.content_margin_left = 8
+		box.content_margin_right = 8
+		theme.set_stylebox(state, "CompactButton", box)
+	theme.set_font_size("font_size", "CompactButton", 26)
 	# No box until touched.
 	_variation("GhostButton", "Button")
 	_button_look("GhostButton", Color(1, 1, 1, 0), Color(1, 1, 1, 0.08), Color(1, 1, 1, 0.04), UiStyle.TEXT)
@@ -204,6 +222,8 @@ func _labels() -> void:
 	theme.set_font("font", "HeadingLabel", UiStyle.font(UiStyle.SEMIBOLD))
 	theme.set_font_size("font_size", "HeadingLabel", 25)
 	theme.set_color("font_color", "HeadingLabel", UiStyle.TEXT_MUTED)
+	_variation("StrongLabel", "Label")
+	theme.set_font("font", "StrongLabel", UiStyle.font(UiStyle.SEMIBOLD))
 	_variation("MutedLabel", "Label")
 	theme.set_font_size("font_size", "MutedLabel", 24)
 	theme.set_color("font_color", "MutedLabel", UiStyle.TEXT_MUTED)

@@ -46,7 +46,8 @@ theme_override_constants/separation = 12
 [node name="Status" type="Label" parent="Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 34
+theme_type_variation = &"StrongLabel"
+theme_override_font_sizes/font_size = 32
 text = "White to move"
 horizontal_alignment = 1
 autowrap_mode = 3
@@ -81,7 +82,7 @@ theme_override_constants/separation = 12
 
 [node name="StepBack" type="Button" parent="Margin/Layout/ViewNav"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("4_step")
@@ -90,15 +91,16 @@ step = -1
 [node name="PlayFromHere" type="Button" parent="Margin/Layout/ViewNav"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
+theme_type_variation = &"AccentButton"
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 2.0
 text = "Play from here"
 
 [node name="StepForward" type="Button" parent="Margin/Layout/ViewNav"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("4_step")
@@ -113,46 +115,46 @@ text = "Ability"
 
 [node name="Buttons" type="HBoxContainer" parent="Margin/Layout"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Undo" type="Button" parent="Margin/Layout/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"CompactButton"
 text = "Undo"
 
 [node name="Redo" type="Button" parent="Margin/Layout/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"CompactButton"
 text = "Redo"
 
 [node name="Menu" type="Button" parent="Margin/Layout/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"CompactButton"
 text = "Menu"
 
 [node name="Resign" type="Button" parent="Margin/Layout/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"CompactButton"
 text = "Resign"
 
 [node name="NewGame" type="Button" parent="Margin/Layout/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 30
+theme_type_variation = &"CompactButton"
 text = "New game"
 
 [node name="PromotionOverlay" type="ColorRect" parent="."]
@@ -164,7 +166,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.55)
+color = Color(0.039215688, 0.039215688, 0.05, 0.66)
 
 [node name="Center" type="CenterContainer" parent="PromotionOverlay"]
 layout_mode = 1
