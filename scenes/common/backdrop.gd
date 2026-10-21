@@ -12,7 +12,7 @@ extends ColorRect
 ## the height).
 const CHECKER_COLUMNS := 8
 const CHECKER_DEPTH := 0.55
-const CHECKER_ALPHA := 0.045
+const CHECKER_ALPHA := 0.035
 
 var _fade: GradientTexture2D
 
