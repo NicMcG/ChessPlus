@@ -132,12 +132,12 @@ func test_sounds_are_real_audio() -> void:
 func test_sound_setting_is_remembered() -> void:
 	UserSettings.set_sound_on(false)
 	check(not UserSettings.sound_on(), "Off when read back from the file")
-	var menu: Node = load("res://scenes/menu/main_menu.tscn").instantiate()
-	(Engine.get_main_loop() as SceneTree).root.add_child(menu)
-	check_eq(menu.get_node("%Sound").text, "Sound: off", "Menu shows off")
-	menu.toggle_sound()
+	var settings := SettingsMenu.new()
+	(Engine.get_main_loop() as SceneTree).root.add_child(settings)
+	check(not settings.sound_toggle.button_pressed and settings.sound_toggle.text == "Off", "Settings shows off")
+	settings.sound_toggle.button_pressed = true
 	check(UserSettings.sound_on(), "Back on")
-	check_eq(menu.get_node("%Sound").text, "Sound: on", "Menu shows on")
-	menu.free()
+	check_eq(settings.sound_toggle.text, "On", "Settings shows on")
+	settings.free()
 	# Tests run silently (see run_tests.gd).
 	UserSettings.set_sound_on(false)

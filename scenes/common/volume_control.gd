@@ -84,7 +84,7 @@ func _build_panel() -> void:
 	slider.focus_mode = Control.FOCUS_NONE
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_style_slider()
+	style_slider(slider)
 	slider.value_changed.connect(_on_slider_changed)
 	slider.drag_ended.connect(func(_moved: bool) -> void: _sounds.play(GameSounds.Sound.MOVE))
 	row.add_child(slider)
@@ -97,7 +97,7 @@ func _build_panel() -> void:
 
 ## A thick track that fills in gold up to a big round handle: the theme's own
 ## slider is too thin to drag with a finger.
-func _style_slider() -> void:
+static func style_slider(target: HSlider) -> void:
 	var track := StyleBoxFlat.new()
 	track.bg_color = Color(0.32, 0.32, 0.34)
 	track.set_corner_radius_all(5)
@@ -105,13 +105,13 @@ func _style_slider() -> void:
 	track.content_margin_bottom = 5
 	var filled := track.duplicate() as StyleBoxFlat
 	filled.bg_color = Color(0.94, 0.78, 0.36)
-	slider.add_theme_stylebox_override("slider", track)
-	slider.add_theme_stylebox_override("grabber_area", filled)
-	slider.add_theme_stylebox_override("grabber_area_highlight", filled)
+	target.add_theme_stylebox_override("slider", track)
+	target.add_theme_stylebox_override("grabber_area", filled)
+	target.add_theme_stylebox_override("grabber_area_highlight", filled)
 	var handle := _round_handle(Color.WHITE)
-	slider.add_theme_icon_override("grabber", handle)
-	slider.add_theme_icon_override("grabber_highlight", handle)
-	slider.custom_minimum_size.y = 40
+	target.add_theme_icon_override("grabber", handle)
+	target.add_theme_icon_override("grabber_highlight", handle)
+	target.custom_minimum_size.y = 40
 
 ## A white dot, as a picture (sliders want their handle as one).
 static func _round_handle(color: Color) -> Texture2D:
