@@ -524,6 +524,8 @@ func _draw() -> void:
 	if state == null:
 		return
 	var board := state.board
+	# A soft shadow under the board lifts it off the background.
+	draw_style_box(_board_shadow(), Rect2(_origin(), Vector2(board.width, board.height) * _square_size()))
 	for rank in range(board.height):
 		for file in range(board.width):
 			var square := Vector2i(file, rank)
@@ -1184,6 +1186,17 @@ func _square_size() -> float:
 	return minf(size.x / state.board.width, size.y / state.board.height)
 
 ## Where the board's top-left corner is inside this control.
+var _shadow: StyleBoxFlat
+
+func _board_shadow() -> StyleBoxFlat:
+	if _shadow == null:
+		_shadow = StyleBoxFlat.new()
+		_shadow.bg_color = DARK_SQUARE
+		_shadow.shadow_color = Color(0, 0, 0, 0.45)
+		_shadow.shadow_size = 22
+		_shadow.shadow_offset = Vector2(0, 8)
+	return _shadow
+
 func board_origin() -> Vector2:
 	return _origin() if state else Vector2.ZERO
 

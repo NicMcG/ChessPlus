@@ -194,7 +194,7 @@ func show_credits() -> void:
 	popup = ModalPanel.new("Credits")
 	for line in CREDITS:
 		popup.add_text(line, 24)
-	popup.add_button("Close", popup.close)
+	popup.add_button("Close", popup.close, &"GhostButton")
 	add_child(popup)
 
 func ask_reset() -> void:
@@ -202,8 +202,8 @@ func ask_reset() -> void:
 	popup.add_text("Every setting and key goes back to how it started.")
 	popup.add_button("Reset", func() -> void:
 		reset_to_defaults()
-		popup.close())
-	popup.add_button("Cancel", popup.close)
+		popup.close(), &"DangerButton")
+	popup.add_button("Cancel", popup.close, &"GhostButton")
 	add_child(popup)
 
 func reset_to_defaults() -> void:
@@ -367,5 +367,4 @@ class GearIcon extends Control:
 				c + along * 13 * u + side * 5 * u, c + along * 21 * u + side * 4 * u,
 				c + along * 21 * u - side * 4 * u, c + along * 13 * u - side * 5 * u,
 			]), white)
-		draw_circle(c, 15 * u, white)
-		draw_circle(c, 6 * u, Color(0.2, 0.2, 0.21))
+		draw_arc(c, 10.5 * u, 0, TAU, 32, white, 9 * u, true)

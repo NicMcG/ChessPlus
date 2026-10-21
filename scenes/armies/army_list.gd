@@ -75,7 +75,7 @@ func ask_import() -> void:
 	code_edit.custom_minimum_size.y = 80
 	code_edit.add_theme_font_size_override("font_size", 40)
 	import_panel.column.add_child(code_edit)
-	var go := import_panel.add_button("Import", func() -> void: pass)
+	var go := import_panel.add_button("Import", func() -> void: pass, &"AccentButton")
 	go.pressed.connect(func() -> void: import_code(code_edit.text))
 	import_panel.add_text("Or paste the army text your friend copied:")
 	var text_edit := LineEdit.new()
@@ -88,7 +88,7 @@ func ask_import() -> void:
 	var message := import_panel.add_text("")
 	message.name = "Message"
 	message.add_theme_color_override("font_color", Color("#ff8a80"))
-	import_panel.add_button("Cancel", import_panel.close)
+	import_panel.add_button("Cancel", import_panel.close, &"GhostButton")
 	add_child(import_panel)
 	PhoneTextInput.attach(code_edit, "Army code")
 	PhoneTextInput.attach(text_edit, "Army text")
