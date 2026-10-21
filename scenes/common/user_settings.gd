@@ -77,6 +77,13 @@ static func reduce_effects() -> bool:
 static func set_reduce_effects(on: bool) -> void:
 	_store("visual", "reduce_effects", on)
 
+## The key a keyboard shortcut is on (see KeyBinds), or `default`.
+static func key_bind(action: String, default: int) -> int:
+	return _settings().get_value("keys", action, default)
+
+static func set_key_bind(action: String, code: int) -> void:
+	_store("keys", action, code)
+
 ## Settings' "Reset to defaults": every setting back to how it started (sound,
 ## notifications, visual, keys). The online game in progress and the default
 ## armies (set in My armies) are kept.

@@ -19,6 +19,7 @@ var volume_control: VolumeControl
 
 func _ready() -> void:
 	SystemFonts.install()
+	KeyBinds.install()
 	fit_window_to_screen()
 	volume_control = VolumeControl.new()
 	add_child(volume_control)
