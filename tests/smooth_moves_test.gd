@@ -159,6 +159,10 @@ func _wait_for_bot(game: Node) -> void:
 func test_bot_thinks_on_its_own_thread() -> void:
 	var game := _open_threaded_bot_game()
 	for san in ["e4", "d4", "Nf3"]:
+		# The Easy bot plays at random, so a planned move may not be legal (after
+		# 2. d4 Bb4+, Nf3 isn't): then any legal move will do.
+		if Notation.find_move(game.state, san) == null:
+			san = Notation.san(game.state, game.state.moves()[0])
 		_play(game, san)
 		check(game.bot_thinking, "The bot thinks after " + san)
 		await _wait_for_bot(game)
