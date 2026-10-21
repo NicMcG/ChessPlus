@@ -16,28 +16,29 @@ const NO_LETTER_SYMBOL := "P"
 
 ## The SAN for `move`, which must be a legal move in `state`'s current position.
 static func san(state: GameState, move: Move) -> String:
+	return _san(move, _check_suffix(state, move), _detail(state, move))
+
+## san() with its check mark ("+", "#" or "") and _detail already worked out.
+static func _san(move: Move, check_suffix: String, detail: String) -> String:
 	var text := ""
 	if move.ability == PieceDef.Ability.RAISE_DEAD:
 		# Text only (for tests and saving): NC!=Q
-		return move.piece.def.symbol.to_upper() + "!=" + move.raised.def.symbol.to_upper() + _check_suffix(state, move)
+		return move.piece.def.symbol.to_upper() + "!=" + move.raised.def.symbol.to_upper() + check_suffix
 	# Text only too: G@e3 (Haunt), BDc1~g5 (Song of Slumber), WWe4! (Full Moon).
 	var letters := move.piece.def.symbol.to_upper()
 	if move.ability == PieceDef.Ability.HAUNT:
-		return letters + "@" + Board.square_name(move.to) + _check_suffix(state, move)
+		return letters + "@" + Board.square_name(move.to) + check_suffix
 	if move.ability == PieceDef.Ability.SONG_OF_SLUMBER:
-		return letters + Board.square_name(move.from) + "~" + Board.square_name(move.to) + _check_suffix(state, move)
+		return letters + Board.square_name(move.from) + "~" + Board.square_name(move.to) + check_suffix
 	if move.ability == PieceDef.Ability.FULL_MOON:
-		return letters + Board.square_name(move.from) + "!" + _check_suffix(state, move)
+		return letters + Board.square_name(move.from) + "!" + check_suffix
 	if move.is_castling():
 		text = "O-O" if move.to.x > move.from.x else "O-O-O"
 	else:
 		var letter := move.piece.def.symbol.to_upper()
-		if letter == NO_LETTER_SYMBOL:
-			# A letterless capture names the file it came from: exd5.
-			if move.is_capture():
-				text = Board.FILE_LETTERS[move.from.x]
-		else:
-			text = letter + _disambiguation(state, move)
+		# A letterless capture names the file it came from (exd5); other pieces
+		# may need a file or rank (Nbd2).
+		text = detail if letter == NO_LETTER_SYMBOL else letter + detail
 		if move.is_capture():
 			text += "x"
 		text += Board.square_name(move.to)
@@ -50,7 +51,18 @@ static func san(state: GameState, move: Move) -> String:
 		# Crack Shot (text only): Axd5!
 		if move.ability == PieceDef.Ability.CRACK_SHOT:
 			text += "!"
-	return text + _check_suffix(state, move)
+	return text + check_suffix
+
+## Which piece of its type made the move, when it isn't obvious from the
+## square it went to: a pawn capturing names its file (exd5); other pieces add a
+## file or rank only if needed (Nbd2). "" for castling and abilities that don't
+## write it. Shared by san() and picture(), so it's only worked out once.
+static func _detail(state: GameState, move: Move) -> String:
+	if move.is_castling() or (move.ability != PieceDef.Ability.NONE and move.ability != PieceDef.Ability.CRACK_SHOT):
+		return ""
+	if move.piece.def.symbol.to_upper() == NO_LETTER_SYMBOL:
+		return Board.FILE_LETTERS[move.from.x] if move.is_capture() else ""
+	return _disambiguation(state, move)
 
 ## Icon names for picture notation (pictures in res://art/icons/).
 const CAPTURE_ICON := "capture"
@@ -66,9 +78,10 @@ const PROMOTE_ICON := "promote"
 ##   {"text": "e4"}                           text (squares, files, castling)
 ## e.g. Nxd5+ is [knight, capture icon, "d5", check icon].
 static func picture(state: GameState, move: Move) -> Array:
-	return _picture(state, move, _check_suffix(state, move))
+	return _picture(move, _check_suffix(state, move), _detail(state, move))
 
-static func _picture(state: GameState, move: Move, check_suffix: String) -> Array:
+## picture() with its check mark and _detail already worked out.
+static func _picture(move: Move, check_suffix: String, detail: String) -> Array:
 	var parts := [{"piece": move.piece.def, "team": move.piece.team}]
 	if move.ability != PieceDef.Ability.NONE:
 		# A special ability: [piece] [lightning bolt] [the piece it targets or brings back].
@@ -91,14 +104,7 @@ static func _picture(state: GameState, move: Move, check_suffix: String) -> Arra
 	elif move.is_castling():
 		parts.append({"text": "O-O" if move.to.x > move.from.x else "O-O-O"})
 	else:
-		# Which piece of that type moved, when it isn't obvious: a pawn capturing
-		# names its file (exd5); others add a file or rank only if needed (Nbd2).
-		var detail := ""
-		if move.piece.def.symbol.to_upper() == NO_LETTER_SYMBOL:
-			if move.is_capture():
-				detail = Board.FILE_LETTERS[move.from.x]
-		else:
-			detail = _disambiguation(state, move)
+		# Which piece of that type moved, when it isn't obvious (see _detail).
 		if detail != "":
 			parts.append({"text": detail})
 		if move.breaks_shield():
@@ -154,9 +160,9 @@ static func numbered_moves(state: GameState, first := 0) -> Array:
 			number = "%d." % state.fullmove_number
 		elif i == first:
 			number = "%d..." % state.fullmove_number
-		var text := san(state, move)
-		var suffix := text.substr(text.length() - 1) if text.ends_with("+") or text.ends_with("#") else ""
-		entries.append([number, text, _picture(state, move, suffix)])
+		var suffix := _check_suffix(state, move)
+		var detail := _detail(state, move)
+		entries.append([number, _san(move, suffix, detail), _picture(move, suffix, detail)])
 		state.make_move(move)
 	state.same_position_again(marks)
 	return entries
@@ -168,9 +174,14 @@ static func _disambiguation(state: GameState, move: Move) -> String:
 	# Usually no other piece of the type can get there at all: checking that
 	# among the moves the pieces can make is quick, and the legal moves (each
 	# checked for leaving the king attacked) are only needed if one can.
-	if _rivals(MoveGenerator.pseudo_legal_moves(state), move).is_empty():
+	var candidates := _rival_moves(MoveGenerator.pseudo_legal_moves(state), move)
+	if candidates.is_empty():
 		return ""
-	var rivals := _rivals(state.moves(), move)
+	# Only the rivals' own moves need checking for leaving the king attacked.
+	var rivals: Array[Vector2i] = []
+	for other in candidates:
+		if not rivals.has(other.from) and MoveGenerator.is_legal(state, other):
+			rivals.append(other.from)
 	if rivals.is_empty():
 		return ""
 	var file_clash := rivals.any(func(pos: Vector2i) -> bool: return pos.x == move.from.x)
@@ -183,13 +194,12 @@ static func _disambiguation(state: GameState, move: Move) -> String:
 		return rank_text
 	return file_text + rank_text
 
-## Where other pieces of `move`'s type among `moves` could move to the same square from.
-static func _rivals(moves: Array[Move], move: Move) -> Array[Vector2i]:
-	var rivals: Array[Vector2i] = []
+## The moves among `moves` by other pieces of `move`'s type to the same square.
+static func _rival_moves(moves: Array[Move], move: Move) -> Array[Move]:
+	var rivals: Array[Move] = []
 	for other in moves:
 		if other.to == move.to and other.from != move.from and other.piece.def == move.piece.def:
-			if not rivals.has(other.from):
-				rivals.append(other.from)
+			rivals.append(other)
 	return rivals
 
 ## "+" if the move gives check, "#" if it's checkmate, otherwise "".

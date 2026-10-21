@@ -37,9 +37,24 @@ func _init(p_board: Board, p_rules: GameRules) -> void:
 	board = p_board
 	rules = p_rules
 
-## The legal moves for whoever's turn it is.
+## The legal moves for whoever's turn it is. Worked out once per position
+## (the game screen asks again for every tap on a piece, the outcome, the move
+## list...) and handed out as a fresh list each time, so changing the list
+## (the practice bot reorders it) can't spoil the kept one.
 func moves() -> Array[Move]:
-	return MoveGenerator.legal_moves(self)
+	var key := _position_now()
+	if key != _moves_key:
+		_moves = MoveGenerator.legal_moves(self)
+		_moves_key = key
+	return _moves.duplicate()
+
+var _moves: Array[Move] = []
+var _moves_key := []
+
+## What tells this position apart from others reached in the game, for keeping
+## answers about it (see outcome() and moves()).
+func _position_now() -> Array:
+	return [_position_ids.back(), board.changes, side_to_move, halfmove_clock, lost[0].size(), lost[1].size()]
 
 ## `team`'s attack table: the lines its pieces can capture along (cached).
 func attack_table(team: Piece.Team) -> Array:
@@ -80,7 +95,7 @@ func is_in_check() -> bool:
 ## every other outcome is a draw. Checkmate counts even if the mating move was
 ## also the 50th move.
 func outcome() -> Outcome:
-	var key := [_position_ids.back(), board.changes, side_to_move, halfmove_clock, lost[0].size(), lost[1].size()]
+	var key := _position_now()
 	if key == _outcome_key:
 		return _outcome
 	_outcome = _work_out_outcome()
@@ -321,23 +336,60 @@ func _undo_decoy(move: Move) -> void:
 ## How many times the current position has occurred, counting now. "Same position"
 ## means the same pieces on the same squares, same side to move, same castling
 ## rights and same en passant possibilities. Only positions since the last capture
-## or pawn-type move can match, so it steps back that far (undoing moves
-## to look, then replaying them).
+## or pawn-type move can match. Each position's key is kept once worked out
+## (outcome() is asked after every move), so usually they're all known already;
+## otherwise it steps back that far (undoing moves to look, then replaying them).
 func _repetition_count() -> int:
-	var key := _position_key()
-	var marks := position_marks()
+	var key := _kept_position_key()
+	var steps := mini(halfmove_clock, history.size())
 	var count := 1
+	# Position i (0 = the start) has id _position_ids[i], and the board had
+	# _board_changes[i] changes then (see make_move).
+	if _position_ids.size() == history.size() + 1:
+		var all_known := true
+		for i in range(history.size() - 1, history.size() - 1 - steps, -1):
+			var known: Array = _position_keys.get(_position_ids[i], [])
+			if known.is_empty() or known[0] != _board_changes[i]:
+				all_known = false
+				break
+			if known[1] == key:
+				count += 1
+		if all_known:
+			return count
+		count = 1
+	var marks := position_marks()
 	var undone: Array[Move] = []
-	for i in range(mini(halfmove_clock, history.size())):
+	for i in range(steps):
 		var move: Move = history.back()
 		undo_move(move)
 		undone.append(move)
-		if _position_key() == key:
+		if _kept_position_key() == key:
 			count += 1
 	for i in range(undone.size() - 1, -1, -1):
 		make_move(undone[i])
 	same_position_again(marks)
 	return count
+
+## Position keys worked out so far: position id -> [board.changes then, key].
+var _position_keys := {}
+
+## _position_key() for the position now, kept for next time.
+func _kept_position_key() -> String:
+	var id: int = _position_ids.back()
+	var known: Array = _position_keys.get(id, [])
+	if not known.is_empty() and known[0] == board.changes:
+		return known[1]
+	# Only positions still in the game can come up again: forget the rest now
+	# and then, so this doesn't keep growing.
+	if _position_keys.size() > 2 * _position_ids.size() + 64:
+		var still := {}
+		for kept_id in _position_ids:
+			if _position_keys.has(kept_id):
+				still[kept_id] = _position_keys[kept_id]
+		_position_keys = still
+	var key := _position_key()
+	_position_keys[id] = [board.changes, key]
+	return key
 
 ## Text that is identical for two positions exactly when they count as the same
 ## position for repetition.
