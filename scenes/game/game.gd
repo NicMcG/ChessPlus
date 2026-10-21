@@ -154,12 +154,13 @@ func _ready() -> void:
 	KeyBinds.install()
 	sounds = GameSounds.new()
 	add_child(sounds)
+	_build_status_row()
 	clock_label = Label.new()
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	clock_label.add_theme_font_size_override("font_size", 32)
 	clock_label.hide()
 	_layout.add_child(clock_label)
-	_layout.move_child(clock_label, status_label.get_index() + 1)
+	_layout.move_child(clock_label, _status_row.get_index() + 1)
 	_build_offer_bar()
 	PieceInfo.prepare(self)
 	game_over_panel = GameOverPanel.new()
@@ -405,6 +406,49 @@ func back_to_game() -> void:
 	board_view.show_game(state)
 	_update_input()
 	_update_text()
+
+## The status line's row: the gear that opens Settings on the left (Mac), the
+## status in the middle, and a gap on the right as wide as the volume button,
+## which sits over that corner (so the status stays centred).
+var _status_row: HBoxContainer
+var gear_button: Button
+## Settings, while it's open over the game.
+var settings_menu: SettingsMenu
+
+func _build_status_row() -> void:
+	_status_row = HBoxContainer.new()
+	_status_row.add_theme_constant_override("separation", 8)
+	var parent := status_label.get_parent()
+	var index := status_label.get_index()
+	parent.remove_child(status_label)
+	gear_button = SettingsMenu.gear_button()
+	gear_button.pressed.connect(open_settings)
+	_status_row.add_child(gear_button)
+	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_status_row.add_child(status_label)
+	_status_row.add_child(VolumeControl.make_room())
+	parent.add_child(_status_row)
+	parent.move_child(_status_row, index)
+
+## Open Settings over the game (the gear). The game carries on underneath;
+## changes show straight away.
+func open_settings() -> void:
+	if settings_menu:
+		return
+	settings_menu = SettingsMenu.new()
+	settings_menu.settings_changed.connect(board_view.apply_settings)
+	settings_menu.closed.connect(close_settings)
+	settings_open = true
+	# Over everything in the game, pop-ups included.
+	settings_menu.z_index = 30
+	add_child(settings_menu)
+
+func close_settings() -> void:
+	if settings_menu:
+		settings_menu.queue_free()
+		settings_menu = null
+	settings_open = false
+	board_view.apply_settings()
 
 ## Keyboard shortcuts (KeyBinds; Mac's Settings, PC). Taken before the buttons
 ## see the key, so Space can't also press a button clicked earlier; not while
@@ -745,9 +789,9 @@ func fit_layout() -> void:
 	if wide:
 		ScreenShape.move_to([_board_column], _wide_box)
 		_wide_box.move_child(_board_column, 0)
-		ScreenShape.move_to([status_label, clock_label, _top_row, hint_toggles, eval_graph, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _side)
+		ScreenShape.move_to([_status_row, clock_label, _top_row, hint_toggles, eval_graph, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _side)
 	else:
-		ScreenShape.move_to([status_label, clock_label, _top_row, _board_column, hint_toggles, eval_graph, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _layout)
+		ScreenShape.move_to([_status_row, clock_label, _top_row, _board_column, hint_toggles, eval_graph, _moves_scroll, offer_bar, ability_button, view_nav, _buttons], _layout)
 	_layout.visible = not wide
 	_wide_box.visible = wide
 

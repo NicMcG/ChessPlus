@@ -72,6 +72,9 @@ func _ready() -> void:
 		_build_keys()
 	_build_other()
 	refresh()
+	# The volume button in the corner and this screen show each other's changes.
+	for control in get_tree().get_nodes_in_group("volume_control"):
+		(control as VolumeControl).changed.connect(refresh)
 
 func _top_bar() -> HBoxContainer:
 	var bar := HBoxContainer.new()
@@ -122,6 +125,7 @@ func _build_sound() -> void:
 func _sound_changed() -> void:
 	GameSounds.apply_volume()
 	refresh()
+	get_tree().call_group("volume_control", "refresh")
 	sound_changed.emit()
 	settings_changed.emit()
 
@@ -343,3 +347,34 @@ func _wide_button(text: String, on_pressed: Callable) -> Button:
 	button.pressed.connect(on_pressed)
 	sections.add_child(button)
 	return button
+
+# --- The gear button that opens Settings from a game -----------------------------------
+
+## A square button with a gear on it, the size of the volume button.
+static func gear_button() -> Button:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(VolumeControl.BUTTON_SIZE, VolumeControl.BUTTON_SIZE)
+	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = "Settings"
+	var icon := GearIcon.new()
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(icon)
+	return button
+
+## A gear, drawn (the font has no gear symbol), in the volume button's white.
+class GearIcon extends Control:
+	func _draw() -> void:
+		var c := size / 2
+		var u := minf(size.x, size.y) / 64.0  # Drawn on a 64 x 64 grid.
+		var white := Color(0.95, 0.95, 0.95)
+		for i in 8:
+			var angle := TAU * i / 8.0
+			var along := Vector2.from_angle(angle)
+			var side := Vector2(-along.y, along.x)
+			draw_colored_polygon(PackedVector2Array([
+				c + along * 13 * u + side * 5 * u, c + along * 21 * u + side * 4 * u,
+				c + along * 21 * u - side * 4 * u, c + along * 13 * u - side * 5 * u,
+			]), white)
+		draw_circle(c, 15 * u, white)
+		draw_circle(c, 6 * u, Color(0.2, 0.2, 0.21))

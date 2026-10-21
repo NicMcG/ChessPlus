@@ -187,3 +187,31 @@ func test_shortcuts_in_a_game() -> void:
 	check(not game.board_view.flipped, "No shortcuts while Settings is open")
 	game.free()
 	_finish()
+
+func test_gear_opens_settings_over_a_game() -> void:
+	var game: Node = load("res://scenes/game/game.tscn").instantiate()
+	_root().add_child(game)
+	check(game.gear_button.is_visible_in_tree(), "A gear beside the status line")
+	check_eq(game.gear_button.get_parent(), game.status_label.get_parent(), "...in the status line's row")
+	game.gear_button.pressed.emit()
+	check(game.settings_menu != null and game.settings_open, "Settings opens over the game")
+	game.settings_menu.speed_buttons["off"].pressed.emit()
+	check_eq(game.board_view.move_time, 0.0, "A change shows straight away (animations off)")
+	game.settings_menu.helper_toggles["coordinates"].button_pressed = false
+	check(not game.board_view.helpers.coordinates, "...coordinates off")
+	game.settings_menu.close()
+	check(game.settings_menu == null and not game.settings_open, "Back closes it, the game is as it was")
+	game.free()
+	_finish()
+
+func test_gear_row_moves_with_the_wide_layout() -> void:
+	var game: Control = load("res://scenes/game/game.tscn").instantiate()
+	_root().add_child(game)
+	# Unpinned from the window so the test can pick the size (as layout_test does).
+	game.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	game.size = Vector2(2048, 1280)
+	check(game.wide, "Wide layout")
+	check(game.gear_button.is_visible_in_tree(), "The gear is still there on a wide screen")
+	game.size = Vector2(720, 1280)
+	check(game.gear_button.is_visible_in_tree(), "...and back on a tall one")
+	game.free()
