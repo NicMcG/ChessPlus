@@ -58,5 +58,8 @@ Instance `INSTANCE_ID`, region `us-east-2`.
    reports in pieces (`sed -n '1,300p' file`, then the next lines, or
    `gzip -c file | base64` split into chunks and joined here). File them in
    `balance/results/run<N>/` with a README, as usual.
-5. The server still stops itself 20 minutes after the last Plusfish job (the
-   idle timer), and a job's last step can be `shutdown -h now`.
+5. Finish every run with `aws ec2 stop-instances --instance-ids
+   INSTANCE_ID`, a stop through AWS, never a `shutdown` on the server:
+   AWS's cost tracker kept billing servers that switched themselves off from
+   inside for hours afterwards (Oct 2026). The server's own switch-off 20
+   minutes after the last Plusfish job (the idle timer) is only the backup.
