@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 # The Chess Plus sims server on AWS (Mac's project, us-east-2): a c8g.16xlarge
 # (64 Graviton4 cores, Arm) named "chessplus-sims", kept stopped between runs
-# (Mac's choice). It stops itself after 20 minutes without a Plusfish job (the
-# timer in tools/sims_server/, installed on it).
+# (Mac's choice).
+# Every run ends with "stop" from here, a stop through AWS (Mac, Oct 2026):
+# AWS's cost tracker kept billing two servers that had switched themselves off
+# from inside (no AWS call) for hours afterwards. So jobs don't end with a
+# shutdown of their own: "wait" waits for the job's end marker, then copy the
+# results and "stop". The server's own idle switch-off (20 minutes without a
+# Plusfish job, the timer in tools/sims_server/) is only the backup.
 # Its address changes every time it starts, so "start" looks it up and points
 # the SSH shortcut "chessplus-sims" (in ~/.ssh/config) at it.
 #
 #   bash tools/sims_server.sh status         running / stopped, and its address
 #   bash tools/sims_server.sh start          start it, wait until it takes SSH
-#   bash tools/sims_server.sh stop           stop it (it keeps its disk)
+#   bash tools/sims_server.sh wait <file>    wait until <file> exists on it (a
+#                                            job's end marker); fails if the job
+#                                            ended without it or the server went away
+#   bash tools/sims_server.sh stop           stop it through AWS (it keeps its disk)
 #   bash tools/sims_server.sh ssh <command>  run a command on it
 #
 # Needs the AWS CLI logged in as profile "chessplus" (aws login --region
@@ -96,6 +104,36 @@ case "${1:-status}" in
 		echo "$NAME is running at $host but doesn't answer SSH yet." >&2
 		exit 1
 		;;
+	wait)
+		marker="${2:?usage: bash tools/sims_server.sh wait <file on the server>}"
+		# Checked every 30 seconds. No marker and no Plusfish job twice in a row
+		# means the job ended without finishing; 10 failed connections in a row
+		# means the server went away (stopped by its idle check, say).
+		quiet=0
+		lost=0
+		while true; do
+			if answer="$(ssh -o BatchMode=yes -o ConnectTimeout=20 chessplus-sims \
+				"if [ -e $marker ]; then echo done; elif pgrep -x plusfish >/dev/null || pgrep -x cargo >/dev/null; then echo working; else echo idle; fi" 2>/dev/null)"; then
+				lost=0
+				case "$answer" in
+					done) echo "$marker is there."; exit 0 ;;
+					working) quiet=0 ;;
+					*) quiet=$((quiet + 1)) ;;
+				esac
+				if [ "$quiet" -ge 2 ]; then
+					echo "No Plusfish job is running and $marker isn't there: the job ended without finishing." >&2
+					exit 1
+				fi
+			else
+				lost=$((lost + 1))
+				if [ "$lost" -ge 10 ]; then
+					echo "Can't reach $NAME any more ($(state_and_address "$id"))." >&2
+					exit 1
+				fi
+			fi
+			sleep 30
+		done
+		;;
 	stop)
 		aws ec2 stop-instances --instance-ids "$id" >/dev/null
 		aws ec2 wait instance-stopped --instance-ids "$id"
@@ -106,7 +144,7 @@ case "${1:-status}" in
 		ssh -o BatchMode=yes chessplus-sims "$@"
 		;;
 	*)
-		echo "Usage: bash tools/sims_server.sh status|start|stop|ssh <command>" >&2
+		echo "Usage: bash tools/sims_server.sh status|start|wait <file>|stop|ssh <command>" >&2
 		exit 2
 		;;
 esac
