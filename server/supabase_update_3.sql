@@ -18,6 +18,9 @@
 -- Banning a device: add its ID (from games.white_id / black_id) to the
 -- "banned" table in the Table Editor.
 
+-- All or nothing: if any line fails, nothing changes.
+begin;
+
 create schema if not exists chessplus_private;
 revoke all on schema chessplus_private from public, anon, authenticated;
 
@@ -501,3 +504,5 @@ grant execute on function
   public.share_army(jsonb),
   public.get_shared_army(text)
   to authenticated;
+
+commit;
