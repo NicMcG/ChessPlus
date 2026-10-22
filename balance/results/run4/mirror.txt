@@ -1,0 +1,12 @@
+army|without the rule|with the rule
+Wide 15b|Best move: Axb7! (g2!b7)  eval +3.30  [16310400 nodes, 3379k nodes/s]|Best move: Ah3 (g2-h3)  eval +2.82  [16417920 nodes, 3406k nodes/s]
+Wide 14b|Best move: Axf7! (a2!f7)  eval +0.26  [16280704 nodes, 3415k nodes/s]|Best move: Gd3 (e2-d3)  eval +0.29  [16078976 nodes, 3320k nodes/s]
+Wide 15c|Best move: Bxg7 (b2xg7)  eval +3.25  [15811712 nodes, 3053k nodes/s]|Best move: Wb6# (g1-b6)  eval #1  [582 nodes, 582k nodes/s]
+Wide 14c|Best move: Axb7! (g2!b7)  eval +3.91  [16190592 nodes, 3025k nodes/s]|Best move: ASab3 (a2-b3)  eval +0.48  [16086144 nodes, 3207k nodes/s]
+Wide 14a|Best move: Axb7! (g2!b7)  eval +4.28  [15916160 nodes, 3321k nodes/s]|Best move: Ba6 (e2-a6)  eval +2.38  [16156800 nodes, 3411k nodes/s]
+Wide 9b|Best move: Lxe7+ (e2xe7)  eval +3.04  [15760512 nodes, 4975k nodes/s]|Best move: GAb6 (b2-b6)  eval +2.88  [15681664 nodes, 5220k nodes/s]
+Wide 13c|Best move: Qxg7 (b2xg7)  eval +0.09  [15932544 nodes, 3345k nodes/s]|Best move: Gd3 (c2-d3)  eval +0.11  [15524992 nodes, 3222k nodes/s]
+Wide 12b|Best move: Axa7 (f2xa7)  eval +0.49  [15971456 nodes, 3970k nodes/s]|Best move: ASg4 (g2-g4)  eval +0.63  [15870080 nodes, 3783k nodes/s]
+Wide 15a|Best move: Axa7 (f2xa7)  eval +0.15  [17095808 nodes, 3518k nodes/s]|Best move: Wg6# (g1-g6)  eval #1  [132 nodes, 132k nodes/s]
+Wide 11a|Best move: Lxh7 (h2xh7)  eval +1.82  [16254080 nodes, 3530k nodes/s]|Best move: Ed4 (f2-d4)  eval +0.19  [15832192 nodes, 3336k nodes/s]
+Standard|Best move: d4 (d2-d4)  eval +0.16  [15912064 nodes, 3483k nodes/s]|Best move: d4 (d2-d4)  eval +0.26  [16131200 nodes, 3500k nodes/s]

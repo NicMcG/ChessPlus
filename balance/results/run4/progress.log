@@ -1,0 +1,8 @@
+[2026-10-22 06:24:56 UTC] start; game version 29863bb (experiment/quiet-first-move); 64 cores; rule --quiet-first-move=true
+[2026-10-22 06:24:56 UTC] part 1: 55 pairings, 40 games each, 8000 nodes, random plies 4, seeds 3000-3054
+[2026-10-22 06:26:03 UTC] part 1 finished (55 pairing files)
+[2026-10-22 06:26:03 UTC] part 2: selfplay 20000 games, 8000 nodes, seed 101
+[2026-10-22 06:33:38 UTC] part 2 finished (exit 0)
+[2026-10-22 06:33:38 UTC] part 3: each army against itself, 2000000 nodes, 8 threads, without and with the rule
+[2026-10-22 06:35:10 UTC] part 3 finished
+[2026-10-22 06:35:10 UTC] all done
