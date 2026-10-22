@@ -171,12 +171,15 @@ weights learn it from what happens 16 to 40 plies later in games Plusfish
 plays against itself (README, "Opening terms"; `reports/START_EVAL.md`):
 
 ```
-$PF drift --games 4000 --nodes 40000 --threads 19 --params ../plusfish-work/params.txt --out ../plusfish-work/drift.jsonl
+$PF drift --games 4000 --nodes 40000 --threads 19 --params ../plusfish-work/params.txt --pool engine/plusfish/reports/meta_pool.txt --out ../plusfish-work/drift.jsonl
 $PF tune ../plusfish-work/drift.jsonl --drift --params ../plusfish-work/params.txt --only omat,omob,oreach,orow1,oability,otempo --threads 19 --out ../plusfish-work/params_open.txt
 ```
 
-`params_open.txt` is then the whole set (the piece weights plus the opening
-ones): use it in place of `params.txt` in steps 3 and 4.
+`--pool` makes about half the armies meta pool ones, so the opening terms
+also learn from the kind of armies people build. `params_open.txt` is then
+the whole set (the piece weights plus the opening ones): use it in place of
+`params.txt` in steps 3 and 4. More games help: the built-in weights were
+fitted on 9,000 (three runs like this one).
 
 `params.txt` is a plain text file, one weight per line:
 `mat:knight 358.9 175.5` means Plusfish counts a Knight as 359 in the

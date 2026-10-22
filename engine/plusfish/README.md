@@ -233,7 +233,7 @@ score at the eval bar's budgets (`--eval-nodes 20000,150000`, a fresh search
 each, plus the score after each finished depth), the score at every ply,
 the material balance, the moves and the result. The games where the start
 score and the later scores disagree most are where the opening judgement is
-wrong; `reports/START_EVAL.md` is what the first 8,000 showed. `--starts`
+wrong; `reports/START_EVAL.md` is what 12,000 of them showed. `--starts`
 only re-scores the starts of an earlier file (another build or `--params`),
 so engines can be compared on the same games; `--features` adds the start's
 evaluation terms by name; `--pool <file>` draws half the armies from a pool.
