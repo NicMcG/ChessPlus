@@ -84,12 +84,19 @@ static func key_bind(action: String, default: int) -> int:
 static func set_key_bind(action: String, code: int) -> void:
 	_store("keys", action, code)
 
+## The mouse button a board action is on (see MouseBinds), or `default`.
+static func mouse_bind(action: String, default: int) -> int:
+	return _settings().get_value("mouse", action, default)
+
+static func set_mouse_bind(action: String, index: int) -> void:
+	_store("mouse", action, index)
+
 ## Settings' "Reset to defaults": every setting back to how it started (sound,
-## notifications, visual, keys). The online game in progress and the default
-## armies (set in My armies) are kept.
+## notifications, visual, keys, mouse buttons). The online game in progress and
+## the default armies (set in My armies) are kept.
 static func reset_to_defaults() -> void:
 	var file := _settings()
-	for section in ["audio", "notify", "visual", "keys"]:
+	for section in ["audio", "notify", "visual", "keys", "mouse"]:
 		if file.has_section(section):
 			file.erase_section(section)
 	file.save(save_path)
