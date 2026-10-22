@@ -1,0 +1,8 @@
+[2026-10-22 05:49:53 UTC] start; game version 8a02334; 64 cores
+[2026-10-22 05:49:53 UTC] part 1: 55 pairings of 11 armies, 40 games each, 8000 nodes, random plies 4, seeds 3000-3054
+[2026-10-22 05:51:00 UTC] part 1 finished (55 pairing files)
+[2026-10-22 05:51:00 UTC] part 3: Standard vs Standard, 4000 games, 8000 nodes, random plies 4, seed 301
+[2026-10-22 05:52:32 UTC] part 3 standard_8k finished (exit 0)
+[2026-10-22 05:52:32 UTC] part 3: Standard vs Standard, 4000 games, 32000 nodes, random plies 4, seed 302
+[2026-10-22 05:58:47 UTC] part 3 standard_32k finished (exit 0)
+[2026-10-22 05:58:47 UTC] all done
