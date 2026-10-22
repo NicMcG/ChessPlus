@@ -67,5 +67,25 @@ at 80% or more (all 55 pairings).
   direction, not clear (1.023, p = 0.056). Long-range pieces: slightly more
   White-won-both in both runs, not clear (p about 0.06-0.07).
 
+## Afterwards: where White's edge comes from
+
+Checked the same day on Mac's PC (no server). Armies have no pawn wall, so
+long-range front-row pieces and Crack Shot can capture before anyone has
+moved, and White goes first. Using "White's first move was a capture or an
+ability" as the sign of that:
+
+| Games | White's first move captures | White scores then | Otherwise |
+|---|---|---|---|
+| run 2, random armies, 8k | 23.5% of games | 67.2% | 52.6% |
+| run 2, random armies, 32k | 23.3% | 68.3% | 53.0% |
+| run 3, meta pool, 8k | 52.1% | 71.1% | 53.7% |
+
+Without a first-move capture, White already scores about 53%, inside chess's
+54-56%. Plusfish rates the chess start +0.29 (2M nodes), like top chess
+engines (+0.20 to +0.35). Each pool army against itself (the same measure for
+an army): Wide 15b +4.59 (1. Axb7!), 14a +4.53 (1. Axb7!), 14c +3.86
+(1. Axb7!), 15c +3.28 (1. Bxg7), 9b +2.91 (1. Lxa7), 11a +1.90 (1. Lxh7),
+12b +0.65, 15a +0.42, 14b +0.16, 13c +0.07.
+
 These are engine-vs-engine results, not human play. Balancing decisions are
-Mac's, discussed in normal Claude chat.
+Mac's.
