@@ -23,4 +23,4 @@ symbol = "J"
 value = 4
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2")])
 decoy = true
-special_rule = "If an enemy piece would capture one of your non-pawn pieces on a square within the Jester's move range, the Jester and your piece swap places first."
+special_rule = "If an enemy piece would capture one of your non-pawn pieces on a square within the Jester's move range, the Jester and your piece swap places first. If more than one Jester could take the hit, the attacking player chooses which."

@@ -67,6 +67,10 @@ var attacker_died := false
 var decoy_piece: Piece
 var decoy_square: Vector2i
 var decoy_piece_had_moved := false
+## True when more than one Jester could take this hit: the attacking player
+## chooses which (Mac, Oct 2026), so there's one move per Jester, and its text
+## names the Jester's square ("e4xd5/c6").
+var decoy_choice := false
 ## Filled in by make_move: the shield the capture broke was one the target gained
 ## (Vampire), and the capturing piece gained a shield by this capture.
 var broke_gained_shield := false
@@ -89,6 +93,28 @@ func lands_on() -> Vector2i:
 func is_castling() -> bool:
 	return partner != null
 
+## A new move just like this one, before it's played (what's chosen: squares,
+## pieces, promotion, ability), for making several versions of one move.
+func copy() -> Move:
+	var other := Move.new(from, to, piece, captured)
+	other.capture_square = capture_square
+	other.skipped_squares = skipped_squares
+	other.shield_target = shield_target
+	other.promotion = promotion
+	other.partner = partner
+	other.partner_from = partner_from
+	other.partner_to = partner_to
+	other.ability = ability
+	other.raised = raised
+	other.raised_from_lost = raised_from_lost
+	other.frozen = frozen
+	return other
+
+## "/c6" (the Jester's square) when the attacker chose which Jester takes the
+## hit, otherwise "". Goes on the end of the move's text and SAN.
+func decoy_text() -> String:
+	return "/" + Board.square_name(decoy_square) if decoy_choice else ""
+
 ## Simple text like "e2-e4", "e4xd5" or "e7-e8=Q". Used for testing, not real notation.
 func to_text() -> String:
 	# Abilities: "c1!g5" (Crack Shot on g5), "d1!=Q" (Raise Dead bringing back a
@@ -103,9 +129,9 @@ func to_text() -> String:
 	if ability == PieceDef.Ability.RAISE_DEAD:
 		return Board.square_name(from) + "!=" + raised.def.symbol.to_upper()
 	if ability == PieceDef.Ability.CRACK_SHOT:
-		return Board.square_name(from) + "!" + Board.square_name(to)
+		return Board.square_name(from) + "!" + Board.square_name(to) + decoy_text()
 	var joiner := "x" if is_capture() else "-"
 	var text := Board.square_name(from) + joiner + Board.square_name(to)
 	if promotion:
 		text += "=" + promotion.symbol.to_upper()
-	return text
+	return text + decoy_text()

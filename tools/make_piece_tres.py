@@ -48,7 +48,7 @@ PIECES = {
         (ALL8, 2, 1, {}),
         (ALL8, 1, 2, {}),
     ], extra={"decoy": "true"},
-        special_rule="If an enemy piece would capture one of your non-pawn pieces on a square within the Jester's move range, the Jester and your piece swap places first."),
+        special_rule="If an enemy piece would capture one of your non-pawn pieces on a square within the Jester's move range, the Jester and your piece swap places first. If more than one Jester could take the hit, the attacking player chooses which."),
     # Batch 3: abilities (PieceDef.Ability HAUNT = 3, SONG_OF_SLUMBER = 4,
     # FULL_MOON = 5). Colours are the ability's gradient, left to right.
     "ghost": dict(name="Ghost", symbol="G", value=3, rules=[

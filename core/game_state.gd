@@ -494,7 +494,14 @@ func find_played_move(text: String) -> Move:
 ## The available move whose to_text() matches, e.g. "e2-e4" or "e7-e8=Q", or null.
 ## For tests.
 func find_move(text: String) -> Move:
-	for move in moves():
+	var all := moves()
+	for move in all:
 		if move.to_text() == text:
 			return move
+	# Saved before the attacker chose which Jester takes a hit (Oct 2026), a move
+	# doesn't name the Jester: it was the first one, as the game picked then.
+	if not text.contains("/"):
+		for move in all:
+			if move.decoy_choice and move.to_text().get_slice("/", 0) == text:
+				return move
 	return null

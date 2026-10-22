@@ -87,6 +87,11 @@ var _selected_moves: Array[Move] = []
 var _ability_moves: Array[Move] = []
 ## True while choosing a target for an ability: only its targets are offered.
 var aiming := false
+## A capture that more than one Jester could take: one move per Jester, until
+## the player taps the Jester they want to take the hit (Mac: the attacking
+## player chooses). Gold rings close in on those Jesters meanwhile; a tap
+## anywhere else calls the capture off. Empty the rest of the time.
+var jester_choices: Array[Move] = []
 
 # Pointer (mouse or finger) state.
 var _pressed := false
@@ -247,6 +252,16 @@ func square_center(square: Vector2i) -> Vector2:
 func tap(square: Vector2i) -> bool:
 	if not _can_play():
 		return false
+	if not jester_choices.is_empty():
+		var picked: Array[Move] = []
+		picked.assign(jester_choices.filter(func(m: Move) -> bool: return m.decoy_square == square))
+		jester_choices.clear()
+		queue_redraw()
+		if not picked.is_empty():
+			_choose(picked)
+			return true
+		# Not one of the Jesters: the capture is called off, and the tap does
+		# whatever it would have done.
 	if _try_move_to(square):
 		return true
 	var piece := state.board.get_piece(square)
@@ -321,7 +336,7 @@ func _process(delta: float) -> void:
 	advance_animation(delta)
 	# Kings in check tremble, aiming rings close in and sleeping pieces' "Zz"
 	# bobs: keep redrawing.
-	if not _check_squares.is_empty() or aiming or (state and state.frozen_piece()) or _any_vampire_aura():
+	if not _check_squares.is_empty() or aiming or not jester_choices.is_empty() or (state and state.frozen_piece()) or _any_vampire_aura():
 		queue_redraw()
 
 ## True if a Vampire has its shield (its aura pulses, so keep redrawing).
@@ -476,13 +491,26 @@ func _try_move_to(square: Vector2i) -> bool:
 	choices.assign(_selected_moves.filter(func(m: Move) -> bool: return m.to == square))
 	if choices.is_empty():
 		return false
+	var from := _selected
 	_clear_selection()
 	queue_redraw()
+	if choices.any(func(m: Move) -> bool: return m.decoy_choice):
+		# More than one Jester could take this hit: the player taps which.
+		jester_choices = choices
+		_jester_attacker = from
+		return true
+	_choose(choices)
+	return true
+
+## Where the attacker stands while the player chooses a Jester (it stays tinted).
+var _jester_attacker := Board.NO_SQUARE
+
+## Play the move, or ask which one if there are several (promotions, Raise Dead).
+func _choose(choices: Array[Move]) -> void:
 	if choices.size() == 1:
 		move_chosen.emit(choices[0])
 	else:
 		choice_needed.emit(choices)
-	return true
 
 func _can_play() -> bool:
 	return input_enabled and state != null and state.outcome() == GameState.Outcome.NONE
@@ -608,6 +636,13 @@ func _draw() -> void:
 	if not (aiming and _aim_unmarked) and (helpers.move_dots or aiming):
 		for move in _selected_moves:
 			_draw_target(move)
+	# Choosing which Jester takes the hit: the attacker stays tinted and gold
+	# rings close in on each Jester that could (always shown: they're needed).
+	if not jester_choices.is_empty():
+		if _jester_attacker != Board.NO_SQUARE:
+			draw_rect(_square_rect(_jester_attacker), SELECTED_TINT)
+		for move in jester_choices:
+			_draw_closing_rings(_square_rect(move.decoy_square))
 	if hint_arrow.size() == 2 and hint_arrow[0] != hint_arrow[1]:
 		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
 	if not hint_piece.is_empty():
@@ -1174,19 +1209,24 @@ func _draw_target(move: Move) -> void:
 	var rect := _square_rect(move.to)
 	var center := rect.get_center()
 	if aiming:
-		# Gold rings that close in on the target (Mac's design): each fades in
-		# large, then shrinks and fades away as the next one fades in.
-		var seconds := Time.get_ticks_msec() / 1000.0
-		for ring in 2:
-			var t := fmod(seconds * 0.8 + ring * 0.5, 1.0)
-			var alpha := smoothstep(0.0, 0.2, t) * (1.0 - t)
-			var radius := rect.size.x * lerpf(0.62, 0.12, t)
-			draw_arc(center, radius, 0, TAU, 40, Color(ABILITY_MARK, ABILITY_MARK.a * alpha), rect.size.x * 0.08, true)
+		_draw_closing_rings(rect)
 		return
 	if move.is_capture() and not state.board.is_empty(move.to):
 		draw_arc(center, rect.size.x * 0.45, 0, TAU, 32, TARGET_MARK, rect.size.x * 0.08, true)
 	else:
 		draw_circle(center, rect.size.x * 0.16, TARGET_MARK)
+
+## Gold rings that close in on the square `rect` (Mac's design, for an
+## ability's targets): each fades in large, then shrinks and fades away as the
+## next one fades in.
+func _draw_closing_rings(rect: Rect2) -> void:
+	var center := rect.get_center()
+	var seconds := Time.get_ticks_msec() / 1000.0
+	for ring in 2:
+		var t := fmod(seconds * 0.8 + ring * 0.5, 1.0)
+		var alpha := smoothstep(0.0, 0.2, t) * (1.0 - t)
+		var radius := rect.size.x * lerpf(0.62, 0.12, t)
+		draw_arc(center, radius, 0, TAU, 40, Color(ABILITY_MARK, ABILITY_MARK.a * alpha), rect.size.x * 0.08, true)
 
 func _square_size() -> float:
 	return minf(size.x / state.board.width, size.y / state.board.height)
@@ -1248,5 +1288,6 @@ func _clear_selection() -> void:
 	_selected_moves.clear()
 	_ability_moves.clear()
 	aiming = false
+	jester_choices.clear()
 	if had_selection:
 		selection_changed.emit(Board.NO_SQUARE)

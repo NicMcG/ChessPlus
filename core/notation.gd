@@ -9,7 +9,8 @@ extends RefCounted
 ##   Pictures (what players see, Mac's design): picture() gives a list of parts
 ##     (piece pictures, small icons and bits of text) that the move list draws:
 ##     [piece] e4, [piece] [crossed swords] d5, [piece] [cracked shield] d5,
-##     [pawn] a8 [arrow] [queen],
+##     [pawn] a8 [arrow] [queen], [bishop] [crossed swords] d5 [jester] c6 (the
+##     attacker chose the Jester on c6 to take the hit),
 ##     then a warning-triangle icon for check or a skull and crossbones for mate.
 
 const NO_LETTER_SYMBOL := "P"
@@ -51,6 +52,8 @@ static func _san(move: Move, check_suffix: String, detail: String) -> String:
 		# Crack Shot (text only): Axd5!
 		if move.ability == PieceDef.Ability.CRACK_SHOT:
 			text += "!"
+		# The attacker chose which Jester takes the hit: Bxd5/c6.
+		text += move.decoy_text()
 	return text + check_suffix
 
 ## Which piece of its type made the move, when it isn't obvious from the
@@ -101,6 +104,9 @@ static func _picture(move: Move, check_suffix: String, detail: String) -> Array:
 			parts.append({"piece": target.def, "team": target.team})
 			if move.breaks_shield():
 				parts.append({"icon": SHIELD_BREAK_ICON})
+			if move.decoy_choice:
+				# Which Jester took the shot: [archer] [lightning bolt] [jester] c6.
+				parts.append({"text": Board.square_name(move.decoy_square)})
 	elif move.is_castling():
 		parts.append({"text": "O-O" if move.to.x > move.from.x else "O-O-O"})
 	else:
@@ -115,6 +121,10 @@ static func _picture(move: Move, check_suffix: String, detail: String) -> Array:
 		if move.promotion:
 			parts.append({"icon": PROMOTE_ICON})
 			parts.append({"piece": move.promotion, "team": move.piece.team})
+		if move.decoy_choice:
+			# Which Jester the attacker chose to take the hit: ... d5 [jester] c6.
+			parts.append({"piece": move.captured.def, "team": move.captured.team})
+			parts.append({"text": Board.square_name(move.decoy_square)})
 	if check_suffix == "+":
 		parts.append({"icon": CHECK_ICON})
 	elif check_suffix == "#":

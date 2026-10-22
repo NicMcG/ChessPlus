@@ -97,6 +97,8 @@ static func haunting_ghosts(state: GameState, team: Piece.Team) -> Array[Piece]:
 ## protected piece (a Knight on a square a Squire could reach) can't be
 ## captured, and a capture of a piece a Jester could reach becomes a swap in
 ## which the Jester is captured instead. Pawn types and kings are never swapped.
+## If more than one Jester could take the hit, the attacking player chooses
+## which (Mac): the capture becomes one move per Jester.
 static func _apply_guards(state: GameState, moves: Array[Move]) -> Array[Move]:
 	var board := state.board
 	var defenders := board.pieces_of(Piece.other_team(state.side_to_move))
@@ -121,14 +123,25 @@ static func _apply_guards(state: GameState, moves: Array[Move]) -> Array[Move]:
 		if protected.has(move.capture_square):
 			continue
 		var target := move.captured
+		var reaching := []
 		if not target.def.is_pawn_type() and not target.def.is_king_type() and not target.def.decoy:
 			for jester: Array in jesters:
 				if (jester[2] as Dictionary).has(move.capture_square):
-					move.decoy_piece = target
-					move.decoy_square = jester[0]
-					move.captured = jester[1]
-					break
-		kept.append(move)
+					reaching.append(jester)
+		if reaching.is_empty():
+			kept.append(move)
+			continue
+		# Copies first, while `move` still aims at the target.
+		var options: Array[Move] = [move]
+		for i in range(1, reaching.size()):
+			options.append(move.copy())
+		for i in reaching.size():
+			var option := options[i]
+			option.decoy_piece = target
+			option.decoy_square = reaching[i][0]
+			option.captured = reaching[i][1]
+			option.decoy_choice = reaching.size() > 1
+			kept.append(option)
 	return kept
 
 ## The squares `piece` (on `from`) could move or capture to by its rules, as the

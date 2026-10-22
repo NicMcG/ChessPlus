@@ -143,6 +143,66 @@ func test_jester_takes_the_hit() -> void:
 	state = _game("k7/2b5/8/4P3/3J4/8/8/7K b - - 0 1")
 	check_eq(state.find_move("c7xe5").captured.def.id, "pawn", "Pawns aren't swapped")
 
+## Two White Jesters (d4, f4) that could both take the hit on the rook (e5).
+const TWO_JESTERS := "k7/2b5/8/4R3/3J1J2/8/8/7K b - - 0 1"
+
+func test_attacker_chooses_which_jester_takes_the_hit() -> void:
+	var state := _game(TWO_JESTERS)
+	var rook := state.board.get_piece(Board.parse_square("e5"))
+	var d4_jester := state.board.get_piece(Board.parse_square("d4"))
+	var f4_jester := state.board.get_piece(Board.parse_square("f4"))
+	var via_d4 := state.find_move("c7xe5/d4")
+	var via_f4 := state.find_move("c7xe5/f4")
+	check(via_d4 != null and via_f4 != null, "One capture per Jester, named by its square")
+	check(via_d4.captured == d4_jester and via_f4.captured == f4_jester, "Each takes its own Jester")
+	check_eq(state.moves().filter(func(m: Move) -> bool: return m.to == Board.parse_square("e5")).size(), 2, "Just those two")
+	state.make_move(via_f4)
+	check_eq(state.board.get_piece(Board.parse_square("f4")), rook, "The rook went to the f4 Jester's square")
+	check_eq(state.board.get_piece(Board.parse_square("d4")), d4_jester, "The other Jester stays")
+	check(state.lost[Piece.Team.WHITE].has(f4_jester), "The chosen Jester is lost")
+	state.undo_move(via_f4)
+	check_eq(state.board.get_piece(Board.parse_square("e5")), rook, "Undo: rook back")
+	check_eq(state.board.get_piece(Board.parse_square("f4")), f4_jester, "Undo: Jester back")
+	# Saved before the choice existed (no Jester named): the first one, as then.
+	check(state.find_move("c7xe5") != null and state.find_move("c7xe5").decoy_choice, "Old move text still loads")
+	# Notation names the Jester too.
+	check_eq(Notation.san(state, via_d4), "Bxe5/d4", "SAN")
+	check_eq(Notation.find_move(state, "Bxe5/f4").decoy_square, Board.parse_square("f4"), "Found by SAN")
+	var picture := Notation.picture(state, via_d4)
+	check(picture.has({"text": "d4"}) and picture.any(func(p: Dictionary) -> bool: return p.get("piece") == d4_jester.def),
+		"The picture shows the Jester and its square")
+	# Only one Jester able to: nothing to choose, nothing extra written.
+	state = _game("k7/2b5/8/4R3/3J4/8/8/7K b - - 0 1")
+	check(not state.find_move("c7xe5").decoy_choice, "One Jester: no choice")
+	check(_def("jester").special_rule.ends_with("If more than one Jester could take the hit, the attacking player chooses which."),
+		"The Jester's card says so (Mac's words)")
+
+func test_tapping_the_jester_to_take_the_hit() -> void:
+	var view := BoardView.new()
+	view.show_game(_game(TWO_JESTERS))
+	view.size = Vector2(800, 800)
+	var chosen: Array[Move] = []
+	view.move_chosen.connect(func(move: Move) -> void: chosen.append(move))
+	view.tap(Board.parse_square("c7"))
+	check(view.tap(Board.parse_square("e5")), "Tapping the rook...")
+	check(chosen.is_empty(), "...doesn't move yet")
+	check_eq(view.jester_choices.size(), 2, "...it waits for a Jester to be picked")
+	view.tap(Board.parse_square("f4"))
+	check_eq(chosen.size(), 1, "Tapping a Jester plays the capture")
+	if chosen.size() == 1:
+		check_eq(chosen[0].decoy_square, Board.parse_square("f4"), "...with that Jester")
+	check(view.jester_choices.is_empty(), "Done choosing")
+	view.tap(Board.parse_square("c7"))
+	view.tap(Board.parse_square("e5"))
+	view.tap(Board.parse_square("h8"))
+	check_eq(chosen.size(), 1, "Tapping anywhere else calls the capture off")
+	check(view.jester_choices.is_empty(), "...and stops choosing")
+	view.free()
+
+func test_plusfish_is_off_with_two_jesters_on_a_side() -> void:
+	check(not PlusfishLink.supports(_game(TWO_JESTERS)), "Two Jesters on one side: Plusfish doesn't know the choice yet")
+	check(PlusfishLink.supports(_game("k2j4/2b5/8/4R3/3J4/8/8/7K b - - 0 1")), "One each: fine")
+
 func test_jester_swap_animates_and_plusfish_knows_it() -> void:
 	var state := _game("k7/2b5/8/4R3/3J4/8/8/7K b - - 0 1")
 	var jester := state.board.get_piece(Board.parse_square("d4"))
