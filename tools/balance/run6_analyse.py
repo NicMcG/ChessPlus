@@ -1,11 +1,13 @@
-"""Balance run 6 (the Front-row rule with strong armies): run 3's round robin
-and success test on a meta pool regrown under the rule, each pool army against
-itself, and random armies at 32,000 nodes compared with run 2's.
+"""Balance runs 6 and 7: run 3's round robin and success test on a regrown
+meta pool, each pool army against itself, and (run 6) random armies at
+32,000 nodes compared with run 2's.
 
-    python tools/balance/run6_analyse.py --run6 <run6 folder> \
-        --run2-32k <run2 32k games.jsonl> --out balance/results/run6/report.md
+    python tools/balance/run6_analyse.py --run6 <run folder> \
+        [--run2-32k <run2 32k games.jsonl>] [--title ...] --out <report.md>
 
-Uses run3_analyse.py's helpers (same statistics and success test).
+Run 6 grew its pool under the Front-row rule (Plusfish branch
+experiment/front-row-rule, --front-row-rule=true); run 7 is the same with the
+normal rules. Uses run3_analyse.py's helpers (same statistics and success test).
 """
 import argparse
 import os
@@ -19,15 +21,15 @@ import run5_analyse as r5
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run6", required=True)
-    ap.add_argument("--run2-32k", required=True)
+    ap.add_argument("--run2-32k", default="")
+    ap.add_argument("--title", default="Balance run 6: the Front-row rule with strong armies (report)")
     ap.add_argument("--pieces", default="data/pieces")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     pieces = r.read_pieces(args.pieces)
-    out = ["# Balance run 6: the Front-row rule with strong armies (report)\n",
-           "Made by `tools/balance/run6_analyse.py`. The meta pool was regrown with Plusfish enforcing the "
-           "Front-row rule (`engine/plusfish` on branch `experiment/front-row-rule`, `--front-row-rule=true`); "
-           "parts 1 and 2 use run 3's settings, so they compare with run 3 directly. Points = percentage points.\n"]
+    out = ["# %s\n" % args.title,
+           "Made by `tools/balance/run6_analyse.py`. Parts 1 and 2 use run 3's settings, so they compare "
+           "with run 3 directly. Points = percentage points.\n"]
     big_gaps, lopsided = r.part1(args.run6, pieces, out)
     out[out.index("## Part 1: meta pool round robin\n")] = "## Part 1: round robin of the new pool (run 3's settings)\n"
 
@@ -40,18 +42,21 @@ def main():
             out.append("| %s `%s` | %s | %s |" % (name, army, res.split("eval")[1].split()[0],
                                                   res.split("Best move:")[1].split("(")[0].strip()))
 
-    out.append("\n## Part 3: random armies at 32,000 nodes\n")
-    before = r5.describe(r.read_games(args.run2_32k))
-    after = r5.describe(r.read_games(os.path.join(args.run6, "selfplay_32k.jsonl")))
-    out.append("| | Run 2 (no rule, 32k) | Run 6 (Front-row rule, 32k) |\n|---|---|---|")
-    for key, label in (("games", "Games"), ("white", "White's score (95%)"), ("draws", "Draws"),
-                       ("both", "White won both games of a swapped pair (chess benchmark 23%)"),
-                       ("first", "Games where White's first move captures or uses an ability"),
-                       ("plies", "Mean game length (plies)")):
-        out.append("| %s | %s | %s |" % (label, before[key], after[key]))
+    selfplay = os.path.join(args.run6, "selfplay_32k.jsonl")
+    if os.path.exists(selfplay) and args.run2_32k:
+        out.append("\n## Part 3: random armies at 32,000 nodes\n")
+        before = r5.describe(r.read_games(args.run2_32k))
+        after = r5.describe(r.read_games(selfplay))
+        out.append("| | Run 2 (no rule, 32k) | Run 6 (Front-row rule, 32k) |\n|---|---|---|")
+        for key, label in (("games", "Games"), ("white", "White's score (95%)"), ("draws", "Draws"),
+                           ("both", "White won both games of a swapped pair (chess benchmark 23%)"),
+                           ("first", "Games where White's first move captures or uses an ability"),
+                           ("plies", "Mean game length (plies)")):
+            out.append("| %s | %s | %s |" % (label, before[key], after[key]))
 
     out.append("\n## Success test (run 3's, decided before running), on the new pool\n")
-    out.append("- Pool armies with a gap over 30 points: %s" % (", ".join("%s (%+.1f)" % g for g in big_gaps) if big_gaps else "none"))
+    out.append("- Pool armies with a gap over 30 points: %s"
+               % (", ".join("%s (%+.1f)" % g for g in big_gaps) if big_gaps else "none"))
     out.append("- Pairings with White at 80%% or more: %s"
                % (", ".join("%s vs %s (%s)" % (a, b, r.pct(m)) for a, b, m in lopsided) if lopsided else "none"))
     out.append("- **Result: %s**" % ("PASSED" if not big_gaps and not lopsided else "FAILED"))

@@ -1,7 +1,7 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 22 October 2026. The full data is in the repo
-(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run5` (a
+Last updated 22 October 2026 (after run 7). The full data is in the repo
+(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run7` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
 Balancing is now discussed in Claude Code; Mac makes the decisions.
@@ -57,10 +57,16 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   52.0% (from 56.1%); an army against itself median +0.26 (chess +0.29), none
   over +1 pawn (was 6 of 18). It would also make the temporary "King exposed"
   rule unnecessary. Status: tested, **not adopted yet** (Mac's choice).
-- **In progress:** run 6 (the Front-row rule with a meta pool grown under it,
-  and Mac's success test: no army's White-minus-Black gap over 30 points, no
-  pairing with White at 80%+) and run 7 (the normal meta pool regrown with
-  Plusfish's newest version, PR #26).
+- **Run 6, the Front-row rule with strong armies** (a meta pool grown under
+  it): White 51.0% overall, every army's White-minus-Black gap under 15
+  points; Mac's success test failed by a single pairing at 82.5% (33 of 40
+  games). At deeper search (32k nodes) random armies under the rule: White
+  51.4%. The one strong army still well ahead against itself opens with a
+  check on move 1 (the rule only stops captures).
+- **Run 7, the normal rules with the improved Plusfish:** the problem is
+  still there (White 59.4%, 3 pairings at 80%+, half the strong armies +3 to
+  +4 against themselves via first-move captures). Its pool is the official
+  meta pool now.
 
 ## Other open questions
 

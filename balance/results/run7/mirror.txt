@@ -1,0 +1,12 @@
+name|army|result
+Wide 11a|1(WW)GK(NC)(CV)(GA)R/(AS)BB(CV)GE(PD)L|Best move: Lxh7 (h2xh7)  eval +0.23  [16051328 nodes, 4394k nodes/s]
+Wide 13c|P(CV)NCK(BR)1B/(AS)G(BR)LV(RM)B(AS)|Best move: Lxd7+ (d2xd7)  eval +4.05  [16790656 nodes, 4044k nodes/s]
+Wide 15a|QE(WW)1KN(NC)(RM)/(AS)APB(BR)(PD)G(AS)|Best move: Axg7! (b2!g7)  eval +3.43  [16202880 nodes, 3782k nodes/s]
+Wide 10a|1Q1KGE(NC)C/B(AS)BG(BR)(AS)(PD)A|Best move: Bxf7+ (a2xf7)  eval +4.05  [16038016 nodes, 3736k nodes/s]
+Wide 14a|(NC)(WW)ENKQPA/GB(AS)(CV)PG1(AS)|Best move: Axa8! (h1!a8)  eval +2.99  [15779968 nodes, 3628k nodes/s]
+Wide 15c|EQ(RO)K1(AS)(WW)(NC)/(PD)GB(RM)GB(PD)(AS)|Best move: Bxh7* (c2xh7)  eval +0.30  [16133248 nodes, 3522k nodes/s]
+Wide 13a|(NC)PQPK(GA)P(CV)/EBAGPEGP|Best move: Ge3 (d2-e3)  eval +0.19  [15813760 nodes, 3319k nodes/s]
+Wide 11c|1Q1NKPP(NC)/(RM)(SQ)(CV)(AS)(RM)A(WW)(AS)|Best move: SQc3 (b2-c3)  eval +0.12  [15863936 nodes, 3304k nodes/s]
+Wide 7c|1G1NKQG1/BA(AS)(RM)(CV)(BR)(AS)(CH)|Best move: Axg7! (b2!g7)  eval +4.10  [15915136 nodes, 3624k nodes/s]
+Standard|standard|Best move: d4 (d2-d4)  eval +0.13  [16042112 nodes, 3488k nodes/s]
+Wide 14a|1(BR)ENK1Q(BR)/C(AS)(RO)EB(PD)AB|Best move: Axb7! (g2!b7)  eval +3.87  [16156800 nodes, 3120k nodes/s]
