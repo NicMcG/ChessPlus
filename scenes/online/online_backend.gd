@@ -1,41 +1,26 @@
 class_name OnlineBackend
 extends Node
 
-## Where online games are stored: one table of games, one row per game (a
-## Dictionary of plain data: code, armies, moves, clocks, status...). This is the
-## shape every backend follows; SupabaseBackend is the real server and
-## MemoryBackend a stand-in for tests.
+## Where online games are kept. Everything goes through the server's functions
+## (server/supabase_update_3.sql): create_game, join_game, get_game, play_move,
+## resign_game, offer_draw, answer_draw, cancel_game, claim_timeout,
+## send_chat, claim_rematch, share_army, get_shared_army. Nobody touches the
+## tables directly, and each function checks the caller may do what they ask.
+## SupabaseBackend is the real server, MemoryBackend a stand-in for tests.
 ##
-## Every call returns {"ok": bool, "rows": Array of rows, "error": String}. The
-## calls may take a moment (they go over the internet), so use them with await.
+## Every call returns {"ok": bool, "rows": Array, "error": String}. A function
+## that answers with a game (or other data) gives it as rows[0]; "nothing
+## changed" (e.g. the opponent moved first) gives no rows. The calls may take a
+## moment (they go over the internet), so use them with await.
 
-## Add a new game. Fails if a game with the same code already exists.
-func insert(_row: Dictionary) -> Dictionary:
-	return failed("not implemented")
-
-## The game with this code (rows is empty if there isn't one).
-func fetch(_code: String) -> Dictionary:
-	return failed("not implemented")
-
-## Change some of a game's columns, but only if it still matches `conditions`
-## (column -> value), e.g. {"move_count": 12} so two moves can't collide. rows
-## holds the updated game, or is empty if the conditions didn't match.
-func update(_code: String, _changes: Dictionary, _conditions: Dictionary = {}) -> Dictionary:
-	return failed("not implemented")
-
-## Run one of the server's functions (see server/*.sql), e.g.
-## call_function("post_chat", {"game_code": ..., "sender": ..., "message": ...}).
-## rows holds the games it changed.
+## Run one of the server's functions with its arguments (names as in the SQL,
+## e.g. {"p_code": "K7QX2", "p_seat": "white"}).
 func call_function(_name: String, _args: Dictionary) -> Dictionary:
 	return failed("not implemented")
 
-## Store a shared army ({"code", "army"}, see ArmyShare). Fails if the code is taken.
-func insert_shared_army(_row: Dictionary) -> Dictionary:
-	return failed("not implemented")
-
-## The shared army with this code (rows is empty if there isn't one).
-func fetch_shared_army(_code: String) -> Dictionary:
-	return failed("not implemented")
+## Who this device is on the server ("" until it has signed in).
+func user_id() -> String:
+	return ""
 
 static func succeeded(rows: Array) -> Dictionary:
 	return {"ok": true, "rows": rows, "error": ""}

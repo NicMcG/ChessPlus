@@ -107,31 +107,33 @@ static func _store(section: String, key: String, value: Variant) -> void:
 	file.set_value(section, key, value)
 	file.save(save_path)
 
-## A new random ID for one online game (16 hex digits). Each game gets its own,
-## so two copies of the game on one phone (e.g. the home-screen app and Safari,
-## which can share storage) can play each other.
-static func new_player_id() -> String:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var id := ""
-	for i in 16:
-		id += "%x" % rng.randi_range(0, 15)
-	return id
-
 ## The online game this copy of the game is playing ("" if none), so it can be
 ## picked up again from the main menu after the app closes.
 static func online_game() -> String:
 	return _settings().get_value("online", "game", "")
 
-## The player ID used in that game.
-static func online_player_id() -> String:
-	return _settings().get_value("online", "game_player_id", "")
+## Which side this device plays in that game (Piece.Team). The same device can
+## hold both sides (two copies of the game on one phone playing each other).
+static func online_team() -> int:
+	return int(_settings().get_value("online", "game_team", Piece.Team.WHITE))
 
-static func set_online_game(code: String, player_id := "") -> void:
+static func set_online_game(code: String, team := Piece.Team.WHITE) -> void:
 	var file := _settings()
 	file.set_value("online", "game", code)
-	file.set_value("online", "game_player_id", player_id if code != "" else "")
+	file.set_value("online", "game_team", team)
+	if file.has_section_key("online", "game_player_id"):
+		file.erase_section_key("online", "game_player_id")
 	file.save(save_path)
+
+## This device's sign-in on the online server ({} if none yet), kept so it
+## stays the same player between visits. `slot` "" is the device's own; tests
+## and the live server check use other slots for extra pretend devices.
+static func online_sign_in(slot := "") -> Dictionary:
+	var data: Variant = _settings().get_value("online_sign_in", slot if slot != "" else "device", {})
+	return data if data is Dictionary else {}
+
+static func set_online_sign_in(data: Dictionary, slot := "") -> void:
+	_store("online_sign_in", slot if slot != "" else "device", data)
 
 ## The saved army (its file, Army.library_path) the player chose as their
 ## default for `team`, or "" for none (then Standard is used). See ArmyChoices.

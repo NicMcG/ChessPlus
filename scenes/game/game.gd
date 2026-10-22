@@ -60,6 +60,8 @@ var _resign_tapped_ms := -1
 ## True while this player's move is on its way to the server.
 var _sending := false
 var _claiming_timeout := false
+## When a refused timeout claim may be tried again (Time.get_ticks_msec()).
+var _next_timeout_claim_ms := 0
 ## The result screen shown when a game ends.
 var game_over_panel: GameOverPanel
 ## Saved armies, for choosing one for a rematch.
@@ -2175,7 +2177,7 @@ func _start_online() -> void:
 	online.changed.connect(_on_online_changed)
 	online.start_polling()
 	if online.status() == OnlineSession.PLAYING:
-		UserSettings.set_online_game(online.code, online.player_id)
+		UserSettings.set_online_game(online.code, online.my_team)
 	else:
 		UserSettings.set_online_game("")
 	_show_new_state()
@@ -2185,25 +2187,39 @@ func _my_online_turn() -> bool:
 		return true
 	return online.status() == OnlineSession.PLAYING and state.side_to_move == online.my_team and not _sending
 
-## Send the moves so far after this player's move. If the connection fails, keep
-## trying until the server has it.
+## Send this player's move. If the connection fails, keep trying until the
+## server has it. If the server didn't take it (the opponent resigned first,
+## the clock ran out, ...), the board goes back to the server's game.
 func _send_online_moves() -> void:
 	_sending = true
 	_update_input()
-	var moves := state.history.map(func(m: Move) -> String: return m.to_text())
+	var move_text: String = state.history.back().to_text()
 	var finished := state.outcome() != GameState.Outcome.NONE
-	var result := await online.send_moves(moves, finished)
-	while not result.ok and is_inside_tree():
+	var result := await online.send_move(move_text, finished)
+	while not result.ok and result.error.begins_with("no connection") and is_inside_tree():
 		status_label.text = "Connection problem - trying again..."
 		await get_tree().create_timer(3.0).timeout
-		result = await online.send_moves(moves, finished)
+		result = await online.send_move(move_text, finished)
 	_sending = false
 	if not is_inside_tree():
 		return
+	if not result.ok:
+		show_notice("The server didn't take that move: " + result.error)
 	# The server had something newer (e.g. the opponent resigned): catch up.
 	if result.rows.is_empty():
 		await online.poll()
+	if online.move_count() != state.history.size():
+		_resync_with_server()
 	_after_online_change()
+
+## Put the board back to the game exactly as the server has it.
+func _resync_with_server() -> void:
+	var server_state := online.create_state(StandardSetup.create_rules())
+	if server_state == null:
+		return
+	state = server_state
+	redo_moves.clear()
+	_show_new_state()
 
 ## Something changed on the server: play any new moves from the opponent.
 func _on_online_changed(_row: Dictionary) -> void:
@@ -2212,8 +2228,8 @@ func _on_online_changed(_row: Dictionary) -> void:
 	for i in range(state.history.size(), server_moves.size()):
 		var move := state.find_move(str(server_moves[i]))
 		if move == null:
-			status_label.text = "This game is out of step with the server."
-			return
+			_resync_with_server()
+			break
 		last_san = Notation.san(state, move)
 		play(move, true)
 	_after_online_change()
@@ -2262,14 +2278,16 @@ func _process(_delta: float) -> void:
 	var you := " (you)"
 	clock_label.text = "White %s%s      Black %s%s" % [white, you if online.my_team == Piece.Team.WHITE else "",
 			black, you if online.my_team == Piece.Team.BLACK else ""]
-	# A clock that has run out ends the game (claimed by whoever notices first).
-	if not _claiming_timeout and online.out_of_time(online.side_to_move(), now):
+	# A clock that has run out ends the game (claimed by whoever notices first;
+	# the server checks with its own clock, so a refused claim waits 2 s).
+	if not _claiming_timeout and now >= _next_timeout_claim_ms and online.out_of_time(online.side_to_move(), now):
 		_claim_timeout(online.side_to_move())
 
 func _claim_timeout(team: Piece.Team) -> void:
 	_claiming_timeout = true
 	await online.claim_timeout(team)
 	_claiming_timeout = false
+	_next_timeout_claim_ms = Time.get_ticks_msec() + 2000
 	_after_online_change()
 
 ## "4:05", never below "0:00".

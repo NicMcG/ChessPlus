@@ -1,0 +1,120 @@
+extends SceneTree
+
+## Checks the real online server (Mac's Supabase project) after
+## server/supabase_update_3.sql: signs in as two pretend players and a stranger
+## (their own sign-ins, kept in a separate settings file), plays a short game,
+## and tries what a cheater would. Prints PASS/FAIL for each check; leaves a
+## finished game and a shared army behind (they're cleared away later).
+##
+## Run: "<godot console exe>" --headless --path . -s res://tools/online_live_check.gd
+
+var failures := 0
+
+func _initialize() -> void:
+	UserSettings.save_path = "user://online_live_check.cfg"
+	_run.call_deferred()
+
+func check(ok: bool, what: String) -> void:
+	print(("PASS  " if ok else "FAIL  ") + what)
+	if not ok:
+		failures += 1
+
+func _backend(slot: String) -> SupabaseBackend:
+	var backend := SupabaseBackend.new(OnlineConfig.SUPABASE_URL, OnlineConfig.SUPABASE_KEY, slot)
+	root.add_child(backend)
+	return backend
+
+func _session(slot: String) -> OnlineSession:
+	var session := OnlineSession.new(_backend(slot))
+	session.poll_seconds = 0
+	root.add_child(session)
+	return session
+
+func _run() -> void:
+	var white := _session("live_white")
+	var black := _session("live_black")
+	var stranger := _session("live_stranger")
+	for s: OnlineSession in [white, black, stranger]:
+		var signed: Dictionary = await (s.backend as SupabaseBackend).sign_in()
+		check(signed.ok, "signed in (%s)" % signed.error)
+	check(white.player_id != "" and white.player_id != black.player_id, "two different players")
+
+	# Nothing can be read or changed directly any more.
+	var direct := await _raw(white.backend as SupabaseBackend, "/rest/v1/games?select=*&limit=1", HTTPClient.METHOD_GET, "")
+	check(direct.status >= 400 or direct.text.strip_edges() == "[]", "the games table can't be read directly (%d)" % direct.status)
+	var direct_write := await _raw(white.backend as SupabaseBackend, "/rest/v1/games", HTTPClient.METHOD_POST, JSON.stringify({"code": "HACK1", "status": "playing"}))
+	check(direct_write.status >= 400, "a game can't be written directly (%d)" % direct_write.status)
+	var anon := await _raw(null, "/rest/v1/rpc/get_game", HTTPClient.METHOD_POST, JSON.stringify({"p_code": "ABCDE"}))
+	check(anon.status >= 400, "without signing in, nothing works (%d)" % anon.status)
+
+	# A game: White creates (3 minutes each), Black joins.
+	var created := await white.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 180000)
+	check(created.ok and white.code.length() == 5, "created a game (%s)" % created.error)
+	var joined := await black.join_game(white.code, StandardSetup.army())
+	check(joined.ok and black.my_team == Piece.Team.BLACK, "joined as Black (%s)" % joined.error)
+	var late := await stranger.join_game(white.code, StandardSetup.army())
+	check(not late.ok and "already started" in late.error, "a third player can't join (%s)" % late.error)
+
+	# Cheating attempts.
+	var early := await black.send_move("e7-e5", false)
+	check(early.ok and early.rows.is_empty(), "Black can't move on White's turn")
+	black.my_team = Piece.Team.WHITE
+	var pretend := await black.send_move("e2-e4", false)
+	check(not pretend.ok and "not a player" in pretend.error, "Black can't move for White (%s)" % pretend.error)
+	var pretend_resign := await black.resign()
+	check(not pretend_resign.ok, "Black can't resign for White")
+	black.my_team = Piece.Team.BLACK
+	var nosy := await stranger.resume(white.code)
+	check(not nosy.ok, "a stranger isn't a player (%s)" % nosy.error)
+
+	# Playing.
+	var moved := await white.send_move("e2-e4", false)
+	check(moved.ok and white.move_count() == 1, "White played e4 (%s)" % moved.error)
+	await black.poll()
+	check(black.moves() == ["e2-e4"], "Black sees e4")
+	var quiet: Dictionary = await black.backend.call_function("get_game", {"p_code": black.code, "p_known_version": int(black.row.version)})
+	check(quiet.ok and quiet.rows[0].get("unchanged", false), "a quiet check gets only the version back")
+	moved = await black.send_move("e7-e5", false)
+	check(moved.ok and black.move_count() == 2, "Black played e5 (%s)" % moved.error)
+	check(int(black.row.black_ms) <= 180000 and int(black.row.black_ms) > 150000, "the server's clock counted Black's time (%d ms left)" % int(black.row.black_ms))
+
+	# Chat: the players see it, a stranger doesn't, and it has a speed limit.
+	var said := await white.post_chat("Good luck!")
+	check(said.ok, "White sent a chat message (%s)" % said.error)
+	var peek: Dictionary = await stranger.backend.call_function("get_game", {"p_code": white.code})
+	check(peek.ok and peek.rows[0].chat == [] and not (peek.rows[0] as Dictionary).has("white_id"), "a stranger sees no chat and no player IDs")
+	for i in 5:
+		await white.post_chat("spam %d" % i)
+	var too_fast := await white.post_chat("one more")
+	check(not too_fast.ok and "too fast" in too_fast.error, "chat speed limit (%s)" % too_fast.error)
+
+	# Draw offer declined, then White resigns.
+	await white.offer_draw()
+	await black.poll()
+	check(black.draw_offer() == "white", "Black sees the draw offer")
+	await black.answer_draw(false)
+	var resigned := await white.resign()
+	check(resigned.ok and white.result_code() == "white_resigned", "White resigned (%s)" % resigned.error)
+
+	# Sharing an army.
+	var shared := await ArmyShare.share(white.backend, StandardSetup.army())
+	check(shared.ok and str(shared.code).length() == 5, "shared an army (%s)" % shared.error)
+	var fetched: Dictionary = await black.backend.call_function("get_shared_army", {"p_code": shared.code})
+	check(fetched.ok and not fetched.rows.is_empty() and fetched.rows[0].army is Dictionary, "read the shared army back")
+
+	print("\n%s" % ("ALL PASSED" if failures == 0 else "%d FAILED" % failures))
+	quit(1 if failures > 0 else 0)
+
+## A raw request, as a cheater would send it ({"status", "text"}); `backend`
+## supplies the sign-in (null = none, just the public key).
+func _raw(backend: SupabaseBackend, path: String, method: HTTPClient.Method, body: String) -> Dictionary:
+	var http := HTTPRequest.new()
+	http.accept_gzip = false
+	root.add_child(http)
+	var headers := PackedStringArray(["apikey: " + OnlineConfig.SUPABASE_KEY, "Content-Type: application/json"])
+	if backend:
+		headers.append("Authorization: Bearer " + str(backend._session().get("access_token", "")))
+	http.request(OnlineConfig.SUPABASE_URL + path, headers, method, body)
+	var reply: Array = await http.request_completed
+	http.queue_free()
+	return {"status": int(reply[1]), "text": (reply[3] as PackedByteArray).get_string_from_utf8()}

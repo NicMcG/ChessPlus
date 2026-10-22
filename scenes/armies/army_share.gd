@@ -19,23 +19,12 @@ const EMPTY_SQUARE := "-"
 ## Imported names are cut to the army builder's limit.
 const NAME_MAX_LENGTH := 20
 
-## Upload `army`. Returns {"ok", "code", "error"}.
+## Upload `army`. Returns {"ok", "code", "error"}. The server makes the code.
 static func share(backend: OnlineBackend, army: Army) -> Dictionary:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var data := SavedGame.army_to_dict(army)
-	var result := OnlineBackend.failed("couldn't share the army")
-	# A new code clashing with an old one is very unlikely; try again if so.
-	for attempt in 5:
-		var code := ""
-		for i in OnlineSession.CODE_LENGTH:
-			code += OnlineSession.CODE_LETTERS[rng.randi_range(0, OnlineSession.CODE_LETTERS.length() - 1)]
-		result = await backend.insert_shared_army({"code": code, "army": data})
-		if result.ok:
-			return {"ok": true, "code": code, "error": ""}
-		if not ("exist" in result.error or "409" in result.error):
-			break
-	return {"ok": false, "code": "", "error": result.error}
+	var result: Dictionary = await backend.call_function("share_army", {"p_army": SavedGame.army_to_dict(army)})
+	if result.ok and not result.rows.is_empty():
+		return {"ok": true, "code": str(result.rows[0].get("code", "")), "error": ""}
+	return {"ok": false, "code": "", "error": result.error if result.error != "" else "couldn't share the army"}
 
 ## Download the army shared under `code` and save a copy in `library`.
 ## Returns "" if it worked, otherwise what went wrong (in plain words).
@@ -45,7 +34,7 @@ static func import_army(backend: OnlineBackend, library: ArmyLibrary, code: Stri
 		return "Army codes are %d letters and numbers long." % OnlineSession.CODE_LENGTH
 	if library.is_full():
 		return "You already have %d saved armies; delete one first." % ArmyLibrary.MAX_ARMIES
-	var found: Dictionary = await backend.fetch_shared_army(wanted)
+	var found: Dictionary = await backend.call_function("get_shared_army", {"p_code": wanted})
 	if not found.ok:
 		return "Couldn't reach the server: " + found.error
 	if found.rows.is_empty():

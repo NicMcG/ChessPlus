@@ -1,7 +1,9 @@
 extends TestSuite
 
 ## Online play: two OnlineSessions ("devices") sharing a pretend server
-## (MemoryBackend), so no internet is needed.
+## (MemoryBackend), so no internet is needed. The pretend server follows the
+## real server's rules (server/supabase_update_3.sql), so these tests also
+## check that nobody can act for the other player.
 
 const KNIGHT = preload("res://data/pieces/knight.tres")
 
@@ -59,10 +61,9 @@ func test_join_problems() -> void:
 	var host := _session("host")
 	var guest := _session("guest")
 	var third := _session("third")
-	check(not (await guest.join_game("ZZZZZ", StandardSetup.army())).ok, "No such game")
+	var missing := await guest.join_game("ZZZZZ", StandardSetup.army())
+	check(not missing.ok and "no game" in missing.error, "No such game: " + missing.error)
 	await host.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 0)
-	var own := await host.join_game(host.code, StandardSetup.army())
-	check(not own.ok and "own game" in own.error, "Can't join your own game")
 	await guest.join_game(host.code, StandardSetup.army())
 	var late := await third.join_game(host.code, StandardSetup.army())
 	check(not late.ok and "already started" in late.error, "Too late")
@@ -72,7 +73,7 @@ func test_moves_travel_between_devices() -> void:
 	var pair: Array = await _started_game()
 	var host: OnlineSession = pair[0]
 	var guest: OnlineSession = pair[1]
-	var sent := await host.send_moves(["e2-e4"], false)
+	var sent := await host.send_move("e2-e4", false)
 	check(sent.ok and not sent.rows.is_empty(), "Move sent")
 	await guest.poll()
 	check_eq(guest.moves(), ["e2-e4"], "Guest sees it")
@@ -85,10 +86,57 @@ func test_moves_cannot_collide() -> void:
 	var pair: Array = await _started_game()
 	var host: OnlineSession = pair[0]
 	var guest: OnlineSession = pair[1]
-	await host.send_moves(["e2-e4"], false)
+	await host.send_move("e2-e4", false)
 	# The guest hasn't heard about e4 yet, so its idea of the move count is old.
-	var clash := await guest.send_moves(["d2-d4"], false)
+	var clash := await guest.send_move("d2-d4", false)
 	check(clash.ok and clash.rows.is_empty(), "Rejected: someone moved first")
+	_free(pair)
+
+func test_nobody_can_act_for_the_other_player() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var guest: OnlineSession = pair[1]
+	# The guest (Black) pretends to be White.
+	guest.my_team = Piece.Team.WHITE
+	var moved := await guest.send_move("e2-e4", false)
+	check(not moved.ok and "not a player" in moved.error, "Can't move for White: " + moved.error)
+	var resigned := await guest.resign()
+	check(not resigned.ok, "Can't resign for White")
+	var chatted := await guest.post_chat("I'm White, honest")
+	check(not chatted.ok, "Can't chat as White")
+	guest.my_team = Piece.Team.BLACK
+	# Black can't move on White's turn either.
+	var early := await guest.send_move("e7-e5", false)
+	check(early.ok and early.rows.is_empty(), "Not Black's turn")
+	# A stranger with the code sees the game but not the chat, and can't act.
+	var stranger := _session("stranger")
+	await host.post_chat("secret plan")
+	var seen := await stranger.resume(host.code)
+	check(not seen.ok and "not a player" in seen.error, "A stranger isn't a player")
+	var peek: Dictionary = await stranger.backend.call_function("get_game", {"p_code": host.code})
+	check_eq(peek.rows[0].chat, [], "...and doesn't see the chat")
+	check(not (peek.rows[0] as Dictionary).has("white_id"), "No player IDs are ever sent")
+	_free(pair + [stranger])
+
+func test_chat_limits() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	for i in 5:
+		check((await host.post_chat("hi %d" % i)).ok, "Message %d sent" % i)
+	var sixth := await host.post_chat("too fast")
+	check(not sixth.ok and "too fast" in sixth.error, "Six in ten seconds is too many: " + sixth.error)
+	MemoryBackend.clock_offset_ms = 11000
+	check((await host.post_chat("later")).ok, "Fine again later")
+	_free(pair)
+
+func test_quiet_polls_send_nothing_new() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var version := int(host.row.version)
+	var quiet: Dictionary = await host.backend.call_function("get_game", {"p_code": host.code, "p_known_version": version})
+	check(quiet.rows[0].get("unchanged", false), "Nothing new: only the version comes back")
+	await host.send_move("e2-e4", false)
+	check(int(host.row.version) > version, "A move changes the version")
 	_free(pair)
 
 func test_resign_and_finish() -> void:
@@ -112,23 +160,53 @@ func test_cancel_while_waiting() -> void:
 	_free([host, guest])
 
 func test_clocks() -> void:
-	var pair: Array = await _started_game(60000)
+	var pair: Array = await _started_game(180000)
 	var host: OnlineSession = pair[0]
 	var guest: OnlineSession = pair[1]
 	var start := host.turn_started_ms
-	check_eq(host.clock_ms(Piece.Team.WHITE, start + 10000), 50000, "White's clock runs on White's turn")
-	check_eq(host.clock_ms(Piece.Team.BLACK, start + 10000), 60000, "Black's doesn't")
-	check(host.out_of_time(Piece.Team.WHITE, start + 60000), "Out of time at zero on your own device")
-	check(not guest.out_of_time(Piece.Team.WHITE, guest.turn_started_ms + 60000), "The opponent waits a little longer")
-	check(guest.out_of_time(Piece.Team.WHITE, guest.turn_started_ms + 60000 + OnlineSession.TIMEOUT_GRACE_MS), "Then claims it")
+	check_eq(host.clock_ms(Piece.Team.WHITE, start + 10000), 170000, "White's clock runs on White's turn")
+	check_eq(host.clock_ms(Piece.Team.BLACK, start + 10000), 180000, "Black's doesn't")
+	check(host.out_of_time(Piece.Team.WHITE, start + 180000), "Out of time at zero on your own device")
+	check(not guest.out_of_time(Piece.Team.WHITE, guest.turn_started_ms + 180000), "The opponent waits a little longer")
+	check(guest.out_of_time(Piece.Team.WHITE, guest.turn_started_ms + 180000 + OnlineSession.TIMEOUT_GRACE_MS), "Then claims it")
+	# The server decides by its own clock: too early, the game goes on.
+	MemoryBackend.clock_offset_ms = 30000
+	await guest.claim_timeout(Piece.Team.WHITE)
+	check_eq(guest.status(), OnlineSession.PLAYING, "Claimed too early: refused")
+	MemoryBackend.clock_offset_ms = 180000 + OnlineSession.TIMEOUT_GRACE_MS
 	await guest.claim_timeout(Piece.Team.WHITE)
 	check_eq(guest.result_code(), "white_timeout", "White lost on time")
+	_free(pair)
+
+func test_server_clock_counts_the_move() -> void:
+	var pair: Array = await _started_game(180000)
+	var host: OnlineSession = pair[0]
+	# 10 s pass on the server; the device says it thought for 9 s (it heard
+	# about the turn a little late): the server takes the device's word, as it's
+	# within the allowance.
+	MemoryBackend.clock_offset_ms = 10000
+	host.turn_started_ms = Time.get_ticks_msec() - 9000
+	await host.send_move("e2-e4", false)
+	check(absi(int(host.row.white_ms) - 171000) < 200, "9 s used: %d left" % int(host.row.white_ms))
+	# Claiming far less than the server saw doesn't work: at most 2.5 s off.
+	MemoryBackend.clock_offset_ms = 30000
+	var guest: OnlineSession = pair[1]
+	await guest.poll()
+	guest.turn_started_ms = Time.get_ticks_msec() - 1000
+	await guest.send_move("e7-e5", false)
+	check(absi(int(guest.row.black_ms) - (180000 - 17500)) < 200, "Said 1 s, but 20 s passed: 17.5 s counted (%d left)" % int(guest.row.black_ms))
+	# Running out on the server ends the game instead of taking the move.
+	MemoryBackend.clock_offset_ms = 30000 + 180000
+	await host.poll()
+	var late := await host.send_move("g1-f3", false)
+	check(late.ok and host.result_code() == "white_timeout", "A move after the flag fell loses on time")
+	check_eq(host.move_count(), 2, "...and isn't added")
 	_free(pair)
 
 func test_resume_after_closing() -> void:
 	var pair: Array = await _started_game()
 	var host: OnlineSession = pair[0]
-	await host.send_moves(["e2-e4"], false)
+	await host.send_move("e2-e4", false)
 	var again := _session("host")
 	var resumed := await again.resume(host.code)
 	check(resumed.ok, "Resumed")
@@ -357,7 +435,7 @@ func test_draw_offer_declined_or_ignored() -> void:
 	await guest.poll()
 	await guest.offer_draw()
 	await host.poll()
-	await host.send_moves(["e2-e4"], false)
+	await host.send_move("e2-e4", false)
 	check_eq(host.draw_offer(), "", "Moving turns the offer down")
 	check_eq(host.status(), OnlineSession.PLAYING, "Game goes on")
 	_free(pair)
@@ -369,7 +447,8 @@ func test_chat_messages() -> void:
 	await host.post_chat("Good luck!")
 	await guest.post_chat("  You too  ")
 	await host.poll()
-	check_eq(host.chat(), [{"from": "white", "text": "Good luck!"}, {"from": "black", "text": "You too"}], "Both messages, in order")
+	var said := host.chat().map(func(m: Dictionary) -> Array: return [m.from, m.text])
+	check_eq(said, [["white", "Good luck!"], ["black", "You too"]], "Both messages, in order")
 	check(not (await host.post_chat("   ")).ok, "Empty messages are not sent")
 	await host.post_chat("x".repeat(300))
 	check_eq((host.chat().back().text as String).length(), 200, "Long messages are cut to 200")
@@ -381,12 +460,18 @@ func test_rematch_claim() -> void:
 	var guest: OnlineSession = pair[1]
 	await host.resign()
 	await guest.poll()
-	check((await host.claim_rematch("NEW01")).rows.size() == 1, "First claim wins")
-	var late := await guest.claim_rematch("NEW02")
+	var host_next := _session("host")
+	var guest_next := _session("guest")
+	await host_next.create_game(StandardSetup.army(), OnlineSession.SIDE_BLACK, 0)
+	await guest_next.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 0)
+	var not_mine := await host.claim_rematch(guest_next.code)
+	check(not not_mine.ok, "Can't point the rematch at someone else's game")
+	check((await host.claim_rematch(host_next.code)).rows.size() == 1, "First claim wins")
+	var late := await guest.claim_rematch(guest_next.code)
 	check(late.rows.is_empty(), "Second claim loses")
 	await guest.poll()
-	check_eq(guest.rematch_code(), "NEW01", "Both see the same rematch")
-	_free(pair)
+	check_eq(guest.rematch_code(), host_next.code, "Both see the same rematch")
+	_free(pair + [host_next, guest_next])
 
 func test_two_copies_on_one_phone_can_play_each_other() -> void:
 	MemoryBackend.clear()
@@ -408,13 +493,13 @@ func test_continue_uses_the_id_saved_with_the_game() -> void:
 	var pair: Array = await _started_game()
 	var guest_screen := _game_screen(pair[1])
 	check_eq(UserSettings.online_game(), guest_screen.online.code, "Game remembered")
-	check_eq(UserSettings.online_player_id(), "guest", "With the guest's ID")
+	check_eq(UserSettings.online_team(), Piece.Team.BLACK, "With the guest's side")
 	var code: String = guest_screen.online.code
 	guest_screen.free()
 	(pair[0] as Node).free()
 	var main: Node = load("res://scenes/main/main.tscn").instantiate()
 	_root().add_child(main)
-	await main.continue_online_game(MemoryBackend.new())
+	await main.continue_online_game(MemoryBackend.new("guest"))
 	check(main.screen.get("online") != null, "Back in the game")
 	if main.screen.get("online") != null:
 		check_eq(main.screen.online.code, code, "The same game")

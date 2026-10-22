@@ -1,7 +1,9 @@
 # Getting online play ready for the public (plan, Oct 21 2026)
 
-Status: designed, nothing built yet. Mac's decisions are final; the rest is the
-technical design to build next.
+Status (22 Oct 2026): step 1 (locking the server: sign-in, checked functions,
+server clocks, limits, cheaper syncing) is built in `server/supabase_update_3.sql`
+and the game; it goes live once Mac runs the SQL. Moves are checked by the
+server for turn and order but not yet for legality: that's the referee, next.
 
 ## Why
 

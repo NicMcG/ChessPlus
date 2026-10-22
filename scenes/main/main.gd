@@ -41,18 +41,15 @@ func show_note(title: String, text: String) -> ModalPanel:
 	add_child(panel)
 	return panel
 
-## Opened with ?selftest=1 (web only): check the online server can be reached
-## from this browser, and print the answer to the browser's console.
+## Opened with ?selftest=1 (web only): check this browser can sign in to the
+## online server and call it, and print the answers to the browser's console.
 func _online_self_test() -> void:
 	var backend := SupabaseBackend.new()
 	add_child(backend)
-	var result := await backend.fetch("SELFTEST")
+	var signed := await backend.sign_in()
+	print("ONLINE SELF-TEST sign in: ok=%s error=%s user=%s" % [signed.ok, signed.error, backend.user_id()])
+	var result := await backend.call_function("get_game", {"p_code": "SELFT"})
 	print("ONLINE SELF-TEST read: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
-	var code := "T%04d" % (Time.get_ticks_usec() % 10000)
-	result = await backend.insert({"code": code, "status": "cancelled", "result": "", "moves": [], "move_count": 0})
-	print("ONLINE SELF-TEST create: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
-	result = await backend.update(code, {"result": "selftest"}, {"status": "cancelled"})
-	print("ONLINE SELF-TEST update: ok=%s error=%s rows=%d" % [result.ok, result.error, result.rows.size()])
 	backend.queue_free()
 
 ## On a computer (not a phone), draw the game at the screen's own pixel size
@@ -265,9 +262,9 @@ func start_online_game(session: OnlineSession) -> void:
 
 ## Pick up the online game this device was playing.
 func continue_online_game(backend: OnlineBackend = null) -> void:
-	var session := OnlineSession.new(backend, UserSettings.online_player_id())
+	var session := OnlineSession.new(backend)
 	add_child(session)
-	var result := await session.resume(UserSettings.online_game())
+	var result := await session.resume(UserSettings.online_game(), UserSettings.online_team())
 	if not result.ok or session.status() != OnlineSession.PLAYING:
 		# It has ended (or gone) since: stop offering it.
 		UserSettings.set_online_game("")

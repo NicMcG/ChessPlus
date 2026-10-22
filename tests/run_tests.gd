@@ -89,6 +89,7 @@ func _run_all() -> void:
 	BoardView.clear_cache()
 	UiStyle.clear_cache()
 	MemoryBackend.clear()
+	SupabaseBackend.clear_cache()
 	get_tree().quit(1 if failed > 0 else 0)
 
 func _matches(file: String, filters: PackedStringArray) -> bool:

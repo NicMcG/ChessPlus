@@ -4,16 +4,21 @@ extends Node
 ## One online game, as seen from this device. It creates or joins the game on
 ## the server, sends this player's moves, and checks the server every
 ## `poll_seconds` for the opponent's moves (changed is emitted when something
-## new arrives). It also keeps the clocks. The game screen does the drawing.
+## new arrives). It also shows the clocks. The game screen does the drawing.
 ##
-## A game on the server is one row (see OnlineBackend):
+## Everything goes through the server's functions (see OnlineBackend), which
+## check this device may do it. A game, as the server shows it ("row"):
 ##   code              5 letters/digits players type to join, e.g. "K7QX2"
-##   white_id/black_id the players' IDs (a fresh random one per game, see
-##                     UserSettings.new_player_id)
+##   you               the sides this device plays (["white"], or both when two
+##                     copies of the game on one phone play each other)
+##   white_taken/...   whether each side has a player
 ##   white_army/...    each army as plain data (SavedGame.army_to_dict)
 ##   time_ms           each player's starting time, 0 = no time limit
-##   white_ms/black_ms time left for each player as of the last move
+##   white_ms/black_ms time left for each player as of the last move, kept by
+##                     the server's clock; turn_ms = how long the current turn
+##                     has been running
 ##   moves, move_count the moves so far as Move.to_text() ("e2-e4", ...)
+##   version           goes up with every change (polling asks for newer only)
 ##   status            "waiting" (for a second player), "playing", "finished",
 ##                     or "cancelled"
 ##   result            once finished: "board" (checkmate or a draw on the board),
@@ -48,11 +53,14 @@ const SIDE_WHITE := 0
 const SIDE_BLACK := 1
 const SIDE_RANDOM := 2
 ## A player only loses on time once their clock is this far past zero as seen
-## from the other device, to allow for the delay in hearing about moves.
+## from the other device, to allow for the delay in hearing about moves (the
+## server allows 2.5 s).
 const TIMEOUT_GRACE_MS := 3000
 
 var backend: OnlineBackend
-var player_id := ""
+## Who this device is on the server (its sign-in).
+var player_id: String:
+	get: return backend.user_id()
 var code := ""
 ## The game as last seen on the server (empty until created or joined).
 var row := {}
@@ -67,10 +75,12 @@ var turn_started_ms := 0
 var _timer: Timer
 var _polling := false
 
+## `p_player_id` is for tests: the pretend server's player this device is.
 func _init(p_backend: OnlineBackend = null, p_player_id := "") -> void:
 	backend = p_backend if p_backend else SupabaseBackend.new()
+	if backend is MemoryBackend and p_player_id != "":
+		(backend as MemoryBackend).user = p_player_id
 	add_child(backend)
-	player_id = p_player_id if p_player_id != "" else UserSettings.new_player_id()
 	rng.randomize()
 
 # --- Starting a game -------------------------------------------------------------
@@ -78,118 +88,77 @@ func _init(p_backend: OnlineBackend = null, p_player_id := "") -> void:
 ## Create a new game with `army` on `side` (SIDE_WHITE/BLACK/RANDOM) and a time
 ## limit (milliseconds each, 0 = none). Afterwards `code` is the code to share.
 ## `army` is an Army, or a Callable(team) -> Army (ArmyChoices.resolver) when it
-## depends on the side.
+## depends on the side (the server picks a Random side).
 ## `eval_bar`: show the eval bar to both players during the game.
 func create_game(army: Variant, side: int, time_ms: int, eval_bar := false) -> Dictionary:
-	my_team = Piece.Team.WHITE if side == SIDE_WHITE else Piece.Team.BLACK
-	if side == SIDE_RANDOM:
-		my_team = Piece.Team.WHITE if rng.randi_range(0, 1) == 0 else Piece.Team.BLACK
-	var me := team_key(my_team)
-	var result := OnlineBackend.failed("couldn't create a game")
-	# A new code clashing with an existing game is very unlikely; try again if so.
-	for attempt in 5:
-		var new_row := {
-			"code": new_code(), "status": WAITING, "result": "",
-			"time_ms": time_ms, "white_ms": time_ms, "black_ms": time_ms,
-			"moves": [], "move_count": 0,
-		}
-		# Only sent when chosen, so games work on a server without the column yet.
-		if eval_bar:
-			new_row["eval_bar"] = true
-		new_row[me + "_id"] = player_id
-		new_row[me + "_army"] = SavedGame.army_to_dict(ArmyChoices.resolve(army, my_team))
-		result = await backend.insert(new_row)
-		if result.ok and not result.rows.is_empty():
-			_set_row(result.rows[0])
-			code = row.code
-			return result
-		if not ("exist" in result.error or "409" in result.error):
-			return result
+	var seat := "random" if side == SIDE_RANDOM else team_key(Piece.Team.WHITE if side == SIDE_WHITE else Piece.Team.BLACK)
+	var args := _armies(army)
+	args.merge({"p_seat": seat, "p_time_ms": time_ms, "p_eval_bar": eval_bar})
+	var result := await backend.call_function("create_game", args)
+	if not result.ok or result.rows.is_empty():
+		return result if not result.ok else OnlineBackend.failed("couldn't create a game")
+	var game: Dictionary = result.rows[0]
+	code = str(game.code)
+	my_team = Piece.Team.BLACK if "black" in game.get("you", []) else Piece.Team.WHITE
+	_set_row(game)
 	return result
 
 ## Join a friend's game by its code, playing with `army` (an Army, or a
 ## Callable(team) -> Army: we get whichever side is free).
 func join_game(p_code: String, army: Variant) -> Dictionary:
 	var wanted := p_code.strip_edges().to_upper()
-	var found := await backend.fetch(wanted)
-	if not found.ok:
-		return found
-	if found.rows.is_empty():
-		return OnlineBackend.failed("There's no game with the code %s." % wanted)
-	var game: Dictionary = found.rows[0]
-	if str(game.get("white_id", "")) == player_id or str(game.get("black_id", "")) == player_id:
-		return OnlineBackend.failed("That's your own game: send the code to a friend.")
-	if game.status != WAITING:
-		return OnlineBackend.failed("That game has already started.")
-	# The free side is ours.
-	var team := Piece.Team.BLACK if _filled(game, "white_id") else Piece.Team.WHITE
-	var me := team_key(team)
-	var changes := {"status": PLAYING}
-	changes[me + "_id"] = player_id
-	changes[me + "_army"] = SavedGame.army_to_dict(ArmyChoices.resolve(army, team))
-	var joined := await backend.update(wanted, changes, {"status": WAITING})
-	if not joined.ok:
-		return joined
-	if joined.rows.is_empty():
-		return OnlineBackend.failed("Someone else joined that game first.")
-	my_team = team
+	var args := _armies(army)
+	args["p_code"] = wanted
+	var result := await backend.call_function("join_game", args)
+	if not result.ok or result.rows.is_empty():
+		return result if not result.ok else OnlineBackend.failed("couldn't join that game")
+	var game: Dictionary = result.rows[0]
 	code = wanted
-	_set_row(joined.rows[0])
-	return joined
+	my_team = Piece.Team.BLACK if game.get("seat", "") == "black" else Piece.Team.WHITE
+	_set_row(game)
+	return result
 
-## Pick up a game this device is already in (after the app was closed).
-func resume(p_code: String) -> Dictionary:
-	var found := await backend.fetch(p_code)
+## Pick up a game this device is already in (after the app was closed), as
+## `team` if it plays both sides.
+func resume(p_code: String, team := -1) -> Dictionary:
+	var found := await backend.call_function("get_game", {"p_code": p_code})
 	if not found.ok:
 		return found
 	if found.rows.is_empty():
 		return OnlineBackend.failed("That game no longer exists.")
 	var game: Dictionary = found.rows[0]
-	if str(game.get("white_id", "")) == player_id:
-		my_team = Piece.Team.WHITE
-	elif str(game.get("black_id", "")) == player_id:
-		my_team = Piece.Team.BLACK
-	else:
+	var sides: Array = game.get("you", [])
+	if sides.is_empty():
 		return OnlineBackend.failed("You're not a player in that game.")
+	var wanted := team_key(team) if team >= 0 else ""
+	my_team = Piece.Team.WHITE if (wanted if wanted in sides else str(sides[0])) == "white" else Piece.Team.BLACK
 	code = p_code
 	_set_row(game)
 	return found
 
 ## Give up waiting for an opponent (only before anyone has joined).
 func cancel() -> Dictionary:
-	return await _change({"status": CANCELLED}, {"status": WAITING})
+	return await _act("cancel_game", {})
 
 # --- Playing ---------------------------------------------------------------------
 
-## Send the whole move list after this player's move (`moves` as Move.to_text()),
-## with both clocks, and whether that move ended the game on the board.
-## Only works if the server still has the move count we last saw, so the two
-## players can never both add a move at once.
-func send_moves(moves: Array, finished: bool) -> Dictionary:
-	var now_ms := Time.get_ticks_msec()
-	var changes := {"moves": moves.duplicate(), "move_count": moves.size()}
-	if timed():
-		changes[team_key(my_team) + "_ms"] = maxi(0, clock_ms(my_team, now_ms))
-	if finished:
-		changes["status"] = FINISHED
-		changes["result"] = "board"
-	# Moving instead of answering turns down the opponent's draw offer.
-	if draw_offer() == team_key(Piece.other_team(my_team)):
-		changes["draw_offer"] = ""
-	var result := await _change(changes, {"move_count": move_count(), "status": PLAYING})
-	return result
+## Send this player's move (Move.to_text()) and whether it ended the game on the
+## board. Only works if the server still has the move count we last saw, so the
+## two players can never both add a move at once (else no rows). The server's
+## clock decides the time used (this device's own measure is sent along, and
+## the server allows for the delay in hearing about the opponent's move).
+func send_move(move_text: String, finished: bool) -> Dictionary:
+	var think_ms := maxi(0, Time.get_ticks_msec() - turn_started_ms)
+	return await _act("play_move", {"p_move": move_text, "p_expected": move_count(),
+			"p_think_ms": think_ms, "p_finished": finished}, 3)
 
 ## Offer the opponent a draw (one offer at a time).
 func offer_draw() -> Dictionary:
-	return await _change({"draw_offer": team_key(my_team)}, {"status": PLAYING, "draw_offer": ""})
+	return await _act("offer_draw", {})
 
 ## Answer the opponent's draw offer.
 func answer_draw(accept: bool) -> Dictionary:
-	var theirs := team_key(Piece.other_team(my_team))
-	if accept:
-		return await _change({"status": FINISHED, "result": "draw_agreed", "draw_offer": ""},
-				{"status": PLAYING, "draw_offer": theirs})
-	return await _change({"draw_offer": ""}, {"draw_offer": theirs})
+	return await _act("answer_draw", {"p_accept": accept})
 
 ## Who is offering a draw right now: "white", "black" or "".
 func draw_offer() -> String:
@@ -200,14 +169,7 @@ func post_chat(text: String) -> Dictionary:
 	var message := text.strip_edges().left(200)
 	if message == "":
 		return OnlineBackend.failed("empty message")
-	var result := OnlineBackend.failed("not sent")
-	for attempt in 3:
-		result = await backend.call_function("post_chat", {"game_code": code, "sender": team_key(my_team), "message": message})
-		if result.ok:
-			break
-	if result.ok and not result.rows.is_empty():
-		_set_row(result.rows[0])
-	return result
+	return await _act("send_chat", {"p_text": message}, 3)
 
 ## The chat so far: [{"from": "white"/"black", "text": ...}, ...].
 func chat() -> Array:
@@ -217,19 +179,20 @@ func chat() -> Array:
 func rematch_code() -> String:
 	return str(row.get("rematch", ""))
 
-## Point this game at its rematch (`new_code`). Fails (rows empty) if the other
-## player got there first: then join theirs instead (see rematch_code()).
+## Point this game at its rematch (`new_code`, a game this device just created).
+## Fails (rows empty) if the other player got there first: then join theirs
+## instead (see rematch_code()).
 func claim_rematch(new_code: String) -> Dictionary:
-	return await _change({"rematch": new_code}, {"rematch": ""})
+	return await _act("claim_rematch", {"p_new_code": new_code})
 
 func resign() -> Dictionary:
-	return await _change({"status": FINISHED, "result": team_key(my_team) + "_resigned"}, {"status": PLAYING})
+	return await _act("resign_game", {}, 3)
 
-## Record that `team` ran out of time (sent by whichever player notices first).
-func claim_timeout(team: Piece.Team) -> Dictionary:
-	var changes := {"status": FINISHED, "result": team_key(team) + "_timeout"}
-	changes[team_key(team) + "_ms"] = 0
-	return await _change(changes, {"status": PLAYING, "move_count": move_count()})
+## Ask the server to end the game because the side to move ran out of time. The
+## server checks with its own clock: if the time isn't up there yet, the game
+## goes on (try again a little later).
+func claim_timeout(_team: Piece.Team) -> Dictionary:
+	return await _act("claim_timeout", {})
 
 # --- Checking the server ----------------------------------------------------------
 
@@ -248,16 +211,21 @@ func stop_polling() -> void:
 		_timer.queue_free()
 		_timer = null
 
-## Look at the server once; emits changed if the game is different now.
+## Look at the server once; emits changed if the game is different now. Only
+## asks for the game if it changed since last time, so a quiet check is a tiny
+## reply.
 func poll() -> void:
 	if _polling or code == "":
 		return
 	_polling = true
-	var result := await backend.fetch(code)
+	var result := await backend.call_function("get_game", {"p_code": code, "p_known_version": int(row.get("version", -1))})
 	_polling = false
-	if result.ok and not result.rows.is_empty() and _differs(result.rows[0]):
-		_set_row(result.rows[0])
-		changed.emit(row)
+	if result.ok and not result.rows.is_empty() and not result.rows[0].get("unchanged", false):
+		var game: Dictionary = result.rows[0]
+		var differs := _differs(game)
+		_set_row(game)
+		if differs:
+			changed.emit(row)
 
 # --- About the game ----------------------------------------------------------------
 
@@ -315,38 +283,41 @@ func out_of_time(team: Piece.Team, now_ms := Time.get_ticks_msec()) -> bool:
 static func team_key(team: Piece.Team) -> String:
 	return "white" if team == Piece.Team.WHITE else "black"
 
-func new_code() -> String:
-	var text := ""
-	for i in CODE_LENGTH:
-		text += CODE_LETTERS[rng.randi_range(0, CODE_LETTERS.length() - 1)]
-	return text
-
 # --- Inside ------------------------------------------------------------------------
 
-## Update the game on the server and remember the result. A network failure is
-## retried a few times; a mismatch (someone else changed it first) is not.
-func _change(changes: Dictionary, conditions: Dictionary) -> Dictionary:
+## Run one of the server's game functions for this game and this player's side,
+## and remember the game it sends back. A network failure is retried up to
+## `tries` times; a refusal or "nothing changed" is not.
+func _act(function: String, args: Dictionary, tries := 1) -> Dictionary:
+	var full := args.duplicate()
+	full["p_code"] = code
+	full["p_seat"] = team_key(my_team)
 	var result := OnlineBackend.failed("not sent")
-	for attempt in 3:
-		result = await backend.update(code, changes, conditions)
-		if result.ok:
+	for attempt in tries:
+		result = await backend.call_function(function, full)
+		if result.ok or not result.error.begins_with("no connection"):
 			break
 	if result.ok and not result.rows.is_empty():
 		_set_row(result.rows[0])
 	return result
 
+## Both armies as server arguments: `army` resolved for each side (it may
+## depend on the side, see ArmyChoices).
+func _armies(army: Variant) -> Dictionary:
+	return {
+		"p_white_army": SavedGame.army_to_dict(ArmyChoices.resolve(army, Piece.Team.WHITE)),
+		"p_black_army": SavedGame.army_to_dict(ArmyChoices.resolve(army, Piece.Team.BLACK)),
+	}
+
 func _set_row(new_row: Dictionary) -> void:
-	# A new move (or the game starting) starts the next player's clock here.
-	if int(new_row.get("move_count", 0)) != move_count() or str(new_row.get("status", "")) != status():
-		turn_started_ms = Time.get_ticks_msec()
+	# The current turn started turn_ms ago by the server's clock.
+	if new_row.has("turn_ms"):
+		turn_started_ms = Time.get_ticks_msec() - int(new_row.turn_ms)
 	row = new_row
 
 func _differs(new_row: Dictionary) -> bool:
-	for column in ["status", "result", "move_count", "white_id", "black_id", "draw_offer", "rematch"]:
+	for column in ["status", "result", "move_count", "white_taken", "black_taken", "draw_offer", "rematch"]:
 		if str(new_row.get(column, "")) != str(row.get(column, "")):
 			return true
 	return (new_row.get("chat", []) as Array).size() != chat().size()
 
-static func _filled(game: Dictionary, column: String) -> bool:
-	var value: Variant = game.get(column)
-	return value != null and str(value) != ""
