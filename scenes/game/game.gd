@@ -145,10 +145,10 @@ var state: GameState
 ## Shown where the move list goes, until the first move.
 var TIP := tip_text(DisplayServer.is_touchscreen_available())
 
-## Phones: hold a piece. PC: Shift + right-click it (a plain right-click rings
-## the square).
+## Phones: hold a piece. PC: the mouse button Settings gives the piece card
+## (middle click unless changed).
 static func tip_text(touchscreen: bool) -> String:
-	return "Tip: %s any piece to see how it moves." % ("hold" if touchscreen else "middle-click")
+	return "Tip: %s any piece to see how it moves." % ("hold" if touchscreen else MouseBinds.verb(MouseBinds.button("piece_card")))
 
 func _ready() -> void:
 	KeyBinds.install()

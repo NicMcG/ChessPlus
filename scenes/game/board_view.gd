@@ -270,7 +270,7 @@ func tap(square: Vector2i) -> bool:
 
 ## The pointer went down at `pos` (a mouse press or a finger touching the screen).
 ## Holding still opens the piece's card only for a finger (`touch`): with a
-## mouse, Shift + right-click (or holding the right button) does that instead.
+## mouse, the piece card's button (middle click unless changed) does that instead.
 func pointer_down(pos: Vector2, touch := true) -> void:
 	# A left click clears the arrows and rings, as on chess websites.
 	clear_drawings()
@@ -436,25 +436,31 @@ func check_long_press(now_ms: int) -> void:
 	if piece:
 		info_requested.emit(piece)
 
+## Which mouse button does what comes from Settings (MouseBinds; by default
+## left = select and move, right = mark squares and draw arrows, middle = the
+## piece card). A finger's touch arrives as a pretend ("emulated") left click,
+## and always selects and moves.
 func _gui_input(event: InputEvent) -> void:
 	var button := event as InputEventMouseButton
-	if button and button.button_index == MOUSE_BUTTON_RIGHT:
-		if button.pressed:
-			right_down(button.position)
-		else:
-			right_up(button.position)
-		accept_event()
-	if button and button.button_index == MOUSE_BUTTON_MIDDLE and button.pressed:
-		middle_click(button.position)
-		accept_event()
-	if button and button.button_index == MOUSE_BUTTON_LEFT:
-		if button.pressed:
-			# A finger's touch arrives as a pretend ("emulated") mouse click.
-			var touch := button.device == InputEvent.DEVICE_ID_EMULATION or DisplayServer.is_touchscreen_available()
-			pointer_down(button.position, touch)
-		else:
-			pointer_up(button.position)
-		accept_event()
+	if button and MouseBinds.can_use(button.button_index):
+		var emulated := button.device == InputEvent.DEVICE_ID_EMULATION
+		var action := "move" if emulated else MouseBinds.action_for(button.button_index)
+		match action:
+			"move":
+				if button.pressed:
+					pointer_down(button.position, emulated or DisplayServer.is_touchscreen_available())
+				else:
+					pointer_up(button.position)
+			"mark":
+				if button.pressed:
+					right_down(button.position)
+				else:
+					right_up(button.position)
+			"piece_card":
+				if button.pressed:
+					middle_click(button.position)
+		if action != "":
+			accept_event()
 	var motion := event as InputEventMouseMotion
 	if motion:
 		pointer_move(motion.position)

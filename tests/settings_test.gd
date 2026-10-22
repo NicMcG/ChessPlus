@@ -148,6 +148,77 @@ func test_keys_can_be_changed_and_swap() -> void:
 	settings.free()
 	_finish()
 
+func _click(index: int, pressed := true, pos := Vector2.ZERO) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = index
+	event.pressed = pressed
+	event.position = pos
+	return event
+
+func test_mouse_buttons_can_be_changed_and_swap() -> void:
+	var settings := _open()
+	check_eq(settings.mouse_buttons["move"].text, "Left click", "Moving starts on the left button")
+	check_eq(settings.mouse_buttons["mark"].text, "Right click", "Marking on the right")
+	check_eq(settings.mouse_buttons["piece_card"].text, "Middle click", "The piece card on the middle")
+	settings.mouse_buttons["piece_card"].pressed.emit()
+	check_eq(settings.mouse_buttons["piece_card"].text, "Click...", "Waiting for a click")
+	settings._input(_click(MOUSE_BUTTON_WHEEL_UP))
+	check_eq(settings.listening_mouse, "piece_card", "The scroll wheel doesn't count")
+	settings._input(_click(MOUSE_BUTTON_XBUTTON1))
+	check_eq(MouseBinds.button("piece_card"), MOUSE_BUTTON_XBUTTON1, "Piece card on a side button")
+	check_eq(settings.mouse_buttons["piece_card"].text, "Side button 1", "...and it says so")
+	settings.listen_for_mouse("move")
+	settings._input(_click(MOUSE_BUTTON_RIGHT))
+	check_eq(MouseBinds.button("move"), MOUSE_BUTTON_RIGHT, "Moving takes the right button...")
+	check_eq(MouseBinds.button("mark"), MOUSE_BUTTON_LEFT, "...and marking gets the left: no button does two things")
+	settings.listen_for_mouse("mark")
+	settings._input(_key(KEY_ESCAPE))
+	check_eq(settings.listening_mouse, "", "Esc stops waiting")
+	check_eq(MouseBinds.button("mark"), MOUSE_BUTTON_LEFT, "...and changes nothing")
+	settings.listen_for_key("flip_board")
+	settings.listen_for_mouse("mark")
+	check_eq(settings.listening, "", "Waiting for a click stops waiting for a key")
+	settings.listening_mouse = ""
+	settings.reset_to_defaults()
+	check_eq(MouseBinds.button("move"), MOUSE_BUTTON_LEFT, "Reset: moving back on the left")
+	check_eq(MouseBinds.button("piece_card"), MOUSE_BUTTON_MIDDLE, "...the piece card on the middle")
+	settings.free()
+	_finish()
+
+func test_the_board_follows_the_mouse_settings() -> void:
+	var view := BoardView.new()
+	view.show_game(StandardSetup.create_game())
+	view.size = Vector2(800, 800)
+	var cards: Array[Piece] = []
+	view.info_requested.connect(func(piece: Piece) -> void: cards.append(piece))
+	var e2 := view.square_center(Board.parse_square("e2"))
+	var e5 := view.square_center(Board.parse_square("e5"))
+	MouseBinds.set_button("move", MOUSE_BUTTON_RIGHT)
+	MouseBinds.set_button("piece_card", MOUSE_BUTTON_XBUTTON1)
+	check_eq(MouseBinds.button("mark"), MOUSE_BUTTON_LEFT, "Marking moved to the left button")
+	view._gui_input(_click(MOUSE_BUTTON_RIGHT, true, e2))
+	view._gui_input(_click(MOUSE_BUTTON_RIGHT, false, e2))
+	check_eq(view.selected_square(), Board.parse_square("e2"), "Right click picks up the pawn")
+	view._gui_input(_click(MOUSE_BUTTON_LEFT, true, e5))
+	view._gui_input(_click(MOUSE_BUTTON_LEFT, false, e5))
+	check(view.highlights.has(Board.parse_square("e5")), "Left click marks a square")
+	view.clear_drawings()
+	view._gui_input(_click(MOUSE_BUTTON_MIDDLE, true, e2))
+	check_eq(cards.size(), 0, "Middle click does nothing now")
+	view._gui_input(_click(MOUSE_BUTTON_XBUTTON1, true, e2))
+	check_eq(cards.size(), 1, "The side button asks for the piece card")
+	var game_script: GDScript = load("res://scenes/game/game.gd")
+	check(game_script.tip_text(false).contains("click side button 1 on"), "The tip names the side button")
+	check(game_script.tip_text(true).contains("hold"), "Phones: still hold")
+	# A finger on a touch screen arrives as a pretend left click: it still moves.
+	var touch := _click(MOUSE_BUTTON_LEFT, true, e2)
+	touch.device = InputEvent.DEVICE_ID_EMULATION
+	view._gui_input(touch)
+	check_eq(view.selected_square(), Board.parse_square("e2"), "A touch picks up the pawn")
+	check(view.highlights.is_empty(), "...and marks nothing")
+	view.free()
+	_finish()
+
 func test_shortcuts_in_a_game() -> void:
 	var game: Node = load("res://scenes/game/game.tscn").instantiate()
 	_root().add_child(game)

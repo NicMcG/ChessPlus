@@ -1,8 +1,8 @@
 class_name SettingsMenu
 extends Control
 
-## The Settings screen (Mac's design, Oct 2026): sound, visual and keyboard
-## settings, the credits, and a button that puts every setting back to how it
+## The Settings screen (Mac's design, Oct 2026): sound, visual, keyboard and
+## mouse settings, the credits, and a button that puts every setting back to how it
 ## started. Opened from the main menu (as its own screen) and from games (the
 ## gear button, on top of the game). Every change is saved straight away.
 
@@ -37,6 +37,10 @@ var reduce_toggle: Button
 var key_buttons := {}
 ## The shortcut waiting for its new key ("" when none).
 var listening := ""
+## The button of each mouse action (MouseBinds.ACTIONS), PC only.
+var mouse_buttons := {}
+## The mouse action waiting for its new button ("" when none).
+var listening_mouse := ""
 ## The Credits or Reset pop-up while it's showing.
 var popup: ModalPanel
 
@@ -68,6 +72,7 @@ func _ready() -> void:
 	_build_visual()
 	if KeyBinds.has_keyboard():
 		_build_keys()
+		_build_mouse()
 	_build_other()
 	refresh()
 	# The volume button in the corner and this screen show each other's changes.
@@ -163,11 +168,16 @@ func _build_keys() -> void:
 ## Wait for the next key, for shortcut `action`.
 func listen_for_key(action: String) -> void:
 	listening = action
+	listening_mouse = ""
 	refresh()
 
 ## While waiting for a key: that key becomes the shortcut (any key, with Ctrl,
-## Shift or Alt if held; pressing only one of those waits on).
+## Shift or Alt if held; pressing only one of those waits on). While waiting for
+## a mouse button: the next click (any button but the wheel) sets it.
 func _input(event: InputEvent) -> void:
+	if listening_mouse != "":
+		_listen_mouse_input(event)
+		return
 	var key := event as InputEventKey
 	if listening == "" or key == null or not key.pressed or key.echo:
 		return
@@ -180,6 +190,53 @@ func _input(event: InputEvent) -> void:
 func set_key(action: String, code: int) -> void:
 	KeyBinds.set_key(action, code)
 	listening = ""
+	refresh()
+	settings_changed.emit()
+
+# --- Mouse --------------------------------------------------------------------------
+
+func _build_mouse() -> void:
+	_heading("Mouse")
+	var hint := Label.new()
+	hint.text = "Press a button here, then click with the mouse button you want."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_font_size_override("font_size", 22)
+	hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	sections.add_child(hint)
+	for action: String in MouseBinds.ACTIONS:
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(220, 60)
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(func() -> void: listen_for_mouse(action))
+		_row(MouseBinds.ACTIONS[action][0], button)
+		mouse_buttons[action] = button
+
+## Wait for the next mouse click, for mouse action `action`.
+func listen_for_mouse(action: String) -> void:
+	listening_mouse = action
+	listening = ""
+	refresh()
+
+## The click that sets the waiting mouse action; Esc stops waiting. Nothing else
+## gets the click (so clicking another setting doesn't also press it).
+func _listen_mouse_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key and key.pressed and key.keycode == KEY_ESCAPE:
+		get_viewport().set_input_as_handled()
+		listening_mouse = ""
+		refresh()
+		return
+	var click := event as InputEventMouseButton
+	if click == null or not MouseBinds.can_use(click.button_index):
+		return
+	get_viewport().set_input_as_handled()
+	if click.pressed:
+		set_mouse(listening_mouse, click.button_index)
+
+## Put mouse action `action` on button `index` (two actions on one button swap).
+func set_mouse(action: String, index: int) -> void:
+	MouseBinds.set_button(action, index)
+	listening_mouse = ""
 	refresh()
 	settings_changed.emit()
 
@@ -213,6 +270,7 @@ func reset_to_defaults() -> void:
 	UserSettings.reset_to_defaults()
 	KeyBinds.install()
 	listening = ""
+	listening_mouse = ""
 	_sound_changed()
 
 ## Show the saved settings (after a change here, or elsewhere such as the volume
@@ -232,6 +290,8 @@ func refresh() -> void:
 	_show_toggle(reduce_toggle, UserSettings.reduce_effects())
 	for action in key_buttons:
 		(key_buttons[action] as Button).text = "Press a key..." if action == listening else KeyBinds.text(KeyBinds.key(action))
+	for action in mouse_buttons:
+		(mouse_buttons[action] as Button).text = "Click..." if action == listening_mouse else MouseBinds.text(MouseBinds.button(action))
 
 # --- Building blocks ---------------------------------------------------------------
 
