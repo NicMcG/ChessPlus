@@ -18,7 +18,8 @@ Part 3, Standard vs Standard: White's score and how often White won both games
 of a pair.
 
 Plain Python, no extra libraries. 95% ranges: mean +-1.96 standard errors for
-scores (draws count half), Wilson intervals for proportions, and the
+army scores (draws count half), Wilson intervals for proportions and for
+White's score in a pairing (on the points scored), and the
 regression's own standard errors for its odds ratios.
 """
 import argparse
@@ -241,7 +242,9 @@ def part1(folder, pieces, out):
             both[1] += 1
             both[0] += white_won_both(games[n], games[n + 1])
         all_white += results
-        mean, lo, hi, _ = mean_range(results)
+        mean = sum(results) / len(results)
+        # Wilson on the points scored: still sensible at 0% or 100%.
+        lo, hi = wilson(sum(results), len(results))
         rows.append((armies[i][0], armies[j][0], len(results), mean, lo, hi))
 
     out.append("## Part 1: meta pool round robin\n")
