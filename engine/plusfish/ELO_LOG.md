@@ -59,6 +59,7 @@ Lazy SMP adds to the clock result on top: 4 threads vs 1 = +102.5 ±24.1 (#5).
 | 32 | Search constants as UCI options + `plusfish spsa`; SPSA-tuned values (31 constants) on the #26 search | nodes 6k / nodes 40k | 4300 / 600 | +5.8 ±6.2 / 0.0 ±15.7 | tool kept, values not |
 | 33 | #27 + #28 + #29 + #30 together (each measured on top of the ones before it): #27+#28+#29 vs the #26 build; #29 on top of #27+#28; #30 on top of the rest | nodes 6k / nodes 6k / nodes 40k | 2000 / 3000 / 1500 | +35.6 ±9.5 / +7.8 ±7.6 / +13.4 ±10.0 | kept |
 | 34 | SPSA re-tune of 27 constants on #33 (12,000 pairs at 6k, whole-number depth limits and singular-extension settings fixed) | nodes 6k | 6000 | +1.6 ±5.3 | not kept (the constants were already about right) |
+| 35 | Opening terms (`omat`, `omob`, `oreach`, `orow1`, `oability` per piece, `otempo`; each times the share of pieces not yet moved), tuned on the first 40 plies of 6,000 `drift` games labelled by the later scores (plies +16..+40), nothing else changed; see reports/START_EVAL.md. Gen 1 (drift run 1 only) vs base: +21.9 ±11.2 at 6k. Kept build vs base: | nodes 6k / nodes 20k (gen 2 weights) / nodes 20k, meta pool | 2000 / 1200 / POOLGAMES | +30.0 ±11.3 / +54.3 ±14.0 / POOLELO | kept |
 
 ## Checkpoint: build after #33 vs the build after #26 (fork main)
 
@@ -106,6 +107,24 @@ averaged) with the real result; the noise ceiling is 0.98.
 With only the 19 old pieces, the starting engine (base1) and the build after
 #22 judged random pairs the same (0.84 vs 0.85 at 20,000 nodes): the search
 work didn't change opening judgement; valuing the new pieces did.
+
+### Drift test (#35, reports/START_EVAL.md)
+
+2,000 held-out `drift` games (random full-budget armies, top move every turn
+at 40,000 nodes): start score vs the result (Brier, lower is better) and vs
+the game's own later scores (plies 16-40, squared error in win chance).
+
+| Start score | Brier | Error vs later | Corr. with later |
+|---|---|---|---|
+| before #35 @20,000 / @150,000 / @1,000,000 | 0.1395 / 0.1371 / 0.1346 | 0.0179 / 0.0161 / 0.0147 | 0.83 / 0.85 / 0.86 |
+| #35 @20,000 / @150,000 / @1,000,000 | 0.1206 / 0.1187 / 0.1177 | 0.0125 / 0.0114 / 0.0108 | 0.88 / 0.89 / 0.90 |
+
+Also tried: scaling the opening terms down to match the later scores (closer
+to them, further from the results: not kept), labels mixed with the result
+(Brier 0.1184, error vs later 0.0136: not kept), training on plies 0-10 / 0-20
+/ 0-60 instead of 0-40 (no better), re-tuning every piece's material,
+mobility, shield and ability weights the same way (no better), and the
+average of the last two search depths as the score (no better).
 
 ## The eval-bar meta pool (`meta`, reports/META_POOL.md)
 
