@@ -6,9 +6,10 @@ the game actually goes? And where it's wrong, why?
 
 ## How it was measured
 
-`plusfish drift` played 8,000 games between random full-budget armies, with
-Plusfish's top move every turn (40,000 nodes a move), logging its score at
-every ply. Each start was also scored the way the eval bar does it: a fresh
+`plusfish drift` played 12,000 games with Plusfish's top move every turn
+(40,000 nodes a move), logging its score at every ply: 8,000 between random
+full-budget armies, and 4,000 where about half the armies came from the meta
+pool. Each start was also scored the way the eval bar does it: a fresh
 search of 20,000 nodes (the web) and 150,000 (the PC).
 
 "The truth" for a start is how the game went: its result, and the average
@@ -16,8 +17,8 @@ win chance Plusfish gave over plies 16 to 40 (once the armies have met; much
 less noisy than one game's result). Scores become win chances with
 1 / (1 + 10^(-score / 720)), the curve that fits these games.
 
-A quarter of the games (every 4th) were kept back for testing; everything
-below is measured on those 2,000 games.
+Every 4th game was kept back for testing (3,000 games); everything below is
+measured on those.
 
 ## What was wrong
 
@@ -48,56 +49,73 @@ Each piece type got opening versions of its terms (material, mobility,
 reach, being on the second row, unused ability, plus one for whose turn it
 is). Each is multiplied by the share of pieces that haven't moved yet, so it
 counts fully at move 0 and fades as the armies develop. They were fitted to
-the later scores of the first 40 plies of 6,000 of the games, with nothing
-else changed.
+the later scores in the first 40 plies of the 9,000 training games; nothing
+else in the evaluation changed.
 
 What they say each piece is really worth *at the start*, compared with
-before (centipawns, 100 = a pawn's cost; middlegame weights):
+before (centipawns, about 100 = a pawn; middlegame weights):
 
 | More than Plusfish thought | | Less than Plusfish thought | |
 |---|---|---|---|
-| Vampire | +139 | Rook | -47 |
-| Princess | +57 | Queen | -38 |
-| Lance | +52 | Wizard | -28 |
-| Werewolf | +51 | Man | -26 |
-| Necromancer | +48 | Chariot | -22 |
-| Ghost | +44 | Assassin | -17 |
-| Cannon | +25 | Knight, Ram | -15 |
+| Vampire | +154 | Rook | -43 |
+| Princess | +70 | Queen | -37 |
+| Lance | +68 | Man, Wizard | -24 |
+| Werewolf | +55 | Knight | -18 |
+| Necromancer | +51 | Assassin | -17 |
+| Ghost | +50 | Chariot | -16 |
+| Cannon | +33 | Ram | -15 |
 
 These are Plusfish's own judgement of the start, not costs: the balance
 report is still the place for those.
 
-## Results (2,000 test games)
+## Results
 
 Brier score = average squared gap between the predicted win chance and the
 result (lower is better; always saying 58% scores 0.166). "Skill" = how much
 of that it removes.
+
+2,000 test games between random armies:
 
 | Start score | Brier vs result | Skill | Error vs later scores | Correlation with later scores |
 |---|---|---|---|---|
 | Before, 20,000 nodes (web) | 0.1395 | 0.16 | 0.0179 | 0.83 |
 | Before, 150,000 nodes (PC) | 0.1371 | 0.18 | 0.0161 | 0.85 |
 | Before, 1,000,000 nodes | 0.1346 | 0.19 | 0.0147 | 0.86 |
-| **After, 20,000 nodes (web)** | **0.1206** | **0.27** | **0.0125** | **0.88** |
-| **After, 150,000 nodes (PC)** | **0.1187** | **0.29** | **0.0114** | **0.89** |
-| After, 1,000,000 nodes | 0.1177 | 0.29 | 0.0108 | 0.90 |
+| **After, 20,000 nodes (web)** | **0.1194** | **0.28** | **0.0126** | **0.88** |
+| **After, 150,000 nodes (PC)** | **0.1180** | **0.29** | **0.0116** | **0.89** |
+| After, 1,000,000 nodes | 0.1175 | 0.29 | 0.0109 | 0.89 |
+
+1,000 test games with meta pool armies on one or both sides: Brier 0.1181 →
+0.1039 at 20,000 nodes, 0.1167 → 0.1019 at 150,000.
 
 At the web's budget Plusfish now judges the start better than it used to
 with 50 times the search. Searching deeper helps little either way, so what's
 left is mostly not search depth: some games are decided by a tactic a few
 moves in, and one game's result is noisy.
 
+A second check with `start-check` (each army pairing played 40 times, 20
+with each colour; correlation of the start score with the real score):
+
+| Start score | 150 random pairings, 20k / 150k | Meta pool + Standard (55), 20k / 150k |
+|---|---|---|
+| Before | 0.63 / 0.65 (picks the right side in 76% / 78% of clear cases) | 0.73 / 0.77 |
+| After | 0.73 / 0.75 (85% / 89%) | 0.73 / 0.77 |
+
+The meta pool was judged as well as before: its armies have no Vampires
+and few pawns, where the biggest corrections are.
+
 Examples (score in pawns, White's view; "later" = average over plies 16-40):
 
 | Game | Before (20k) | After (20k) | Later | Result |
 |---|---|---|---|---|
-| Ghost/Princess/Lance/Vampire/Necromancer army vs two Chariots, two Cavalry, Galleon, Squire | -4.6 | -1.7 | +5.5 | White won |
-| #778 | -5.1 | -1.5 | +6.8 | White won |
-| #58 | +6.1 | +2.9 | -0.2 | Black won |
+| #999 | -4.6 | -1.3 | +5.5 | White won |
+| #778 | -5.1 | -1.7 | +6.8 | White won |
+| #58 | +6.1 | +3.0 | -0.2 | Black won |
 
-It also plays better, since the opening is where every game starts: +37
-±11 Elo at 6,000 nodes a move and +54 ±14 at 20,000 (the web eval bar's
-budget), random armies; see ELO_LOG #35.
+It also plays better, since the opening is where every game starts:
++35 ±10 Elo at 6,000 nodes a move and +43 ±13 at 20,000 (the web eval
+bar's budget) with random armies. With the meta pool's ten armies it plays
+about the same as before (+7 ±12). See ELO_LOG #35.
 
 ## Still open
 
