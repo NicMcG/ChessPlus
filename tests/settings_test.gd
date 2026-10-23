@@ -89,6 +89,7 @@ func test_privacy_notice() -> void:
 	check(text.contains("no accounts"), "Says there are no accounts")
 	check(text.contains("30 days"), "Says how long games are kept")
 	check(text.contains("not the chat"), "Says strangers can't read the chat")
+	check(text.contains("90 days"), "Says how long reports are kept")
 	settings.popup.close()
 	settings.free()
 	_finish()

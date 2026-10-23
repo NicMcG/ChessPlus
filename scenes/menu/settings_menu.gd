@@ -29,7 +29,7 @@ const PRIVACY: Array[String] = [
 	"Local games, your armies and your settings stay on this device.",
 	"For online play, this device signs in to the game's server (run by Supabase) with a random ID. The server keeps your online games (moves, armies and their names, and chat) and deletes them 30 days after they end, or after a day if nobody joined. It also notes when you were last online, for the player count, and forgets that after a day.",
 	"Your opponent sees your army, its name and your chat messages. Anyone with a game's code can see its moves and armies, but not the chat.",
-	"If a game is reported, its chat and moves are kept so the report can be looked at.",
+	"If a game is reported, its chat and moves are kept for 90 days so the report can be looked at.",
 	"Armies you share by code stay on the server so others can import them.",
 	"Like any website, the server and the game's web host (GitHub) record connection details such as IP addresses.",
 ]
