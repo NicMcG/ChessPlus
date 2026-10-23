@@ -1,0 +1,11 @@
+[2026-10-23 04:51:29 UTC] start; game version 78f6fd2 (HEAD); 64 cores; rule --white-quiet-first=true; pieces /home/ubuntu/plusfish-work/pieces/p100
+[2026-10-23 04:51:29 UTC] part 0 (control): selfplay 20000 games, 8000 nodes, seed 101, no rule, main's Plusfish
+[2026-10-23 04:59:46 UTC] part 0 finished (exit 0)
+[2026-10-23 04:59:48 UTC] part 1: selfplay 20000 games, 8000 nodes, seed 101, rule
+[2026-10-23 05:08:25 UTC] part 1 finished (exit 0)
+[2026-10-23 05:08:27 UTC] part 2: 55 pairings of 11 armies, 40 games each, 8000 nodes, random plies 4, seeds 3000-3054, rule
+[2026-10-23 05:09:39 UTC] part 2 finished (55 pairing files)
+[2026-10-23 05:09:39 UTC] part 3: 62 armies against themselves, 2000000 nodes, 8 threads, 8 at a time, without and with the rule
+[2026-10-23 17:24:01 UTC] resumed: part 3 again (the server had switched itself off during it)
+[2026-10-23 17:25:11 UTC] part 3 finished (62 armies)
+[2026-10-23 17:25:11 UTC] all done

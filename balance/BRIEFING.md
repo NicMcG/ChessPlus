@@ -1,7 +1,7 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 22 October 2026 (after run 7). The full data is in the repo
-(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run7` (a
+Last updated 23 October 2026 (after runs 8 and 9). The full data is in the repo
+(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run9` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
 Balancing is now discussed in Claude Code; Mac makes the decisions.
@@ -67,10 +67,25 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   still there (White 59.4%, 3 pairings at 80%+, half the strong armies +3 to
   +4 against themselves via first-move captures). Its pool is the official
   meta pool now.
+- **Run 8, cheaper pawns (0.75 and 0.5):** no walls. Strong armies take more
+  pawns at 0.5 (4.5 each) but put them on the back row, behind the pieces, so
+  first-move captures stay; White's edge grows slightly (random armies 56.1%
+  and 56.5%, round robins 64.2% and 62.3%, 8-9 pairings at 80%+). The Pawn's
+  measured worth stays about 0.72 whatever its price. On this data it
+  doesn't help.
+- **Run 9, White-only quiet first move** (White may not capture, break a
+  shield or use an ability on its first move unless in check; Black
+  unrestricted): the best result yet. Random armies White 52.7% (control on
+  today's engine 55.7%); round robin of the strong pool 50.5%, every army's
+  gap under 8 points, no pairing at 80%+; an army against itself median +0.20
+  (chess +0.29), none with Black more than a pawn ahead. Mac's success test
+  missed on one line: the round robin's White score 50.5% is under the 52%
+  floor (95% range 48.9-52.2%).
 
 ## Other open questions
 
-- Whether to adopt the Front-row rule (and the army builder's wording for it).
+- Whether to adopt the Front-row rule or the White-only quiet first move
+  (run 9), and the wording for whichever is chosen.
 - Queen at 9 vs measured ~10 (raising it puts Standard over 39).
 - Vampire still ~0.5 under its worth; Bishop ~0.5 under.
 - The Berserker/Barbarian card note; Nicholas's Plusfish retrain.

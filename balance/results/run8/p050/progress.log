@@ -1,0 +1,9 @@
+[2026-10-23 18:20:55 UTC] start; game version 665aac8 (HEAD); 64 cores; Pawn cost 0.5; pieces /home/ubuntu/plusfish-work/pieces/p050 (value = 0.5)
+[2026-10-23 18:20:55 UTC] part 1: meta --wide 64 --game-climb --king-exposed reject --rounds 15 --seed 1
+[2026-10-23 18:57:42 UTC] part 1 finished (exit 0)
+[2026-10-23 18:57:42 UTC] part 2: 55 pairings of 11 armies, 40 games each, 8000 nodes, random plies 4, seeds 3000-3054
+[2026-10-23 18:58:48 UTC] part 2 finished (55 pairing files)
+[2026-10-23 18:58:48 UTC] part 3: selfplay 20000 games, 8000 nodes, seed 101
+[2026-10-23 19:07:01 UTC] part 3 finished (exit 0)
+[2026-10-23 19:07:03 UTC] report written (exit 0)
+[2026-10-23 19:07:03 UTC] all done

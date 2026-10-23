@@ -1,0 +1,51 @@
+20000 games read; extracting positions...
+927132 quiet positions; fitting...
+Balance report from 20000 self-play games
+White scores 56.5% overall (first-move edge with equal armies: +53 Elo); 24% draws; 128 plies per game on average
+Endings: adjudicated_win 13925, fifty_moves 2601, repetition 1845, checkmate 1255, insufficient_material 151, max_plies 142, adjudicated_draw 51, stalemate 30
+
+Values are on the army-cost scale (the fit is scaled so that, on average, value = cost).
+  worth (army): what one extra piece of the type at the start is worth, from game results
+  worth (board): what a fresh one (shield intact, ability unused) is worth while on the
+                 board mid-game; more precise, but blind to promotion and one-shot pieces
+
+piece         cost   games   worth (army)  Elo/piece  worth (board)  verdict
+Queen            9    8772     9.89 ±0.34       +571     9.74 ±0.08  UNDERPRICED by ~0.9
+Princess       8.5   10072     8.16 ±0.31       +472     8.41 ±0.07  slightly overpriced (-0.3)
+Wizard           8    8636     8.19 ±0.31       +473     7.15 ±0.07  about right
+Vampire        6.5    9782     6.84 ±0.25       +395     8.05 ±0.07  slightly underpriced (+0.3)
+Rook             5    9714     4.69 ±0.20       +271     4.80 ±0.06  slightly overpriced (-0.3)
+Archer         4.5    9694     4.75 ±0.19       +274     4.18 ±0.12  slightly underpriced (+0.2)
+Cannon           4    9468     3.75 ±0.17       +217     2.80 ±0.07  slightly overpriced (-0.3)
+Chariot          4    9666     3.62 ±0.17       +209     4.03 ±0.06  slightly overpriced (-0.4)
+Jester           4    9610     3.61 ±0.17       +209     3.84 ±0.07  slightly overpriced (-0.4)
+Squire           4    9804     3.81 ±0.17       +220     4.46 ±0.05  slightly overpriced (-0.2)
+Bard           3.5    9492     3.16 ±0.15       +183     2.80 ±1.57  slightly overpriced (-0.3)
+Lance          3.5    9632     3.42 ±0.16       +198     2.01 ±0.08  about right
+Necromancer    3.5    9592     3.83 ±0.16       +221     3.70 ±0.09  slightly underpriced (+0.3)
+Rogue          3.5    9772     3.47 ±0.16       +201     3.78 ±0.05  about right
+Bishop           3    9840     3.37 ±0.15       +195     3.21 ±0.05  slightly underpriced (+0.4)
+Catapult         3    9706     2.83 ±0.14       +164     2.88 ±0.05  slightly overpriced (-0.2)
+Cavalry          3    9668     3.19 ±0.14       +184     4.11 ±0.05  slightly underpriced (+0.2)
+Galleon          3    9786     3.11 ±0.14       +180     3.24 ±0.05  about right
+Ghost            3    9778     3.12 ±0.14       +180     2.75 ±0.09  about right
+Knight           3    9690     3.17 ±0.14       +183     3.18 ±0.06  slightly underpriced (+0.2)
+Man              3    9658     2.73 ±0.14       +158     3.03 ±0.05  slightly overpriced (-0.3)
+Parapet          3    9668     2.54 ±0.14       +147     3.03 ±0.04  slightly overpriced (-0.5)
+Ram              3    9544     3.09 ±0.15       +179     3.38 ±0.06  about right
+Werewolf         3    9714     3.30 ±0.14       +191     3.47 ±0.14  slightly underpriced (+0.3)
+Barbarian      2.5   10528     2.63 ±0.13       +152     1.99 ±0.05  slightly underpriced (+0.1)
+Paladin        1.5   12822     1.47 ±0.10        +85     1.50 ±0.08  about right
+Elephant         1   14412     0.77 ±0.08        +44     0.56 ±0.03  slightly overpriced (-0.2)
+Assassin       0.5   17240     0.35 ±0.07        +20     0.33 ±0.03  slightly overpriced (-0.1)
+Pawn           0.5   19568     0.72 ±0.04        +41     0.96 ±0.01  slightly underpriced (+0.2)
+
+Other terms (board regression, in points):
+  ability:archer         +1.08 ±0.09
+  ability:bard           +4.20 ±1.11
+  ability:ghost          +1.22 ±0.07
+  shield:paladin         +0.76 ±0.06
+  mat:werewolf_wolf      +3.76 ±0.06
+  raise_potential        +0.58 ±0.06
+  tempo                  +0.11 ±0.03
+wrote /home/ubuntu/plusfish-work/run8/p050/report_8k.html

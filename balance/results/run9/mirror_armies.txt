@@ -1,0 +1,62 @@
+run 4|Wide 15b|(AS)P(BR)NKN(NC)1/B(AS)EQ(RM)(PD)AB
+run 4|Wide 14b|(PD)Q(BR)NK(BR)(CV)P/A(GA)(RM)EGE(AS)(AS)
+run 4|Wide 15c|B(CV)(GA)CKNW(AS)/NB(NC)(PD)EPP(AS)
+run 4|Wide 14c|QP(BR)NK(BR)P1/(AS)(AS)BB(RO)(PD)A(GA)
+run 4|Wide 14a|1(BR)ENK1Q(BR)/C(AS)(RO)EB(PD)AB
+run 4|Wide 9b|1(NC)1K(BD)(AS)1B/L(GA)(AS)(RM)LQB(GA)
+run 4|Wide 13c|C1(BR)K(RM)N(BR)P/BQG(AS)(RO)(PD)E(PD)
+run 4|Wide 12b|M(RO)1KN2Q/EN(BR)G(PD)A(AS)A
+run 4|Wide 15a|(RM)(BR)(GA)K(BD)PWP/PB(PD)(RM)BA(AS)(AS)
+run 4|Wide 11a|(CV)(NC)1(CV)K(RO)(BR)Q/(AS)(GA)(PD)(AS)NEPL
+run 4|Standard|standard
+run 5 (rule)|1|J(SQ)(CT)KBMMB/PPPPV1PE
+run 5 (rule)|2|(PR)(AS)(GA)(PR)KQ(NC)E/5P2
+run 5 (rule)|3|(PR)(RM)VKE(BD)(CT)J/1P1(GA)P1(AS)1
+run 5 (rule)|4|(CH)(CT)(PR)(CT)K(RO)NB/(AS)PNPPPPP
+run 5 (rule)|5|(GA)(CT)NKJM(BD)(CT)/P(BR)PPPPPP
+run 5 (rule)|6|Q(NC)(NC)KVENJ/(AS)PPPPPPP
+run 5 (rule)|7|(PA)BQ(CV)KJ(CV)(CT)/PPP1P(AS)1(PD)
+run 5 (rule)|8|(GA)AGKV(RM)(NC)(RM)/(CH)E(BR)E(AS)P(AS)P
+run 5 (rule)|9|(CH)B(SQ)K1(NC)(PD)Q/PPPPPPPP
+run 5 (rule)|10|RJ(CT)(CT)KE(PD)Q/PPPPPPPP
+run 5 (rule)|11|(CH)(GA)(RO)KQEEV/P1PPPPPP
+run 5 (rule)|12|(PA)(GA)V(PR)K(BR)N(WW)/PPPPPPPP
+run 5 (rule)|13|(CH)(WW)AQK(SQ)(GA)M/(AS)PEE1P1P
+run 5 (rule)|14|VE(BD)KM(BD)(PR)E/P(BR)PPPPPP
+run 5 (rule)|15|(CT)(RO)EK(BD)EN(NC)/(BD)PPPPPV1
+run 5 (rule)|16|RVMJKM(CV)V/P(AS)(AS)PP(BR)P1
+run 5 (rule)|17|V1(PR)BK(PD)(CT)(CV)/PPPPPPPP
+run 5 (rule)|18|(PA)(PD)Q(RO)K(NC)NV/2(BR)(BR)1PP1
+run 5 (rule)|19|(GA)(CT)(WW)GKN(PR)(PR)/P(AS)4P1
+run 5 (rule)|20|(CH)(AS)(CT)KB(NC)(SQ)R/PP1(BR)PJ(BR)(NC)
+run 5 (no rule)|21|(NC)(CT)(SQ)KC(PD)A(BD)/1EL1EPPL
+run 5 (no rule)|22|(PA)(PR)(PD)KJ(WW)C(PA)/1B3L1P
+run 5 (no rule)|23|(CH)(AS)MKJN(WW)A/PPPPPLPP
+run 5 (no rule)|24|(AS)(PR)Q(AS)K(PD)N(BD)/PPP2LPP
+run 5 (no rule)|25|(PA)(RM)(CT)(PR)KM(RO)(SQ)/PP(AS)1PLPP
+run 5 (no rule)|26|Q(PR)(PR)K(AS)E(NC)(GA)/P1E5
+run 5 (no rule)|27|(PA)(RM)(NC)(WW)K(PR)(GA)M/2EPPPPE
+run 5 (no rule)|28|(PA)(NC)V(NC)KBWB/2(PD)P1PL1
+run 5 (no rule)|29|EC(CV)KV(NC)(CV)J/(AS)PPPPEBL
+run 5 (no rule)|30|(CT)AGK(NC)(PR)WC/1(AS)P4(PD)
+run 5 (no rule)|31|(PD)C(PD)KW(CV)(RO)C/P(PA)P(SQ)PP1P
+run 5 (no rule)|32|R(NC)VWK(GA)J(AS)/1E1P3E
+run 5 (no rule)|33|(CH)AC(NC)KE(AS)(PA)/P(PD)PP(CT)PP(BR)
+run 5 (no rule)|34|(GA)AGKV(RM)(NC)(RM)/(CH)E(BR)E(AS)P(AS)P
+run 5 (no rule)|35|(CH)(NC)NK(PR)(SQ)AC/(PD)3P(AS)2
+run 5 (no rule)|36|(CH)Q(RM)VKEB(PA)/N2(CH)(AS)2P
+run 5 (no rule)|37|(CH)(RO)(RO)KE(SQ)C(PD)/PNP(RM)PPPL
+run 5 (no rule)|38|(PA)(PD)VK(AS)(CV)WN/1(BR)1(CV)(AS)(RM)2
+run 5 (no rule)|39|RWVK(CT)JE(PA)/1(GA)2E1(GA)(AS)
+run 5 (no rule)|40|RC(GA)KB(CT)(NC)(PA)/P(PD)PPPP(AS)J
+current pool|Wide 14a|(NC)(WW)ENKQPA/GB(AS)(CV)PG1(AS)
+current pool|Wide 15a|QE(WW)1KN(NC)(RM)/(AS)APB(BR)(PD)G(AS)
+current pool|Wide 15c|EQ(RO)K1(AS)(WW)(NC)/(PD)GB(RM)GB(PD)(AS)
+current pool|Wide 13a|(NC)PQPK(GA)P(CV)/EBAGPEGP
+current pool|Wide 10a|1Q1KGE(NC)C/B(AS)BG(BR)(AS)(PD)A
+current pool|Wide 11a|1(WW)GK(NC)(CV)(GA)R/(AS)BB(CV)GE(PD)L
+current pool|Wide 11c|1Q1NKPP(NC)/(RM)(SQ)(CV)(AS)(RM)A(WW)(AS)
+current pool|Wide 13c|P(CV)NCK(BR)1B/(AS)G(BR)LV(RM)B(AS)
+current pool|Wide 7c|1G1NKQG1/BA(AS)(RM)(CV)(BR)(AS)(CH)
+current pool|Wide 14a (run 2)|1(BR)ENK1Q(BR)/C(AS)(RO)EB(PD)AB
+current pool|Standard|standard

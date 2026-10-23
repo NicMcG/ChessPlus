@@ -1,0 +1,17 @@
+[2026-10-23 04:50:33 UTC] fetching branches
+[2026-10-23 04:51:02 UTC] built pf-main from origin/main (de87b38)
+[2026-10-23 04:51:29 UTC] built pf-wq from origin/experiment/white-quiet-first (78f6fd2)
+[2026-10-23 04:51:29 UTC] pieces p100: Pawn value = 1
+[2026-10-23 04:51:29 UTC] pieces p075: Pawn value = 0.75
+[2026-10-23 04:51:29 UTC] pieces p050: Pawn value = 0.5
+[2026-10-23 04:51:29 UTC] rule check, White's first move, can capture: 2 moves without the rule, 1 with it
+[2026-10-23 04:51:29 UTC] rule check, White in check, capture allowed: 3 moves without the rule, 3 with it
+[2026-10-23 04:51:29 UTC] rule check, Black's first move, unrestricted: 2 moves without the rule, 2 with it
+[2026-10-23 04:51:29 UTC] rule check, White's second move, unrestricted: 2 moves without the rule, 2 with it
+[2026-10-23 04:51:29 UTC] run 9
+[2026-10-23 17:24:01 UTC] resuming (idle switch-off had stopped the server at 05:10 UTC); builds now named plusfish
+[2026-10-23 17:24:01 UTC] run 9, part 3 (redone in full)
+[2026-10-23 17:25:11 UTC] run 9 done
+[2026-10-23 17:25:11 UTC] run 8, Pawn 0.75
+[2026-10-23 18:20:55 UTC] run 8, Pawn 0.5
+[2026-10-23 19:07:03 UTC] all done
