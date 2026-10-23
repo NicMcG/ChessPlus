@@ -2,7 +2,7 @@
 
 Status (22 Oct 2026): step 1 (locking the server: sign-in, checked functions,
 server clocks, limits, cheaper syncing) is built in `server/supabase_update_3.sql`
-and the game; it goes live once Mac runs the SQL. Moves are checked by the
+and the game; LIVE since 22 Oct 2026 (live check 26/26). Moves are checked by the
 server for turn and order but not yet for legality: that's the referee, next.
 
 ## Why
