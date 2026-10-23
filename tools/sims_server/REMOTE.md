@@ -37,14 +37,20 @@ usual ~$2.54/hour while running.
 
 ## How a cloud session runs a job
 
-Instance `INSTANCE_ID`, region `us-east-2`.
+Region `us-east-2`. Find the server's ID by its name first (the key may look up
+any server, but only start, stop and command this one):
 
-1. `aws ec2 start-instances --instance-ids INSTANCE_ID`, then wait
+    ID=$(aws ec2 describe-instances --filters Name=tag:Name,Values=chessplus-sims \
+      --query 'Reservations[].Instances[?State.Name!=`terminated`].InstanceId' --output text)
+
+(`remote-policy.json` says `INSTANCE_ID` where the real policy in AWS names it.)
+
+1. `aws ec2 start-instances --instance-ids $ID`, then wait
    (`aws ec2 wait instance-running ...`) and until
    `aws ssm describe-instance-information` lists it as Online (about a minute
    after boot).
 2. Send commands with `aws ssm send-command --document-name AWS-RunShellScript
-   --instance-ids INSTANCE_ID --parameters 'commands=[...]'` and read
+   --instance-ids $ID --parameters 'commands=[...]'` and read
    them back with `aws ssm get-command-invocation`. Commands run as root: run
    the work as the `ubuntu` user (`sudo -iu ubuntu bash -lc '...'`), where Rust,
    `~/ChessPlus` and `~/plusfish-work/` live. Set a long
@@ -59,7 +65,7 @@ Instance `INSTANCE_ID`, region `us-east-2`.
    `gzip -c file | base64` split into chunks and joined here). File them in
    `balance/results/run<N>/` with a README, as usual.
 5. Finish every run with `aws ec2 stop-instances --instance-ids
-   INSTANCE_ID`, a stop through AWS, never a `shutdown` on the server:
+   $ID`, a stop through AWS, never a `shutdown` on the server:
    AWS's cost tracker kept billing servers that switched themselves off from
    inside for hours afterwards (Oct 2026). The server's own switch-off 20
    minutes after the last Plusfish job (the idle timer) is only the backup.

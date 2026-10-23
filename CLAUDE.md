@@ -11,7 +11,7 @@ Everything in the rules engine should be built so standard chess is just one con
 * Godot 4.7.2 (standard build, not .NET), GDScript only
 * Renderer: Compatibility
 * Indent with tabs (GDScript is strict about this)
-* Repo: github.com/thedarkhorse99/ChessPlus, branch main
+* Repo: github.com/thedarkhorse99/ChessPlus, branch main (public: never commit private details; commits use Mac's GitHub noreply address, set in this repo's git config)
 * Mac works on Windows; the project lives at C:\\Users<you>\\Documents\\Godot\\ChessPlus\\ (res:// = this folder)
 
 ## How Mac wants to work

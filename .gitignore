@@ -9,3 +9,7 @@
 balance/results/*/log_*.txt
 server/supabase/functions/referee/plusfish_wasm.ts
 server/supabase/.temp/
+
+# Private notes on Mac's PC only (the repo is public)
+CLAUDE.local.md
+__pycache__/
