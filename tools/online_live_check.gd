@@ -25,7 +25,7 @@ func _backend(slot: String) -> SupabaseBackend:
 	return backend
 
 func _session(slot: String) -> OnlineSession:
-	var session := OnlineSession.new(_backend(slot))
+	var session := OnlineSession.new(SupabaseBackend.new(OnlineConfig.SUPABASE_URL, OnlineConfig.SUPABASE_KEY, slot))
 	session.poll_seconds = 0
 	root.add_child(session)
 	return session
