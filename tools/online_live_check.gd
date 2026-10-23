@@ -53,6 +53,7 @@ func _run() -> void:
 	var joined := await black.join_game(white.code, StandardSetup.army())
 	check(joined.ok and black.my_team == Piece.Team.BLACK, "joined as Black (%s)" % joined.error)
 	check(black.increment_ms() == 2000, "both see the 2-second bonus")
+	var white_turn_began := Time.get_ticks_msec()
 	var late := await stranger.join_game(white.code, StandardSetup.army())
 	check(not late.ok and "already started" in late.error, "a third player can't join (%s)" % late.error)
 
@@ -71,7 +72,11 @@ func _run() -> void:
 	# Playing.
 	var moved := await white.send_move("e2-e4", false)
 	check(moved.ok and white.move_count() == 1, "White played e4 (%s)" % moved.error)
-	check(int(white.row.white_ms) > 180000 and int(white.row.white_ms) <= 182000, "the bonus was added after White's move (%d ms left)" % int(white.row.white_ms))
+	# White's turn ran while the cheating checks above happened: the server
+	# charges that time, then adds the 2 seconds back.
+	var white_used := Time.get_ticks_msec() - white_turn_began
+	check(int(white.row.white_ms) >= 180000 - white_used + 2000 - 1000 and int(white.row.white_ms) <= 182000,
+			"the bonus was added after White's move (%d ms left after %d ms)" % [int(white.row.white_ms), white_used])
 	await black.poll()
 	check(black.moves() == ["e2-e4"], "Black sees e4")
 	var quiet: Dictionary = await black.backend.call_function("get_game", {"p_code": black.code, "p_known_version": int(black.row.version)})
