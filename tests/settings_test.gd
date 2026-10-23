@@ -73,6 +73,26 @@ func test_credits_and_reset() -> void:
 	settings.free()
 	_finish()
 
+func test_privacy_notice() -> void:
+	var settings := _open()
+	var labels := []
+	for child in settings.sections.get_children():
+		if child is Button:
+			labels.append((child as Button).text)
+	check(labels.has("Privacy"), "A Privacy button beside Credits")
+	settings.show_privacy()
+	var text := ""
+	for child in settings.popup.paragraphs.get_children():
+		if child is Label:
+			text += (child as Label).text + "
+"
+	check(text.contains("no accounts"), "Says there are no accounts")
+	check(text.contains("30 days"), "Says how long games are kept")
+	check(text.contains("not the chat"), "Says strangers can't read the chat")
+	settings.popup.close()
+	settings.free()
+	_finish()
+
 func test_main_menu_opens_settings_and_back() -> void:
 	var main: Node = load("res://scenes/main/main.tscn").instantiate()
 	main.library = ArmyLibrary.new("user://test_armies/")

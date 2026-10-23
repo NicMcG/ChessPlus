@@ -21,6 +21,19 @@ const CREDITS: Array[String] = [
 	"Sounds: giggle by Lomond (CC BY 3.0), thunder by Jud McCranie (CC BY-SA 4.0), church bell by Pete w. View (CC BY-SA 4.0), choir: Coro Santa Pazienza (CC BY 3.0)",
 ]
 
+## The privacy notice (drafted by Claude for Mac to change, Oct 2026): what the
+## game keeps and who sees it. Keep it true when online play changes (the
+## server's rules are in server/supabase_update_*.sql).
+const PRIVACY: Array[String] = [
+	"Chess Plus has no accounts and never asks for your name, email or password.",
+	"Local games, your armies and your settings stay on this device.",
+	"For online play, this device signs in to the game's server (run by Supabase) with a random ID. The server keeps your online games (moves, armies and their names, and chat) and deletes them 30 days after they end, or after a day if nobody joined. It also notes when you were last online, for the player count, and forgets that after a day.",
+	"Your opponent sees your army, its name and your chat messages. Anyone with a game's code can see its moves and armies, but not the chat.",
+	"If a game is reported, its chat and moves are kept so the report can be looked at.",
+	"Armies you share by code stay on the server so others can import them.",
+	"Like any website, the server and the game's web host (GitHub) record connection details such as IP addresses.",
+]
+
 ## The scrolling list of settings.
 var sections: VBoxContainer
 var sound_toggle: Button
@@ -41,7 +54,7 @@ var listening := ""
 var mouse_buttons := {}
 ## The mouse action waiting for its new button ("" when none).
 var listening_mouse := ""
-## The Credits or Reset pop-up while it's showing.
+## The Credits, Privacy or Reset pop-up while it's showing.
 var popup: ModalPanel
 
 func _ready() -> void:
@@ -242,18 +255,25 @@ func set_mouse(action: String, index: int) -> void:
 
 # --- Credits and reset ---------------------------------------------------------------
 
-## Credits and Reset with no title over them (Mac: "More" looked like a button).
+## Credits, Privacy and Reset with no title over them (Mac: "More" looked like a button).
 func _build_other() -> void:
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 12
 	sections.add_child(gap)
 	_wide_button("Credits", show_credits)
+	_wide_button("Privacy", show_privacy)
 	_wide_button("Reset to defaults", ask_reset)
 
 func show_credits() -> void:
 	popup = ModalPanel.new("Credits")
 	for line in CREDITS:
 		popup.add_text(line, 24)
+	popup.add_button("Close", popup.close, &"GhostButton")
+	add_child(popup)
+
+func show_privacy() -> void:
+	popup = ModalPanel.new("Privacy")
+	popup.add_paragraphs(PRIVACY)
 	popup.add_button("Close", popup.close, &"GhostButton")
 	add_child(popup)
 
