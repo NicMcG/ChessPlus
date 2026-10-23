@@ -78,6 +78,20 @@ func _run() -> void:
 	check(moved.ok and black.move_count() == 2, "Black played e5 (%s)" % moved.error)
 	check(int(black.row.black_ms) <= 180000 and int(black.row.black_ms) > 150000, "the server's clock counted Black's time (%d ms left)" % int(black.row.black_ms))
 
+	# The referee: illegal moves, rule-breaking armies, out-of-date copies.
+	var illegal := await white.send_move("e1-e3", false)
+	check(not illegal.ok and "isn't allowed" in illegal.error, "the referee refuses an illegal move (%s)" % illegal.error)
+	var greedy := Army.new()
+	greedy.place(load("res://data/pieces/king.tres"), Vector2i(4, 0))
+	for file in [0, 1, 2, 3, 5, 6, 7]:
+		greedy.place(load("res://data/pieces/queen.tres"), Vector2i(file, 0))
+	var other := _session("live_stranger")
+	var refused := await other.create_game(greedy, OnlineSession.SIDE_WHITE, 0)
+	check(not refused.ok and "army rules" in refused.error, "the referee refuses an army over the budget (%s)" % refused.error)
+	var outdated: Dictionary = await other.backend.referee("create", {"seat": "white", "white_army": SavedGame.army_to_dict(StandardSetup.army()),
+			"black_army": SavedGame.army_to_dict(StandardSetup.army()), "time_ms": 0, "rules": "old-version"})
+	check(not outdated.ok and "out of date" in outdated.error, "an out-of-date copy is told to update (%s)" % outdated.error)
+
 	# Chat: the players see it, a stranger doesn't, and it has a speed limit.
 	var said := await white.post_chat("Good luck!")
 	check(said.ok, "White sent a chat message (%s)" % said.error)
@@ -95,6 +109,19 @@ func _run() -> void:
 	await black.answer_draw(false)
 	var resigned := await white.resign()
 	check(resigned.ok and white.result_code() == "white_resigned", "White resigned (%s)" % resigned.error)
+
+	# A quick checkmate: the referee ends the game, whatever the player says.
+	var mate_white := _session("live_white")
+	var mate_black := _session("live_black")
+	await mate_white.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 0)
+	await mate_black.join_game(mate_white.code, StandardSetup.army())
+	for text in ["f2-f3", "e7-e5", "g2-g4", "d8-h4"]:
+		await mate_white.poll()
+		await mate_black.poll()
+		var mover: OnlineSession = mate_white if mate_white.side_to_move() == Piece.Team.WHITE else mate_black
+		var sent := await mover.send_move(text, false)
+		check(sent.ok, "played %s (%s)" % [text, sent.error])
+	check(mate_black.status() == OnlineSession.FINISHED and mate_black.result_code() == "board", "the referee ended the game at checkmate")
 
 	# Sharing an army.
 	var shared := await ArmyShare.share(white.backend, StandardSetup.army())

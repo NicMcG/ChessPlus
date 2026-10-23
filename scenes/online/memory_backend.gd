@@ -40,10 +40,7 @@ func call_function(name: String, args: Dictionary) -> Dictionary:
 	if offline:
 		return failed("offline")
 	match name:
-		"create_game": return _create(args)
-		"join_game": return _join(args)
 		"get_game": return _get_game(args)
-		"play_move": return _play(args)
 		"resign_game": return _resign(args)
 		"offer_draw": return _offer_draw(args)
 		"answer_draw": return _answer_draw(args)
@@ -55,7 +52,90 @@ func call_function(name: String, args: Dictionary) -> Dictionary:
 		"get_shared_army": return _get_shared_army(args)
 	return failed("no such function: " + name)
 
-# --- The server's functions -----------------------------------------------------------------
+## The referee (server/supabase/functions/referee), with the game's own rules
+## engine in place of Plusfish: armies must keep the army rules, moves must be
+## legal, and the rules engine says when the game ends.
+func referee(action: String, args: Dictionary) -> Dictionary:
+	if offline:
+		return failed("offline")
+	match action:
+		"create": return _referee_create(args)
+		"join": return _referee_join(args)
+		"move": return _referee_move(args)
+	return failed("unknown action")
+
+const UPDATE_NEEDED := "This copy of Chess Plus is out of date for online play: it updates itself at the main menu."
+
+func _referee_create(args: Dictionary) -> Dictionary:
+	if args.get("rules", "") != RuleSet.version():
+		return failed(UPDATE_NEEDED)
+	var seat := str(args.seat)
+	if seat == "random":
+		seat = "white" if randi() % 2 == 0 else "black"
+	var problem := _army_problem(args.white_army if seat == "white" else args.black_army)
+	if problem != "":
+		return failed(problem)
+	return _create({"p_seat": seat, "p_white_army": args.white_army, "p_black_army": args.black_army,
+			"p_time_ms": args.time_ms, "p_eval_bar": args.get("eval_bar", false), "p_rules": args.rules})
+
+func _referee_join(args: Dictionary) -> Dictionary:
+	var code := str(args.code).strip_edges().to_upper()
+	if not games.has(code):
+		return failed("There's no game with the code %s." % code)
+	var g: Dictionary = games[code]
+	if args.get("rules", "") != g.rules:
+		return failed("You and your opponent have different versions of Chess Plus: both update themselves at the main menu.")
+	if g.status != OnlineSession.WAITING:
+		return failed("That game was cancelled." if g.status == OnlineSession.CANCELLED else "That game has already started.")
+	var seat := "white" if g.white_id == "" else "black"
+	var mine: Variant = args.white_army if seat == "white" else args.black_army
+	var problem := _army_problem(mine)
+	if problem != "":
+		return failed(problem)
+	var start := _game_state(mine if seat == "white" else g.white_army, mine if seat == "black" else g.black_army, [])
+	return _join({"p_code": code, "p_white_army": args.white_army, "p_black_army": args.black_army,
+			"p_finished": start.outcome() != GameState.Outcome.NONE, "p_refereed": PlusfishLink.supports(start)})
+
+func _referee_move(args: Dictionary) -> Dictionary:
+	var code := str(args.code).strip_edges().to_upper()
+	if not games.has(code):
+		return failed("There's no game with the code %s." % code)
+	var g: Dictionary = games[code]
+	var text := str(args.move)
+	var refereed: bool = g.refereed
+	var finished := bool(args.get("finished", false))
+	if refereed and g.status == OnlineSession.PLAYING and int(g.move_count) == int(args.expected) and args.seat == _mover(g):
+		if "/" in text:
+			refereed = false
+		else:
+			var state := _game_state(g.white_army, g.black_army, g.moves)
+			var move: Move = state.find_move(text) if state else null
+			if move == null:
+				return failed("That move isn't allowed.")
+			state.make_move(move)
+			finished = state.outcome() != GameState.Outcome.NONE
+	return _play({"p_code": code, "p_seat": args.seat, "p_move": text, "p_expected": args.expected,
+			"p_think_ms": args.think_ms, "p_finished": finished, "p_refereed": refereed})
+
+## The referee's refusal for an army breaking the rules, or "".
+static func _army_problem(data: Variant) -> String:
+	var army := SavedGame.army_from_dict(data) if army_ok(data) else null
+	if army == null:
+		return "Your army breaks the army rules: That isn't an army."
+	var problems := army.problems(StandardSetup.create_rules(), 8)
+	return "" if problems.is_empty() else "Your army breaks the army rules: " + " ".join(problems)
+
+## The game from the two armies (as data) after `moves` (null if one can't be played).
+static func _game_state(white: Variant, black: Variant, moves: Array) -> GameState:
+	var state := ArmySetup.create_game(SavedGame.army_from_dict(white), SavedGame.army_from_dict(black), StandardSetup.create_rules())
+	for text: Variant in moves:
+		var move := state.find_move(str(text))
+		if move == null:
+			return null
+		state.make_move(move)
+	return state
+
+# --- The server's functions (the referee's create/join/play, and the rest) ---------------
 
 func _create(args: Dictionary) -> Dictionary:
 	var seat := str(args.p_seat)
@@ -78,6 +158,7 @@ func _create(args: Dictionary) -> Dictionary:
 		"white_id": user if seat == "white" else "", "black_id": user if seat == "black" else "",
 		"white_army": army if seat == "white" else null, "black_army": army if seat == "black" else null,
 		"chat": [], "draw_offer": "", "rematch": "", "created_by": user, "turn_started": 0,
+		"rules": str(args.get("p_rules", "")), "refereed": true,
 	}
 	games[code] = g
 	return succeeded([_view(g)])
@@ -97,7 +178,11 @@ func _join(args: Dictionary) -> Dictionary:
 		return failed("That army can't be used online.")
 	g[seat + "_id"] = user
 	g[seat + "_army"] = army
+	g.refereed = bool(args.get("p_refereed", true))
 	g.status = OnlineSession.PLAYING
+	if bool(args.get("p_finished", false)):
+		g.status = OnlineSession.FINISHED
+		g.result = "board"
 	g.turn_started = now_ms()
 	_touch(g)
 	var view := _view(g)
@@ -122,7 +207,7 @@ func _play(args: Dictionary) -> Dictionary:
 	if g.status != OnlineSession.PLAYING or int(g.move_count) != int(args.p_expected) or args.p_seat != mover:
 		return succeeded([])
 	var text := str(args.p_move)
-	if not RegEx.create_from_string("^[A-Za-z0-9!=@~x-]{2,16}$").search(text):
+	if not RegEx.create_from_string("^[A-Za-z0-9!=@~x/-]{2,20}$").search(text):
 		return failed("That move can't be sent.")
 	var left := 0
 	if int(g.time_ms) > 0:
@@ -139,6 +224,7 @@ func _play(args: Dictionary) -> Dictionary:
 	if g.draw_offer != mover:
 		g.draw_offer = ""
 	g.turn_started = now_ms()
+	g.refereed = g.refereed and bool(args.get("p_refereed", false))
 	if bool(args.get("p_finished", false)):
 		g.status = OnlineSession.FINISHED
 		g.result = "board"

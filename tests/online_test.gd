@@ -506,3 +506,69 @@ func test_continue_uses_the_id_saved_with_the_game() -> void:
 		check_eq(main.screen.online.my_team, Piece.Team.BLACK, "On the same side")
 	main.free()
 	UserSettings.set_online_game("")
+
+# --- The referee (MemoryBackend judges with the game's own rules, as the real
+# referee does with Plusfish) --------------------------------------------------------
+
+func test_referee_refuses_illegal_moves() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var bad := await host.send_move("e2-e5", false)
+	check(not bad.ok and "isn't allowed" in bad.error, "A pawn can't jump three squares: " + bad.error)
+	check_eq(host.move_count(), 0, "Nothing was played")
+	var good := await host.send_move("e2-e4", false)
+	check(good.ok and host.move_count() == 1, "A legal move goes through")
+	_free(pair)
+
+func test_referee_decides_how_the_game_ends() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var guest: OnlineSession = pair[1]
+	for text in ["f2-f3", "e7-e5", "g2-g4"]:
+		await host.poll()
+		await guest.poll()
+		var mover: OnlineSession = host if host.side_to_move() == host.my_team else guest
+		check((await mover.send_move(text, false)).ok, "Played " + text)
+	await guest.poll()
+	# The mating move, sent as "not finished": the referee knows better.
+	await guest.send_move("d8-h4", false)
+	check_eq(guest.status(), OnlineSession.FINISHED, "Checkmate ends the game on the server")
+	check_eq(guest.result_code(), "board", "Ended on the board")
+	_free(pair)
+
+func test_referee_refuses_armies_that_break_the_rules() -> void:
+	MemoryBackend.clear()
+	var host := _session("host")
+	var greedy := Army.new()
+	greedy.place(load("res://data/pieces/king.tres"), Vector2i(4, 0))
+	for file in [0, 1, 2, 3, 5, 6, 7]:
+		greedy.place(load("res://data/pieces/queen.tres"), Vector2i(file, 0))
+	var created := await host.create_game(greedy, OnlineSession.SIDE_WHITE, 0)
+	check(not created.ok and "army rules" in created.error, "Seven queens are refused: " + created.error)
+	host.free()
+
+func test_referee_needs_the_same_rules() -> void:
+	MemoryBackend.clear()
+	var host := _session("host")
+	var backend: MemoryBackend = host.backend
+	var old := await backend.referee("create", {"seat": "white", "white_army": SavedGame.army_to_dict(StandardSetup.army()),
+			"black_army": SavedGame.army_to_dict(StandardSetup.army()), "time_ms": 0, "rules": "old-version"})
+	check(not old.ok and "out of date" in old.error, "An old copy of the game is told to update: " + old.error)
+	host.free()
+
+func test_referee_ends_king_exposed_at_once() -> void:
+	MemoryBackend.clear()
+	var host := _session("host")
+	var guest := _session("guest")
+	# White's Lance looks straight up the e-file at Black's king.
+	var lance_army := StandardSetup.army()
+	for file in [0, 1, 6, 4]:
+		lance_army.remove_at(Vector2i(file, 1))
+	lance_army.place(load("res://data/pieces/lance.tres"), Vector2i(4, 1))
+	var open_army := StandardSetup.army()
+	open_army.remove_at(Vector2i(4, 1))
+	await host.create_game(lance_army, OnlineSession.SIDE_WHITE, 0)
+	var joined := await guest.join_game(host.code, open_army)
+	check(joined.ok, "Joined: " + joined.error)
+	check_eq(guest.status(), OnlineSession.FINISHED, "King exposed: over before it starts, on the server too")
+	_free([host, guest])

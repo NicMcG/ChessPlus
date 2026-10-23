@@ -1,0 +1,7 @@
+# Supabase's command-line tool reads this when uploading the referee
+# (tools/deploy_referee.sh). Only the function's own settings are used.
+project_id = "mwifzxkilmlgqcbkswkn"
+
+[functions.referee]
+# The referee checks each caller's sign-in itself.
+verify_jwt = false

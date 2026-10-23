@@ -93,8 +93,8 @@ func _init(p_backend: OnlineBackend = null, p_player_id := "") -> void:
 func create_game(army: Variant, side: int, time_ms: int, eval_bar := false) -> Dictionary:
 	var seat := "random" if side == SIDE_RANDOM else team_key(Piece.Team.WHITE if side == SIDE_WHITE else Piece.Team.BLACK)
 	var args := _armies(army)
-	args.merge({"p_seat": seat, "p_time_ms": time_ms, "p_eval_bar": eval_bar})
-	var result := await backend.call_function("create_game", args)
+	args.merge({"seat": seat, "time_ms": time_ms, "eval_bar": eval_bar, "rules": RuleSet.version()})
+	var result := await backend.referee("create", args)
 	if not result.ok or result.rows.is_empty():
 		return result if not result.ok else OnlineBackend.failed("couldn't create a game")
 	var game: Dictionary = result.rows[0]
@@ -108,8 +108,8 @@ func create_game(army: Variant, side: int, time_ms: int, eval_bar := false) -> D
 func join_game(p_code: String, army: Variant) -> Dictionary:
 	var wanted := p_code.strip_edges().to_upper()
 	var args := _armies(army)
-	args["p_code"] = wanted
-	var result := await backend.call_function("join_game", args)
+	args.merge({"code": wanted, "rules": RuleSet.version()})
+	var result := await backend.referee("join", args)
 	if not result.ok or result.rows.is_empty():
 		return result if not result.ok else OnlineBackend.failed("couldn't join that game")
 	var game: Dictionary = result.rows[0]
@@ -142,15 +142,24 @@ func cancel() -> Dictionary:
 
 # --- Playing ---------------------------------------------------------------------
 
-## Send this player's move (Move.to_text()) and whether it ended the game on the
-## board. Only works if the server still has the move count we last saw, so the
+## Send this player's move (Move.to_text()) to the referee, which checks it's
+## legal and decides whether it ended the game (`finished` only counts in a
+## game the referee can't judge). Only works if the server still has the move count we last saw, so the
 ## two players can never both add a move at once (else no rows). The server's
 ## clock decides the time used (this device's own measure is sent along, and
 ## the server allows for the delay in hearing about the opponent's move).
 func send_move(move_text: String, finished: bool) -> Dictionary:
 	var think_ms := maxi(0, Time.get_ticks_msec() - turn_started_ms)
-	return await _act("play_move", {"p_move": move_text, "p_expected": move_count(),
-			"p_think_ms": think_ms, "p_finished": finished}, 3)
+	var args := {"code": code, "seat": team_key(my_team), "move": move_text, "expected": move_count(),
+			"think_ms": think_ms, "finished": finished}
+	var result := OnlineBackend.failed("not sent")
+	for attempt in 3:
+		result = await backend.referee("move", args)
+		if result.ok or not result.error.begins_with("no connection"):
+			break
+	if result.ok and not result.rows.is_empty():
+		_set_row(result.rows[0])
+	return result
 
 ## Offer the opponent a draw (one offer at a time).
 func offer_draw() -> Dictionary:
@@ -305,8 +314,8 @@ func _act(function: String, args: Dictionary, tries := 1) -> Dictionary:
 ## depend on the side, see ArmyChoices).
 func _armies(army: Variant) -> Dictionary:
 	return {
-		"p_white_army": SavedGame.army_to_dict(ArmyChoices.resolve(army, Piece.Team.WHITE)),
-		"p_black_army": SavedGame.army_to_dict(ArmyChoices.resolve(army, Piece.Team.BLACK)),
+		"white_army": SavedGame.army_to_dict(ArmyChoices.resolve(army, Piece.Team.WHITE)),
+		"black_army": SavedGame.army_to_dict(ArmyChoices.resolve(army, Piece.Team.BLACK)),
 	}
 
 func _set_row(new_row: Dictionary) -> void:

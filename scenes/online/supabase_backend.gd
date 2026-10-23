@@ -54,6 +54,24 @@ func call_function(name: String, args: Dictionary) -> Dictionary:
 		return succeeded(data)
 	return succeeded([data])
 
+func referee(action: String, args: Dictionary) -> Dictionary:
+	var body := args.duplicate()
+	body["action"] = action
+	var signed := await sign_in()
+	if not signed.ok:
+		return signed
+	var reply := await _request("/functions/v1/referee", body, true)
+	if reply.status == 401:
+		_session().erase("access_token")
+		signed = await sign_in()
+		if not signed.ok:
+			return signed
+		reply = await _request("/functions/v1/referee", body, true)
+	if not reply.ok:
+		return failed(reply.error)
+	var game: Variant = reply.data.get("game") if reply.data is Dictionary else null
+	return succeeded([game] if game is Dictionary else [])
+
 ## Make sure this device is signed in (signing in or renewing if needed).
 ## {"ok", "error"}.
 func sign_in() -> Dictionary:
