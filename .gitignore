@@ -8,3 +8,4 @@
 # Balancing tool logs (the results .csv files are kept)
 balance/results/*/log_*.txt
 server/supabase/functions/referee/plusfish_wasm.ts
+server/supabase/.temp/

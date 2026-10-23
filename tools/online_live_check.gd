@@ -79,6 +79,7 @@ func _run() -> void:
 	check(int(black.row.black_ms) <= 180000 and int(black.row.black_ms) > 150000, "the server's clock counted Black's time (%d ms left)" % int(black.row.black_ms))
 
 	# The referee: illegal moves, rule-breaking armies, out-of-date copies.
+	await white.poll()
 	var illegal := await white.send_move("e1-e3", false)
 	check(not illegal.ok and "isn't allowed" in illegal.error, "the referee refuses an illegal move (%s)" % illegal.error)
 	var greedy := Army.new()
