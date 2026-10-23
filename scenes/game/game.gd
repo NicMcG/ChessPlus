@@ -2138,7 +2138,8 @@ func _rematch_with(army: Variant, side := OnlineSession.SIDE_RANDOM) -> void:
 		return
 	game_over_panel.set_note("Setting up the rematch...")
 	var next := _new_session()
-	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)), bool(online.row.get("eval_bar", false)))
+	var created := await next.create_game(army, side, int(online.row.get("time_ms", 0)), bool(online.row.get("eval_bar", false)),
+			online.increment_ms())
 	if not created.ok:
 		_rematch_failed(next, "Couldn't set up a rematch: " + created.error)
 		return

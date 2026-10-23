@@ -39,14 +39,24 @@ const CANCELLED := "cancelled"
 ## Letters and digits for game codes (no 0/O or 1/I, which look alike).
 const CODE_LETTERS := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 5
-## The time limits a game can be created with: [name, milliseconds each].
+## The time limits online games offer (Mac's full set, Oct 2026), written
+## "3+2" = 3 minutes each, 2 seconds added after each of your moves:
+## [name, milliseconds each, bonus milliseconds per move]. The server knows the
+## same list (time_ok in server/supabase_update_6.sql).
 const TIME_CONTROLS := [
-	["No time limit", 0],
-	["3 minutes", 180000],
-	["5 minutes", 300000],
-	["10 minutes", 600000],
-	["15 minutes", 900000],
-	["30 minutes", 1800000],
+	["No time limit", 0, 0],
+	["1+0", 60000, 0],
+	["1+1", 60000, 1000],
+	["2+1", 120000, 1000],
+	["3+0", 180000, 0],
+	["3+2", 180000, 2000],
+	["5+0", 300000, 0],
+	["5+3", 300000, 3000],
+	["10+0", 600000, 0],
+	["10+5", 600000, 5000],
+	["15+10", 900000, 10000],
+	["30+0", 1800000, 0],
+	["30+20", 1800000, 20000],
 ]
 ## Quick match: "Any" time (whatever the opponent picked; 10 minutes each if
 ## both pick Any).
@@ -96,10 +106,10 @@ func _init(p_backend: OnlineBackend = null, p_player_id := "") -> void:
 ## `army` is an Army, or a Callable(team) -> Army (ArmyChoices.resolver) when it
 ## depends on the side (the server picks a Random side).
 ## `eval_bar`: show the eval bar to both players during the game.
-func create_game(army: Variant, side: int, time_ms: int, eval_bar := false) -> Dictionary:
+func create_game(army: Variant, side: int, time_ms: int, eval_bar := false, increment_ms := 0) -> Dictionary:
 	var seat := "random" if side == SIDE_RANDOM else team_key(Piece.Team.WHITE if side == SIDE_WHITE else Piece.Team.BLACK)
 	var args := _armies(army)
-	args.merge({"seat": seat, "time_ms": time_ms, "eval_bar": eval_bar, "rules": RuleSet.version()})
+	args.merge({"seat": seat, "time_ms": time_ms, "increment_ms": increment_ms, "eval_bar": eval_bar, "rules": RuleSet.version()})
 	var result := await backend.referee("create", args)
 	if not result.ok or result.rows.is_empty():
 		return result if not result.ok else OnlineBackend.failed("couldn't create a game")
@@ -160,9 +170,9 @@ var _quick_args := {}
 ## QUICK_ANY = whatever the opponent picked). Waits until paired (then the
 ## game is this session's, as after joining) or cancel_quick_match().
 ## {"ok", "error"}; on success `code` is the game.
-func find_quick_match(army: Variant, time_ms: int) -> Dictionary:
+func find_quick_match(army: Variant, time_ms: int, increment_ms := 0) -> Dictionary:
 	_quick_args = _armies(army)
-	_quick_args.merge({"time_ms": time_ms, "rules": RuleSet.version()})
+	_quick_args.merge({"time_ms": time_ms, "increment_ms": increment_ms, "rules": RuleSet.version()})
 	looking = true
 	var result := await _try_quick()
 	while looking and result.ok and code == "":
@@ -217,6 +227,13 @@ func _try_quick() -> Dictionary:
 func _take_quick_game(game_code: String) -> Dictionary:
 	looking = false
 	return await resume(game_code)
+
+## How many players are online and how many are waiting for a quick match
+## (Mac's live counts on Play online): {"online", "looking"}, or {} if the
+## server can't be reached.
+func online_counts() -> Dictionary:
+	var result := await backend.call_function("online_counts", {})
+	return result.rows[0] if result.ok and not result.rows.is_empty() else {}
 
 ## Report the opponent (Mac's Report): the server keeps this game's chat and
 ## moves for Mac to read.
@@ -334,6 +351,10 @@ func move_count() -> int:
 
 func moves() -> Array:
 	return row.get("moves", [])
+
+## Seconds added to a player's clock after each of their moves (in ms).
+func increment_ms() -> int:
+	return int(row.get("increment_ms", 0))
 
 func timed() -> bool:
 	return int(row.get("time_ms", 0)) > 0

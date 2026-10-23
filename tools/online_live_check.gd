@@ -47,11 +47,12 @@ func _run() -> void:
 	var anon := await _raw(null, "/rest/v1/rpc/get_game", HTTPClient.METHOD_POST, JSON.stringify({"p_code": "ABCDE"}))
 	check(anon.status >= 400, "without signing in, nothing works (%d)" % anon.status)
 
-	# A game: White creates (3 minutes each), Black joins.
-	var created := await white.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 180000)
+	# A game: White creates (3+2: 3 minutes each, 2 seconds back per move), Black joins.
+	var created := await white.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 180000, false, 2000)
 	check(created.ok and white.code.length() == 5, "created a game (%s)" % created.error)
 	var joined := await black.join_game(white.code, StandardSetup.army())
 	check(joined.ok and black.my_team == Piece.Team.BLACK, "joined as Black (%s)" % joined.error)
+	check(black.increment_ms() == 2000, "both see the 2-second bonus")
 	var late := await stranger.join_game(white.code, StandardSetup.army())
 	check(not late.ok and "already started" in late.error, "a third player can't join (%s)" % late.error)
 
@@ -70,13 +71,14 @@ func _run() -> void:
 	# Playing.
 	var moved := await white.send_move("e2-e4", false)
 	check(moved.ok and white.move_count() == 1, "White played e4 (%s)" % moved.error)
+	check(int(white.row.white_ms) > 180000 and int(white.row.white_ms) <= 182000, "the bonus was added after White's move (%d ms left)" % int(white.row.white_ms))
 	await black.poll()
 	check(black.moves() == ["e2-e4"], "Black sees e4")
 	var quiet: Dictionary = await black.backend.call_function("get_game", {"p_code": black.code, "p_known_version": int(black.row.version)})
 	check(quiet.ok and quiet.rows[0].get("unchanged", false), "a quiet check gets only the version back")
 	moved = await black.send_move("e7-e5", false)
 	check(moved.ok and black.move_count() == 2, "Black played e5 (%s)" % moved.error)
-	check(int(black.row.black_ms) <= 180000 and int(black.row.black_ms) > 150000, "the server's clock counted Black's time (%d ms left)" % int(black.row.black_ms))
+	check(int(black.row.black_ms) <= 182000 and int(black.row.black_ms) > 150000, "the server's clock counted Black's time (%d ms left)" % int(black.row.black_ms))
 
 	# The referee: illegal moves, rule-breaking armies, out-of-date copies.
 	await white.poll()
@@ -130,14 +132,18 @@ func _run() -> void:
 	q1.quick_poll_seconds = 0
 	q2.quick_poll_seconds = 0
 	q1._quick_args = q1._armies(StandardSetup.army())
-	q1._quick_args.merge({"time_ms": 180000, "rules": RuleSet.version()})
+	q1._quick_args.merge({"time_ms": 180000, "increment_ms": 2000, "rules": RuleSet.version()})
 	var waiting := await q1._try_quick()
 	check(waiting.ok and q1.code == "", "quick match: the first player waits (%s)" % waiting.error)
+	var counts := await q2.online_counts()
+	check(int(counts.get("online", 0)) >= 2 and int(counts.get("looking", 0)) >= 1,
+			"live counts: %s" % str(counts))
 	var found := await q2.find_quick_match(StandardSetup.army(), OnlineSession.QUICK_ANY)
 	check(found.ok and q2.code != "", "quick match: the second is paired at once (%s)" % found.error)
 	await q1.check_quick_match()
 	check(q1.code == q2.code and q1.my_team != q2.my_team, "quick match: both in the same game, opposite sides")
-	check(int(q2.row.get("time_ms", 0)) == 180000, "quick match: Any takes the other player's 3 minutes")
+	check(int(q2.row.get("time_ms", 0)) == 180000 and int(q2.row.get("increment_ms", 0)) == 2000,
+			"quick match: Any takes the other player's 3+2")
 	var reported := await q1.report_opponent("live check")
 	check(reported.ok, "reported the opponent (%s)" % reported.error)
 	var twice := await q1.report_opponent("live check")

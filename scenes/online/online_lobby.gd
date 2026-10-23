@@ -47,6 +47,7 @@ func _ready() -> void:
 	for time_control in OnlineSession.TIME_CONTROLS:
 		quick_time_pick.add_item(time_control[0])
 	quick_button.pressed.connect(quick_match)
+	_build_counts()
 	eval_check = CheckButton.new()
 	eval_check.text = "Eval bar for both players"
 	eval_check.custom_minimum_size.y = 70
@@ -80,8 +81,8 @@ func chosen_army() -> Callable:
 func create() -> void:
 	_set_busy(true, "Creating a game...")
 	session = _new_session()
-	var time_ms: int = OnlineSession.TIME_CONTROLS[time_pick.selected][1]
-	var result := await session.create_game(chosen_army(), side_pick.selected, time_ms, eval_check.button_pressed)
+	var time_control: Array = OnlineSession.TIME_CONTROLS[time_pick.selected]
+	var result := await session.create_game(chosen_army(), side_pick.selected, time_control[1], eval_check.button_pressed, time_control[2])
 	_set_busy(false)
 	if not result.ok:
 		_drop_session()
@@ -96,6 +97,49 @@ func create() -> void:
 	session.changed.connect(_on_changed)
 	session.start_polling()
 
+## The live counts at the top (Mac's design): players online and players
+## waiting for a quick match, checked every COUNTS_SECONDS while this screen
+## shows. Hidden until the first answer (or if the server can't be reached).
+var counts_label: Label
+const COUNTS_SECONDS := 5.0
+var _counting := false
+
+func _build_counts() -> void:
+	counts_label = Label.new()
+	counts_label.theme_type_variation = &"MutedLabel"
+	counts_label.add_theme_font_size_override("font_size", 26)
+	counts_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	counts_label.hide()
+	form.get_parent().add_child(counts_label)
+	form.get_parent().move_child(counts_label, form.get_index())
+	if backend == null and not OnlineConfig.is_configured():
+		return
+	var timer := Timer.new()
+	timer.wait_time = COUNTS_SECONDS
+	timer.timeout.connect(refresh_counts)
+	add_child(timer)
+	timer.start()
+	refresh_counts.call_deferred()
+
+## Ask the server for the live counts once and show them.
+func refresh_counts() -> void:
+	if _counting or not is_inside_tree():
+		return
+	_counting = true
+	var counter := _new_session()
+	var counts := await counter.online_counts()
+	counter.queue_free()
+	_counting = false
+	if not is_instance_valid(counts_label):
+		return
+	counts_label.visible = not counts.is_empty()
+	if not counts.is_empty():
+		counts_label.text = counts_text(int(counts.online), int(counts.looking))
+
+## "12 players online · 3 looking for a quick match" (drafted by Claude).
+static func counts_text(online: int, looking: int) -> String:
+	return "%d %s online · %d looking for a quick match" % [online, "player" if online == 1 else "players", looking]
+
 ## Look for someone to play (Mac's Quick match): wait until the server pairs
 ## this player with someone whose time fits, then off to the game.
 func quick_match() -> void:
@@ -103,11 +147,12 @@ func quick_match() -> void:
 	session = _new_session()
 	var picked := quick_time_pick.selected
 	var time_ms: int = OnlineSession.QUICK_ANY if picked == 0 else OnlineSession.TIME_CONTROLS[picked - 1][1]
+	var bonus_ms: int = 0 if picked == 0 else OnlineSession.TIME_CONTROLS[picked - 1][2]
 	%CodeCard.hide()
 	%WaitLabel.text = "Looking for an opponent..."
 	form.hide()
 	waiting.show()
-	var result := await session.find_quick_match(chosen_army(), time_ms)
+	var result := await session.find_quick_match(chosen_army(), time_ms, bonus_ms)
 	if not is_instance_valid(session):
 		return
 	_set_busy(false)

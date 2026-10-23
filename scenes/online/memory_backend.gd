@@ -22,7 +22,8 @@ var offline := false
 ## Who this device is signed in as.
 var user := ""
 
-const TIME_CONTROLS := [0, 180000, 300000, 600000, 900000, 1800000]
+## Players seen online: user -> time (ms), for the live counts.
+static var presence := {}
 const LAG_ALLOWANCE_MS := 2500
 
 func _init(p_user := "") -> void:
@@ -40,6 +41,7 @@ static func clear() -> void:
 	shared_armies.clear()
 	queue.clear()
 	reports.clear()
+	presence.clear()
 	clock_offset_ms = 0
 
 func call_function(name: String, args: Dictionary) -> Dictionary:
@@ -59,6 +61,7 @@ func call_function(name: String, args: Dictionary) -> Dictionary:
 		"quick_match_status": return _quick_status()
 		"leave_quick_match": return _leave_quick()
 		"report_player": return _report(args)
+		"online_counts": return _online_counts()
 	return failed("no such function: " + name)
 
 ## The referee (server/supabase/functions/referee), with the game's own rules
@@ -86,7 +89,8 @@ func _referee_create(args: Dictionary) -> Dictionary:
 	if problem != "":
 		return failed(problem)
 	return _create({"p_seat": seat, "p_white_army": args.white_army, "p_black_army": args.black_army,
-			"p_time_ms": args.time_ms, "p_eval_bar": args.get("eval_bar", false), "p_rules": args.rules})
+			"p_time_ms": args.time_ms, "p_increment_ms": args.get("increment_ms", 0), "p_eval_bar": args.get("eval_bar", false),
+			"p_rules": args.rules})
 
 func _referee_join(args: Dictionary) -> Dictionary:
 	var code := str(args.code).strip_edges().to_upper()
@@ -135,13 +139,15 @@ func _referee_quick(args: Dictionary) -> Dictionary:
 		if problem != "":
 			return failed(problem)
 	var time := int(args.time_ms)
-	if time not in TIME_CONTROLS and time != OnlineSession.QUICK_ANY:
+	var bonus := 0 if time == OnlineSession.QUICK_ANY else int(args.get("increment_ms", 0))
+	if time != OnlineSession.QUICK_ANY and not time_ok(time, bonus):
 		return failed("That time limit isn't one of the choices.")
+	presence[user] = now_ms()
 	var mine: Dictionary = queue.get(user, {})
 	if mine.get("game_code", "") != "":
 		queue.erase(user)
 		return succeeded([{"paired": mine.game_code}])
-	queue[user] = {"white_army": args.white_army, "black_army": args.black_army, "time_ms": time,
+	queue[user] = {"white_army": args.white_army, "black_army": args.black_army, "time_ms": time, "increment_ms": bonus,
 			"rules": args.rules, "game_code": "", "seen": now_ms(), "entered": mine.get("entered", now_ms())}
 	for other: String in _quick_candidates(user):
 		var theirs: Dictionary = queue[other]
@@ -150,10 +156,11 @@ func _referee_quick(args: Dictionary) -> Dictionary:
 		var black: Variant = theirs.black_army if i_am_white else args.black_army
 		var start := _game_state(white, black, [])
 		var t: int = time if time >= 0 else (int(theirs.time_ms) if int(theirs.time_ms) >= 0 else 600000)
+		var b: int = bonus if time >= 0 else (int(theirs.increment_ms) if int(theirs.time_ms) >= 0 else 0)
 		var code := _new_code(games)
 		var g := {
 			"code": code, "status": OnlineSession.PLAYING, "result": "", "version": 0,
-			"time_ms": t, "white_ms": t, "black_ms": t, "moves": [], "move_count": 0, "eval_bar": false,
+			"time_ms": t, "increment_ms": b, "white_ms": t, "black_ms": t, "moves": [], "move_count": 0, "eval_bar": false,
 			"white_id": user if i_am_white else other, "black_id": other if i_am_white else user,
 			"white_army": white, "black_army": black, "chat": [], "draw_offer": "", "rematch": "",
 			"created_by": user, "turn_started": now_ms(), "rules": args.rules,
@@ -170,6 +177,19 @@ func _referee_quick(args: Dictionary) -> Dictionary:
 		return succeeded([view])
 	return succeeded([])
 
+## The server's list of time controls (time_ok in the SQL).
+static func time_ok(base: int, bonus: int) -> bool:
+	for control: Array in OnlineSession.TIME_CONTROLS:
+		if control[1] == base and control[2] == bonus:
+			return true
+	return false
+
+func _online_counts() -> Dictionary:
+	presence[user] = now_ms()
+	var online := presence.values().filter(func(t: int) -> bool: return now_ms() - t < 60000).size()
+	var looking := queue.values().filter(func(q: Dictionary) -> bool: return q.game_code == "" and now_ms() - int(q.seen) < 20000).size()
+	return succeeded([{"online": online, "looking": looking}])
+
 ## Waiting players whose time fits this player's, seen in the last 20 s, oldest first.
 func _quick_candidates(who: String) -> Array:
 	var mine: Dictionary = queue[who]
@@ -178,7 +198,8 @@ func _quick_candidates(who: String) -> Array:
 		var q: Dictionary = queue[other]
 		if other == who or q.game_code != "" or q.rules != mine.rules or now_ms() - int(q.seen) > 20000:
 			continue
-		if q.time_ms == mine.time_ms or q.time_ms == OnlineSession.QUICK_ANY or mine.time_ms == OnlineSession.QUICK_ANY:
+		var same: bool = q.time_ms == mine.time_ms and q.increment_ms == mine.increment_ms
+		if same or q.time_ms == OnlineSession.QUICK_ANY or mine.time_ms == OnlineSession.QUICK_ANY:
 			found.append(other)
 	found.sort_custom(func(a: String, b: String) -> bool: return queue[a].entered < queue[b].entered)
 	return found
@@ -241,7 +262,7 @@ func _create(args: Dictionary) -> Dictionary:
 		seat = "white" if randi() % 2 == 0 else "black"
 	if seat not in ["white", "black"]:
 		return failed("Choose White, Black or Random.")
-	if int(args.p_time_ms) not in TIME_CONTROLS:
+	if not time_ok(int(args.p_time_ms), int(args.get("p_increment_ms", 0))):
 		return failed("That time limit isn't one of the choices.")
 	var army: Variant = args.p_white_army if seat == "white" else args.p_black_army
 	if not army_ok(army):
@@ -251,7 +272,8 @@ func _create(args: Dictionary) -> Dictionary:
 	var code := _new_code(games)
 	var g := {
 		"code": code, "status": OnlineSession.WAITING, "result": "", "version": 0,
-		"time_ms": int(args.p_time_ms), "white_ms": int(args.p_time_ms), "black_ms": int(args.p_time_ms),
+		"time_ms": int(args.p_time_ms), "increment_ms": int(args.get("p_increment_ms", 0)),
+		"white_ms": int(args.p_time_ms), "black_ms": int(args.p_time_ms),
 		"moves": [], "move_count": 0, "eval_bar": bool(args.get("p_eval_bar", false)),
 		"white_id": user if seat == "white" else "", "black_id": user if seat == "black" else "",
 		"white_army": army if seat == "white" else null, "black_army": army if seat == "black" else null,
@@ -288,6 +310,7 @@ func _join(args: Dictionary) -> Dictionary:
 	return succeeded([view])
 
 func _get_game(args: Dictionary) -> Dictionary:
+	presence[user] = now_ms()
 	var code := str(args.p_code).strip_edges().to_upper()
 	if not games.has(code):
 		return succeeded([])
@@ -316,7 +339,7 @@ func _play(args: Dictionary) -> Dictionary:
 			_finish(g, mover + "_timeout")
 			g[mover + "_ms"] = 0
 			return succeeded([_view(g)])
-		g[mover + "_ms"] = left
+		g[mover + "_ms"] = left + int(g.get("increment_ms", 0))
 	g.moves.append(text)
 	g.move_count = int(g.move_count) + 1
 	if g.draw_offer != mover:
@@ -483,7 +506,7 @@ func _view(g: Dictionary) -> Dictionary:
 			you.append(seat)
 	return {
 		"code": g.code, "status": g.status, "result": g.result, "version": g.version,
-		"time_ms": g.time_ms, "white_ms": g.white_ms, "black_ms": g.black_ms,
+		"time_ms": g.time_ms, "increment_ms": g.get("increment_ms", 0), "white_ms": g.white_ms, "black_ms": g.black_ms,
 		"moves": g.moves.duplicate(), "move_count": g.move_count, "eval_bar": g.eval_bar,
 		"white_army": g.white_army, "black_army": g.black_army,
 		"white_taken": g.white_id != "", "black_taken": g.black_id != "",

@@ -6,6 +6,7 @@ extends TestSuite
 ## check that nobody can act for the other player.
 
 const KNIGHT = preload("res://data/pieces/knight.tres")
+const LOBBY = preload("res://scenes/online/online_lobby.gd")
 
 func _session(player_id: String) -> OnlineSession:
 	var session := OnlineSession.new(MemoryBackend.new(), player_id)
@@ -698,4 +699,99 @@ func test_lobby_quick_match() -> void:
 		check_eq((ready_sessions[0] as OnlineSession).code, other.code, "The same game")
 	lobby.free()
 	other.free()
+	backend.free()
+
+# --- Bonus time and live counts ----------------------------------------------------
+
+func test_time_choices_are_the_full_set() -> void:
+	var names := OnlineSession.TIME_CONTROLS.map(func(c: Array) -> String: return c[0])
+	check_eq(names, ["No time limit", "1+0", "1+1", "2+1", "3+0", "3+2", "5+0", "5+3", "10+0", "10+5",
+			"15+10", "30+0", "30+20"], "Mac's full set, in order")
+	for control: Array in OnlineSession.TIME_CONTROLS:
+		if control[1] > 0:
+			check_eq(control[0], "%d+%d" % [control[1] / 60000, control[2] / 1000], "Name matches the times")
+
+func test_bonus_is_added_after_each_move() -> void:
+	MemoryBackend.clear()
+	var host := _session("host")
+	var guest := _session("guest")
+	var created := await host.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 180000, false, 2000)
+	check(created.ok, "3+2 can be created: " + created.error)
+	await guest.join_game(host.code, StandardSetup.army())
+	await host.poll()
+	check_eq(host.increment_ms(), 2000, "Both see the bonus")
+	MemoryBackend.clock_offset_ms = 10000
+	host.turn_started_ms = Time.get_ticks_msec() - 10000
+	await host.send_move("e2-e4", false)
+	check(absi(int(host.row.white_ms) - (180000 - 10000 + 2000)) < 200, "10 s used, 2 s back: %d left" % int(host.row.white_ms))
+	_free([host, guest])
+
+func test_only_listed_times_can_be_used() -> void:
+	MemoryBackend.clear()
+	var host := _session("host")
+	var odd := await host.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 180000, false, 5000)
+	check(not odd.ok, "3+5 isn't one of the choices")
+	var old := await host.create_game(StandardSetup.army(), OnlineSession.SIDE_WHITE, 900000, false, 0)
+	check(not old.ok, "15+0 was dropped")
+	host.free()
+
+func test_quick_match_needs_the_same_bonus() -> void:
+	MemoryBackend.clear()
+	var first := _quick_session("first")
+	var second := _quick_session("second")
+	var third := _quick_session("third")
+	first._quick_args = first._armies(StandardSetup.army())
+	first._quick_args.merge({"time_ms": 180000, "increment_ms": 2000, "rules": RuleSet.version()})
+	await first._try_quick()
+	second._quick_args = second._armies(StandardSetup.army())
+	second._quick_args.merge({"time_ms": 180000, "increment_ms": 0, "rules": RuleSet.version()})
+	await second._try_quick()
+	check(first.code == "" and second.code == "", "3+2 and 3+0 don't fit")
+	var found := await third.find_quick_match(StandardSetup.army(), 180000, 2000)
+	check(found.ok and third.code != "", "3+2 meets 3+2")
+	check_eq(int(third.row.increment_ms), 2000, "With the bonus")
+	_free([first, second, third])
+
+func test_quick_match_any_takes_the_bonus_too() -> void:
+	MemoryBackend.clear()
+	var first := _quick_session("first")
+	var second := _quick_session("second")
+	first._quick_args = first._armies(StandardSetup.army())
+	first._quick_args.merge({"time_ms": 600000, "increment_ms": 5000, "rules": RuleSet.version()})
+	await first._try_quick()
+	await second.find_quick_match(StandardSetup.army(), OnlineSession.QUICK_ANY)
+	check(int(second.row.time_ms) == 600000 and int(second.row.increment_ms) == 5000, "Any plays the other's 10+5")
+	_free([first, second])
+
+func test_online_counts() -> void:
+	MemoryBackend.clear()
+	var watcher := _session("watcher")
+	var counts := await watcher.online_counts()
+	check_eq(counts, {"online": 1, "looking": 0}, "Just me, on Play online")
+	var waiter := _quick_session("waiter")
+	waiter._quick_args = waiter._armies(StandardSetup.army())
+	waiter._quick_args.merge({"time_ms": 300000, "rules": RuleSet.version()})
+	await waiter._try_quick()
+	counts = await watcher.online_counts()
+	check_eq(counts, {"online": 2, "looking": 1}, "One more, looking for a quick match")
+	MemoryBackend.clock_offset_ms = 61000
+	counts = await watcher.online_counts()
+	check_eq(counts, {"online": 1, "looking": 0}, "Gone quiet for a minute: not counted")
+	check_eq(LOBBY.counts_text(1, 0), "1 player online · 0 looking for a quick match", "One player")
+	check_eq(LOBBY.counts_text(12, 3), "12 players online · 3 looking for a quick match", "Several")
+	_free([watcher, waiter])
+
+func test_lobby_shows_the_counts() -> void:
+	MemoryBackend.clear()
+	var lobby: Node = load("res://scenes/online/online_lobby.tscn").instantiate()
+	var backend := MemoryBackend.new()
+	lobby.backend = backend
+	lobby.player_id = "lobby"
+	_root().add_child(lobby)
+	await lobby.refresh_counts()
+	check(lobby.counts_label.visible, "The counts show")
+	check_eq(lobby.counts_label.text, "1 player online · 0 looking for a quick match", "Counting me")
+	check_eq(lobby.quick_time_pick.get_item_text(0), "Any", "Quick match: Any first")
+	check_eq(lobby.quick_time_pick.item_count, OnlineSession.TIME_CONTROLS.size() + 1, "Then every time")
+	lobby.free()
 	backend.free()

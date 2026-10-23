@@ -4,10 +4,10 @@
 // then writes it, through database functions that nobody but the referee may
 // call (server/supabase_update_4.sql). Deployed by tools/deploy_referee.sh.
 //
-// POST {action: "create", seat, white_army, black_army, time_ms, eval_bar, rules}
+// POST {action: "create", seat, white_army, black_army, time_ms, increment_ms, eval_bar, rules}
 //      {action: "join", code, white_army, black_army, rules}
 //      {action: "move", code, seat, move, expected, think_ms, finished}
-//      {action: "quick", white_army, black_army, time_ms (-1 = Any), rules}
+//      {action: "quick", white_army, black_army, time_ms (-1 = Any), increment_ms, rules}
 //      {action: "health"}
 // Reply: {game: {...}} (the game as the caller may see it; null = "nothing
 // changed", e.g. the opponent moved first) or {error: "plain words"}.
@@ -106,7 +106,7 @@ async function create(user: string, body: Record<string, any>): Promise<Response
   if (problem) return reply({ error: problem }, 400);
   return await rpc("referee_create_game", {
     p_user: user, p_seat: seat, p_white_army: body.white_army, p_black_army: body.black_army,
-    p_time_ms: body.time_ms, p_eval_bar: !!body.eval_bar, p_rules: body.rules,
+    p_time_ms: body.time_ms, p_increment_ms: body.increment_ms ?? 0, p_eval_bar: !!body.eval_bar, p_rules: body.rules,
   });
 }
 
@@ -181,7 +181,8 @@ async function quick(user: string, body: Record<string, any>): Promise<Response>
   const problem = armyError(body.white_army, rs) ?? armyError(body.black_army, rs);
   if (problem) return reply({ error: problem }, 400);
   const entered = await rpcData("referee_quick_enter", {
-    p_user: user, p_white_army: body.white_army, p_black_army: body.black_army, p_time_ms: body.time_ms, p_rules: body.rules,
+    p_user: user, p_white_army: body.white_army, p_black_army: body.black_army, p_time_ms: body.time_ms,
+    p_increment_ms: body.increment_ms ?? 0, p_rules: body.rules,
   });
   if ("error" in entered) return reply({ error: entered.error }, 400);
   if (entered.data?.code) {
