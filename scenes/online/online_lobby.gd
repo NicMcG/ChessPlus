@@ -1,8 +1,9 @@
 extends Control
 
-## Before an online game. Pick your army, then either create a game (choosing
-## your side and the time limit) and send its code to a friend, or type in a
-## friend's code to join theirs. When both players are in, game_ready hands the
+## Before an online game. Pick your army, then play someone new (Quick match:
+## pick a time or Any and wait to be paired), create a game (choosing your side
+## and the time limit) and send its code to a friend, or type in a friend's code
+## to join theirs. When both players are in, game_ready hands the
 ## OnlineSession to the main scene, which opens the game.
 
 signal closed
@@ -12,6 +13,8 @@ signal game_ready(session: OnlineSession)
 @onready var side_pick: OptionButton = %Side
 @onready var time_pick: OptionButton = %Time
 @onready var create_button: Button = %Create
+@onready var quick_time_pick: OptionButton = %QuickTime
+@onready var quick_button: Button = %QuickMatch
 @onready var code_edit: LineEdit = %CodeEdit
 @onready var join_button: Button = %Join
 @onready var form: Control = %Form
@@ -39,6 +42,11 @@ func _ready() -> void:
 		side_pick.add_item(side)
 	for time_control in OnlineSession.TIME_CONTROLS:
 		time_pick.add_item(time_control[0])
+	# Quick match times: Any first, then the usual choices.
+	quick_time_pick.add_item("Any")
+	for time_control in OnlineSession.TIME_CONTROLS:
+		quick_time_pick.add_item(time_control[0])
+	quick_button.pressed.connect(quick_match)
 	eval_check = CheckButton.new()
 	eval_check.text = "Eval bar for both players"
 	eval_check.custom_minimum_size.y = 70
@@ -61,6 +69,7 @@ func _ready() -> void:
 		_show_message("Online play isn't connected to a server yet.")
 		create_button.disabled = true
 		join_button.disabled = true
+		quick_button.disabled = true
 
 ## The army choice, as a Callable(team) -> Army: the side isn't known yet when
 ## it's Random, or when joining.
@@ -80,10 +89,37 @@ func create() -> void:
 		return
 	code_label.text = session.code
 	%Copy.text = "Copy code"
+	%CodeCard.show()
+	%WaitLabel.text = "Waiting for them to join..."
 	form.hide()
 	waiting.show()
 	session.changed.connect(_on_changed)
 	session.start_polling()
+
+## Look for someone to play (Mac's Quick match): wait until the server pairs
+## this player with someone whose time fits, then off to the game.
+func quick_match() -> void:
+	_set_busy(true, "")
+	session = _new_session()
+	var picked := quick_time_pick.selected
+	var time_ms: int = OnlineSession.QUICK_ANY if picked == 0 else OnlineSession.TIME_CONTROLS[picked - 1][1]
+	%CodeCard.hide()
+	%WaitLabel.text = "Looking for an opponent..."
+	form.hide()
+	waiting.show()
+	var result := await session.find_quick_match(chosen_army(), time_ms)
+	if not is_instance_valid(session):
+		return
+	_set_busy(false)
+	if result.ok and session.code != "":
+		_start()
+		return
+	waiting.hide()
+	form.show()
+	var stopped: bool = result.error == "cancelled"
+	_drop_session()
+	if not stopped:
+		_show_message("Couldn't find a game: " + result.error)
 
 ## Join the game whose code was typed in.
 func join() -> void:
@@ -100,8 +136,14 @@ func join() -> void:
 		return
 	_start()
 
-## Stop waiting and remove the game from the server.
+## Stop waiting: leave the quick-match queue, or remove the created game from
+## the server. (A quick match made just before Cancel is played after all.)
 func cancel_waiting() -> void:
+	if session and session.looking:
+		await session.cancel_quick_match()
+		if session.code != "":
+			_start()
+		return
 	if session:
 		session.stop_polling()
 		await session.cancel()
@@ -138,6 +180,7 @@ func _drop_session() -> void:
 func _set_busy(busy: bool, text := "") -> void:
 	create_button.disabled = busy
 	join_button.disabled = busy
+	quick_button.disabled = busy
 	_show_message(text)
 
 func _show_message(text: String) -> void:

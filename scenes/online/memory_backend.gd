@@ -11,6 +11,10 @@ extends OnlineBackend
 static var games := {}
 ## code -> army data.
 static var shared_armies := {}
+## Quick match queue: user -> {white_army, black_army, time_ms, rules, game_code, seen, entered}.
+static var queue := {}
+## Reports: {code, reporter, reported, reason, chat, moves}.
+static var reports: Array = []
 ## Added to the server's clock (tests use it to pretend time has passed).
 static var clock_offset_ms := 0
 ## Set to true to make every call fail, as if the internet were down.
@@ -34,6 +38,8 @@ static func now_ms() -> int:
 static func clear() -> void:
 	games.clear()
 	shared_armies.clear()
+	queue.clear()
+	reports.clear()
 	clock_offset_ms = 0
 
 func call_function(name: String, args: Dictionary) -> Dictionary:
@@ -50,6 +56,9 @@ func call_function(name: String, args: Dictionary) -> Dictionary:
 		"claim_rematch": return _claim_rematch(args)
 		"share_army": return _share_army(args)
 		"get_shared_army": return _get_shared_army(args)
+		"quick_match_status": return _quick_status()
+		"leave_quick_match": return _leave_quick()
+		"report_player": return _report(args)
 	return failed("no such function: " + name)
 
 ## The referee (server/supabase/functions/referee), with the game's own rules
@@ -62,6 +71,7 @@ func referee(action: String, args: Dictionary) -> Dictionary:
 		"create": return _referee_create(args)
 		"join": return _referee_join(args)
 		"move": return _referee_move(args)
+		"quick": return _referee_quick(args)
 	return failed("unknown action")
 
 const UPDATE_NEEDED := "This copy of Chess Plus is out of date for online play: it updates itself at the main menu."
@@ -116,6 +126,94 @@ func _referee_move(args: Dictionary) -> Dictionary:
 			finished = state.outcome() != GameState.Outcome.NONE
 	return _play({"p_code": code, "p_seat": args.seat, "p_move": text, "p_expected": args.expected,
 			"p_think_ms": args.think_ms, "p_finished": finished, "p_refereed": refereed})
+
+func _referee_quick(args: Dictionary) -> Dictionary:
+	if args.get("rules", "") != RuleSet.version():
+		return failed(UPDATE_NEEDED)
+	for side in ["white_army", "black_army"]:
+		var problem := _army_problem(args[side])
+		if problem != "":
+			return failed(problem)
+	var time := int(args.time_ms)
+	if time not in TIME_CONTROLS and time != OnlineSession.QUICK_ANY:
+		return failed("That time limit isn't one of the choices.")
+	var mine: Dictionary = queue.get(user, {})
+	if mine.get("game_code", "") != "":
+		queue.erase(user)
+		return succeeded([{"paired": mine.game_code}])
+	queue[user] = {"white_army": args.white_army, "black_army": args.black_army, "time_ms": time,
+			"rules": args.rules, "game_code": "", "seen": now_ms(), "entered": mine.get("entered", now_ms())}
+	for other: String in _quick_candidates(user):
+		var theirs: Dictionary = queue[other]
+		var i_am_white := randi() % 2 == 0
+		var white: Variant = args.white_army if i_am_white else theirs.white_army
+		var black: Variant = theirs.black_army if i_am_white else args.black_army
+		var start := _game_state(white, black, [])
+		var t: int = time if time >= 0 else (int(theirs.time_ms) if int(theirs.time_ms) >= 0 else 600000)
+		var code := _new_code(games)
+		var g := {
+			"code": code, "status": OnlineSession.PLAYING, "result": "", "version": 0,
+			"time_ms": t, "white_ms": t, "black_ms": t, "moves": [], "move_count": 0, "eval_bar": false,
+			"white_id": user if i_am_white else other, "black_id": other if i_am_white else user,
+			"white_army": white, "black_army": black, "chat": [], "draw_offer": "", "rematch": "",
+			"created_by": user, "turn_started": now_ms(), "rules": args.rules,
+			"refereed": PlusfishLink.supports(start),
+		}
+		if start.outcome() != GameState.Outcome.NONE:
+			g.status = OnlineSession.FINISHED
+			g.result = "board"
+		games[code] = g
+		theirs.game_code = code
+		queue.erase(user)
+		var view := _view(g)
+		view["seat"] = "white" if i_am_white else "black"
+		return succeeded([view])
+	return succeeded([])
+
+## Waiting players whose time fits this player's, seen in the last 20 s, oldest first.
+func _quick_candidates(who: String) -> Array:
+	var mine: Dictionary = queue[who]
+	var found := []
+	for other: String in queue:
+		var q: Dictionary = queue[other]
+		if other == who or q.game_code != "" or q.rules != mine.rules or now_ms() - int(q.seen) > 20000:
+			continue
+		if q.time_ms == mine.time_ms or q.time_ms == OnlineSession.QUICK_ANY or mine.time_ms == OnlineSession.QUICK_ANY:
+			found.append(other)
+	found.sort_custom(func(a: String, b: String) -> bool: return queue[a].entered < queue[b].entered)
+	return found
+
+func _quick_status() -> Dictionary:
+	if not queue.has(user):
+		return succeeded([{"gone": true}])
+	var mine: Dictionary = queue[user]
+	if mine.game_code != "":
+		queue.erase(user)
+		return succeeded([{"code": mine.game_code}])
+	mine.seen = now_ms()
+	return succeeded([{"waiting": true, "others": _quick_candidates(user).size()}])
+
+func _leave_quick() -> Dictionary:
+	var mine: Dictionary = queue.get(user, {})
+	queue.erase(user)
+	if mine.get("game_code", "") != "":
+		return succeeded([{"code": mine.game_code}])
+	return succeeded([{"left": true}])
+
+func _report(args: Dictionary) -> Dictionary:
+	var found := _my_game(args)
+	if found.has("error"):
+		return failed(found.error)
+	var g: Dictionary = found.game
+	var other: String = g.black_id if args.p_seat == "white" else g.white_id
+	if other == "" or other == user:
+		return failed("There's no opponent to report.")
+	for r: Dictionary in reports:
+		if r.code == g.code and r.reporter == user:
+			return failed("You've already reported this game.")
+	reports.append({"code": g.code, "reporter": user, "reported": other, "reason": str(args.get("p_reason", "")),
+			"chat": g.chat.duplicate(true), "moves": g.moves.duplicate()})
+	return succeeded([{"reported": true}])
 
 ## The referee's refusal for an army breaking the rules, or "".
 static func _army_problem(data: Variant) -> String:

@@ -69,8 +69,14 @@ func referee(action: String, args: Dictionary) -> Dictionary:
 		reply = await _request("/functions/v1/referee", body, true)
 	if not reply.ok:
 		return failed(reply.error)
-	var game: Variant = reply.data.get("game") if reply.data is Dictionary else null
-	return succeeded([game] if game is Dictionary else [])
+	var data: Variant = reply.data
+	var game: Variant = data.get("game") if data is Dictionary else null
+	if game is Dictionary:
+		return succeeded([game])
+	# Quick match: paired by someone else meanwhile (the game's code), or still waiting.
+	if data is Dictionary and data.get("paired") is String:
+		return succeeded([{"paired": data.paired}])
+	return succeeded([])
 
 ## Make sure this device is signed in (signing in or renewing if needed).
 ## {"ok", "error"}.

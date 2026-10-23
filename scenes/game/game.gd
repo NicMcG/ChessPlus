@@ -2032,6 +2032,8 @@ func _build_online_extras() -> void:
 	_buttons.move_child(draw_button, new_game_button.get_index())
 	chat_panel = ChatPanel.new()
 	chat_panel.send_requested.connect(send_chat)
+	chat_panel.mute_toggled.connect(set_muted)
+	chat_panel.report_requested.connect(ask_report)
 	add_child(chat_panel)
 
 func _update_online_controls() -> void:
@@ -2042,7 +2044,7 @@ func _update_online_controls() -> void:
 	draw_button.text = "Draw offered" if online.draw_offer() == OnlineSession.team_key(online.my_team) else "Draw"
 	offer_bar.visible = playing and online.draw_offer() == theirs
 	new_game_button.text = "Results" if is_over() else "Resign"
-	var unread := online.chat().size() - _chat_seen
+	var unread := _visible_chat().size() - _chat_seen
 	chat_button.text = "Chat (%d)" % unread if unread > 0 else "Chat"
 	if chat_panel.visible:
 		_refresh_chat()
@@ -2069,8 +2071,41 @@ func send_chat(text: String) -> void:
 	_update_online_controls()
 
 func _refresh_chat() -> void:
-	_chat_seen = online.chat().size()
-	chat_panel.show_messages(online.chat(), OnlineSession.team_key(online.my_team))
+	_chat_seen = _visible_chat().size()
+	chat_panel.show_messages(online.chat(), OnlineSession.team_key(online.my_team), online.muted)
+
+## The chat messages this player sees (not the opponent's while muted).
+func _visible_chat() -> Array:
+	if not online.muted:
+		return online.chat()
+	var mine := OnlineSession.team_key(online.my_team)
+	return online.chat().filter(func(m: Dictionary) -> bool: return m.get("from", "") == mine)
+
+## Mute or unmute the opponent's chat (Mac's Mute; this game and its rematches).
+func set_muted(muted: bool) -> void:
+	online.muted = muted
+	_refresh_chat()
+	_update_online_controls()
+
+## Report the opponent (Mac's Report): asks first, then the server keeps this
+## game's chat and moves for review; the opponent is muted too.
+func ask_report() -> void:
+	var panel := ModalPanel.new("Report your opponent?")
+	panel.add_text(REPORT_TEXT)
+	panel.add_button("Report", func() -> void:
+		panel.close()
+		send_report(), &"DangerButton")
+	panel.add_button("Cancel", panel.close, &"GhostButton")
+	panel.z_index = 40
+	add_child(panel)
+
+## The report pop-up's text (drafted by Claude for Mac to change).
+const REPORT_TEXT := "This game's chat and moves will be sent for review, and your opponent will be muted."
+
+func send_report() -> void:
+	var result := await online.report_opponent()
+	set_muted(true)
+	show_notice("Thanks: your report was sent." if result.ok else result.error)
 
 func _opponent_wants_rematch() -> bool:
 	return online.rematch_code() != "" and online.rematch_code() != _my_rematch_code
@@ -2137,6 +2172,8 @@ func _join_rematch(rematch_code: String, army: Variant) -> void:
 func _new_session() -> OnlineSession:
 	var next := OnlineSession.new(online.backend.duplicate(), online.player_id)
 	next.poll_seconds = online.poll_seconds
+	# A muted opponent stays muted in the rematch.
+	next.muted = online.muted
 	add_child(next)
 	return next
 

@@ -2,10 +2,17 @@ class_name ChatPanel
 extends ColorRect
 
 ## The chat window in an online game: the messages so far ("You: ..." /
-## "Opponent: ..."), a box to type in, Send and Close. It doesn't talk to the
-## server itself: it emits `send_requested` and the game screen sends it.
+## "Opponent: ..."), a box to type in, Send and Close, and (Mac's design) Mute
+## (hides the opponent's messages) and Report. It doesn't talk to the server
+## itself: it emits signals and the game screen acts on them.
 
 signal send_requested(text: String)
+signal mute_toggled(muted: bool)
+signal report_requested
+
+## The Mute button (says "Unmute" while muted) and the Report button.
+var mute_button: Button
+var report_button: Button
 
 var _messages: VBoxContainer
 var _scroll: ScrollContainer
@@ -40,6 +47,18 @@ func _init() -> void:
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.theme_type_variation = &"DialogTitle"
 	top.add_child(heading)
+	mute_button = Button.new()
+	mute_button.text = "Mute"
+	mute_button.theme_type_variation = &"GhostButton"
+	mute_button.custom_minimum_size = Vector2(140, 70)
+	mute_button.pressed.connect(func() -> void: mute_toggled.emit(mute_button.text == "Mute"))
+	top.add_child(mute_button)
+	report_button = Button.new()
+	report_button.text = "Report"
+	report_button.theme_type_variation = &"DangerButton"
+	report_button.custom_minimum_size = Vector2(140, 70)
+	report_button.pressed.connect(func() -> void: report_requested.emit())
+	top.add_child(report_button)
 	var close := Button.new()
 	close.text = "Close"
 	close.theme_type_variation = &"GhostButton"
@@ -92,14 +111,20 @@ func _exit_tree() -> void:
 		_web_list = ""
 
 ## Show `messages` (from OnlineSession.chat()); `my_side` is "white"/"black".
-func show_messages(messages: Array, my_side: String) -> void:
+## `muted`: leave out the opponent's messages (a note says so).
+func show_messages(messages: Array, my_side: String, muted := false) -> void:
+	mute_button.text = "Unmute" if muted else "Mute"
+	if muted:
+		messages = messages.filter(func(m: Dictionary) -> bool: return m.get("from", "") == my_side)
 	for child in _messages.get_children():
 		_messages.remove_child(child)
 		child.queue_free()
 	if _web_list != "":
-		_show_in_browser(messages, my_side)
+		_show_in_browser(messages, my_side, muted)
 		return
-	if messages.is_empty():
+	if muted:
+		_messages.add_child(_message_label(MUTED_NOTE, UiStyle.TEXT_MUTED))
+	elif messages.is_empty():
 		_messages.add_child(_message_label("No messages yet. Say hello!", UiStyle.TEXT_MUTED))
 	for message: Dictionary in messages:
 		var mine: bool = message.get("from", "") == my_side
@@ -108,9 +133,14 @@ func show_messages(messages: Array, my_side: String) -> void:
 				UiStyle.ACCENT_TEXT if mine else UiStyle.TEXT))
 	_scroll_to_end.call_deferred()
 
-func _show_in_browser(messages: Array, my_side: String) -> void:
+## What shows while the opponent is muted.
+const MUTED_NOTE := "Your opponent is muted: their messages are hidden."
+
+func _show_in_browser(messages: Array, my_side: String, muted := false) -> void:
 	var items := []
-	if messages.is_empty():
+	if muted:
+		items.append({"text": MUTED_NOTE, "color": "#999999"})
+	elif messages.is_empty():
 		items.append({"text": "No messages yet. Say hello!", "color": "#999999"})
 	for message: Dictionary in messages:
 		var mine: bool = message.get("from", "") == my_side

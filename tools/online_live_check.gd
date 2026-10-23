@@ -124,6 +124,27 @@ func _run() -> void:
 		check(sent.ok, "played %s (%s)" % [text, sent.error])
 	check(mate_black.status() == OnlineSession.FINISHED and mate_black.result_code() == "board", "the referee ended the game at checkmate")
 
+	# Quick match: one waits, the other is paired with them; then a report.
+	var q1 := _session("live_white")
+	var q2 := _session("live_black")
+	q1.quick_poll_seconds = 0
+	q2.quick_poll_seconds = 0
+	q1._quick_args = q1._armies(StandardSetup.army())
+	q1._quick_args.merge({"time_ms": 180000, "rules": RuleSet.version()})
+	var waiting := await q1._try_quick()
+	check(waiting.ok and q1.code == "", "quick match: the first player waits (%s)" % waiting.error)
+	var found := await q2.find_quick_match(StandardSetup.army(), OnlineSession.QUICK_ANY)
+	check(found.ok and q2.code != "", "quick match: the second is paired at once (%s)" % found.error)
+	await q1.check_quick_match()
+	check(q1.code == q2.code and q1.my_team != q2.my_team, "quick match: both in the same game, opposite sides")
+	check(int(q2.row.get("time_ms", 0)) == 180000, "quick match: Any takes the other player's 3 minutes")
+	var reported := await q1.report_opponent("live check")
+	check(reported.ok, "reported the opponent (%s)" % reported.error)
+	var twice := await q1.report_opponent("live check")
+	check(not twice.ok and "already" in twice.error, "only one report per game (%s)" % twice.error)
+	var left := await q1.resign()
+	check(left.ok, "resigned the quick game")
+
 	# Sharing an army.
 	var shared := await ArmyShare.share(white.backend, StandardSetup.army())
 	check(shared.ok and str(shared.code).length() == 5, "shared an army (%s)" % shared.error)

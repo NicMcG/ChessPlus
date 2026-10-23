@@ -143,6 +143,30 @@ func test_online_chat() -> void:
 	host.free()
 	guest.free()
 
+func test_online_mute_and_report() -> void:
+	var pair: Array = await _online_pair()
+	var host: Node = pair[0]
+	var guest: Node = pair[1]
+	host.set_muted(true)
+	check_eq(host.chat_panel.mute_button.text, "Unmute", "Mute button turns into Unmute")
+	await guest.send_chat("rude words")
+	await host.online.poll()
+	check_eq(host.chat_button.text, "Chat", "No unread count for a muted opponent")
+	host.open_chat()
+	check_eq(host._visible_chat().size(), 0, "Their message is hidden")
+	host.set_muted(false)
+	check_eq(host._visible_chat().size(), 1, "Unmuted: it shows again")
+	host.ask_report()
+	var panel: ModalPanel = host.get_children().filter(func(n: Node) -> bool: return n is ModalPanel).back()
+	check(panel != null, "Asks first")
+	await host.send_report()
+	panel.close()
+	check_eq(MemoryBackend.reports.size(), 1, "The report reached the server")
+	check(host.online.muted, "Reporting mutes them too")
+	check_eq(host.last_notice, "Thanks: your report was sent.", "Says thanks")
+	host.free()
+	guest.free()
+
 func test_online_rematch_offerer_picks_the_side() -> void:
 	var pair: Array = await _online_pair(300000)
 	var host: Node = pair[0]

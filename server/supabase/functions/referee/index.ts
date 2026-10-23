@@ -7,6 +7,7 @@
 // POST {action: "create", seat, white_army, black_army, time_ms, eval_bar, rules}
 //      {action: "join", code, white_army, black_army, rules}
 //      {action: "move", code, seat, move, expected, think_ms, finished}
+//      {action: "quick", white_army, black_army, time_ms (-1 = Any), rules}
 //      {action: "health"}
 // Reply: {game: {...}} (the game as the caller may see it; null = "nothing
 // changed", e.g. the opponent moved first) or {error: "plain words"}.
@@ -170,6 +171,56 @@ async function move(user: string, body: Record<string, any>): Promise<Response> 
   });
 }
 
+// Quick match: check both armies (the side isn't known yet), join the queue,
+// then try to pair with whoever fits. Reply {game} once paired, else
+// {game: null, waiting: true}; the waiting player checks the queue
+// (quick_match_status) and asks again when someone who fits is there.
+async function quick(user: string, body: Record<string, any>): Promise<Response> {
+  const rs = ruleSet(body.rules);
+  if (!rs) return reply({ error: UPDATE_NEEDED }, 400);
+  const problem = armyError(body.white_army, rs) ?? armyError(body.black_army, rs);
+  if (problem) return reply({ error: problem }, 400);
+  const entered = await rpcData("referee_quick_enter", {
+    p_user: user, p_white_army: body.white_army, p_black_army: body.black_army, p_time_ms: body.time_ms, p_rules: body.rules,
+  });
+  if ("error" in entered) return reply({ error: entered.error }, 400);
+  if (entered.data?.code) {
+    return reply({ game: null, paired: entered.data.code });
+  }
+  for (const other of (entered.data?.candidates ?? []) as Record<string, any>[]) {
+    const iAmWhite = Math.random() < 0.5;
+    const white = (iAmWhite ? body.white_army : other.white_army) as ArmyData;
+    const black = (iAmWhite ? other.black_army : body.black_army) as ArmyData;
+    if (armyError(white, rs) || armyError(black, rs)) continue;
+    const refereed = supported(white, black, rs);
+    let finished = false;
+    if (refereed) {
+      const start = judge(white, black, [], rs, plusfish);
+      finished = start.legal && start.outcome !== "none";
+    }
+    const paired = await rpcData("referee_quick_pair", {
+      p_user: user, p_other: other.user_id, p_white_user: iAmWhite ? user : other.user_id,
+      p_finished: finished, p_refereed: refereed,
+    });
+    if (!("error" in paired) && paired.data) return reply({ game: paired.data });
+  }
+  return reply({ game: null, waiting: true });
+}
+
+// Like rpc(), but hands back the data: {data} or {error}.
+async function rpcData(name: string, args: Record<string, unknown>): Promise<{ data?: any; error?: string }> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: "POST", headers: serverHeaders(), body: JSON.stringify(args) });
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      return { error: JSON.parse(text).message ?? `the server said ${res.status}` };
+    } catch {
+      return { error: `the server said ${res.status}` };
+    }
+  }
+  return { data: text.trim() === "" ? null : JSON.parse(text) };
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return reply({ error: "POST only" }, 405);
@@ -189,6 +240,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "create": return await create(user, body);
       case "join": return await join(user, body);
       case "move": return await move(user, body);
+      case "quick": return await quick(user, body);
     }
     return reply({ error: "unknown action" }, 400);
   } catch (e) {

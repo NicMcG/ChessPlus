@@ -572,3 +572,130 @@ func test_referee_ends_king_exposed_at_once() -> void:
 	check(joined.ok, "Joined: " + joined.error)
 	check_eq(guest.status(), OnlineSession.FINISHED, "King exposed: over before it starts, on the server too")
 	_free([host, guest])
+
+# --- Quick match and reports ---------------------------------------------------------
+
+func _quick_session(player_id: String) -> OnlineSession:
+	var session := _session(player_id)
+	session.quick_poll_seconds = 0
+	return session
+
+func test_quick_match_pairs_two_players() -> void:
+	MemoryBackend.clear()
+	var first := _quick_session("first")
+	var second := _quick_session("second")
+	# The first waits (nobody else yet): one try, then they're in the queue.
+	first.looking = true
+	first._quick_args = first._armies(StandardSetup.army())
+	first._quick_args.merge({"time_ms": 300000, "rules": RuleSet.version()})
+	var waiting := await first._try_quick()
+	check(waiting.ok and first.code == "", "Nobody to play yet: waiting")
+	# The second arrives with the same time: paired at once.
+	var found := await second.find_quick_match(StandardSetup.army(), 300000)
+	check(found.ok and second.code != "", "Paired: " + found.error)
+	# The first hears about it on its next check of the queue.
+	await first.check_quick_match()
+	check_eq(first.code, second.code, "Both are in the same game")
+	check(first.my_team != second.my_team, "On opposite sides")
+	check_eq(int(first.row.time_ms), 300000, "5 minutes each, as both chose")
+	check_eq(first.status(), OnlineSession.PLAYING, "The game is on")
+	_free([first, second])
+
+func test_quick_match_times_must_fit() -> void:
+	MemoryBackend.clear()
+	var first := _quick_session("first")
+	var second := _quick_session("second")
+	var third := _quick_session("third")
+	first._quick_args = first._armies(StandardSetup.army())
+	first._quick_args.merge({"time_ms": 180000, "rules": RuleSet.version()})
+	await first._try_quick()
+	second._quick_args = second._armies(StandardSetup.army())
+	second._quick_args.merge({"time_ms": 600000, "rules": RuleSet.version()})
+	await second._try_quick()
+	check(first.code == "" and second.code == "", "3 minutes and 10 minutes don't fit")
+	# Any fits either: paired with whoever waited longest, at their time.
+	var found := await third.find_quick_match(StandardSetup.army(), OnlineSession.QUICK_ANY)
+	check(found.ok, "Any found a game")
+	check_eq(int(third.row.time_ms), 180000, "With the first player, at their 3 minutes")
+	_free([first, second, third])
+
+func test_quick_match_any_with_any_is_ten_minutes() -> void:
+	MemoryBackend.clear()
+	var first := _quick_session("first")
+	var second := _quick_session("second")
+	first._quick_args = first._armies(StandardSetup.army())
+	first._quick_args.merge({"time_ms": OnlineSession.QUICK_ANY, "rules": RuleSet.version()})
+	await first._try_quick()
+	await second.find_quick_match(StandardSetup.army(), OnlineSession.QUICK_ANY)
+	check_eq(int(second.row.time_ms), 600000, "Any with Any: 10 minutes each")
+	_free([first, second])
+
+func test_quick_match_cancel() -> void:
+	MemoryBackend.clear()
+	var first := _quick_session("first")
+	var second := _quick_session("second")
+	first._quick_args = first._armies(StandardSetup.army())
+	first._quick_args.merge({"time_ms": 0, "rules": RuleSet.version()})
+	await first._try_quick()
+	await first.cancel_quick_match()
+	check(first.code == "" and not first.looking, "Stopped looking")
+	second._quick_args = second._armies(StandardSetup.army())
+	second._quick_args.merge({"time_ms": 0, "rules": RuleSet.version()})
+	await second._try_quick()
+	check_eq(second.code, "", "Nobody left in the queue to pair with")
+	_free([first, second])
+
+func test_quick_match_checks_armies() -> void:
+	MemoryBackend.clear()
+	var first := _quick_session("first")
+	var greedy := Army.new()
+	greedy.place(load("res://data/pieces/king.tres"), Vector2i(4, 0))
+	for file in [0, 1, 2, 3, 5, 6, 7]:
+		greedy.place(load("res://data/pieces/queen.tres"), Vector2i(file, 0))
+	var found := await first.find_quick_match(greedy, 0)
+	check(not found.ok and "army rules" in found.error, "A rule-breaking army can't queue: " + found.error)
+	first.free()
+
+func test_report_opponent() -> void:
+	var pair: Array = await _started_game()
+	var host: OnlineSession = pair[0]
+	var guest: OnlineSession = pair[1]
+	await guest.post_chat("something rude")
+	await host.poll()
+	var reported := await host.report_opponent()
+	check(reported.ok, "Reported: " + reported.error)
+	check_eq(MemoryBackend.reports.size(), 1, "One report kept")
+	check_eq(MemoryBackend.reports[0].reported, "guest", "Against the guest")
+	check_eq(MemoryBackend.reports[0].chat[0].text, "something rude", "With the chat")
+	var again := await host.report_opponent()
+	check(not again.ok and "already" in again.error, "Only once per game")
+	_free(pair)
+
+func test_lobby_quick_match() -> void:
+	MemoryBackend.clear()
+	var lobby: Node = load("res://scenes/online/online_lobby.tscn").instantiate()
+	var backend := MemoryBackend.new()
+	lobby.backend = backend
+	lobby.player_id = "lobby"
+	_root().add_child(lobby)
+	var ready_sessions := []
+	lobby.game_ready.connect(func(session: OnlineSession) -> void: ready_sessions.append(session))
+	lobby.quick_time_pick.select(0)
+	lobby.quick_match()
+	await get_tree_frames(2)
+	check(lobby.waiting.visible and not lobby.get_node("%CodeCard").visible, "Waiting, with no code to share")
+	check_eq(lobby.get_node("%WaitLabel").text, "Looking for an opponent...", "Says it's looking")
+	var other := _quick_session("other")
+	var found := await other.find_quick_match(StandardSetup.army(), 300000)
+	check(found.ok, "The other player is paired with the waiting one")
+	# The lobby checks the queue every 2 seconds.
+	var waited := 0.0
+	while ready_sessions.is_empty() and waited < 5.0:
+		await (Engine.get_main_loop() as SceneTree).create_timer(0.2).timeout
+		waited += 0.2
+	check_eq(ready_sessions.size(), 1, "The lobby's game starts")
+	if not ready_sessions.is_empty():
+		check_eq((ready_sessions[0] as OnlineSession).code, other.code, "The same game")
+	lobby.free()
+	other.free()
+	backend.free()

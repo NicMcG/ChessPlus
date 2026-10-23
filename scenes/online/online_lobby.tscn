@@ -94,6 +94,40 @@ custom_minimum_size = Vector2(0, 84)
 layout_mode = 2
 fit_to_longest_item = false
 
+[node name="QuickCard" type="PanelContainer" parent="Margin/Layout/Form/Cards"]
+layout_mode = 2
+theme_type_variation = &"CardPanel"
+
+[node name="Box" type="VBoxContainer" parent="Margin/Layout/Form/Cards/QuickCard"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="QuickHeading" type="Label" parent="Margin/Layout/Form/Cards/QuickCard/Box"]
+layout_mode = 2
+theme_type_variation = &"DialogTitle"
+theme_override_font_sizes/font_size = 32
+text = "Play someone new"
+
+[node name="QuickTimeLabel" type="Label" parent="Margin/Layout/Form/Cards/QuickCard/Box"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+vertical_alignment = 2
+theme_type_variation = &"HeadingLabel"
+text = "Time for each player"
+
+[node name="QuickTime" type="OptionButton" parent="Margin/Layout/Form/Cards/QuickCard/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+fit_to_longest_item = false
+
+[node name="QuickMatch" type="Button" parent="Margin/Layout/Form/Cards/QuickCard/Box"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "Quick match"
+
 [node name="CreateCard" type="PanelContainer" parent="Margin/Layout/Form/Cards"]
 layout_mode = 2
 theme_type_variation = &"CardPanel"
@@ -186,6 +220,7 @@ theme_override_constants/separation = 20
 alignment = 1
 
 [node name="CodeCard" type="PanelContainer" parent="Margin/Layout/Waiting"]
+unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"CardPanel"
 

@@ -48,6 +48,9 @@ const TIME_CONTROLS := [
 	["15 minutes", 900000],
 	["30 minutes", 1800000],
 ]
+## Quick match: "Any" time (whatever the opponent picked; 10 minutes each if
+## both pick Any).
+const QUICK_ANY := -1
 ## Side choices when creating a game.
 const SIDE_WHITE := 0
 const SIDE_BLACK := 1
@@ -68,6 +71,9 @@ var my_team := Piece.Team.WHITE
 ## Seconds between checks for the opponent's moves. 0 = only when poll() is
 ## called (tests).
 var poll_seconds := 1.5
+## Mac's Mute: the opponent's chat messages are hidden (for this game and its
+## rematches; the game screen carries it over).
+var muted := false
 var rng := RandomNumberGenerator.new()
 ## When (Time.get_ticks_msec()) the current player's turn started, as seen here.
 var turn_started_ms := 0
@@ -139,6 +145,84 @@ func resume(p_code: String, team := -1) -> Dictionary:
 ## Give up waiting for an opponent (only before anyone has joined).
 func cancel() -> Dictionary:
 	return await _act("cancel_game", {})
+
+# --- Quick match -----------------------------------------------------------------
+
+## Seconds between checks of the quick-match queue while waiting (0 = only when
+## check_quick_match() is called: tests).
+var quick_poll_seconds := 2.0
+## True while waiting for a quick match.
+var looking := false
+var _quick_args := {}
+
+## Look for an opponent (Mac's Quick match): `army` (an Army or a
+## Callable(team) -> Army) and a time limit (milliseconds each, 0 = none,
+## QUICK_ANY = whatever the opponent picked). Waits until paired (then the
+## game is this session's, as after joining) or cancel_quick_match().
+## {"ok", "error"}; on success `code` is the game.
+func find_quick_match(army: Variant, time_ms: int) -> Dictionary:
+	_quick_args = _armies(army)
+	_quick_args.merge({"time_ms": time_ms, "rules": RuleSet.version()})
+	looking = true
+	var result := await _try_quick()
+	while looking and result.ok and code == "":
+		if quick_poll_seconds <= 0:
+			break  # Tests check the queue themselves (check_quick_match).
+		await get_tree().create_timer(quick_poll_seconds).timeout
+		if not looking:
+			break
+		result = await check_quick_match()
+	looking = false
+	if not result.ok:
+		return result
+	return OnlineBackend.succeeded([row]) if code != "" else OnlineBackend.failed("cancelled")
+
+## One check of the queue while waiting: picks up the game if someone paired
+## with us, asks the referee to pair again if someone who fits is waiting.
+func check_quick_match() -> Dictionary:
+	var status := await backend.call_function("quick_match_status", {})
+	if not status.ok or status.rows.is_empty():
+		return status
+	var answer: Dictionary = status.rows[0]
+	if answer.get("code") is String:
+		return await _take_quick_game(answer.code)
+	if answer.get("gone", false):
+		# Dropped from the queue (away too long): join it again.
+		return await _try_quick()
+	if int(answer.get("others", 0)) > 0:
+		return await _try_quick()
+	return OnlineBackend.succeeded([])
+
+## Stop looking. If a game was made just before, it's this session's after all
+## (`code` is set): play it.
+func cancel_quick_match() -> Dictionary:
+	looking = false
+	var left := await backend.call_function("leave_quick_match", {})
+	if left.ok and not left.rows.is_empty() and left.rows[0].get("code") is String:
+		return await _take_quick_game(left.rows[0].code)
+	return left
+
+func _try_quick() -> Dictionary:
+	var result := await backend.referee("quick", _quick_args)
+	if not result.ok or result.rows.is_empty():
+		return result
+	var answer: Dictionary = result.rows[0]
+	if answer.get("paired") is String:
+		return await _take_quick_game(answer.paired)
+	code = str(answer.code)
+	my_team = Piece.Team.BLACK if answer.get("seat", "") == "black" else Piece.Team.WHITE
+	_set_row(answer)
+	return result
+
+func _take_quick_game(game_code: String) -> Dictionary:
+	looking = false
+	return await resume(game_code)
+
+## Report the opponent (Mac's Report): the server keeps this game's chat and
+## moves for Mac to read.
+func report_opponent(reason := "") -> Dictionary:
+	var full := {"p_code": code, "p_seat": team_key(my_team), "p_reason": reason}
+	return await backend.call_function("report_player", full)
 
 # --- Playing ---------------------------------------------------------------------
 

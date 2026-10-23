@@ -20,8 +20,9 @@ func call_function(_name: String, _args: Dictionary) -> Dictionary:
 
 ## Ask the referee (server/supabase/functions/referee) to create a game, join
 ## one or play a move: it checks the army or the move with the game's own rules
-## first. `action` "create" / "join" / "move"; rows[0] is the game, or no rows
-## for "nothing changed" (e.g. the opponent moved first).
+## first. `action` "create" / "join" / "move" / "quick"; rows[0] is the game, or
+## no rows for "nothing changed" (e.g. the opponent moved first, or a quick
+## match still waiting); a quick match paired meanwhile gives {"paired": code}.
 func referee(_action: String, _args: Dictionary) -> Dictionary:
 	return failed("not implemented")
 
