@@ -1,7 +1,7 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 24 October 2026 (after run 11). The full data is in the repo
-(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run11` (a
+Last updated 24 October 2026 (after run 12). The full data is in the repo
+(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run12` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
 Balancing is now discussed in Claude Code; Mac makes the decisions.
@@ -98,6 +98,17 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   48.0% (Black ahead), with White dropping the Queen and Black becoming the
   striker, but both colour pools came out weaker than the all-rounders (the
   split search never settled), so that half is a first look only.
+- **Run 12, the split search in phases** (one colour grown for 5 rounds
+  against the other pool frozen, then the other, 30 rounds): it cycles
+  instead of settling. Each pool shoots up against the frozen opponent and
+  collapses when the opponent's phase begins; both colour pools lose to the
+  all-rounders (normal rules: White specialists 51.5% against the ordinary
+  pool, which scores 59.4% against itself), and "specialists vs specialists"
+  (White 36.8% normal, 43.3% rule) only measures which colour had the last
+  phase. The one steady army is run 7's all-rounder Wide 14a. Conclusion:
+  colour specialists found against a small searched pool are counters to
+  those ten opponents, not generally strong; a fairer test would judge each
+  colour against a fixed, broad opponent set (the all-round pool itself).
 
 ## Other open questions
 

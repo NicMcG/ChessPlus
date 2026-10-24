@@ -1,0 +1,8 @@
+[2026-10-24 06:09:49 UTC] start; game version 0cbc2db (HEAD); 64 cores; rules: normal (none); start pool engine/plusfish/reports/meta_pool.txt
+[2026-10-24 06:09:49 UTC] part 1: meta --wide 64 --game-climb --king-exposed reject --rounds 30 --phase 5 --stable 99 --seed 1 --split-colours
+[2026-10-24 07:19:46 UTC] part 1 finished (exit 0)
+[2026-10-24 07:19:46 UTC] part 2: White armies against Black armies
+[2026-10-24 07:22:04 UTC] part 2 finished (121 pairings)
+[2026-10-24 07:22:04 UTC] part 3: White armies against the ordinary pool, then the ordinary pool against Black armies
+[2026-10-24 07:26:28 UTC] part 3 finished (121 and 121 pairings)
+[2026-10-24 07:26:28 UTC] all done

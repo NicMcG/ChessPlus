@@ -1,4 +1,4 @@
-"""Balance run 11: separate White and Black armies (Mac, 24 Oct 2026; report
+"""Balance runs 11 and 12 (--title / --note for 12): separate White and Black armies (Mac, 24 Oct 2026; report
 only, no pass/fail). For each rule set (normal, and the White-only quiet
 first move) Plusfish grew a White pool and a Black pool side by side
 (`meta --wide --split-colours`), then played:
@@ -117,15 +117,17 @@ def main():
     ap.add_argument("--run10", required=True)
     ap.add_argument("--pieces", default="data/pieces")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--title", default="Balance run 11: separate White and Black armies (report)")
+    ap.add_argument("--note", default="", help="a sentence added to the opening paragraph (e.g. run 12's phases)")
     args = ap.parse_args()
     pieces = r.read_pieces(args.pieces)
     baselines = {"run7": a.round_robin(args.run7), "run10": a.round_robin(args.run10)}
-    out = ["# Balance run 11: separate White and Black armies (report)\n",
+    out = ["# %s\n" % args.title,
            "Made by `tools/balance/run11_analyse.py`. Plusfish grew a White pool and a Black pool side by side "
            "(`meta --wide --split-colours`): a White army is judged only as White against the Black pool, and the other "
            "way round. All games below have fixed colours, 40 games a pairing, 8,000 nodes, `--random-plies 4`. "
            "\"Ordinary pool\" = the one-army-for-both-colours pool for that rule set (run 7's for the normal rules, run 10's "
-           "for the White-only quiet first move); its own round robin is the baseline. Points = percentage points.\n"]
+           "for the White-only quiet first move); its own round robin is the baseline. Points = percentage points.%s\n" % (" " + args.note if args.note else "")]
     summary = []
     for label, title, base_name in RULES:
         folder = os.path.join(args.run11, label)
