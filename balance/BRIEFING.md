@@ -1,7 +1,7 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 23 October 2026 (after runs 8 and 9). The full data is in the repo
-(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run9` (a
+Last updated 24 October 2026 (after run 10). The full data is in the repo
+(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run10` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
 Balancing is now discussed in Claude Code; Mac makes the decisions.
@@ -81,6 +81,12 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   (chess +0.29), none with Black more than a pawn ahead. Mac's success test
   missed on one line: the round robin's White score 50.5% is under the 52%
   floor (95% range 48.9-52.2%).
+- **Run 10, the White-only quiet first move with strong armies** (a meta
+  pool grown under it): round robin White 51.1% (95% 49.5-52.7%), biggest
+  army gap +11.3, one pairing at exactly 80.0% (32 of 40); armies against
+  themselves median +0.14, none over +1, none with Black more than a pawn
+  ahead. Success test missed on two lines, both at the edge (round robin
+  under 52%, one pairing on the 80% line).
 
 ## Other open questions
 

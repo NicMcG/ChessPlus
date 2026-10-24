@@ -1,0 +1,12 @@
+source|name|army|without the rule|with the rule
+new pool|Wide 9b|AA(BR)QK(CV)2/(AS)B1(RM)(CV)(BR)G(AS)|Best move: Af5 (b1-f5)  eval +1.05  [15944832 nodes, 4218k nodes/s]|Best move: Af5 (b1-f5)  eval +0.65  [15921280 nodes, 4148k nodes/s]
+new pool|Wide 9c|1PBK1(NC)Q1/A1(AS)GG(SQ)AB|Best move: Axb7! (g2!b7)  eval +3.01  [15877248 nodes, 4162k nodes/s]|Best move: Ah3 (g2-h3)  eval +0.18  [16155776 nodes, 4148k nodes/s]
+new pool|Wide 4c|EQ(RO)K(WW)(AS)1(NC)/BGB(RM)G(PD)(PD)(AS)|Best move: Bxh7 (c2xh7)  eval +0.66  [16565376 nodes, 4014k nodes/s]|Best move: Gb3 (b2-b3)  eval -0.21  [15989888 nodes, 3923k nodes/s]
+new pool|Wide 15a|1Q(BR)KCG1(NC)/BEB(AS)(AS)AG(PD)|Best move: Bxf7+ (a2xf7)  eval +3.06  [15882368 nodes, 3836k nodes/s]|Best move: ASf3+ (e2-f3)  eval +0.42  [15605888 nodes, 3725k nodes/s]
+new pool|Wide 11a|P1(AS)1K(AS)P(NC)/B(GA)N(SQ)(RM)ABQ|Best move: Axa7! (f2!a7)  eval +2.42  [15988864 nodes, 3871k nodes/s]|Best move: Qh3 (h2-h3)  eval +0.24  [16318592 nodes, 3708k nodes/s]
+new pool|Wide 7c|2(CV)K(NC)(WW)B1/Q(AS)(BR)(GA)(CV)GEA|Best move: Axc7! (h2!c7)  eval +0.42  [16288896 nodes, 3714k nodes/s]|Best move: BRd3 (c2-d3)  eval +0.12  [15993984 nodes, 3692k nodes/s]
+new pool|Wide 14a|(WW)QBKC2(CV)/1(BR)ABG(CV)P1|Best move: Gf3+ (e2-f3)  eval +0.45  [16152704 nodes, 3505k nodes/s]|Best move: Gd3+ (e2-d3)  eval +0.37  [15942784 nodes, 3587k nodes/s]
+new pool|Wide 14a|(NC)(WW)ENKQPA/GB(AS)(CV)PG1(AS)|Best move: Axa8! (h1!a8)  eval +3.03  [16426112 nodes, 3542k nodes/s]|Best move: e4 (e2-e4)  eval +0.08  [16214144 nodes, 3476k nodes/s]
+new pool|Wide 4b|1PPK(BR)C(NC)1/A(AS)(WW)(BR)GBQ(PD)|Best move: Qxb7 (g2xb7)  eval +0.18  [15919232 nodes, 3798k nodes/s]|Best move: Gd3 (e2-d3)  eval +0.14  [16090240 nodes, 3793k nodes/s]
+new pool|Wide 15a|QE(WW)1KN(NC)(RM)/(AS)APB(BR)(PD)G(AS)|Best move: Axg7! (b2!g7)  eval +3.86  [16048256 nodes, 3736k nodes/s]|Best move: c3 (c2-c3)  eval -0.41  [15913088 nodes, 3785k nodes/s]
+new pool|Standard|standard|Best move: d4 (d2-d4)  eval +0.13  [16086144 nodes, 3506k nodes/s]|Best move: d4 (d2-d4)  eval +0.07  [16071808 nodes, 3483k nodes/s]
