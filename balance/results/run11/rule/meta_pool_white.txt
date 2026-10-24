@@ -1,0 +1,13 @@
+# Chess Plus White armies grown by `plusfish meta --wide --split-colours` (judged only as White against the Black pool).
+# After round 15. Games = mean score as White against the Black pool (40 games per pair, 6000 nodes per move); eval = mean turn-0 advantage as White at 20000 nodes (cp).
+# army | name | cost | games (Elo) | eval | pieces
+1B(BR)KCE(PD)(NC)/A(AS)BGQ(AS)(CV)1 | Wide W14a | 39 | 64.6% (+105) | +277 | Queen, Archer, Cannon, Necromancer, 2 Bishop, Cavalry, Ghost, Barbarian, Paladin, Elephant, 2 Assassin
+BP(NC)K2QB/A1(AS)GG(CH)1A | Wide W15a | 39 | 58.6% (+61) | +120 | Queen, 2 Archer, Chariot, Necromancer, 2 Bishop, 2 Ghost, Pawn, Assassin
+2(CV)K(NC)(WW)B1/Q(AS)(BR)(GA)(CV)GEA | Wide 7c | 39 | 54.8% (+33) | +11 | Queen, Archer, Necromancer, Bishop, 2 Cavalry, Galleon, Ghost, Werewolf, Barbarian, Elephant, Assassin
+1AQ1K(CV)(BR)1/(AS)AG(CV)NB(BR)(AS) | Wide W14c | 39 | 52.4% (+17) | +187 | Queen, 2 Archer, Bishop, 2 Cavalry, Ghost, Knight, 2 Barbarian, 2 Assassin
+EQ(RO)K(WW)(AS)1(NC)/BGB(RM)G(PD)(PD)(AS) | Wide 4c | 39 | 51.4% (+10) | -19 | Queen, Necromancer, Rogue, 2 Bishop, 2 Ghost, Ram, Werewolf, 2 Paladin, Elephant, 2 Assassin
+Q(GA)PBKN(NC)1/(AS)AGP(BR)(PD)(WW)(AS) | Wide W4c | 39 | 46.2% (-26) | -0 | Queen, Archer, Necromancer, Bishop, Galleon, Ghost, Knight, Werewolf, Barbarian, Paladin, 2 Pawn, 2 Assassin
+WP(WW)CKPE(NC)/(AS)GGAB(PD)(PD)(AS) | Wide W7a | 39 | 44.1% (-41) | +2 | Wizard, Archer, Cannon, Necromancer, Bishop, 2 Ghost, Werewolf, 2 Paladin, Elephant, 2 Pawn, 2 Assassin
+(AS)B(BR)EK(CV)W1/GALA(PD)EG1 | Wide W11a | 39 | 36.9% (-93) | -58 | Wizard, 2 Archer, Lance, Bishop, Cavalry, 2 Ghost, Barbarian, Paladin, 2 Elephant, Assassin
+GW1K(NC)(PD)B1/(GA)(BR)G(BR)A1A1 | Wide W12c | 39 | 29.8% (-149) | -58 | Wizard, 2 Archer, Necromancer, Bishop, Galleon, 2 Ghost, 2 Barbarian, Paladin
+1WPKN(NC)G1/1VCBGPB1 | Wide W10a | 39 | 25.9% (-183) | -200 | Wizard, Vampire, Cannon, Necromancer, 2 Bishop, 2 Ghost, Knight, 2 Pawn

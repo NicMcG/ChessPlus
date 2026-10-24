@@ -1,7 +1,7 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 24 October 2026 (after run 10). The full data is in the repo
-(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run10` (a
+Last updated 24 October 2026 (after run 11). The full data is in the repo
+(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run11` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
 Balancing is now discussed in Claude Code; Mac makes the decisions.
@@ -87,6 +87,17 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   themselves median +0.14, none over +1, none with Black more than a pawn
   ahead. Success test missed on two lines, both at the edge (round robin
   under 52%, one pairing on the 80% line).
+- **Run 11, separate White and Black armies** (players can set a default
+  army per colour; Plusfish grew a White pool and a Black pool side by side,
+  each judged only as its colour; report only): under the normal rules a
+  Black-only army gains about 8 points against the all-round pool, a
+  White-only army about 1; specialists against specialists White 57.6% (all-
+  rounders 59.4%). Black's armies keep long-range pieces out of the front row
+  and take Paladins; White's take pawns, Rams, Cannons and strikers. Under the
+  White-only quiet first move, specialists against specialists gave White
+  48.0% (Black ahead), with White dropping the Queen and Black becoming the
+  striker, but both colour pools came out weaker than the all-rounders (the
+  split search never settled), so that half is a first look only.
 
 ## Other open questions
 
