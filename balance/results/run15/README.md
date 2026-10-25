@@ -53,7 +53,11 @@ and mirror matches (run 14's parts 3 and 4).
 `plusfish perft-suite`, and traced games from the game's own engine leaning
 towards the three new pieces, the Parapet (Wall from the keyword now) and the
 ability pieces, checked with `trace-check --abilities-need-move=true`: must be
-0 mismatches. Results below.
+0 mismatches. **Done before the run (25 Oct, branch commit 96dd282):** perft
+suite all PASS; 340 traced games (283 with Grunts, 284 Abatis, 282 Vassals,
+184 Parapets), 25,949 + 25,367 = **51,316 positions, 0 mismatches** with the
+rule on; with it off, 132 mismatches in the first set (the traces exercise
+the ability rule too).
 
 ## Parts and settings
 
