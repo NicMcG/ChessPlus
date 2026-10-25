@@ -746,9 +746,10 @@ func _piece_texture(piece: Piece, as_def: PieceDef = null, intact := false) -> T
 	return texture
 
 ## A piece whose special ability hasn't been used yet (it glows, so both
-## players can see which pieces can still use theirs).
+## players can see which pieces can still use theirs), whether or not it has
+## moved yet (an ability needs a move first, Mac, Oct 2026).
 static func has_ability_ready(piece: Piece) -> bool:
-	return piece.def.ability != PieceDef.Ability.NONE and not piece.ability_used
+	return piece.has_unused_ability()
 
 ## A faint glow around the edge of a piece in its ability's colours: its
 ## silhouette drawn slightly offset all the way round, behind it.

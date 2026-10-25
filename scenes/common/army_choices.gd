@@ -75,7 +75,7 @@ func fill(pick: OptionButton) -> void:
 		if entry.kind == BROKEN:
 			pick.set_item_disabled(index, true)
 			pick.set_item_tooltip(index, "
-".join(entry.problems) + "
+".join(RuleText.plain_lines(entry.problems)) + "
 Fix it in My armies.")
 	pick.select(0)
 

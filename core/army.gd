@@ -80,15 +80,15 @@ func problems(rules: GameRules, board_width: int) -> PackedStringArray:
 
 	var kings := pieces.filter(func(p: ArmyPiece) -> bool: return p.def.is_king_type())
 	if kings.is_empty():
-		found.append("Needs a king.")
+		found.append("Needs a *King*.")
 	for king in kings:
 		if king.square.y != 0 or not king_files(board_width).has(king.square.x):
-			found.append("The king must start in the middle of the back row.")
+			found.append("The *King* must start in the middle of the back row.")
 
 	var extra_royals := pieces.filter(func(p: ArmyPiece) -> bool:
 			return p.def.is_royal_type() and not p.def.is_king_type()).size()
 	if extra_royals > rules.army_max_extra_royals:
-		found.append("Too many royal pieces: %d besides the king (the most is %d)." % [extra_royals, rules.army_max_extra_royals])
+		found.append("Too many *Royal* pieces: %d besides the *King* (the most is %d)." % [extra_royals, rules.army_max_extra_royals])
 
 	var checked := {}
 	for piece in pieces:

@@ -426,7 +426,7 @@ func test_captured_pieces_and_material() -> void:
 	_play(game, "exd5")
 	check_eq(game.captured_bottom.pieces.size(), 1, "White captured one piece")
 	check_eq(game.captured_bottom.pieces[0].def.id, "pawn", "A pawn")
-	check_eq(game.captured_bottom.advantage_text(), "+6", "White is 6 ahead (rook + pawn against nothing)")
+	check_eq(game.captured_bottom.advantage_text(), "+5.5", "White is 5.5 ahead (rook 4.5 + pawn against nothing; Rook 4.5 since Oct 2026)")
 	check_eq(game.captured_top.pieces.size(), 0, "Black captured nothing")
 	check_eq(game.captured_top.advantage_text(), "", "Black isn't ahead")
 	game.free()

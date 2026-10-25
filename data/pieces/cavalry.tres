@@ -24,5 +24,5 @@ id = "cavalry"
 display_name = "Cavalry"
 symbol = "CV"
 value = 3
-move_note = "This piece always moves 2 squares, then 1 square. Never 1 square, then 2 squares."
+move_note = "When it moves to a square an L shape away, this piece goes 2 squares, then 1 square. Never 1 square, then 2 squares."
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2"), SubResource("Resource_rule3")])

@@ -24,3 +24,4 @@ display_name = "Barbarian"
 symbol = "BR"
 value = 2.5
 move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1"), SubResource("Resource_rule2"), SubResource("Resource_rule3")])
+move_note = "When it moves to a square an L shape away, this piece goes 2 squares, then 1 square. Never 1 square, then 2 squares."

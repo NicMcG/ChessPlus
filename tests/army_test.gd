@@ -22,9 +22,9 @@ func _army(placements: Array) -> Army:
 func _just_a_king() -> Army:
 	return _army([[KING, Vector2i(4, 0)]])
 
-func test_standard_army_is_legal_and_costs_39() -> void:
+func test_standard_army_is_legal_and_costs_40() -> void:
 	var army := StandardSetup.army()
-	check_eq(army.cost(), 39.0, "Cost")
+	check_eq(army.cost(), 40.0, "Cost (Queen 10 since Oct 2026; the budget is 40)")
 	check_eq(army.problems(rules, 8), PackedStringArray(), "Problems")
 
 func test_two_standard_armies_make_the_standard_game() -> void:
@@ -50,12 +50,12 @@ func test_promotion_includes_opponents_pieces() -> void:
 	check(rules.promotion_options.size() == 4, "The shared rules weren't changed")
 
 func test_over_budget() -> void:
-	# The standard army (39) with two pawns swapped for two Paladins (1.5 each): 40.
+	# The standard army (40) with two pawns swapped for two Paladins (1.5 each): 41.
 	var army := StandardSetup.army()
 	army.place(PALADIN, Vector2i(0, 1))
 	army.place(PALADIN, Vector2i(7, 1))
-	check_eq(army.cost(), 40.0, "Cost")
-	check_eq(army.problems(rules, 8), PackedStringArray(["Costs 40 points; the budget is 39."]), "Problems")
+	check_eq(army.cost(), 41.0, "Cost")
+	check_eq(army.problems(rules, 8), PackedStringArray(["Costs 41 points; the budget is 40."]), "Problems")
 
 func test_fractional_costs() -> void:
 	var army := _army([[KING, Vector2i(4, 0)], [PALADIN, Vector2i(2, 0)], [PALADIN, Vector2i(5, 0)]])
@@ -64,7 +64,8 @@ func test_fractional_costs() -> void:
 	check_eq(army.problems(rules, 8), PackedStringArray(["Costs 3 points; the budget is 2.5."]), "Problems")
 
 func test_king_required_and_only_one() -> void:
-	check_eq(Army.new().problems(rules, 8), PackedStringArray(["Needs a king."]), "Empty army")
+	# Problem texts mark piece types for italics (*King*): RuleText.plain takes the marks off.
+	check_eq(RuleText.plain_lines(Army.new().problems(rules, 8)), PackedStringArray(["Needs a King."]), "Empty army")
 	var two_kings := _army([[KING, Vector2i(4, 0)], [KING, Vector2i(3, 0)]])
 	check_eq(two_kings.problems(rules, 8), PackedStringArray(["Too many kings: 2 (the most is 1)."]), "Two kings")
 
@@ -72,15 +73,15 @@ func test_king_must_start_in_the_middle_of_the_back_row() -> void:
 	for file in [3, 4]:
 		check(_army([[KING, Vector2i(file, 0)]]).is_valid(rules, 8), "King on file %d" % file)
 	for square in [Vector2i(0, 0), Vector2i(2, 0), Vector2i(5, 0), Vector2i(4, 1)]:
-		check_eq(_army([[KING, square]]).problems(rules, 8),
-				PackedStringArray(["The king must start in the middle of the back row."]), "King on %s" % square)
+		check_eq(RuleText.plain_lines(_army([[KING, square]]).problems(rules, 8)),
+				PackedStringArray(["The King must start in the middle of the back row."]), "King on %s" % square)
 
 func test_one_royal_piece_besides_the_king() -> void:
 	var army := _army([[KING, Vector2i(4, 0)], [QUEEN, Vector2i(3, 0)]])
 	check(army.is_valid(rules, 8), "One queen is fine")
 	army.place(QUEEN, Vector2i(3, 1))
-	check_eq(army.problems(rules, 8),
-			PackedStringArray(["Too many royal pieces: 2 besides the king (the most is 1)."]), "Two queens")
+	check_eq(RuleText.plain_lines(army.problems(rules, 8)),
+			PackedStringArray(["Too many Royal pieces: 2 besides the King (the most is 1)."]), "Two queens")
 	check(_just_a_king().is_valid(rules, 8), "No queen is fine too")
 
 func test_tags_on_the_standard_pieces() -> void:

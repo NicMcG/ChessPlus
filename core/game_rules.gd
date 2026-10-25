@@ -14,7 +14,7 @@ extends Resource
 
 @export_group("Armies")
 ## How many points each army may spend.
-@export var army_budget := 39.0
+@export var army_budget := 40.0
 ## How many rows, counted from each player's own edge, armies may start on.
 @export var army_start_rows := 2
 ## The most copies of one piece type an army may have. Pawn types have no limit

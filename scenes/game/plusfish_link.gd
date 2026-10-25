@@ -107,11 +107,17 @@ const KNOWN_ABILITIES := PieceDef.Ability.FULL_MOON
 ## two Jesters. (A second one made by promotion later is rare: Plusfish can't
 ## read that game's choice moves, so the eval bar stops there and the Plusfish
 ## bot hands over to Hard.)
+## Tests of the screen can pretend Plusfish knows the ability rule below.
+static var pretend_knows_abilities := false
+
+## Plusfish doesn't know Mac's Oct 2026 rule that an ability needs a move first
+## (a capture or shield break counts), so it's off for any game with a special
+## ability in it, on the board or already lost, until Plusfish is updated.
 static func supports(state: GameState) -> bool:
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		var jesters := 0
-		for piece: Piece in state.board.pieces_of(team).values():
-			if piece.def.ability > KNOWN_ABILITIES:
+		for piece: Piece in state.board.pieces_of(team).values() + state.lost[team]:
+			if piece.def.ability != PieceDef.Ability.NONE and not pretend_knows_abilities:
 				return false
 			if piece.def.decoy:
 				jesters += 1

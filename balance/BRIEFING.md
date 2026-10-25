@@ -8,18 +8,21 @@ Balancing is now discussed in Claude Code; Mac makes the decisions.
 
 ## The game in one paragraph
 
-Each player builds an army on a budget of 39 points (pawns count) on their
+Each player builds an army on a budget of 40 points (pawns count) on their
 own first two rows of an 8x8 board: exactly one King (middle of the back row),
 at most one extra Royal piece, at most 2 copies of any non-pawn type. White
 moves first. 30 piece types.
 
 ## Current prices
 
-Pawn 1, Knight 3, Bishop 3, Rook 5, Queen 9, King 0. Archer 4.5, Assassin 0.5,
-Barbarian 2.5, Bard 3.5, Cannon 4, Catapult 3, Cavalry 3, Chariot 4, Elephant 1,
-Galleon 3, Ghost 3, Jester 4, Lance 3.5, Man 3, Necromancer 3.5, Paladin 1.5,
-Parapet 3, Princess 8.5, Ram 3, Rogue 3.5, Squire 4, Vampire 6.5, Werewolf 3,
-Wizard 8.
+Pawn 1, Knight 3, Bishop 3.5, Rook 4.5, Queen 10, King 0. Archer 4.5, Assassin
+0.5, Barbarian 2.5, Bard 3.5, Cannon 4, Catapult 3, Cavalry 3, Chariot 4,
+Elephant 1, Galleon 3, Ghost 3, Jester 3.5, Lance 3.5, Man 3, Necromancer 3.5,
+Paladin 1.5, Parapet 2.5, Princess 8.5, Ram 3, Rogue 3.5, Squire 4, Vampire 6.5,
+Werewolf 3.5, Wizard 8. **Budget 40** (was 39) since 24 Oct 2026, when Mac set
+Queen 10, Bishop 3.5, Rook 4.5, Werewolf 3.5, Parapet 2.5 and Jester 3.5, and
+made special abilities usable only once the piece has moved (a capture or
+shield break counts). Runs 1-13 were at the old prices and rules.
 
 Changed in October from run 1's data: Vampire 4 -> 6.5, Princess 7 -> 8.5,
 Squire 3 -> 4, Galleon 4.5 -> 3, Elephant 1.5 -> 1, Paladin 2 -> 1.5,

@@ -29,7 +29,7 @@ PIECES = {
     ]),
     # Batch 2 (rules in the engine: see PieceDef.blocks_jumps, shield_on_capture,
     # protects and decoy).
-    "parapet": dict(name="Parapet", symbol="PA", value=3, keywords=2, rules=[
+    "parapet": dict(name="Parapet", symbol="PA", value=2.5, keywords=2, rules=[
         ([(1, 0), (-1, 0)], 0, 0, {}),
         (DIAG, 1, 0, {}),
     ], extra={"blocks_jumps": "true"},
@@ -38,17 +38,17 @@ PIECES = {
         ([(1, 0), (-1, 0), (0, -1)], 0, 0, {}),
         ([(1, 1), (-1, 1)], 1, 0, {}),
     ], extra={"shield_on_capture": "true"},
-        special_rule="Whenever the Vampire captures a piece, if the Vampire didn't have one, it gains SHIELD."),
+        special_rule="Whenever the Vampire captures a piece, if the Vampire didn't have one, it gains {Shield}."),
     "squire": dict(name="Squire", symbol="SQ", value=4, rules=[
         (ORTHO, 2, 0, {}),
         (DIAG, 1, 0, {}),
     ], extra={"protects": 'Array[String](["knight"])'},
         special_rule="Your Knights that are within the Squire's move range can't be captured."),
-    "jester": dict(name="Jester", symbol="J", value=4, rules=[
+    "jester": dict(name="Jester", symbol="J", value=3.5, rules=[
         (ALL8, 2, 1, {}),
         (ALL8, 1, 2, {}),
     ], extra={"decoy": "true"},
-        special_rule="If an enemy piece would capture one of your non-pawn pieces on a square within the Jester's move range, the Jester and your piece swap places first. If more than one Jester could take the hit, the attacking player chooses which."),
+        special_rule="If an enemy piece would capture one of your non-*Pawn* pieces on a square within the Jester's move range, the Jester and your piece swap places first. If more than one Jester could take the hit, the attacking player chooses which."),
     # Batch 3: abilities (PieceDef.Ability HAUNT = 3, SONG_OF_SLUMBER = 4,
     # FULL_MOON = 5). Colours are the ability's gradient, left to right.
     "ghost": dict(name="Ghost", symbol="G", value=3, rules=[
@@ -59,15 +59,15 @@ PIECES = {
     "bard": dict(name="Bard", symbol="BD", value=3.5, rules=[
         (DIAG, 4, 0, {}),
     ], ability=4, ability_name="Song of Slumber", colors=["#F5C542", "#C46A12"],
-        ability_text="Put an enemy non-king piece within the Bard's move range to sleep during your opponent's next turn. (It can't take actions.)"),
-    "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
+        ability_text="Put an enemy non-*King* piece within the Bard's move range to sleep during your opponent's next turn. (It can't take actions.)"),
+    "werewolf": dict(name="Werewolf", symbol="WW", value=3.5, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
     ], ability=5, ability_name="Full Moon", colors=["#F5F2E3", "#8E959E"], glow=["#789EFF", "#283199"], transforms_into="forms/werewolf_wolf",
         extra={"form_name": '"Human"'},
         ability_text="The Werewolf transforms from human form into wolf form."),
     # The Werewolf after Full Moon. Kept in forms/ so the army builder doesn't offer it.
-    "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3, path="forms/werewolf_wolf", rules=[
+    "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3.5, path="forms/werewolf_wolf", rules=[
         ([(1, 0), (-1, 0), (0, -1)], 1, 0, {}),
         ([(1, 1), (-1, 1), (0, 1)], 2, 0, {}),
     ], extra={"form_name": '"Wolf"'},

@@ -1257,7 +1257,10 @@ func use_ability() -> void:
 		if piece and piece.ability_used:
 			show_notice("%s has already been used." % piece.def.ability_name)
 		elif piece and piece.def.ability == PieceDef.Ability.HAUNT:
-			show_notice("The Ghost can use Haunt after it has been captured.")
+			show_notice("The Ghost can use Haunt after it has moved and been captured.")
+		elif piece and not piece.has_moved:
+			# Mac's rule (Oct 2026): an ability needs a move first.
+			show_notice("%s can be used once this piece has moved." % piece.def.ability_name)
 		else:
 			show_notice("This ability can't be used right now.")
 		return

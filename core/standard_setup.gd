@@ -28,7 +28,7 @@ static func create_game() -> GameState:
 static func from_fen(fen: String) -> GameState:
 	return Fen.parse(fen, piece_defs(), create_rules())
 
-## The standard set of pieces as an army (it costs exactly 39).
+## The standard set of pieces as an army (it costs exactly 40 at Oct 2026's prices: the budget).
 static func army() -> Army:
 	var result := Army.new()
 	result.army_name = "Standard"

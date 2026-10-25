@@ -160,7 +160,7 @@ func _row_for(army: Army) -> Control:
 	if not problems.is_empty():
 		open.icon = WARNING_ICON
 		open.add_theme_constant_override("icon_max_width", 44)
-		open.tooltip_text = "Can't be used in games until it's fixed:\n" + "\n".join(problems)
+		open.tooltip_text = "Can't be used in games until it's fixed:\n" + "\n".join(RuleText.plain_lines(problems))
 	open.pressed.connect(func() -> void: edit_requested.emit(army))
 	# The name over its cost, drawn on top of the button (taps go to the button).
 	var words := VBoxContainer.new()
