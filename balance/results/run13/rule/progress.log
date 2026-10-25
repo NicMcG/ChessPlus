@@ -1,0 +1,8 @@
+[2026-10-24 23:14:48 UTC] start; game version 095369e (HEAD); 64 cores; rules: rule --white-quiet-first=true; start pool engine/plusfish/reports/meta_pool_white_quiet_first.txt
+[2026-10-24 23:14:48 UTC] part 1: meta --wide 64 --game-climb --king-exposed reject --rounds 15 --seed 1 --split-colours --fixed-opponent
+[2026-10-25 00:19:06 UTC] part 1 finished (exit 0)
+[2026-10-25 00:19:06 UTC] part 2: White armies against Black armies
+[2026-10-25 00:21:12 UTC] part 2 finished (121 pairings)
+[2026-10-25 00:21:12 UTC] part 3: White armies against the ordinary pool, then the ordinary pool against Black armies
+[2026-10-25 00:25:32 UTC] part 3 finished (121 and 121 pairings)
+[2026-10-25 00:25:32 UTC] all done

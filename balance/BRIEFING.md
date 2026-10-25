@@ -1,7 +1,7 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 24 October 2026 (after run 12). The full data is in the repo
-(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run12` (a
+Last updated 25 October 2026 (after run 13). The full data is in the repo
+(github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run13` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
 Balancing is now discussed in Claude Code; Mac makes the decisions.
@@ -109,6 +109,15 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   colour specialists found against a small searched pool are counters to
   those ten opponents, not generally strong; a fairer test would judge each
   colour against a fixed, broad opponent set (the all-round pool itself).
+- **Run 13, each colour judged against the all-round pool frozen** (the fair
+  version; it settled, and supersedes 11 and 12 for this question). Normal
+  rules: a White-only army (strikers: long-range pieces in the front row,
+  Archers, Lances) gains +11 points against the all-rounders, a Black-only
+  army (defenders: few exposed pieces, Ghosts, Paladins) +13.5; specialists
+  against specialists White 56.7% (all-rounders 59.4%), so colour defaults
+  narrow White's edge a little but it stays. Under the White-only quiet first
+  move: gains +6.8 / +5.2, the two pools look alike, and specialists against
+  specialists is level at 50.0%, the most even setting measured so far.
 
 ## Other open questions
 

@@ -1,13 +1,13 @@
 # Chess Plus Black armies grown by `plusfish meta --wide --split-colours` (judged only as Black against the White pool).
 # After round 15. Games = mean score as Black against the White pool (40 games per pair, 6000 nodes per move); eval = mean turn-0 advantage as Black at 20000 nodes (cp).
 # army | name | cost | games (Elo) | eval | pieces
-PPQKA(WW)P1/B(AS)(BR)GG(WW)B(PD) | Wide B14a | 39 | 58.7% (+61) | +80 | Queen, Archer, 2 Bishop, 2 Ghost, 2 Werewolf, Barbarian, Paladin, 3 Pawn, Assassin
-Q(WW)(CH)KBPPP/(AS)(AS)G(BR)BG(PD)N | Wide B12c | 39 | 50.6% (+4) | -26 | Queen, Chariot, 2 Bishop, 2 Ghost, Knight, Werewolf, Barbarian, Paladin, 3 Pawn, 2 Assassin
-1Q(WW)KBBE(NC)/(AS)1AE(CV)GG(PD) | Wide B11a | 39 | 48.3% (-12) | -3 | Queen, Archer, Necromancer, 2 Bishop, Cavalry, 2 Ghost, Werewolf, Paladin, 2 Elephant, Assassin
-Q(BR)(WW)NK1(NC)(RM)/(AS)EPBA(PD)G(AS) | Wide B6c | 39 | 46.9% (-22) | +1 | Queen, Archer, Necromancer, Bishop, Ghost, Knight, Ram, Werewolf, Barbarian, Paladin, Elephant, Pawn, 2 Assassin
-1BBPK(NC)(SQ)P/A1QM(BR)PG(AS) | Wide B8a | 39 | 45.6% (-30) | -227 | Queen, Archer, Squire, Necromancer, 2 Bishop, Ghost, Man, Barbarian, 3 Pawn, Assassin
-AQ1KNPP1/(AS)(SQ)NGB(NC)G(AS) | Wide B13a | 39 | 32.0% (-131) | -496 | Queen, Archer, Squire, Necromancer, Bishop, 2 Ghost, 2 Knight, 2 Pawn, 2 Assassin
-PG1KQ(NC)1(PD)/(AS)B(BR)AG(WW)(PD)B | Wide B12a | 39 | 30.6% (-142) | -189 | Queen, Archer, Necromancer, 2 Bishop, 2 Ghost, Werewolf, Barbarian, 2 Paladin, Pawn, Assassin
-1PB(CV)K(NC)B1/A1(AS)P(CT)Q(WW)A | Wide B7a | 39 | 28.0% (-164) | -340 | Queen, 2 Archer, Necromancer, 2 Bishop, Catapult, Cavalry, Werewolf, 2 Pawn, Assassin
-(NC)(WW)ENKQPA/GB(AS)(CV)PG1(AS) | Wide 14a | 39 | 27.0% (-173) | -578 | Queen, Archer, Necromancer, Bishop, Cavalry, 2 Ghost, Knight, Werewolf, Elephant, 2 Pawn, 2 Assassin
-1B1(NC)K2C/(AS)(AS)AVN(CV)(PD)Q | Wide B10c | 39 | 25.2% (-189) | -525 | Queen, Vampire, Archer, Cannon, Necromancer, Bishop, Cavalry, Knight, Paladin, 2 Assassin
+1B(BR)K(NC)(WW)Q1/(AS)(PD)(BR)(PD)(PA)GGB | Wide B14a | 39 | 69.4% (+143) | +140 | Queen, Necromancer, 2 Bishop, 2 Ghost, Parapet, Werewolf, 2 Barbarian, 2 Paladin, Assassin
+2BQK1PA/E(PD)VAG(PD)G(AS) | Wide B7c | 39 | 64.4% (+103) | +34 | Queen, Vampire, 2 Archer, Bishop, 2 Ghost, 2 Paladin, Elephant, Pawn, Assassin
+PP(WW)1KA(RO)(NC)/P(AS)(BR)QGG(AS)B | Wide B13c | 39 | 63.5% (+96) | +72 | Queen, Archer, Necromancer, Rogue, Bishop, 2 Ghost, Werewolf, Barbarian, 3 Pawn, 2 Assassin
+1Q(RO)K(WW)(AS)E(NC)/(PD)GB(CV)BG(PD)(AS) | Wide B4b | 39 | 60.3% (+73) | +128 | Queen, Necromancer, Rogue, 2 Bishop, Cavalry, 2 Ghost, Werewolf, 2 Paladin, Elephant, 2 Assassin
+1QGK(NC)(WW)A1/1GAN(GA)(BR)2 | Wide B11b | 39 | 60.2% (+72) | +98 | Queen, 2 Archer, Necromancer, Galleon, 2 Ghost, Knight, Werewolf, Barbarian
+1Q(NC)AKPB1/1(AS)N(CV)(BR)GGB | Wide B11c | 39 | 59.7% (+68) | +51 | Queen, Archer, Necromancer, 2 Bishop, Cavalry, 2 Ghost, Knight, Barbarian, Pawn, Assassin
+(AS)1Q1KN(SQ)(NC)/(AS)1(CV)B(BR)GG(SQ) | Wide B10a | 39 | 59.3% (+66) | -2 | Queen, 2 Squire, Necromancer, Bishop, Cavalry, 2 Ghost, Knight, Barbarian, 2 Assassin
+Q(WW)BPKN(NC)1/(AS)AP(BR)(RM)(PD)G(AS) | Wide B10c | 39 | 55.5% (+38) | +42 | Queen, Archer, Necromancer, Bishop, Ghost, Knight, Ram, Werewolf, Barbarian, Paladin, 2 Pawn, 2 Assassin
+BPQKA(SQ)BP/(AS)G(CV)G(GA)1P1 | Wide B12c | 39 | 55.0% (+35) | +73 | Queen, Archer, Squire, 2 Bishop, Cavalry, Galleon, 2 Ghost, 3 Pawn, Assassin
+G(SQ)(CV)KQP(NC)1/(AS)1BB(AS)G(PD)(SQ) | Wide B9c | 39 | 52.0% (+14) | -16 | Queen, 2 Squire, Necromancer, 2 Bishop, Cavalry, 2 Ghost, Paladin, Pawn, 2 Assassin
