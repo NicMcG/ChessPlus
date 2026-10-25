@@ -155,20 +155,15 @@ export function startPosition(white: ArmyData, black: ArmyData, rs: RuleSetData)
 
 // Whether Plusfish knows every rule these armies use (PlusfishLink.supports):
 // no special ability newer than the rule set says it knows (none at all while
-// it hasn't learnt that an ability needs a move first, Mac, Oct 2026), and no
-// side with two Jesters (the attacker's choice of which one takes the hit is
-// new to it). A game it can't judge is played unrefereed, as before the referee.
+// it hasn't learnt that an ability needs a move first, Mac, Oct 2026). A game
+// it can't judge is played unrefereed, as before the referee.
 export function supported(white: ArmyData, black: ArmyData, rs: RuleSetData): boolean {
   if (rs.judge === false) return false;
   const byId = pieceById(rs);
   for (const army of [white, black]) {
-    let jesters = 0;
     for (const [id] of army.pieces) {
-      const def = byId.get(id)!;
-      if (def.ability > rs.known_abilities) return false;
-      if (def.decoy) jesters++;
+      if (byId.get(id)!.ability > rs.known_abilities) return false;
     }
-    if (jesters > 1) return false;
   }
   return true;
 }
