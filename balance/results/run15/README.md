@@ -48,6 +48,29 @@ Report only: each new piece's worth; how many of each the pool armies take
 and how many sit in the front row; the move-1 tally; the colour specialists
 and mirror matches (run 14's parts 3 and 4).
 
+## Run 15D (Mac, 25 Oct 2026, straight after run 15; lines written before it starts)
+
+**Arm D** = arm C with the **White-only quiet first move** on as well
+(Plusfish `--white-quiet-first=true`, run 9's rule: White may not capture,
+break a shield or use an ability on its first move unless in check; Black's
+first move is unrestricted). Same branch and build. The all-round pool is
+regrown **under the rule from C's regrown pool**; then the same parts as C
+(round robin, colour specialists, mirror matches with the ability rule only
+and with both rules, move-1 tally), plus **5,000 random-army games at 32,000
+nodes (seed 303) for both C and D** (`selfplay_32k.jsonl`, `report_32k.txt`).
+Script: `tools/balance/run15d_server.sh` (the branch). Expected: about 2.7
+hours, roughly $7 metered.
+
+Success lines for D: lines 1-7 above, judged on D (line 4's "no bigger"
+against C; line 7 against C's pool), plus:
+
+8. **Specialists vs specialists under 60%** (White's score when D's White
+   specialists play D's Black specialists; run 14 B was 70.6%, run 13 under
+   this rule 50.0%).
+9. **No White specialist at 90%+ against every Black specialist** (no White
+   pool army whose score as White over the whole Black pool is 90% or more;
+   run 14 B had one at 100%).
+
 ## Before the run: does Plusfish agree with the game?
 
 `plusfish perft-suite`, and traced games from the game's own engine leaning
