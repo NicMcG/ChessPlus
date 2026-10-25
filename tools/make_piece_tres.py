@@ -60,7 +60,7 @@ PIECES = {
         (DIAG, 4, 0, {}),
     ], ability=4, ability_name="Song of Slumber", colors=["#F5C542", "#C46A12"],
         ability_text="Put an enemy non-*King* piece within the Bard's move range to sleep during your opponent's next turn. (It can't take actions.)"),
-    "werewolf": dict(name="Werewolf", symbol="WW", value=3.5, rules=[
+    "werewolf": dict(name="Werewolf", symbol="WW", value=3, rules=[
         (DIAG, 1, 0, {}),
         ([(0, 1)], 1, 0, {}),
     ], ability=5, ability_name="Full Moon", colors=["#F5F2E3", "#8E959E"], glow=["#789EFF", "#283199"], transforms_into="forms/werewolf_wolf",
@@ -72,10 +72,10 @@ PIECES = {
     # be taken en passant; neither can take en passant (they capture straight),
     # the Vassal can (sideways onto the skipped square), all from the engine's
     # general en passant rule for pawn types.
-    "grunt": dict(name="Grunt", symbol="GR", value=1.5, types=4, keywords=8, rules=[
+    "grunt": dict(name="Grunt", symbol="GR", value=1, types=4, keywords=8, rules=[
         ([(0, 1)], 1, 0, {"first_move_max_steps": 2}),
     ], special_rule="On its first move, the Grunt can move 2 squares forward."),
-    "abatis": dict(name="Abatis", symbol="AB", value=1, types=4, keywords=16, rules=[
+    "abatis": dict(name="Abatis", symbol="AB", value=0.5, types=4, keywords=16, rules=[
         ([(0, 1)], 1, 0, {"first_move_max_steps": 2}),
         ([(0, -1)], 1, 0, {}),
     ], special_rule="On its first move, the Abatis can move 2 squares forward."),
@@ -83,7 +83,7 @@ PIECES = {
         ([(0, 1), (1, 0), (-1, 0)], 1, 0, {}),
     ]),
     # The Werewolf after Full Moon. Kept in forms/ so the army builder doesn't offer it.
-    "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3.5, path="forms/werewolf_wolf", rules=[
+    "werewolf_wolf": dict(name="Werewolf", symbol="WF", value=3, path="forms/werewolf_wolf", rules=[
         ([(1, 0), (-1, 0), (0, -1)], 1, 0, {}),
         ([(1, 1), (-1, 1), (0, 1)], 2, 0, {}),
     ], extra={"form_name": '"Wolf"'},

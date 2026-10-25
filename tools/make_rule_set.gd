@@ -108,7 +108,7 @@ func _test_cases(version: String) -> Dictionary:
 			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))),
 			"black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
 			"start": PlusfishLink.position_for(start),
-			"supported": PlusfishLink.supports(start),
+			"supported": PlusfishLink.referee_can_judge() and PlusfishLink.supports(start),
 			"moves": moves,
 			"outcome": OUTCOMES[state.outcome()],
 		})
@@ -122,7 +122,7 @@ func _test_cases(version: String) -> Dictionary:
 		cases.append({
 			"white": SavedGame.army_to_dict(white), "black": SavedGame.army_to_dict(black),
 			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))), "black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
-			"start": PlusfishLink.position_for(start), "supported": PlusfishLink.supports(start),
+			"start": PlusfishLink.position_for(start), "supported": PlusfishLink.referee_can_judge() and PlusfishLink.supports(start),
 			"moves": game[4], "outcome": OUTCOMES[state.outcome()],
 		})
 	var broken := []

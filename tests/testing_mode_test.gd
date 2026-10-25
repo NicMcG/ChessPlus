@@ -39,9 +39,13 @@ func test_pieces_start_unmoved() -> void:
 	var position := TestingPosition.new()
 	_kings(position)
 	position.place(Board.parse_square("a1"), _def("rook"), Piece.Team.WHITE)
-	position.place(Board.parse_square("c3"), _def("pawn"), Piece.Team.WHITE)
+	position.place(Board.parse_square("c2"), _def("pawn"), Piece.Team.WHITE)
+	position.place(Board.parse_square("f3"), _def("pawn"), Piece.Team.WHITE)
+	position.place(Board.parse_square("b7"), _def("pawn"), Piece.Team.WHITE)
 	var state := position.create_state()
-	check(state.find_move("c3-c5") != null, "A pawn anywhere gets its double step")
+	check(state.find_move("c2-c4") != null, "A pawn on the starting rows is unmoved: it gets its double step")
+	check(state.find_move("f3-f5") == null and state.find_move("f3-f4") != null, "A pawn beyond them counts as moved (promotion needs a move first)")
+	check(state.find_move("b7-b8=R") != null, "...so a pawn set up on the seventh can promote (to the Rook on the board)")
 	check(state.find_move("e1-c1") != null, "The King can castle with a Rook in its corner")
 
 func test_wolf_form_can_be_placed() -> void:

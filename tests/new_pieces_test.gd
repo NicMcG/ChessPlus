@@ -26,7 +26,7 @@ func _sans(state: GameState) -> Array:
 	return state.moves().map(func(m: Move) -> String: return Notation.san(state, m))
 
 func test_costs_and_tags() -> void:
-	check_eq([MAN.value, CANNON.value, LANCE.value, PALADIN.value], [3.0, 4.0, 3.5, 1.5], "Costs (Paladin 1.5, was 2: Mac, Oct 2026)")
+	check_eq([MAN.value, CANNON.value, LANCE.value, PALADIN.value], [3.0, 4.0, 3.0, 1.5], "Costs (Lance 3 since 25 Oct 2026; Paladin 1.5, was 2: Mac, Oct 2026)")
 	check(not CANNON.has_castle(), "Cannon has no Castle keyword")
 	check(LANCE.has_promote() and LANCE.can_promote() and not LANCE.is_pawn_type(), "Lance: Promote, not a pawn")
 	check(PALADIN.has_shield(), "Paladin: Shield")
@@ -79,7 +79,11 @@ func test_lance_promotes_like_a_pawn() -> void:
 	black.place(ROOK, Vector2i(0, 0))  # Turned round for Black: on h8.
 	var game := ArmySetup.create_game(white, black, StandardSetup.create_rules())
 	var to_a8 := _moves_of(game, "lance").filter(func(t: String) -> bool: return t.begins_with("a1-a8"))
-	check_eq(to_a8, ["a1-a8=L", "a1-a8=Q", "a1-a8=R"], "Must promote; same choices as pawns (queen, rook, lance)")
+	check_eq(to_a8, ["a1-a8"], "On its first move it reaches the far rank without promoting (Mac, 25 Oct 2026)")
+	game.make_move(game.find_move("a1-a2"))
+	game.make_move(game.find_move("d8-e8"))  # Black's king: the army is turned round, so it starts on d8.
+	to_a8 = _moves_of(game, "lance").filter(func(t: String) -> bool: return t.begins_with("a2-a8"))
+	check_eq(to_a8, ["a2-a8=L", "a2-a8=Q", "a2-a8=R"], "Once moved it must promote; same choices as pawns (queen, rook, lance)")
 
 func test_lance_does_not_reset_fifty_moves() -> void:
 	var state := _parse("k7/8/8/8/3L4/8/8/7K w - - 10 30")

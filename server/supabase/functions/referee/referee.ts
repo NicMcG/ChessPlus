@@ -26,6 +26,8 @@ export interface RuleSetData {
   max_extra_royals: number;
   castling_corner: boolean;
   known_abilities: number;
+  /** False while Plusfish lacks rules the game has: then no game is judged. */
+  judge?: boolean;
 }
 
 // An army as the game sends it (SavedGame.army_to_dict).
@@ -157,6 +159,7 @@ export function startPosition(white: ArmyData, black: ArmyData, rs: RuleSetData)
 // side with two Jesters (the attacker's choice of which one takes the hit is
 // new to it). A game it can't judge is played unrefereed, as before the referee.
 export function supported(white: ArmyData, black: ArmyData, rs: RuleSetData): boolean {
+  if (rs.judge === false) return false;
   const byId = pieceById(rs);
   for (const army of [white, black]) {
     let jesters = 0;

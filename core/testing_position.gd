@@ -71,11 +71,16 @@ func create_state() -> GameState:
 	for square: Vector2i in pieces:
 		var entry: Array = pieces[square]
 		var piece := _new_piece(entry[0], entry[1])
-		piece.has_moved = piece.def.ability != PieceDef.Ability.NONE
+		# Set-up pieces count as unmoved (castling, double steps), except ability
+		# pieces (an ability needs a move first) and promoting pieces outside the
+		# owner's two starting rows (promotion needs a move first too).
+		var row := square.y if entry[1] == Piece.Team.WHITE else height - 1 - square.y
+		piece.has_moved = piece.def.ability != PieceDef.Ability.NONE or (piece.def.can_promote() and row > 1)
 		board.set_piece(square, piece)
 	var rules: GameRules = StandardSetup.create_rules().duplicate()
 	rules.promotion_options = ArmySetup.promotion_options_for(board)
 	var state := GameState.new(board, rules)
+	state.from_position = true
 	state.side_to_move = side_to_move
 	for entry: Array in captured:
 		# A captured piece counts as having moved (so a captured Ghost may Haunt:

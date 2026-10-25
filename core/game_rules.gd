@@ -12,6 +12,13 @@ extends Resource
 ## owner's back rank.
 @export var castling_partner_in_corner := true
 
+## White may not attack on its first move of a game: no capture and no shield
+## break (special abilities already need a move first). Black's first move is
+## unrestricted. Mac's rule (25 Oct 2026, from balance runs 9-15D), for games
+## played from the start; positions set up from FEN or in testing mode are
+## not a game's start (`GameState.from_position`).
+@export var white_quiet_first_move := true
+
 @export_group("Armies")
 ## How many points each army may spend.
 @export var army_budget := 40.0

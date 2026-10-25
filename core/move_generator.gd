@@ -11,7 +11,10 @@ static func legal_moves(state: GameState) -> Array[Move]:
 	var table := state.attack_table(enemy)
 	var royals := _royal_squares(state.board, state.side_to_move)
 	var legal: Array[Move] = []
+	var quiet := state.white_quiet_first_move_applies()
 	for move in pseudo_legal_moves(state):
+		if quiet and move.is_capture():
+			continue
 		if _keeps_royals_safe(state, move, royals, enemy, table):
 			legal.append(move)
 	return legal
@@ -20,6 +23,8 @@ static func legal_moves(state: GameState) -> Array[Move]:
 ## doesn't leave a royal piece attacked). Quicker than looking for it among
 ## legal_moves when only a few moves need checking.
 static func is_legal(state: GameState, move: Move) -> bool:
+	if move.is_capture() and state.white_quiet_first_move_applies():
+		return false
 	var enemy := Piece.other_team(state.side_to_move)
 	return _keeps_royals_safe(state, move, _royal_squares(state.board, state.side_to_move), enemy, state.attack_table(enemy))
 
@@ -607,9 +612,11 @@ static func _add_hop_capture(state: GameState, from: Vector2i, screen: Vector2i,
 ## so instead of the plain move this adds one move per promotion option.
 static func _append(state: GameState, move: Move, moves: Array[Move]) -> void:
 	var options := state.rules.promotion_options
-	# A shield break doesn't move the piece, so it can't promote.
+	# A shield break doesn't move the piece, so it can't promote. A piece that
+	# has never moved can't promote either (Mac, 25 Oct 2026): reaching the far
+	# rank on its first move, it just stands there as it is.
 	if not move.piece.def.can_promote() or move.breaks_shield() or options.is_empty() \
-			or move.to.y != _far_rank(state.board, move.piece.team):
+			or not move.piece.has_moved or move.to.y != _far_rank(state.board, move.piece.team):
 		moves.append(move)
 		return
 	for option in options:

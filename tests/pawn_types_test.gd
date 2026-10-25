@@ -1,7 +1,7 @@
 extends TestSuite
 
-## Mac's three pawn-type pieces (25 Oct 2026): Grunt (GR, 1.5, Shield: moves
-## and captures 1 forward, 2 on its first move), Abatis (AB, 1, Wall: 1 forward
+## Mac's three pawn-type pieces (25 Oct 2026): Grunt (GR, 1 (was 1.5 until run 15), Shield: moves
+## and captures 1 forward, 2 on its first move), Abatis (AB, 0.5 (was 1), Wall: 1 forward
 ## or back, 2 forward on its first move), Vassal (VS, 1: 1 forward or sideways,
 ## takes en passant sideways). All promote, any number per army.
 
@@ -17,8 +17,8 @@ func _texts(state: GameState) -> Array:
 	return state.moves().map(func(m: Move) -> String: return m.to_text())
 
 func test_data() -> void:
-	check(GRUNT.is_pawn_type() and GRUNT.has_shield() and GRUNT.symbol == "GR" and GRUNT.value == 1.5, "Grunt: Pawn type, Shield, GR, 1.5")
-	check(ABATIS.is_pawn_type() and ABATIS.has_wall() and ABATIS.symbol == "AB" and ABATIS.value == 1.0, "Abatis: Pawn type, Wall, AB, 1")
+	check(GRUNT.is_pawn_type() and GRUNT.has_shield() and GRUNT.symbol == "GR" and GRUNT.value == 1.0, "Grunt: Pawn type, Shield, GR, 1")
+	check(ABATIS.is_pawn_type() and ABATIS.has_wall() and ABATIS.symbol == "AB" and ABATIS.value == 0.5, "Abatis: Pawn type, Wall, AB, 0.5")
 	check(VASSAL.is_pawn_type() and VASSAL.keywords == 0 and VASSAL.symbol == "VS" and VASSAL.value == 1.0, "Vassal: Pawn type, VS, 1")
 	var rules := StandardSetup.create_rules()
 	for def: PieceDef in [GRUNT, ABATIS, VASSAL]:

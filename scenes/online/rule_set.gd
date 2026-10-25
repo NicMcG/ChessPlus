@@ -39,6 +39,7 @@ static func data() -> Dictionary:
 			"max_extra_royals": rules.army_max_extra_royals,
 			"castling_corner": rules.castling_partner_in_corner,
 			"known_abilities": PlusfishLink.known_abilities(),
+			"judge": PlusfishLink.referee_can_judge(),
 		}
 	return _data
 

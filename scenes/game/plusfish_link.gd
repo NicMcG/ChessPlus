@@ -116,6 +116,15 @@ static var pretend_knows_abilities := false
 ## in it, on the board or already lost, until Plusfish is updated (then this
 ## goes back to KNOWN_ABILITIES). The online referee follows it through the
 ## rule set (RuleSet.data), so it refuses to judge the same games.
+## True once Plusfish (the online referee's copy, web/plusfish.wasm) knows every
+## rule of the game. False since Mac's rules of 24-25 Oct 2026 (abilities and
+## promotion need a move first, White's quiet first move, the 75-move rule):
+## the referee would refuse honest moves (a Lance landing on the far rank
+## without promoting) and allow others, so until Plusfish is rebuilt with them
+## online games keep only the turn and order checks (`games.refereed` false).
+static func referee_can_judge() -> bool:
+	return pretend_knows_abilities
+
 static func known_abilities() -> PieceDef.Ability:
 	return KNOWN_ABILITIES if pretend_knows_abilities else PieceDef.Ability.NONE
 

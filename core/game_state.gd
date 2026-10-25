@@ -21,6 +21,9 @@ var en_passant_squares: Array[Vector2i] = []
 var en_passant_victim: Vector2i = Board.NO_SQUARE
 ## Half-moves since the last capture or pawn-type move (100 = 50 moves each).
 var halfmove_clock: int = 0
+## True for a position set up from FEN, in testing mode or by an import: not
+## a game's start, so White's quiet first move doesn't apply there.
+var from_position := false
 ## Plies since the pieces on the board last changed: a capture (a shield
 ## break, a Ram's death and a Crack Shot count), a promotion, Raise Dead, a
 ## Ghost's Haunt return or a Werewolf's transformation. Pawn moves don't reset
@@ -282,6 +285,12 @@ func _next_turn() -> void:
 	if side_to_move == Piece.Team.BLACK:
 		fullmove_number += 1
 	side_to_move = Piece.other_team(side_to_move)
+
+## True while White is about to make the game's first move and may not attack
+## (`GameRules.white_quiet_first_move`): no capture, no shield break.
+func white_quiet_first_move_applies() -> bool:
+	return rules.white_quiet_first_move and not from_position and history.is_empty() \
+			and side_to_move == Piece.Team.WHITE
 
 ## True if the move changes the pieces on the board (the 75-move rule's
 ## count): any capture or shield break, a promotion, Raise Dead, Haunt or Full

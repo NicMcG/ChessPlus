@@ -25,7 +25,7 @@ const EXPLANATIONS := {
 	"Pawn": "Any number per army. It can take part in en passant.",
 	"Jump": "Leaps over pieces: the squares it jumps over can't block it.",
 	"Castle": "Your *King* can castle with it if neither has moved and it started in a corner of your back row.",
-	"Promote": "Must turn into another piece when it reaches the far end (any non-*Pawn*, non-*King* piece that started the game).",
+	"Promote": "Must turn into another piece when it reaches the far end (any non-*Pawn*, non-*King* piece that started the game). Not on its first move: it just stops there.",
 	"Shield": "The first capture only breaks its shield, and the attacker stays where it was.",
 	"Wall": "The opponent's pieces can't jump over it.",
 	"Special Ability": "Once per game, after the piece has moved at least once (a capture or a shield break counts). Uses your turn.",

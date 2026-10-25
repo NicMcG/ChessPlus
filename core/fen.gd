@@ -25,6 +25,7 @@ static func parse(text: String, defs: Array[PieceDef], rules: GameRules) -> Game
 	if board == null:
 		return null
 	var state := GameState.new(board, rules)
+	state.from_position = true
 	state.side_to_move = Piece.Team.BLACK if fields.size() > 1 and fields[1] == "b" else Piece.Team.WHITE
 	_set_moved_flags(board, fields[2] if fields.size() > 2 else "-")
 	if fields.size() > 3 and fields[3] != "-":
@@ -186,6 +187,11 @@ static func _set_moved_flags(board: Board, castling: String) -> void:
 			elif _has_first_move_rule(piece.def):
 				var home_rank := 1 if piece.team == Piece.Team.WHITE else board.height - 2
 				piece.has_moved = rank != home_rank
+			elif piece.def.can_promote():
+				# A promoting piece (a Lance) off its owner's two starting rows has
+				# moved, so it may promote (promotion needs a move first).
+				var row := rank if piece.team == Piece.Team.WHITE else board.height - 1 - rank
+				piece.has_moved = row > 1
 	for c in castling:
 		if c.to_upper() != "K" and c.to_upper() != "Q":
 			continue
