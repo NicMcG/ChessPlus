@@ -70,12 +70,19 @@ def fmt(x, digits=2, sign=False):
     return ("%+." + str(digits) + "f") % x if sign else ("%." + str(digits) + "f") % x
 
 
-def first_moves_tally(path, defs):
-    """The move-1 facts of one arm (plusfish first-moves): shares by kind, by mover, by target, free hits."""
+def first_moves_tally(path, defs, subset=None):
+    """The move-1 facts of one arm (plusfish first-moves): shares by kind, by mover, by target, free hits.
+    subset "random" = the random-army games only (selfplay.jsonl), "pool" = the pool games (round robin and grids)."""
     if not os.path.exists(path):
         return None
     rows = [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
     rows = [x for x in rows if x["kind"] != "none"]
+    if subset == "random":
+        rows = [x for x in rows if x["file"].endswith("selfplay.jsonl")]
+    elif subset == "pool":
+        rows = [x for x in rows if not x["file"].endswith("selfplay.jsonl")]
+    if not rows:
+        return None
     n = len(rows)
     name = lambda pid: defs.get(pid, {}).get("name", pid) if pid else "-"
     value = lambda pid: defs.get(pid, {}).get("value", 0.0) if pid else 0.0
@@ -110,7 +117,7 @@ def first_moves_tally(path, defs):
         "by_target": sorted(((name(k), len(v), statistics.mean(y["result"] for y in v), value(k)) for k, v in by_target.items()), key=lambda t: -t[1]),
         "pairs": sorted(((name(m), name(t), len(v), statistics.mean(y["result"] for y in v),
                           sum(1 for y in v if y["stands"] and not y["recapturable"]) / len(v)) for (m, t), v in pairs.items()), key=lambda t: -t[2])[:15],
-        "ability": {name(k): len(v) for k, v in by_mover.items() if any(y["kind"] == "ability" for y in v)},
+        "ability": {name(k): n for k, n in ((k, sum(1 for y in v if y["kind"] == "ability")) for k, v in by_mover.items()) if n},
         "ability_count": len(kinds.get("ability", [])),
     }
 
@@ -286,15 +293,20 @@ def main():
             out.append("\nPairings at 80%%+: %s" % "; ".join(lop))
 
     # --- (5) move-1 tally -------------------------------------------------------------
-    tallies = {label: first_moves_tally(os.path.join(folder, "firstmoves.jsonl"), defs) for label, folder in (("A", A), ("B", B))}
-    tallies = {k: v for k, v in tallies.items() if v}
+    tallies = {}
+    for subset, word in (("random", "random armies"), ("pool", "pool games")):
+        for label, folder in (("A", A), ("B", B)):
+            t = first_moves_tally(os.path.join(folder, "firstmoves.jsonl"), defs, subset)
+            if t:
+                tallies["%s, %s" % (label, word)] = t
     if tallies:
         out.append("\n## (5) White's first move, every game of each arm\n")
-        out.append("All of an arm's games together (random armies, the round robin and, for B, the specialist grids). "
+        out.append("Random armies = the 20,000 balance-report games of the arm; pool games = its regrown pool's round robin "
+                   "and, for B, the specialist grids (strong armies, so far more first-move contact). "
                    "\"Hit\" = a capture, a shield break or a special ability on move 1. \"Free\" = a capture or shield break "
                    "where Black could not capture (or break the shield of) the mover where it stood afterwards; "
                    "\"recaptured\" = Black's reply did hit it. White's score = points per game in those games.\n")
-        out.append("| | " + " | ".join("Arm " + k for k in tallies) + " |\n|---|" + "---|" * len(tallies))
+        out.append("| | " + " | ".join(tallies) + " |\n|---|" + "---|" * len(tallies))
         rows = [
             ("Games", lambda t: "%d" % t["games"]),
             ("White's first move a hit", lambda t: "%s (%d)" % (r.pct(t["hits"] / t["games"]), t["hits"])),
@@ -311,7 +323,7 @@ def main():
         for title, f in rows:
             out.append("| %s | " % title + " | ".join(f(t) for t in tallies.values()) + " |")
         for label, t in tallies.items():
-            out.append("\n### Arm %s: by the piece that hit (move 1)\n" % label)
+            out.append("\n### %s: by the piece that hit (move 1)\n" % label)
             out.append("| Mover | Hits | Share of hits | White's score | Free | Recaptured |\n|---|---|---|---|---|---|")
             for name, n, score, free, recap in t["by_mover"]:
                 out.append("| %s | %d | %s | %s | %s | %s |" % (name, n, r.pct(n / t["hits"]), r.pct(score), r.pct(free), r.pct(recap)))
@@ -320,13 +332,16 @@ def main():
             for name, n, score, val in t["by_target"]:
                 out.append("| %s | %s | %d | %s | %s |" % (name, fmt(val, 1), n, r.pct(n / t["hits"]), r.pct(score)))
             out.append("\n**Commonest hits (mover -> target):** " + "; ".join("%s x %s %d (White %s, free %s)" % (m, tg, n, r.pct(sc), r.pct(fr)) for m, tg, n, sc, fr in t["pairs"]))
-        if "A" in tallies and "B" in tallies:
-            ta, tb = tallies["A"], tallies["B"]
+        if "A, random armies" in tallies and "B, random armies" in tallies:
+            ta, tb = tallies["A, random armies"], tallies["B, random armies"]
             capA = ta["kinds"].get("capture", (0, 0))[0] / ta["games"]
             capB = tb["kinds"].get("capture", (0, 0))[0] / tb["games"]
-            checks.append(("5. Under the rule no game starts with an ability, and White's first-move capture share is no higher than A's",
-                           tb["ability_count"] == 0 and capB <= capA + 0.005,
-                           "abilities on move 1 in B: %d; first-move captures A %s, B %s" % (tb["ability_count"], r.pct(capA), r.pct(capB))))
+            b_all = [t for k, t in tallies.items() if k.startswith("B,")]
+            abilities = sum(t["ability_count"] for t in b_all)
+            checks.append(("5. Under the rule no game starts with an ability, and White's first-move capture share (random armies) is no higher than A's",
+                           abilities == 0 and capB <= capA + 0.005,
+                           "abilities on move 1 in B's %d games: %d; first-move captures in random armies A %s, B %s" % (
+                               sum(t["games"] for t in b_all), abilities, r.pct(capA), r.pct(capB))))
 
     # --- success test ---------------------------------------------------------------
     out.append("\n## Success lines (from the README, written before the run)\n")
