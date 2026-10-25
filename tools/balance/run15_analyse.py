@@ -67,30 +67,41 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run15", required=True)
     ap.add_argument("--run14", required=True)
+    ap.add_argument("--arm", default="C", choices=["C", "D"], help="C (run 15) or D (run 15D: C plus the White-only quiet first move)")
     ap.add_argument("--pieces", default="data/pieces")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     pieces = r.read_pieces(args.pieces)
     defs = r14.read_defs(args.pieces)
     sym_of = {d["name"]: d["symbol"] for d in defs.values()}
-    C = os.path.join(args.run15, "C")
-    B = os.path.join(args.run14, "B")
-    out = ["# Balance run 15: the three new pawn-type pieces (report)\n",
-           "Made by `tools/balance/run15_analyse.py`. Arm C = run 14's arm B (budget 40, the 24 Oct prices, the ability "
-           "rule) plus the Grunt (1.5), Abatis (1) and Vassal (1), the Wall keyword and the 75-move rule. Compared with run "
-           "14's arm B throughout. Points = percentage points.\n"]
+    # The arm under test and its baseline: C against run 14's B; D against C.
+    C = os.path.join(args.run15, args.arm)
+    B = os.path.join(args.run15, "C") if args.arm == "D" else os.path.join(args.run14, "B")
+    LC = "Run 15 " + args.arm
+    LB = "Run 15 C" if args.arm == "D" else "Run 14 B"
+    if args.arm == "D":
+        out = ["# Balance run 15D: the new pieces with the White-only quiet first move (report)\n",
+               "Made by `tools/balance/run15_analyse.py --arm D`. Arm D = arm C (budget 40, the 24 Oct prices, the ability rule, "
+               "the Grunt, Abatis and Vassal) plus the White-only quiet first move (Plusfish `--white-quiet-first=true`: White may not "
+               "capture, break a shield or use an ability on its first move unless in check). Its all-round pool was regrown under the "
+               "rule from C's. Compared with arm C throughout. Points = percentage points.\n"]
+    else:
+        out = ["# Balance run 15: the three new pawn-type pieces (report)\n",
+               "Made by `tools/balance/run15_analyse.py`. Arm C = run 14's arm B (budget 40, the 24 Oct prices, the ability "
+               "rule) plus the Grunt (1.5), Abatis (1) and Vassal (1), the Wall keyword and the 75-move rule. Compared with run "
+               "14's arm B throughout. Points = percentage points.\n"]
     checks = []
 
     # --- (1) prices and the new pieces' worth -----------------------------------------------
     repC, headC = r14.read_report(os.path.join(C, "report.txt"))
     repB, headB = r14.read_report(os.path.join(B, "report.txt"))
     out.append("## (1) Piece values: 20,000 random-army games, 8,000 nodes\n")
-    for label, head in (("Run 14 B", headB), ("Run 15 C", headC)):
+    for label, head in ((LB, headB), (LC, headC)):
         if head:
             out.append("%s: %s" % (label, " / ".join(h.strip() for h in head[:2])))
     out.append("\n\"Worth\" = what one extra piece at the start is worth by game results, on the cost scale (±95%). "
                "Bold = new in run 15; * = has a special ability.\n")
-    out.append("| Piece | Cost | Worth, run 14 B | Worth, run 15 C | Verdict, C | C minus B |\n|---|---|---|---|---|---|")
+    out.append("| Piece | Cost | Worth, %s | Worth, %s | Verdict, %s | %s minus %s |\n|---|---|---|---|---|---|" % (LB, LC, args.arm, args.arm, LB[-1]))
     order = sorted(set(repC) | set(repB), key=lambda p: -(repC.get(p) or repB.get(p))["cost"])
     for p in order:
         rb, rc = repB.get(p), repC.get(p)
@@ -116,7 +127,7 @@ def main():
 
     # --- random armies ---------------------------------------------------------------
     rand = {}
-    for label, folder in (("Run 14 B", B), ("Run 15 C", C)):
+    for label, folder in ((LB, B), (LC, C)):
         path = os.path.join(folder, "selfplay.jsonl")
         if os.path.exists(path):
             rand[label] = a.random_armies(path)
@@ -125,11 +136,29 @@ def main():
         out.append(a.RANDOM_HEADER)
         for label, st in rand.items():
             a.write_random(out, st, label)
+        # The 32,000-node games (run 15D's part 6), where they exist.
+        deep = {}
+        for label, folder in ((LB, B), (LC, C)):
+            path = os.path.join(folder, "selfplay_32k.jsonl")
+            if os.path.exists(path):
+                deep[label] = a.random_armies(path)
+        if deep:
+            out.append("\n### The same at 32,000 nodes (5,000 games, seed 303)\n")
+            out.append(a.RANDOM_HEADER)
+            for label, st in deep.items():
+                a.write_random(out, st, label + " (32k)")
+            for label, folder in ((LB, B), (LC, C)):
+                rep32, _ = r14.read_report(os.path.join(folder, "report_32k.txt"))
+                if rep32:
+                    worst = sorted(((rep32[q]["worth"] - rep32[q]["cost"], q) for q in rep32), key=lambda t: -abs(t[0]))[:6]
+                    news = ", ".join("%s %.2f (%+.2f)" % (q, rep32[q]["worth"], rep32[q]["worth"] - rep32[q]["cost"]) for q in NEW if q in rep32)
+                    out.append("\n%s at 32k, worth (rough, 5,000 games): new pieces %s; furthest off: %s." % (
+                        label, news or "-", ", ".join("%s %+.2f" % (q, d) for d, q in worst)))
 
     # --- (2) the pool, its new pieces and front rows -------------------------------------------
     rr = {}
     pools = {}
-    for label, folder in (("Run 14 B", B), ("Run 15 C", C)):
+    for label, folder in ((LB, B), (LC, C)):
         path = os.path.join(folder, "meta_pool.txt")
         if not os.path.exists(path):
             continue
@@ -158,23 +187,23 @@ def main():
             mean, lo, hi, _ = r.mean_range([g["result"] for g in every])
             rr[label]["lo"], rr[label]["hi"] = lo, hi
             out.append("\nWhite's score with its 95%% range: %s (%s-%s)." % (r.pct(mean), r.pct(lo), r.pct(hi)))
-    if "Run 14 B" in pools and "Run 15 C" in pools:
-        fb = statistics.mean(x["front"] for x in pools["Run 14 B"])
-        fc = statistics.mean(x["front"] for x in pools["Run 15 C"])
-        pb = statistics.mean(x["front_pawns"] for x in pools["Run 14 B"])
-        pc = statistics.mean(x["front_pawns"] for x in pools["Run 15 C"])
-        checks.append(("7. Front-row occupancy in the pool rises against run 14's B pool (filled squares; pawn types in the front row shown too)",
+    if LB in pools and LC in pools:
+        fb = statistics.mean(x["front"] for x in pools[LB])
+        fc = statistics.mean(x["front"] for x in pools[LC])
+        pb = statistics.mean(x["front_pawns"] for x in pools[LB])
+        pc = statistics.mean(x["front_pawns"] for x in pools[LC])
+        checks.append(("7. Front-row occupancy in the pool rises against %s's pool (filled squares; pawn types in the front row shown too)" % LB,
                        fc > fb + 1e-9, "filled squares %.1f -> %.1f of 8; pawn types in the front row %.1f -> %.1f" % (fb, fc, pb, pc)))
         typesB, typesC = len(a.diversity(B, pieces)[1]), len(a.diversity(C, pieces)[1])
         abil_in_C = [pieces.get(sym, {}).get("name", sym) for sym, c in a.diversity(C, pieces)[1] if pieces.get(sym, {}).get("ability")]
-        checks.append(("6. Diversity: C's pool has at least as many piece types as run 14 B's (within 2) and at least 3 of the 5 ability types",
-                       typesC >= typesB - 2 and len(abil_in_C) >= 3, "types B %d, C %d; ability types in C's pool: %s" % (typesB, typesC, ", ".join(abil_in_C) or "none")))
-    if "Run 14 B" in rand and "Run 15 C" in rand and "Run 15 C" in rr:
-        b, c = rand["Run 14 B"], rand["Run 15 C"]
-        rrc = rr["Run 15 C"]
+        checks.append(("6. Diversity: %s's pool has at least as many piece types as %s's (within 2) and at least 3 of the 5 ability types" % (args.arm, LB),
+                       typesC >= typesB - 2 and len(abil_in_C) >= 3, "types %s %d, %s %d; ability types in %s's pool: %s" % (LB[-1], typesB, args.arm, typesC, args.arm, ", ".join(abil_in_C) or "none")))
+    if LB in rand and LC in rand and LC in rr:
+        b, c = rand[LB], rand[LC]
+        rrc = rr[LC]
         ok = (c["white"] <= b["white"] or c["lo"] <= b["hi"]) and 0.50 <= rrc["white"] <= 0.55 and not a.big_gaps(rrc) and not a.lopsided(rrc)
-        checks.append(("4. White's edge no bigger than run 14 B's in random armies, and C's round robin passes Mac's lines (50-55%, no gap over 30, no pairing at 80%+)", ok,
-                       "random armies B %s (%s-%s), C %s (%s-%s); C's round robin White %s (%s-%s), biggest gap %+.1f, pairings at 80%%+: %d" % (
+        checks.append(("4. White's edge no bigger than %s's in random armies, and %s's round robin passes Mac's lines (50-55%%, no gap over 30, no pairing at 80%%+)" % (LB, args.arm), ok,
+                       "random armies %s %%s (%%s-%%s), %s %%s (%%s-%%s); %s's round robin White %%s (%%s-%%s), biggest gap %%+.1f, pairings at 80%%%%+: %%d" % (LB[-1], args.arm, args.arm) % (
                            r.pct(b["white"]), r.pct(b["lo"]), r.pct(b["hi"]), r.pct(c["white"]), r.pct(c["lo"]), r.pct(c["hi"]),
                            r.pct(rrc["white"]), r.pct(rrc["lo"]), r.pct(rrc["hi"]), max(g[2] for g in rrc["gaps"] if g[1] != "standard"), len(a.lopsided(rrc)))))
 
@@ -202,8 +231,8 @@ def main():
 
     # --- (3) colour specialists -------------------------------------------------------------
     split = os.path.join(C, "split")
-    if os.path.isdir(os.path.join(split, "specialists")) and "Run 15 C" in rr:
-        base = rr["Run 15 C"]
+    if os.path.isdir(os.path.join(split, "specialists")) and LC in rr:
+        base = rr[LC]
         out.append("\n## (3) Colour specialists (run 13's method on C's regrown pool)\n")
         wpath = os.path.join(split, "meta_pool_white.txt")
         bpath = os.path.join(split, "meta_pool_black.txt")
@@ -227,7 +256,14 @@ def main():
         out.append("| All-rounders as White against Black specialists | %s (%s-%s) | Black gains %+.1f points |" % (r.pct(ovb["white"]), r.pct(ovb["lo"]), r.pct(ovb["hi"]), 100 * (base["white"] - ovb["white"])))
         out.append("| White specialists against Black specialists | %s (%s-%s) | %+.1f points for White overall |" % (r.pct(spec["white"]), r.pct(spec["lo"]), r.pct(spec["hi"]), 100 * (spec["white"] - base["white"])))
         out.append("| Uneven specialist matchups (either side at 80%%+, Standard left out) | %d of %d | |" % (len(lop), len(real)))
-        out.append("\nRun 14 B (same rules, without the new pieces): White specialists +16.3, Black +7.5, specialists vs specialists 70.6% (all-rounders 53.6%).")
+        out.append("\nRun 14 B (no new pieces, no first-move rule): White specialists +16.3, Black +7.5, specialists vs specialists 70.6% (all-rounders 53.6%); run 13 under the White-only quiet first move: +6.8 / +5.2, 50.0%.")
+        top_white = max((statistics.mean(spec["by_white"][k]) for k in range(len(spec["whites"])) if spec["by_white"][k]), default=0.0)
+        if args.arm == "D":
+            checks.append(("8. Specialists vs specialists under 60%", spec["white"] < 0.60, "White %s (%s-%s)" % (r.pct(spec["white"]), r.pct(spec["lo"]), r.pct(spec["hi"]))))
+            checks.append(("9. No White specialist at 90%+ against every Black specialist", top_white < 0.90, "best White specialist %s over the Black pool" % r.pct(top_white)))
+        else:
+            checks.append(("Report only: specialists vs specialists, and the best White specialist (lines 8 and 9 of run 15D)", True,
+                           "White %s; best White specialist %s over the Black pool" % (r.pct(spec["white"]), r.pct(top_white))))
         out.append("\nEach White army as White (all Black armies) and each Black army as Black (all White armies):\n")
         out.append("| White army | Score as White | | Black army | Score as Black |\n|---|---|---|---|---|")
         for k in range(max(len(spec["whites"]), len(spec["blacks"]))):
@@ -240,12 +276,12 @@ def main():
     # --- (5) move-1 tally ------------------------------------------------------------------
     tallies = {}
     for subset, word in (("random", "random armies"), ("pool", "pool games")):
-        for label, folder in (("B", B), ("C", C)):
+        for label, folder in ((LB[-1], B), (args.arm, C)):
             t = r14.first_moves_tally(os.path.join(folder, "firstmoves.jsonl"), defs, subset)
             if t:
                 tallies["%s, %s" % (label, word)] = t
     if tallies:
-        out.append("\n## (5) White's first move, every game (B = run 14's arm B, C = run 15)\n")
+        out.append("\n## (5) White's first move, every game (%s = %s, %s = %s)\n" % (LB[-1], LB, args.arm, LC))
         out.append("Random armies = the 20,000 balance-report games; pool games = the regrown pool's round robin and the specialist grids. "
                    "\"Hit\" = a capture, a shield break or a special ability on move 1; \"free\" = Black could not hit the mover back where it stood.\n")
         out.append("| | " + " | ".join(tallies) + " |\n|---|" + "---|" * len(tallies))
@@ -261,7 +297,7 @@ def main():
         for title, f in rows:
             out.append("| %s | " % title + " | ".join(f(t) for t in tallies.values()) + " |")
         for label, t in tallies.items():
-            if not label.startswith("C"):
+            if not label.startswith(args.arm):
                 continue
             out.append("\n### %s: by the piece that hit (move 1)\n" % label)
             out.append("| Mover | Hits | Share of hits | White's score | Free | Recaptured |\n|---|---|---|---|---|---|")
@@ -272,9 +308,9 @@ def main():
             for name, n, score, val in t["by_target"]:
                 out.append("| %s | %s | %d | %s | %s |" % (name, r14.fmt(val, 1), n, r.pct(n / t["hits"]), r.pct(score)))
             out.append("\n**Commonest hits (mover -> target):** " + "; ".join("%s x %s %d (White %s, free %s)" % (m, tg, n, r.pct(sc), r.pct(fr)) for m, tg, n, sc, fr in t["pairs"]))
-        if "C, random armies" in tallies:
-            abilities = sum(t["ability_count"] for k, t in tallies.items() if k.startswith("C,"))
-            checks.append(("5. Under the rule no game starts with an ability", abilities == 0, "abilities on move 1 in C's games: %d" % abilities))
+        if args.arm + ", random armies" in tallies:
+            abilities = sum(t["ability_count"] for k, t in tallies.items() if k.startswith(args.arm + ","))
+            checks.append(("5. Under the rule no game starts with an ability", abilities == 0, "abilities on move 1 in %s's games: %d" % (args.arm, abilities)))
 
     out.append("\n## Success lines (from the README, written before the run)\n")
     checks.sort(key=lambda c: c[0])
