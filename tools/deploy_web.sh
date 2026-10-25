@@ -21,6 +21,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 cd "$PROJECT"
+# A fresh copy of the project (a deploy worktree) has no imported files yet, and
+# Godot then exits without a word from the scripts below; importing is quick.
+"$GODOT" --headless --path . --import > /dev/null 2>&1 || true
 # The online referee must know this version's rules before players get it
 # (tools/deploy_referee.sh records each rule set it has uploaded).
 VERSION="$("$GODOT" --headless --path . -s res://tools/make_rule_set.gd 2>&1 | sed -n 's/^Rule set \([0-9a-f]*\) written.*/\1/p')"
