@@ -241,7 +241,7 @@ static func _army_problem(data: Variant) -> String:
 	var army := SavedGame.army_from_dict(data) if army_ok(data) else null
 	if army == null:
 		return "Your army breaks the army rules: That isn't an army."
-	var problems := army.problems(StandardSetup.create_rules(), 8)
+	var problems := RuleText.plain_lines(army.problems(StandardSetup.create_rules(), 8))
 	return "" if problems.is_empty() else "Your army breaks the army rules: " + " ".join(problems)
 
 ## The game from the two armies (as data) after `moves` (null if one can't be played).

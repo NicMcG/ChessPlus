@@ -105,8 +105,8 @@ func _test_cases(version: String) -> Dictionary:
 		cases.append({
 			"white": SavedGame.army_to_dict(white),
 			"black": SavedGame.army_to_dict(black),
-			"white_problems": Array(white.problems(rules, 8)),
-			"black_problems": Array(black.problems(rules, 8)),
+			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))),
+			"black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
 			"start": PlusfishLink.position_for(start),
 			"supported": PlusfishLink.supports(start),
 			"moves": moves,
@@ -121,7 +121,7 @@ func _test_cases(version: String) -> Dictionary:
 			state.make_move(state.find_move(text))
 		cases.append({
 			"white": SavedGame.army_to_dict(white), "black": SavedGame.army_to_dict(black),
-			"white_problems": Array(white.problems(rules, 8)), "black_problems": Array(black.problems(rules, 8)),
+			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))), "black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
 			"start": PlusfishLink.position_for(start), "supported": PlusfishLink.supports(start),
 			"moves": game[4], "outcome": OUTCOMES[state.outcome()],
 		})
@@ -130,7 +130,7 @@ func _test_cases(version: String) -> Dictionary:
 		var army := _army(text, true, defs)
 		if army == null:
 			continue
-		broken.append({"army": SavedGame.army_to_dict(army), "problems": Array(army.problems(rules, 8))})
+		broken.append({"army": SavedGame.army_to_dict(army), "problems": Array(RuleText.plain_lines(army.problems(rules, 8)))})
 	return {"version": version, "games": cases, "broken": broken}
 
 ## An army from its text (rows from the back; extra rows make it break the

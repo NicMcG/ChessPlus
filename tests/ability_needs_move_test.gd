@@ -144,6 +144,14 @@ func test_plusfish_is_off_for_ability_pieces_until_it_knows_the_rule() -> void:
 	PlusfishLink.pretend_knows_abilities = true
 	check(PlusfishLink.supports(with_archer), "Tests can pretend Plusfish knows the rule")
 	PlusfishLink.pretend_knows_abilities = false
+	# The online referee follows through the rule set: it judges no ability game either.
+	RuleSet.clear_cache()
+	check_eq(int(RuleSet.data()["known_abilities"]), int(PieceDef.Ability.NONE), "The rule set says Plusfish knows no ability")
+	PlusfishLink.pretend_knows_abilities = true
+	RuleSet.clear_cache()
+	check_eq(int(RuleSet.data()["known_abilities"]), int(PlusfishLink.KNOWN_ABILITIES), "...until it learns the rule")
+	PlusfishLink.pretend_knows_abilities = false
+	RuleSet.clear_cache()
 
 func test_rule_text_markup() -> void:
 	check_eq(RuleText.to_bbcode("Needs a *King*."), "Needs a [i]King[/i].", "Types in italics")

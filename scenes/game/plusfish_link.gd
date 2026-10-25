@@ -110,14 +110,20 @@ const KNOWN_ABILITIES := PieceDef.Ability.FULL_MOON
 ## Tests of the screen can pretend Plusfish knows the ability rule below.
 static var pretend_knows_abilities := false
 
-## Plusfish doesn't know Mac's Oct 2026 rule that an ability needs a move first
-## (a capture or shield break counts), so it's off for any game with a special
-## ability in it, on the board or already lost, until Plusfish is updated.
+## The last special ability Plusfish may judge today. Plusfish doesn't know
+## Mac's Oct 2026 rule that an ability needs a move first (a capture or shield
+## break counts), so that's none: it's off for any game with a special ability
+## in it, on the board or already lost, until Plusfish is updated (then this
+## goes back to KNOWN_ABILITIES). The online referee follows it through the
+## rule set (RuleSet.data), so it refuses to judge the same games.
+static func known_abilities() -> PieceDef.Ability:
+	return KNOWN_ABILITIES if pretend_knows_abilities else PieceDef.Ability.NONE
+
 static func supports(state: GameState) -> bool:
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		var jesters := 0
 		for piece: Piece in state.board.pieces_of(team).values() + state.lost[team]:
-			if piece.def.ability != PieceDef.Ability.NONE and not pretend_knows_abilities:
+			if piece.def.ability > known_abilities():
 				return false
 			if piece.def.decoy:
 				jesters += 1
