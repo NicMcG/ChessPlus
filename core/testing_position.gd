@@ -62,18 +62,27 @@ static func standard() -> TestingPosition:
 ## their double step, kings may castle with partners in their corners), with
 ## its shield and ability; the captured pieces are already in each side's lost
 ## pieces (so Raise Dead and Haunt can use them). Pawns promote to any piece
-## type on the board, as in army games.
+## type on the board, as in army games. A set-up position counts as mid-game
+## for abilities (an ability needs a move first, Mac's rule, Oct 2026): pieces
+## with one, and captured pieces, count as having moved, as they do when a
+## position is loaded from FEN.
 func create_state() -> GameState:
 	var board := Board.new(width, height)
 	for square: Vector2i in pieces:
 		var entry: Array = pieces[square]
-		board.set_piece(square, _new_piece(entry[0], entry[1]))
+		var piece := _new_piece(entry[0], entry[1])
+		piece.has_moved = piece.def.ability != PieceDef.Ability.NONE
+		board.set_piece(square, piece)
 	var rules: GameRules = StandardSetup.create_rules().duplicate()
 	rules.promotion_options = ArmySetup.promotion_options_for(board)
 	var state := GameState.new(board, rules)
 	state.side_to_move = side_to_move
 	for entry: Array in captured:
-		state.lost[entry[1]].append(_new_piece(entry[0], entry[1]))
+		# A captured piece counts as having moved (so a captured Ghost may Haunt:
+		# an ability needs a move first, Mac's rule).
+		var piece := _new_piece(entry[0], entry[1])
+		piece.has_moved = true
+		state.lost[entry[1]].append(piece)
 	return state
 
 ## A piece of `def`. A changed form (the wolf) remembers what it started as.

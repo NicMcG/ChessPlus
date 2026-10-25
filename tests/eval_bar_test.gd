@@ -96,7 +96,9 @@ func test_request_mirrors_black_armies_as_the_game_does() -> void:
 ## that can still Haunt, and a Werewolf (whose wolf form goes along too).
 func _new_pieces_start() -> GameState:
 	var start := Fen.parse("4k3/8/8/3v+4/8/8/(WW)7/4K2(BD) w - - 0 1", PieceCatalog.all_defs(), StandardSetup.create_rules())
-	start.lost[Piece.Team.WHITE].append(Piece.new(load("res://data/pieces/ghost.tres"), Piece.Team.WHITE))
+	var ghost := Piece.new(load("res://data/pieces/ghost.tres"), Piece.Team.WHITE)
+	ghost.has_moved = true  # It moved before it was captured: it may Haunt (Mac's rule, Oct 2026).
+	start.lost[Piece.Team.WHITE].append(ghost)
 	return start
 
 func test_request_carries_the_new_rules() -> void:
@@ -314,6 +316,7 @@ func _hand_in_best(game: Node, ply: int, best: String, best_san: String) -> void
 func test_best_move_shows_what_a_pawn_promotes_to() -> void:
 	PlusfishLink.enabled = true
 	PlusfishLink.pretend_available = true
+	PlusfishLink.pretend_knows_abilities = true  # A Necromancer is in the position (see PlusfishLink.supports).
 	var game := _open_testing_game(_promotion_position(Piece.Team.WHITE))
 	check(game.state.find_move("b7-b8=R") != null, "The position allows the promotion")
 	check(game.testing_position.problems().is_empty(), "A fine position: %s" % [game.testing_position.problems()])
@@ -327,11 +330,13 @@ func test_best_move_shows_what_a_pawn_promotes_to() -> void:
 	_hand_in_best(game, 0, "d2-e3", "NCe3")
 	check(game.board_view.hint_piece.is_empty(), "An ordinary move has no badge")
 	game.free()
+	PlusfishLink.pretend_knows_abilities = false
 	_finish()
 
 func test_best_move_shows_what_raise_dead_brings_back() -> void:
 	PlusfishLink.enabled = true
 	PlusfishLink.pretend_available = true
+	PlusfishLink.pretend_knows_abilities = true  # A Necromancer is in the position (see PlusfishLink.supports).
 	var game := _open_testing_game(_promotion_position(Piece.Team.BLACK))
 	check(game.state.find_move("f7!=B") != null, "Black's Necromancer can raise the Bishop")
 	_hand_in_best(game, 0, "f7!=B", "NC!=B")
@@ -344,6 +349,7 @@ func test_best_move_shows_what_raise_dead_brings_back() -> void:
 	game.play(game.state.find_move("g2-g1=Q"))
 	check(game.board_view.hint_piece.is_empty(), "Gone once a move is played")
 	game.free()
+	PlusfishLink.pretend_knows_abilities = false
 	_finish()
 
 func test_bar_only_after_the_game() -> void:

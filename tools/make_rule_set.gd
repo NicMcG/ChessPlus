@@ -40,7 +40,7 @@ const SHORT_GAMES := [
 	["RNBQKBNR/PPPPLPPP", false, "RNBQKBNR/PPPP1PPP", false, []],
 	# Black's Jesters on a8 and c8 could both take the Wizard's hit on b8: White
 	# chooses the one on a8.
-	["(PA)W(WW)K(GA)JMJ/(GA)1(BR)PE(WW)(AS)1", true, "M(BD)(GA)KGJVJ/(AS)(AS)PN(CT)P1(CV)", true, ["b1xb8/a8", "a8xb8"]],
+	["RWBKNBNR/P1PPPPPP", true, "1N1K1JRJ/PPPPPP1P", true, ["b1xb8/a8", "a8xb8"]],
 ]
 ## Armies that break the rules, with the problems the game finds.
 const BROKEN := [
@@ -108,8 +108,8 @@ func _test_cases(version: String) -> Dictionary:
 		cases.append({
 			"white": SavedGame.army_to_dict(white),
 			"black": SavedGame.army_to_dict(black),
-			"white_problems": Array(white.problems(rules, 8)),
-			"black_problems": Array(black.problems(rules, 8)),
+			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))),
+			"black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
 			"start": PlusfishLink.position_for(start),
 			"supported": PlusfishLink.supports(start),
 			"moves": moves,
@@ -124,7 +124,7 @@ func _test_cases(version: String) -> Dictionary:
 			state.make_move(state.find_move(text))
 		cases.append({
 			"white": SavedGame.army_to_dict(white), "black": SavedGame.army_to_dict(black),
-			"white_problems": Array(white.problems(rules, 8)), "black_problems": Array(black.problems(rules, 8)),
+			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))), "black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
 			"start": PlusfishLink.position_for(start), "supported": PlusfishLink.supports(start),
 			"moves": game[4], "outcome": OUTCOMES[state.outcome()],
 		})
@@ -133,7 +133,7 @@ func _test_cases(version: String) -> Dictionary:
 		var army := _army(text, true, defs)
 		if army == null:
 			continue
-		broken.append({"army": SavedGame.army_to_dict(army), "problems": Array(army.problems(rules, 8))})
+		broken.append({"army": SavedGame.army_to_dict(army), "problems": Array(RuleText.plain_lines(army.problems(rules, 8)))})
 	return {"version": version, "games": cases, "broken": broken}
 
 ## An army from its text (rows from the back; extra rows make it break the

@@ -32,7 +32,7 @@ func _abilities(state: GameState, ability: PieceDef.Ability) -> Array[Move]:
 	return found
 
 func test_costs_symbols_and_forms() -> void:
-	check_eq([_def("ghost").value, _def("bard").value, _def("werewolf").value], [3.0, 3.5, 3.0], "Costs")
+	check_eq([_def("ghost").value, _def("bard").value, _def("werewolf").value], [3.0, 3.5, 3.5], "Costs (Werewolf 3.5 since Oct 2026)")
 	check_eq([_def("ghost").symbol, _def("bard").symbol, _def("werewolf").symbol], ["G", "BD", "WW"], "Symbols")
 	var wolf := _def("werewolf").transforms_into
 	check(wolf != null and wolf.id == "werewolf_wolf", "The Werewolf knows its wolf form")
@@ -187,7 +187,9 @@ func test_raise_dead_brings_back_a_werewolf_not_a_wolf() -> void:
 func test_eval_bar_knows_the_abilities() -> void:
 	for id in ["ghost", "bard", "werewolf"]:
 		var state := _game("4k3/8/8/8/3%s4/8/8/4K3 w - - 0 1" % ("(%s)" % _def(id).symbol if _def(id).symbol.length() > 1 else _def(id).symbol))
-		check(PlusfishLink.supports(state), "Plusfish knows the %s's ability" % id)
+		# Plusfish knows these abilities, but not yet Mac's Oct 2026 rule that an ability needs a
+		# move first, so it's off for games with ability pieces until it's updated.
+		check(not PlusfishLink.supports(state), "Plusfish is off for the %s until it knows abilities need a move first" % id)
 
 # --- On the game screen ------------------------------------------------------------------
 
@@ -223,7 +225,7 @@ func test_ghost_on_the_board_explains_haunt() -> void:
 	game.board_view.tap(Board.parse_square("d4"))
 	check(game.ability_button.visible, "Its button shows")
 	game.use_ability()
-	check_eq(game.last_notice, "The Ghost can use Haunt after it has been captured.", "Says when it works")
+	check_eq(game.last_notice, "The Ghost can use Haunt after it has moved and been captured.", "Says when it works")
 	game.free()
 
 func test_song_of_slumber_on_screen() -> void:

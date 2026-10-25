@@ -18,4 +18,4 @@ move_rules = Array[ExtResource("1_rule")]([SubResource("Resource_rule1")])
 ability = 4
 ability_colors = PackedColorArray(0.961, 0.773, 0.259, 1, 0.769, 0.416, 0.0706, 1)
 ability_name = "Song of Slumber"
-ability_text = "Put an enemy non-king piece within the Bard's move range to sleep during your opponent's next turn. (It can't take actions.)"
+ability_text = "Put an enemy non-*King* piece within the Bard's move range to sleep during your opponent's next turn. (It can't take actions.)"

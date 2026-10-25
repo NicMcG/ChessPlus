@@ -1,0 +1,8 @@
+[2026-10-24 00:23:14 UTC] start; game version 49adaf3 (HEAD); 64 cores; rule --white-quiet-first=true; pieces /home/ubuntu/ChessPlus/data/pieces (value = 1)
+[2026-10-24 00:23:14 UTC] part 1: meta --wide 64 --game-climb --king-exposed reject --rounds 15 --seed 1, rule
+[2026-10-24 01:06:18 UTC] part 1 finished (exit 0)
+[2026-10-24 01:06:18 UTC] part 2: 55 pairings of 11 armies, 40 games each, 8000 nodes, random plies 4, seeds 3000-3054, rule
+[2026-10-24 01:07:26 UTC] part 2 finished (55 pairing files)
+[2026-10-24 01:07:26 UTC] part 3: each army against itself, 2000000 nodes, 8 threads, 8 at a time, without and with the rule
+[2026-10-24 01:07:43 UTC] part 3 finished
+[2026-10-24 01:07:43 UTC] all done

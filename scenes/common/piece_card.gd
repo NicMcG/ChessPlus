@@ -12,27 +12,23 @@ extends VBoxContainer
 ## Used in the army builder (always showing the chosen piece) and in games
 ## (inside PieceInfo, when you hold a piece).
 
-## Each keyword's box colour and text colour.
-const KEYWORD_COLORS := {
-	"Jump": [Color("#F2A51F"), Color("#2A1A00")],
-	"Castle": [Color("#8C8C8C"), Color.WHITE],
-	"Promote": [Color("#7B4BC9"), Color.WHITE],
-	"Shield": [Color("#8FD0F5"), Color("#0B2A3D")],
-}
+## Each keyword's box colour and text colour (shared with RuleText, which draws
+## keywords inline in rule texts).
+const KEYWORD_COLORS := RuleText.KEYWORD_COLORS
+const ITALIC_FONT := RuleText.ITALIC_FONT
 
-## The short explanation shown for each type and keyword.
+## The short explanation shown for each type and keyword (Mac's rulings, Oct
+## 2026; *type* = italics, {keyword} = its coloured box: see RuleText).
 const EXPLANATIONS := {
-	"King": "Your most important piece: if it's checkmated, you lose. Every army has exactly one, starting in the middle of the back row. It can castle.",
-	"Royal": "An army can have only one royal piece besides its king.",
-	"Pawn": "Any number per army. It must turn into another piece when it reaches the far end. It can capture, and be captured, en passant. Moving it resets the 50-move count.",
-	"Jump": "Leaps over pieces: the squares it jumps over can't block it (the yellow marks show where it lands).",
-	"Castle": "The king can castle with it while it's still in its back corner.",
-	"Promote": "Must turn into another piece when it reaches the far end (any non-pawn, non-king piece that started the game).",
-	"Shield": "The first capture only breaks its shield, and the attacker stays where it was. The second capture takes it. The shield never comes back.",
-	"Special Ability": "Once per game. Uses your turn.",
+	"King": "If a *King* is checkmated, its side loses. Every army has exactly one, starting in the middle of the back row. It can castle.",
+	"Royal": "An army can have only one *Royal* piece besides its *King*.",
+	"Pawn": "Any number per army. It can capture, and be captured, en passant. Moving it resets the 50-move count.",
+	"Jump": "Leaps over pieces: the squares it jumps over can't block it.",
+	"Castle": "Your *King* can castle with it if neither has moved and it started in a corner of your back row.",
+	"Promote": "Must turn into another piece when it reaches the far end (any non-*Pawn*, non-*King* piece that started the game).",
+	"Shield": "The first capture only breaks its shield, and the attacker stays where it was.",
+	"Special Ability": "Once per game, after the piece has moved at least once (a capture or a shield break counts). Uses your turn.",
 }
-
-const ITALIC_FONT := preload("res://art/fonts/OpenSans-Italic.ttf")
 
 var def: PieceDef
 ## Whose moves the mini board and legend show: `def`'s, or (for a piece with two
@@ -168,16 +164,14 @@ func _apply_zoom() -> void:
 	%Name.add_theme_font_size_override("font_size", _z(40))
 	%GuideBoard.custom_minimum_size = Vector2(_z(BOARD_SIZE), _z(BOARD_SIZE))
 	$Special/SpecialTitle.add_theme_font_size_override("font_size", _z(26))
-	%SpecialText.add_theme_font_size_override("font_size", _z(22))
-	%MoveNote.add_theme_font_size_override("font_size", _z(22))
-	%MoveNote.add_theme_font_override("font", _italic_font())
-	%MoveNote.add_theme_color_override("font_color", Color(0.78, 0.78, 0.78))
+	RuleText.style(%SpecialText, _z(22))
+	RuleText.style(%MoveNote, _z(22), Color(0.78, 0.78, 0.78))
 	$Ability/AbilityHeader/AbilityTitle.add_theme_font_size_override("font_size", _z(26))
 	%AbilityName.add_theme_font_size_override("font_size", _z(22))
-	%AbilityText.add_theme_font_size_override("font_size", _z(22))
-	var tip_label: Label = tooltip.get_child(0)
+	RuleText.style(%AbilityText, _z(22))
+	var tip_label: RichTextLabel = tooltip.get_child(0)
 	tip_label.custom_minimum_size = Vector2(_z(420), 0)
-	tip_label.add_theme_font_size_override("font_size", _z(22))
+	RuleText.style(tip_label, _z(22))
 
 ## E.g. "Free", "1 point", "3 points".
 static func cost_text(p_def: PieceDef) -> String:
@@ -222,7 +216,7 @@ func show_tooltip(item: Control, tag: String) -> void:
 		hide_tooltip()
 		return
 	tooltip_owner = item
-	tooltip.get_child(0).text = EXPLANATIONS[tag]
+	RuleText.show(tooltip.get_child(0), EXPLANATIONS[tag])
 	tooltip.reset_size()
 	tooltip.visible = true
 	# Below the type/keyword, kept inside the screen; above it if there's no room.
@@ -251,10 +245,9 @@ func _make_tooltip() -> void:
 	style.set_corner_radius_all(10)
 	style.set_content_margin_all(12)
 	tooltip.add_theme_stylebox_override("panel", style)
-	var label := Label.new()
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var label := RichTextLabel.new()
 	label.custom_minimum_size = Vector2(420, 0)
-	label.add_theme_font_size_override("font_size", 22)
+	RuleText.style(label, 22)
 	tooltip.add_child(label)
 	add_child(tooltip)
 
@@ -297,13 +290,13 @@ func _refresh() -> void:
 	_fill_keywords()
 	var special := special_rules(def)
 	%Special.visible = not special.is_empty()
-	%SpecialText.text = "\n".join(special)
+	RuleText.show(%SpecialText, "\n".join(special))
 	%Ability.visible = def.ability_name != ""
 	# The name in a box like the keywords', filled with the piece's gradient.
 	%AbilityName.text = def.ability_name.to_upper()
 	%AbilityName.add_theme_color_override("font_color", def.ability_label_color())
 	%AbilityChip.add_theme_stylebox_override("panel", GradientStyleBox.new(def.ability_gradient(), 8, _z(14), _z(4)))
-	%AbilityText.text = def.ability_text
+	RuleText.show(%AbilityText, def.ability_text)
 
 ## "3 points" followed by the types in italics, e.g. "Free · King, Royal".
 func _fill_details() -> void:
@@ -327,19 +320,14 @@ func _detail_label(text: String) -> Label:
 	label.add_theme_color_override("font_color", Color(0.78, 0.78, 0.78))
 	return label
 
-## Open Sans Italic (res://art/fonts/, the italic partner of Godot's built-in
-## font), at the same semi-bold weight as the normal text. Bundled, so it looks
-## the same on PC, phones and in browsers. (Slanting the normal font made the
-## letters jiggle instead.)
+## Open Sans Italic at the normal text's weight (see RuleText.italic_font).
 func _italic_font() -> Font:
-	var italic := FontVariation.new()
-	italic.base_font = ITALIC_FONT
-	italic.variation_opentype = {"wght": 600}
-	return italic
+	return RuleText.italic_font()
 
 ## The note about how the shown moves work, in italics (only some pieces).
 func _fill_move_note() -> void:
-	%MoveNote.text = moves_def.move_note
+	# The whole note in italics (types inside it stay italic too).
+	%MoveNote.text = "[i]%s[/i]" % RuleText.to_bbcode(moves_def.move_note)
 	%MoveNote.visible = moves_def.move_note != ""
 
 ## The legend, the same on every card (Mac), whichever marks this piece uses;

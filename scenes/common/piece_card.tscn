@@ -49,12 +49,15 @@ size_flags_horizontal = 3
 alignment = 1
 theme_override_constants/separation = 6
 
-[node name="MoveNote" type="Label" parent="."]
+[node name="MoveNote" type="RichTextLabel" parent="."]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
-autowrap_mode = 3
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 22
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
 
 [node name="Keywords" type="HFlowContainer" parent="."]
 unique_name_in_owner = true
@@ -72,12 +75,15 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 26
 text = "Special Rule"
 
-[node name="SpecialText" type="Label" parent="Special"]
+[node name="SpecialText" type="RichTextLabel" parent="Special"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
-autowrap_mode = 3
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 22
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
 
 [node name="Ability" type="VBoxContainer" parent="."]
 unique_name_in_owner = true
@@ -105,9 +111,12 @@ theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 22
 text = "ABILITY"
 
-[node name="AbilityText" type="Label" parent="Ability"]
+[node name="AbilityText" type="RichTextLabel" parent="Ability"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
-autowrap_mode = 3
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 22
+bbcode_enabled = true
+fit_content = true
+scroll_active = false

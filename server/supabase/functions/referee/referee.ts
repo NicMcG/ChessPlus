@@ -88,15 +88,15 @@ export function armyProblems(army: unknown, rs: RuleSetData): string[] {
     found.push(`Costs ${points(cost)} points; the budget is ${points(rs.budget)}.`);
   }
   const kings = pieces.filter((p) => p.def.types & KING);
-  if (kings.length === 0) found.push("Needs a king.");
+  if (kings.length === 0) found.push("Needs a King.");
   for (const king of kings) {
     if (king.row !== 0 || !kingFiles(rs.width).includes(king.file)) {
-      found.push("The king must start in the middle of the back row.");
+      found.push("The King must start in the middle of the back row.");
     }
   }
   const extraRoyals = pieces.filter((p) => (p.def.types & ROYAL) && !(p.def.types & KING)).length;
   if (extraRoyals > rs.max_extra_royals) {
-    found.push(`Too many royal pieces: ${extraRoyals} besides the king (the most is ${rs.max_extra_royals}).`);
+    found.push(`Too many Royal pieces: ${extraRoyals} besides the King (the most is ${rs.max_extra_royals}).`);
   }
   const checked = new Set<string>();
   for (const p of pieces) {
@@ -152,7 +152,9 @@ export function startPosition(white: ArmyData, black: ArmyData, rs: RuleSetData)
 }
 
 // Whether Plusfish knows every rule these armies use (PlusfishLink.supports):
-// no special ability newer than it knows.
+// no special ability newer than the rule set says it knows (none at all while
+// it hasn't learnt that an ability needs a move first, Mac, Oct 2026). A game
+// it can't judge is played unrefereed, as before the referee.
 export function supported(white: ArmyData, black: ArmyData, rs: RuleSetData): boolean {
   const byId = pieceById(rs);
   for (const army of [white, black]) {

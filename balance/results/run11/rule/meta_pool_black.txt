@@ -1,0 +1,13 @@
+# Chess Plus Black armies grown by `plusfish meta --wide --split-colours` (judged only as Black against the White pool).
+# After round 15. Games = mean score as Black against the White pool (40 games per pair, 6000 nodes per move); eval = mean turn-0 advantage as Black at 20000 nodes (cp).
+# army | name | cost | games (Elo) | eval | pieces
+(NC)P(WW)K(BR)1P(PD)/ABP(BR)G(AS)GQ | Wide B14a | 39 | 63.9% (+99) | +72 | Queen, Archer, Necromancer, Bishop, 2 Ghost, Werewolf, 2 Barbarian, Paladin, 3 Pawn, Assassin
+2(CV)K(NC)(WW)B1/Q(AS)(BR)(GA)(CV)GEA | Wide 7c | 39 | 55.8% (+40) | -31 | Queen, Archer, Necromancer, Bishop, 2 Cavalry, Galleon, Ghost, Werewolf, Barbarian, Elephant, Assassin
+(CV)(RM)1K2Q(PD)/(AS)A(WW)(NC)G(WW)A(AS) | Wide B10c | 39 | 55.2% (+37) | +6 | Queen, 2 Archer, Necromancer, Cavalry, Ghost, Ram, 2 Werewolf, Paladin, 2 Assassin
+1A1K1(NC)(SQ)Q/PGABG(AS)B1 | Wide B12c | 39 | 54.2% (+30) | +51 | Queen, 2 Archer, Squire, Necromancer, 2 Bishop, 2 Ghost, Pawn, Assassin
+EQ(RO)K(WW)(AS)1(NC)/BGB(RM)G(PD)(PD)(AS) | Wide 4c | 39 | 54.2% (+30) | -14 | Queen, Necromancer, Rogue, 2 Bishop, 2 Ghost, Ram, Werewolf, 2 Paladin, Elephant, 2 Assassin
+P1(AS)1K(AS)P(NC)/B(GA)N(SQ)(RM)ABQ | Wide 11a | 39 | 54.1% (+29) | -92 | Queen, Archer, Squire, Necromancer, 2 Bishop, Galleon, Knight, Ram, 2 Pawn, 2 Assassin
+1Q1KE(BR)G(NC)/(PD)(CH)BB(AS)GA(AS) | Wide B14c | 39 | 53.0% (+21) | +41 | Queen, Archer, Chariot, Necromancer, 2 Bishop, 2 Ghost, Barbarian, Paladin, Elephant, 2 Assassin
+A(CV)QK(AS)(BR)2/(AS)1A(BR)(WW)(CT)BB | Wide B15a | 39 | 53.0% (+21) | +47 | Queen, 2 Archer, 2 Bishop, Catapult, Cavalry, Werewolf, 2 Barbarian, 2 Assassin
+B(CT)(AS)KE(GA)Q(RM)/G1AG(BR)B(AS)1 | Wide B13a | 39 | 47.2% (-19) | -118 | Queen, Archer, 2 Bishop, Catapult, Galleon, 2 Ghost, Ram, Barbarian, Elephant, 2 Assassin
+(NC)PENK(AS)PA/B(CV)GG(WW)Q1(AS) | Wide B3c | 39 | 44.6% (-37) | -224 | Queen, Archer, Necromancer, Bishop, Cavalry, 2 Ghost, Knight, Werewolf, Elephant, 2 Pawn, 2 Assassin

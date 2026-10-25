@@ -29,7 +29,7 @@ const TRAY_BUTTON_MAX := 170.0
 @onready var name_edit: LineEdit = %NameEdit
 @onready var points_label: Label = %Points
 @onready var army_board: ArmyBoard = %ArmyBoard
-@onready var problems_label: Label = %Problems
+@onready var problems_label: RichTextLabel = %Problems
 @onready var tray: GridContainer = %Tray
 @onready var card: PieceCard = %Card
 @onready var team_button: Button = %TeamToggle
@@ -408,7 +408,9 @@ func _build_tray() -> void:
 func _refresh() -> void:
 	points_label.text = "Points: %s / %s" % [Army.format_points(army.cost()), Army.format_points(rules.army_budget)]
 	var found := problems()
-	problems_label.text = "\n".join(found)
+	# Rich text: piece types in italics (*King*); see RuleText.
+	RuleText.style(problems_label, 22, Color(1, 0.54, 0.5))
+	RuleText.show(problems_label, "\n".join(found))
 	problems_label.visible = not found.is_empty()
 	save_button.disabled = not found.is_empty()
 	if share_button:

@@ -27,8 +27,15 @@ func _init(p_def: PieceDef, p_team: Team) -> void:
 func has_active_shield() -> bool:
 	return (def.has_shield() and not shield_broken) or gained_shield
 
-## True if this piece has a special ability it hasn't used yet.
+## True if this piece has a special ability it hasn't used yet. An ability can
+## only be used once the piece has moved at least once (Mac, Oct 2026); a
+## capture or a shield break counts as a move even if the piece stays put.
 func can_use_ability() -> bool:
+	return has_unused_ability() and has_moved
+
+## True if this piece has a special ability it hasn't used yet, whether or not
+## it may use it right now (the board glows for these).
+func has_unused_ability() -> bool:
 	return def.ability != PieceDef.Ability.NONE and not ability_used
 
 ## The type this piece started the game as (what Raise Dead brings back).

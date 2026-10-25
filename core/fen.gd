@@ -160,7 +160,9 @@ static func _tokens(row: String) -> PackedStringArray:
 
 ## FEN doesn't store has_moved, so work it out:
 ## - castling pieces count as moved unless the castling rights say otherwise;
-## - pieces with a first-move rule (pawns) are unmoved only on their starting rank.
+## - pieces with a first-move rule (pawns) are unmoved only on their starting rank;
+## - pieces with a special ability count as moved (an ability needs a move
+##   first, Mac's rule; a FEN position is assumed to be mid-game).
 static func _set_moved_flags(board: Board, castling: String) -> void:
 	for rank in range(board.height):
 		for file in range(board.width):
@@ -168,7 +170,7 @@ static func _set_moved_flags(board: Board, castling: String) -> void:
 			var piece := board.get_piece(pos)
 			if piece == null:
 				continue
-			if piece.def.is_king_type() or piece.def.has_castle():
+			if piece.def.is_king_type() or piece.def.has_castle() or piece.def.ability != PieceDef.Ability.NONE:
 				piece.has_moved = true
 			elif _has_first_move_rule(piece.def):
 				var home_rank := 1 if piece.team == Piece.Team.WHITE else board.height - 2

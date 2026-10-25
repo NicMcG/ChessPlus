@@ -103,10 +103,22 @@ const KNOWN_ABILITIES := PieceDef.Ability.FULL_MOON
 ## opponent's pieces, a Squire protects Knights anywhere in its move pattern
 ## even through pieces, the Berserker's L-moves go 2 then 1, and when more than
 ## one Jester could take a hit the attacker chooses which: "c7xe5/d4".)
+## Tests of the screen can pretend Plusfish knows the ability rule below.
+static var pretend_knows_abilities := false
+
+## The last special ability Plusfish may judge today. Plusfish doesn't know
+## Mac's Oct 2026 rule that an ability needs a move first (a capture or shield
+## break counts), so that's none: it's off for any game with a special ability
+## in it, on the board or already lost, until Plusfish is updated (then this
+## goes back to KNOWN_ABILITIES). The online referee follows it through the
+## rule set (RuleSet.data), so it refuses to judge the same games.
+static func known_abilities() -> PieceDef.Ability:
+	return KNOWN_ABILITIES if pretend_knows_abilities else PieceDef.Ability.NONE
+
 static func supports(state: GameState) -> bool:
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
-		for piece: Piece in state.board.pieces_of(team).values():
-			if piece.def.ability > KNOWN_ABILITIES:
+		for piece: Piece in state.board.pieces_of(team).values() + state.lost[team]:
+			if piece.def.ability > known_abilities():
 				return false
 	return true
 

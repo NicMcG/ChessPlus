@@ -85,11 +85,12 @@ static func _add_haunt_moves(state: GameState, moves: Array[Move]) -> void:
 				haunt.ability = PieceDef.Ability.HAUNT
 				moves.append(haunt)
 
-## `team`'s lost pieces that can still use Haunt to come back.
+## `team`'s lost pieces that can still use Haunt to come back: a Ghost that
+## moved at least once before it was captured (Mac's rule for every ability).
 static func haunting_ghosts(state: GameState, team: Piece.Team) -> Array[Piece]:
 	var ghosts: Array[Piece] = []
 	for piece: Piece in state.lost[team]:
-		if piece.def.ability == PieceDef.Ability.HAUNT and not piece.ability_used:
+		if piece.def.ability == PieceDef.Ability.HAUNT and piece.can_use_ability():
 			ghosts.append(piece)
 	return ghosts
 

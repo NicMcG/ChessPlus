@@ -206,6 +206,9 @@ func make_move(move: Move) -> void:
 			move.shield_target.shield_broken = true
 		if move.piece.def.dies_on_capture:
 			_remove_dead_attacker(move, move.from)
+		# Breaking a shield counts as a move (Mac): the piece may use its ability
+		# afterwards (undo puts piece_had_moved back).
+		move.piece.has_moved = true
 		_clear_en_passant()
 		_next_turn()
 		return
@@ -216,9 +219,10 @@ func make_move(move: Move) -> void:
 		board.set_piece(move.decoy_square, move.decoy_piece)
 		move.decoy_piece.has_moved = true
 	if move.ability == PieceDef.Ability.CRACK_SHOT:
-		# The Archer shoots from where it stands.
+		# The Archer shoots from where it stands (a capture counts as a move).
 		board.set_piece(move.capture_square, null)
 		lost[move.captured.team].append(move.captured)
+		move.piece.has_moved = true
 		_clear_en_passant()
 		_next_turn()
 		return

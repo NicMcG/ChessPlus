@@ -91,8 +91,8 @@ func test_builder_starts_empty_and_places_pieces() -> void:
 	builder.tap_square(Vector2i(4, 0))
 	builder.select(QUEEN)
 	builder.tap_square(Vector2i(3, 0))
-	check_eq(builder.army.cost(), 9.0, "King + queen")
-	check_eq(builder.points_label.text, "Points: 9 / 39", "Points shown")
+	check_eq(builder.army.cost(), 10.0, "King + queen (Queen 10 since Oct 2026)")
+	check_eq(builder.points_label.text, "Points: 10 / 40", "Points shown")
 	check(builder.problems_label.text.contains("name"), "Still needs a name")
 	builder.name_edit.text = "Queenly"
 	builder.name_edit.text_changed.emit("Queenly")
@@ -219,9 +219,9 @@ func test_match_setup_shows_broken_armies_greyed_out() -> void:
 	_open(setup)
 	var pick: OptionButton = setup.first_pick
 	check_eq(pick.item_count, 5, "Default, Random, Standard, Mine, Bats")
-	check_eq(pick.get_item_text(4), "Bats  (44.5 pts) – over budget", "Last, with the reason")
+	check_eq(pick.get_item_text(4), "Bats  (45.5 pts) – over budget", "Last, with the reason")
 	check(pick.is_item_disabled(4), "...greyed out: it can't be picked")
-	check(pick.get_item_tooltip(4).contains("the budget is 39"), "...and says what's wrong")
+	check(pick.get_item_tooltip(4).contains("the budget is 40"), "...and says what's wrong")
 	check(not pick.is_item_disabled(3), "Legal armies can be picked")
 	check(not setup.choices.saved.has(setup.choices.entries[4].army), "Random never picks it")
 	setup.free()
@@ -330,7 +330,7 @@ func test_army_list_warns_about_armies_that_break_the_rules() -> void:
 	check(bats != null and mine != null, "Both listed: %s" % [names.keys()])
 	if bats and mine:
 		check(bats.icon != null, "Warning sign on the over-budget army")
-		check(bats.tooltip_text.contains("the budget is 39"), "Its tooltip says why")
+		check(bats.tooltip_text.contains("the budget is 40"), "Its tooltip says why")
 		check(mine.icon == null, "None on a legal army")
 	army_list.free()
 	_fresh_library()
