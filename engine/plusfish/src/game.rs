@@ -339,6 +339,8 @@ pub struct ParsedFen {
     pub ep: Option<String>,
     pub halfmove: u32,
     pub fullmove: u32,
+    /// The 75-move count ("unchanged=N"); left out, it equals the halfmove clock.
+    pub unchanged: Option<u32>,
     /// Lost pieces in order: kind, team, marks.
     pub lost: Vec<(usize, usize, u16)>,
     pub promo: Option<Vec<usize>>,
@@ -400,9 +402,12 @@ pub fn parse_fen_text(cat: &Catalog, text: &str) -> Result<ParsedFen, String> {
         fullmove: fields.get(5).and_then(|v| v.parse().ok()).unwrap_or(1),
         lost: Vec::new(),
         promo: None,
+        unchanged: None,
     };
     for f in fields.iter().skip(6) {
-        if let Some(v) = f.strip_prefix("lost=") {
+        if let Some(v) = f.strip_prefix("unchanged=") {
+            pf.unchanged = v.parse().ok();
+        } else if let Some(v) = f.strip_prefix("lost=") {
             pf.lost = parse_marked_list(cat, v)?;
         } else if let Some(v) = f.strip_prefix("promo=") {
             pf.promo = Some(parse_piece_list(cat, v)?.into_iter().map(|(k, _)| k).collect());
@@ -453,11 +458,19 @@ pub fn game_from_fen(cat: &Arc<Catalog>, text: &str, promo: Option<Vec<usize>>) 
         let team = if flags & BLACK_BIT != 0 { BLACK } else { WHITE };
         let mut c = code(k, team) | (flags & (BROKEN | GAINED | USED));
         let def = r.def(k);
-        if def.is_king() || def.has_castle() {
+        // As the game's `Fen._set_moved_flags`: ability pieces count as moved (an
+        // ability needs a move first), and so does a promoting piece off its
+        // owner's two starting rows (promotion needs a move first too).
+        if def.is_king() || def.has_castle() || def.ability != Ability::None {
             c |= MOVED;
         } else if def.has_first_move_rule() {
             let home = if team == WHITE { 1 } else { r.h - 2 };
             if r.rank(s) != home {
+                c |= MOVED;
+            }
+        } else if def.can_promote() {
+            let row = if team == WHITE { r.rank(s) } else { r.h - 1 - r.rank(s) };
+            if row > 1 {
                 c |= MOVED;
             }
         }
@@ -504,8 +517,10 @@ pub fn game_from_fen(cat: &Arc<Catalog>, text: &str, promo: Option<Vec<usize>>) 
     }
     p.halfmove = pf.halfmove;
     p.fullmove = pf.fullmove;
+    p.unchanged = pf.unchanged.unwrap_or(pf.halfmove);
     for &(k, team, marks) in &pf.lost {
-        p.lose(r, team, code(k, team) | marks);
+        // A captured piece counts as having moved (a lost Ghost may Haunt).
+        p.lose(r, team, code(k, team) | marks | MOVED);
     }
     Ok(Game::new(rules.clone(), p))
 }
@@ -559,6 +574,7 @@ pub fn fen(p: &Position, r: &Rules, with_extras: bool) -> String {
         p.halfmove,
         p.fullmove
     );
+    // The 75-move count ("unchanged=N") is read but, like the game's Fen.write, not written.
     if with_extras {
         let mut lost = String::new();
         for team in 0..2 {
@@ -614,5 +630,6 @@ pub fn outcome_name(o: Outcome) -> &'static str {
         Outcome::Repetition => "repetition",
         Outcome::Insufficient => "insufficient_material",
         Outcome::KingExposed => "king_exposed",
+        Outcome::SeventyFiveMoves => "seventy_five_moves",
     }
 }

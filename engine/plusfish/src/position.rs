@@ -59,6 +59,20 @@ pub const F_CHOICE: u16 = 2048;
 /// Every special-ability move.
 pub const F_ABILITY: u16 = F_CRACK | F_RAISE | F_HAUNT | F_SONG | F_MOON;
 
+// Mac's rules of 24-25 Oct 2026, as the game plays them (they were switches
+// on his experiment branches):
+// - A special ability needs a move first (`Piece.can_use_ability`): a capture
+//   or a shield break counts as a move even when the piece stays put (Crack
+//   Shot included), and a Ghost captured before it ever moved can't Haunt.
+// - A piece that has never moved can't promote: reaching the far rank on its
+//   first move, it just stands there (`MoveGenerator._append`).
+// - White's quiet first move: at the start of an army game White may not
+//   capture or break a shield (`GameState.white_quiet_first_move_applies`; no
+//   "unless in check"). `Position::white_quiet_first` says whether this game
+//   started that way (a FEN or a testing-mode set-up doesn't).
+// - The 75-move rule: 150 plies without a change to the pieces is a draw
+//   (`Position::unchanged`).
+
 pub const GEN_ALL: u8 = 0;
 pub const GEN_CAPTURES: u8 = 1;
 pub const GEN_TACTICAL: u8 = 2;
@@ -136,6 +150,9 @@ pub struct KindInfo {
     pub dies: bool,
     pub ability: Ability,
     pub first_move: bool,
+    /// Whether this kind has moved changes its moves: a first-move rule (the
+    /// double step), an ability or promotion (both need a move first).
+    pub moved_matters: bool,
     pub can_capture: bool,
     pub cost: f64,
     /// The Parapet: the other side's pieces can't leap over it.
@@ -279,6 +296,7 @@ impl Rules {
                 dies: d.dies_on_capture,
                 ability: d.ability,
                 first_move: d.has_first_move_rule(),
+                moved_matters: d.has_first_move_rule() || d.ability != Ability::None || d.can_promote(),
                 can_capture: d.can_capture(),
                 cost: d.value,
                 blocks_jumps: d.blocks_jumps,
@@ -641,7 +659,7 @@ impl Rules {
                 h ^= self.z.gained[sq];
             }
         }
-        if c & MOVED == 0 && self.info[k].first_move {
+        if c & MOVED == 0 && self.info[k].moved_matters {
             h ^= self.z.unmoved[sq];
         }
         h
@@ -663,6 +681,14 @@ pub struct Position {
     pub ep_victim: u8,
     pub halfmove: u32,
     pub fullmove: u32,
+    /// Plies since the pieces on the board last changed (`GameState.change_clock`):
+    /// a capture or shield break, a promotion, Raise Dead, Haunt or Full Moon
+    /// reset it; pawn moves don't. 150 is a draw (Mac's 75-move rule, Oct 2026).
+    pub unchanged: u32,
+    /// The game started as an army game, so White's first move may not capture
+    /// or break a shield (applies while White is to move on move 1). Hashed, so
+    /// the same squares from a set-up position aren't mixed up with it.
+    pub white_quiet_first: bool,
     /// Lost pieces per team, as counts per kind (the kind each started the
     /// game as: a lost wolf counts as a Werewolf).
     pub lost: [[u8; MAX_KINDS]; 2],
@@ -691,6 +717,8 @@ pub enum Outcome {
     /// Before the first move, the side NOT to move has its king attacked (some
     /// army pairings): that side loses (the game's temporary rule).
     KingExposed,
+    /// 150 plies with no change to the pieces on the board (Mac, Oct 2026).
+    SeventyFiveMoves,
 }
 
 impl Outcome {
@@ -730,6 +758,8 @@ impl Position {
             ep_victim: NO_SQ,
             halfmove: 0,
             fullmove: 1,
+            unchanged: 0,
+            white_quiet_first: false,
             lost: [[0; MAX_KINDS]; 2],
             ghosts: [0; 2],
             ghost_n: [0; 2],
@@ -772,7 +802,8 @@ impl Position {
         self.add_lost(r, team, k as usize, 1);
         if k == r.haunt_kind && self.ghost_n[team] < 16 {
             let n = self.ghost_n[team];
-            let bits = self.ghosts[team] | if c & USED == 0 { 1 << n } else { 0 };
+            let can_haunt = c & USED == 0 && c & MOVED != 0;
+            let bits = self.ghosts[team] | if can_haunt { 1 << n } else { 0 };
             self.set_ghosts(team, bits, n + 1);
         }
     }
@@ -822,6 +853,14 @@ impl Position {
         let new = (old as i32 + delta).clamp(0, 255) as u8;
         self.hash ^= r.lost_key(team, kind, old) ^ r.lost_key(team, kind, new);
         self.lost[team][kind] = new;
+    }
+
+    /// Turns White's quiet first move on (army games) or off.
+    pub fn set_white_quiet_first(&mut self, r: &Rules, on: bool) {
+        if self.white_quiet_first != on {
+            self.hash ^= mix64(r.z.side ^ 0x5157_4649_5253_5421);
+            self.white_quiet_first = on;
+        }
     }
 
     pub fn set_side(&mut self, r: &Rules, side: usize) {
@@ -1353,7 +1392,9 @@ impl Position {
 
     #[inline(always)]
     fn push(&self, r: &Rules, kind: usize, us: usize, m: Move, out: &mut Vec<Move>) {
-        if r.info[kind].can_promote && m.flags & F_SHIELD == 0 && !r.promo.is_empty() && r.rank(m.to as usize) == r.far_rank(us) {
+        if r.info[kind].can_promote && m.flags & F_SHIELD == 0 && !r.promo.is_empty() && r.rank(m.to as usize) == r.far_rank(us)
+            && self.sq[m.from as usize] & MOVED != 0
+        {
             for &p in &r.promo {
                 let mut pm = m;
                 pm.promo = p + 1;
@@ -1414,7 +1455,7 @@ impl Position {
             let c = self.sq[from];
             let k = kind_of(c);
             let info = r.info[k];
-            let promo_quiet = mode == GEN_TACTICAL && info.can_promote && !r.promo.is_empty();
+            let promo_quiet = mode == GEN_TACTICAL && info.can_promote && !r.promo.is_empty() && c & MOVED != 0;
             let first_new = out.len();
             let moved = c & MOVED != 0;
             for ray in r.rays_of(k, us, from) {
@@ -1506,7 +1547,7 @@ impl Position {
             if !tactical_only && info.is_king && !moved {
                 self.gen_castling(r, from, out);
             }
-            if c & USED == 0 {
+            if c & USED == 0 && c & MOVED != 0 {
                 match info.ability {
                     Ability::CrackShot => {
                         let end = out.len();
@@ -1554,6 +1595,19 @@ impl Position {
         }
         if r.guards != 0 {
             self.apply_guards(r, out, first);
+        }
+        // White's quiet first move (no "unless in check" exception). Abilities
+        // can't happen yet anyway: nothing has moved.
+        if self.white_quiet_first && self.side == WHITE && self.fullmove == 1 {
+            let mut i = first;
+            while i < out.len() {
+                let m = out[i];
+                if m.is_capture() || m.flags & (F_EP | F_ABILITY) != 0 {
+                    out.swap_remove(i);
+                } else {
+                    i += 1;
+                }
+            }
         }
     }
 
@@ -1685,9 +1739,14 @@ impl Position {
         } else {
             self.halfmove += 1;
         }
+        if m.is_capture() || m.flags & F_SHIELD != 0 || m.promo != 0 {
+            self.unchanged = 0;
+        } else {
+            self.unchanged += 1;
+        }
         if m.flags & F_CRACK != 0 {
             self.remove(r, from);
-            c |= USED;
+            c |= USED | MOVED;
             self.put(r, from, c);
         }
         self.ep = 0;
@@ -1699,6 +1758,10 @@ impl Position {
             if r.info[k].dies {
                 self.remove(r, from);
                 self.lose(r, us, c);
+            } else if c & MOVED == 0 {
+                // Breaking a shield counts as the attacker's move (the ability rule).
+                self.remove(r, from);
+                self.put(r, from, c | MOVED);
             }
             self.next_turn(r);
             return;
@@ -1768,6 +1831,11 @@ impl Position {
         let to = m.to as usize;
         self.ep = 0;
         self.ep_victim = NO_SQ;
+        if m.flags & F_SONG != 0 {
+            self.unchanged += 1;
+        } else {
+            self.unchanged = 0;
+        }
         if m.flags & F_HAUNT != 0 {
             // A lost Ghost comes back, its Haunt used.
             let g = m.extra as usize;
@@ -1984,6 +2052,9 @@ impl Position {
         }
         if self.halfmove >= 100 {
             return Outcome::FiftyMoves;
+        }
+        if self.unchanged >= 150 {
+            return Outcome::SeventyFiveMoves;
         }
         if repetitions(keys, self.halfmove as usize) >= 3 {
             return Outcome::Repetition;

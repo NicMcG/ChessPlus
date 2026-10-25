@@ -390,6 +390,13 @@ hit, the attacker chooses which), 600 more games with two Jesters an army
 played): zero mismatches (the engine before failed 110 games). Perft from six
 two-Jester positions (with Archers, Squires, Rams, Bards and more) matches the
 game's own count to depth 3, two of them to depth 4.
+After Mac's rules of 24-25 Oct 2026 (below), 700 more games, 400 of them
+with two or more ability pieces or Lances an army (174,449 positions): zero
+mismatches. `trace-check` counted 539 White first moves with an attack held
+back, 13,850 positions where an unmoved piece couldn't use its ability yet,
+303 where a first move reached the far rank without promoting, 128 unmoved
+Ghosts captured (never to Haunt) and 14 games ending by the 75-move rule.
+The engine before failed 291 of the first 2,088 positions.
 
 ```
 plusfish trace-games --count 40 --seed 1 > games.txt
@@ -405,6 +412,27 @@ If more than one Jester could take the same hit, the attacker chooses which
 Jester's square (`c7xe5/d4`, Crack Shot `a1!c3/d4`, SAN `Bxe5/d4`). A text
 without it, from before the rule, finds the Jester on the lower square
 (the game finds the first in its piece list, which may differ).
+
+Mac's rules of 24-25 Oct 2026, as the game plays them:
+
+* **An ability needs a move first** (`Piece.can_use_ability`). A capture or
+  a shield break counts as a move even when the piece stays put (Crack Shot
+  too), and a Ghost captured before it ever moved can never Haunt.
+* **So does promotion**: a piece reaching the far rank on its very first
+  move stays as it is (a Lance from the front row).
+* **White's first move may not attack** (no capture, no shield break, no
+  "unless in check"), at the start of an army game only: a FEN or a
+  testing-mode set-up doesn't count (`Position::white_quiet_first`, the
+  request's `white_quiet_first`).
+* **The 75-move rule**: 150 plies without a change to the pieces (a capture,
+  shield break, promotion, Raise Dead, Haunt or Full Moon) is a draw
+  (`Position::unchanged`, outcome `seventy_five_moves`, FEN `unchanged=N`).
+* The **Wall** keyword (the Parapet and Abatis) is read as `blocks_jumps`.
+
+Whether a piece has moved now changes its moves when it has an ability or
+promotes, so it is part of the hash for those kinds too. A FEN counts ability
+pieces, promoting pieces off their two starting rows and lost pieces as
+moved, as the game's `Fen` and testing mode do.
 
 ## Engine details
 

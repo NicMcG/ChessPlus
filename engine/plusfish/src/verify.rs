@@ -92,6 +92,7 @@ fn outcome_code(o: Outcome) -> i64 {
         Outcome::Repetition => 4,
         Outcome::Insufficient => 5,
         Outcome::KingExposed => 6,
+        Outcome::SeventyFiveMoves => 7,
     }
 }
 
@@ -266,6 +267,37 @@ impl Coverage {
         if out == Outcome::KingExposed {
             self.add("games ending with the king exposed at the start");
         }
+        if out == Outcome::SeventyFiveMoves {
+            self.add("games ending by the 75-move rule");
+        }
+        let legal = p.legal_moves(r);
+        // White's quiet first move: what would White have without it?
+        if p.white_quiet_first && p.side == WHITE && p.fullmove == 1 {
+            let mut free = p.clone();
+            free.set_white_quiet_first(r, false);
+            if free.legal_moves(r).len() > legal.len() {
+                self.add("positions where White's first move may not attack");
+            }
+        }
+        // An ability or a promotion needs a move first: the same position with
+        // the side to move's unmoved ability and promoting pieces marked moved.
+        let us = p.side;
+        let mut moved = p.clone();
+        for s in p.squares(us).collect::<Vec<_>>() {
+            let c = p.sq[s];
+            let info = &r.info[kind_of(c)];
+            if c & MOVED == 0 && (info.ability != Ability::None || info.can_promote) {
+                moved.remove(r, s);
+                moved.put(r, s, c | MOVED);
+            }
+        }
+        let wider: Vec<Move> = moved.legal_moves(r).into_iter().filter(|m| !legal.contains(m)).collect();
+        if wider.iter().any(|m| m.flags & F_ABILITY != 0) {
+            self.add("positions where an unmoved piece can't use its ability yet");
+        }
+        if wider.iter().any(|m| m.promo != 0) {
+            self.add("positions where a first move reaches the far rank without promoting");
+        }
     }
 
     fn played(&mut self, before: &Position, r: &Rules, m: Move) {
@@ -290,6 +322,12 @@ impl Coverage {
         }
         if f & F_CHOICE != 0 {
             self.add("played: a chosen Jester (of two or more)");
+        }
+        if m.is_capture() && f & (F_SHIELD | F_DECOY) == 0 {
+            let t = before.sq[m.capture_square() as usize];
+            if t != 0 && kind_of(t) == r.haunt_kind as usize && t & MOVED == 0 {
+                self.add("played: an unmoved Ghost captured (it may never Haunt)");
+            }
         }
         if f & F_SHIELD != 0 && before.sq[m.to as usize] & GAINED != 0 {
             self.add("played: gained shield broken");

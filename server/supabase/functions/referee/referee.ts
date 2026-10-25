@@ -26,7 +26,8 @@ export interface RuleSetData {
   max_extra_royals: number;
   castling_corner: boolean;
   known_abilities: number;
-  /** False while Plusfish lacks rules the game has: then no game is judged. */
+  /** True once Plusfish knows every rule of the game (rule sets from 25 Oct 2026
+   *  on); a rule set without it, or with false, has no game judged. */
   judge?: boolean;
 }
 
@@ -149,16 +150,20 @@ export function startPosition(white: ArmyData, black: ArmyData, rs: RuleSetData)
   promo.sort((a, b) => byId.get(b)!.value - byId.get(a)!.value);
   return {
     width: rs.width, height: rs.height, board, side: 0, halfmove: 0, fullmove: 1,
+    unchanged: 0, white_quiet_first: true,
     ep: [], ep_victim: null, lost: [], promo, castling_corner: rs.castling_corner,
   };
 }
 
 // Whether Plusfish knows every rule these armies use (PlusfishLink.supports):
-// no special ability newer than the rule set says it knows (none at all while
-// it hasn't learnt that an ability needs a move first, Mac, Oct 2026). A game
-// it can't judge is played unrefereed, as before the referee.
+// no special ability newer than the rule set says it knows. Only rule sets
+// that say `judge: true` are judged: the bundled Plusfish plays today's rules
+// (an ability or promotion needs a move first, White's quiet first move, the
+// 75-move rule), so games started on an older rule set, from before those
+// rules or while Plusfish lacked them, aren't judged by rules they didn't have.
+// A game it can't judge is played unrefereed, as before the referee.
 export function supported(white: ArmyData, black: ArmyData, rs: RuleSetData): boolean {
-  if (rs.judge === false) return false;
+  if (rs.judge !== true) return false;
   const byId = pieceById(rs);
   for (const army of [white, black]) {
     for (const [id] of army.pieces) {

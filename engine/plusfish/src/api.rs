@@ -15,8 +15,11 @@
 //!   board     the starting position: [[piece id, team (0 White, 1 Black), file,
 //!             rank, moved, shield_broken, ability_used, gained_shield], ...]
 //!   side, halfmove, fullmove, ep ([[file, rank], ...]), ep_victim ([file, rank]
-//!             or null), lost ([[piece id, team, ability_used], ...] in the order
-//!             lost), promo ([piece id, ...]), castling_corner
+//!             or null), lost ([[piece id, team, ability_used, moved], ...] in the
+//!             order lost; moved left out = true), promo ([piece id, ...]),
+//!             castling_corner, unchanged (the 75-move count; default halfmove),
+//!             white_quiet_first (true at an army game's start: White's first
+//!             move may not capture)
 //!   moves     the moves played since, as Move.to_text() ("e2-e4", "a1!c3", ...)
 //!   plies     which positions to evaluate (number of moves played); default all
 //!   nodes     search nodes per position (default 100000); depth (optional)
@@ -97,7 +100,7 @@ pub fn catalog_from_json(j: &Json) -> Result<Catalog, String> {
         def.keywords = num(p, "keywords", 0.0) as u8;
         def.ability = Ability::from_code(num(p, "ability", 0.0) as i32);
         def.dies_on_capture = flag(p, "dies_on_capture");
-        def.blocks_jumps = flag(p, "blocks_jumps");
+        def.blocks_jumps = flag(p, "blocks_jumps") || def.keywords & KW_WALL != 0;
         def.shield_on_capture = flag(p, "shield_on_capture");
         def.decoy = flag(p, "decoy");
         def.protects = p.get("protects").and_then(|v| v.as_arr()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
@@ -147,12 +150,15 @@ pub fn game_from_request(req: &Json, cat: &Arc<Catalog>) -> Result<Game, String>
     for p in req.get("promo").and_then(|v| v.as_arr()).map(|v| v.as_slice()).unwrap_or(&[]) {
         promo.push(kind(p.as_str().unwrap_or(""))?);
     }
-    // Lost pieces in the order they were lost: kind, team, ability used.
-    let mut lost: Vec<(usize, usize, bool)> = Vec::new();
+    // Lost pieces in the order they were lost: kind, team, ability used, has
+    // moved (left out: moved, as a set-up position's captured pieces are; a
+    // Ghost captured before it ever moved can't Haunt).
+    let mut lost: Vec<(usize, usize, bool, bool)> = Vec::new();
+    let truthy = |v: Option<&Json>| matches!(v, Some(Json::Bool(true))) || v.and_then(|v| v.as_f64()).unwrap_or(0.0) != 0.0;
     for e in req.get("lost").and_then(|v| v.as_arr()).map(|v| v.as_slice()).unwrap_or(&[]) {
         let a = e.as_arr().ok_or("bad lost entry")?;
-        let used = matches!(a.get(2), Some(Json::Bool(true))) || a.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0) != 0.0;
-        lost.push((kind(a.first().and_then(|v| v.as_str()).unwrap_or(""))?, (a.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as usize).min(1), used));
+        let moved = a.get(3).is_none() || truthy(a.get(3));
+        lost.push((kind(a.first().and_then(|v| v.as_str()).unwrap_or(""))?, (a.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as usize).min(1), truthy(a.get(2)), moved));
     }
     let mut present: Vec<usize> = placed.iter().map(|p| p.1).collect();
     present.extend(promo.iter().copied());
@@ -170,6 +176,9 @@ pub fn game_from_request(req: &Json, cat: &Arc<Catalog>) -> Result<Game, String>
     p.set_side(r, if num(req, "side", 0.0) as i32 == 1 { BLACK } else { WHITE });
     p.halfmove = num(req, "halfmove", 0.0) as u32;
     p.fullmove = num(req, "fullmove", 1.0) as u32;
+    // The 75-move count (`GameState.change_clock`); left out, the halfmove clock.
+    p.unchanged = num(req, "unchanged", p.halfmove as f64) as u32;
+    p.set_white_quiet_first(r, flag(req, "white_quiet_first"));
     for (x, y) in pairs(req.get("ep")) {
         if x >= 0 && y >= 0 && x < w && y < h {
             p.ep |= 1u128 << (y * w + x);
@@ -180,8 +189,8 @@ pub fn game_from_request(req: &Json, cat: &Arc<Catalog>) -> Result<Game, String>
             p.ep_victim = (y as i32 * w + x as i32) as u8;
         }
     }
-    for (k, team, used) in lost {
-        p.lose(r, team, code(k, team) | if used { USED } else { 0 });
+    for (k, team, used, moved) in lost {
+        p.lose(r, team, code(k, team) | if used { USED } else { 0 } | if moved { MOVED } else { 0 });
     }
     let mut game = Game::new(rules.clone(), p);
     for mv in req.get("moves").and_then(|v| v.as_arr()).map(|v| v.as_slice()).unwrap_or(&[]) {

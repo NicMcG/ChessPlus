@@ -941,7 +941,7 @@ impl<'a> Searcher<'a> {
         let r = self.r;
         let root = ply == 0;
         if !root {
-            if self.is_repetition(p) || p.halfmove >= 100 {
+            if self.is_repetition(p) || p.halfmove >= 100 || p.unchanged >= 150 {
                 return 0;
             }
             if (p.occupied().count_ones() as usize) <= 5 && p.checkmate_impossible(r) {
@@ -998,6 +998,7 @@ impl<'a> Searcher<'a> {
                 child.ep_victim = NO_SQ;
                 child.frozen = NO_SQ;
                 child.halfmove += 1;
+                child.unchanged += 1;
                 child.set_side(r, 1 - us);
                 child.update_key(r);
                 let rd = (self.sp.nmp_base + depth * self.sp.nmp_depth_mul) / 256;

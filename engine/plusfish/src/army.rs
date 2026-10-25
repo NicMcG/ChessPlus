@@ -12,7 +12,7 @@ use crate::position::*;
 use crate::util::Rng;
 use std::sync::Arc;
 
-pub const BUDGET: f64 = 39.0;
+pub const BUDGET: f64 = 40.0;
 pub const START_ROWS: i32 = 2;
 pub const MAX_COPIES: usize = 2;
 pub const MAX_EXTRA_ROYALS: usize = 1;
@@ -389,5 +389,7 @@ pub fn army_game(cat: &Arc<Catalog>, white: &Army, black: &Army, w: i32, h: i32)
         let file = if black.mirror { w - 1 - p0.1 } else { p0.1 };
         p.put(&rules, ((h - 1 - p0.2) * w + file) as usize, code(p0.0, BLACK));
     }
+    // An army game's start: White's first move may not capture.
+    p.set_white_quiet_first(&rules, true);
     Game::new(rules, p)
 }
