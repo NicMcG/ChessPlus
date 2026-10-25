@@ -58,7 +58,12 @@ pass line, they show how the strongest armies play under the rule.
   logging every position's FEN, full legal move list, check and outcome.
   `plusfish trace-check` with `--abilities-need-move=true` must give **0
   mismatches**; without the flag it must give **some** (proof the traces
-  exercise the rule). Results below.
+  exercise the rule). **Done before the run (25 Oct, branch commit de5f5f6):**
+  perft suite all PASS; traces with the rule on: 23,632 + 24,092 = 47,724
+  positions, **0 mismatches** (coverage: 89 Crack Shots, 179 Raise Deads, 167
+  Haunts, 102 Songs of Slumber, 192 Full Moons, 158 Vampire shields gained,
+  91 broken); with the rule off: 142 + 144 = **286 of the 320 games
+  mismatch** (the first unmoved-piece ability each game).
 
 ## Parts and settings
 
