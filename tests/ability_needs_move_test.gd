@@ -134,24 +134,16 @@ func test_game_screen_says_the_piece_must_move_first() -> void:
 	check(not game.board_view.aiming, "Not aiming")
 	game.free()
 
-func test_plusfish_is_off_for_ability_pieces_until_it_knows_the_rule() -> void:
+func test_plusfish_knows_the_ability_rule() -> void:
 	var with_archer := _fen("4k3/8/8/8/8/8/8/2A1K3 w - - 0 1")
-	check(not PlusfishLink.supports(with_archer), "An ability piece on the board: off")
+	check(PlusfishLink.supports(with_archer), "An ability piece on the board: on")
 	var plain := _fen("4k3/8/8/8/8/8/8/R3K3 w - - 0 1")
-	check(PlusfishLink.supports(plain), "No abilities: on")
 	plain.lost[Piece.Team.WHITE].append(Piece.new(GHOST, Piece.Team.WHITE))
-	check(not PlusfishLink.supports(plain), "A lost Ghost: off too")
-	PlusfishLink.pretend_knows_abilities = true
-	check(PlusfishLink.supports(with_archer), "Tests can pretend Plusfish knows the rule")
-	PlusfishLink.pretend_knows_abilities = false
-	# The online referee follows through the rule set: it judges no ability game either.
+	check(PlusfishLink.supports(plain), "A lost Ghost: on too")
+	# The online referee follows through the rule set: it judges ability games again.
 	RuleSet.clear_cache()
-	check_eq(int(RuleSet.data()["known_abilities"]), int(PieceDef.Ability.NONE), "The rule set says Plusfish knows no ability")
-	PlusfishLink.pretend_knows_abilities = true
-	RuleSet.clear_cache()
-	check_eq(int(RuleSet.data()["known_abilities"]), int(PlusfishLink.KNOWN_ABILITIES), "...until it learns the rule")
-	PlusfishLink.pretend_knows_abilities = false
-	RuleSet.clear_cache()
+	check_eq(int(RuleSet.data()["known_abilities"]), int(PlusfishLink.KNOWN_ABILITIES), "The rule set says Plusfish knows every ability")
+	check(RuleSet.data()["judge"], "And the referee judges games")
 
 func test_rule_text_markup() -> void:
 	check_eq(RuleText.to_bbcode("Needs a *King*."), "Needs a [i]King[/i].", "Types in italics")

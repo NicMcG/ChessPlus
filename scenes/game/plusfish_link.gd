@@ -101,34 +101,29 @@ const KNOWN_ABILITIES := PieceDef.Ability.FULL_MOON
 ## newer special ability gets no eval bar until Plusfish is updated for it.
 ## (Plusfish knows Mac's Oct 2026 changes too: a Parapet stops only the
 ## opponent's pieces, a Squire protects Knights anywhere in its move pattern
-## even through pieces, the Berserker's L-moves go 2 then 1, and when more than
-## one Jester could take a hit the attacker chooses which: "c7xe5/d4".)
-## Tests of the screen can pretend Plusfish knows the ability rule below.
-static var pretend_knows_abilities := false
-
-## The last special ability Plusfish may judge today. Plusfish doesn't know
-## Mac's Oct 2026 rule that an ability needs a move first (a capture or shield
-## break counts), so that's none: it's off for any game with a special ability
-## in it, on the board or already lost, until Plusfish is updated (then this
-## goes back to KNOWN_ABILITIES). The online referee follows it through the
-## rule set (RuleSet.data), so it refuses to judge the same games.
-## True once Plusfish (the online referee's copy, web/plusfish.wasm) knows every
-## rule of the game. False since Mac's rules of 24-25 Oct 2026 (abilities and
-## promotion need a move first, White's quiet first move, the 75-move rule):
-## the referee would refuse honest moves (a Lance landing on the far rank
-## without promoting) and allow others, so until Plusfish is rebuilt with them
-## online games keep only the turn and order checks (`games.refereed` false).
-static func referee_can_judge() -> bool:
-	return pretend_knows_abilities
-
-static func known_abilities() -> PieceDef.Ability:
-	return KNOWN_ABILITIES if pretend_knows_abilities else PieceDef.Ability.NONE
-
+## even through pieces, the Berserker's L-moves go 2 then 1, when more than one
+## Jester could take a hit the attacker chooses which ("c7xe5/d4"), the Wall
+## keyword, and the rules of 24-25 Oct 2026: an ability and a promotion need a
+## move first, White's first move may not attack, and the 75-move rule.)
 static func supports(state: GameState) -> bool:
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		for piece: Piece in state.board.pieces_of(team).values() + state.lost[team]:
 			if piece.def.ability > known_abilities():
 				return false
+	return true
+
+## The last special ability the online referee may judge (the rule set's
+## `known_abilities`). If Mac changes an ability's rule before Plusfish learns
+## it, make this PieceDef.Ability.NONE until it does, as on 24 Oct 2026.
+static func known_abilities() -> PieceDef.Ability:
+	return KNOWN_ABILITIES
+
+## True while Plusfish (the online referee's copy, web/plusfish.wasm) knows
+## every rule of the game; the rule set carries it as `judge`. It was false
+## from Mac's rules of 24-25 Oct 2026 until Plusfish learnt them: if a new rule
+## comes before Plusfish knows it, make this false again, and online games keep
+## only the turn and order checks (`games.refereed` false) meanwhile.
+static func referee_can_judge() -> bool:
 	return true
 
 ## True if Plusfish can run here.
@@ -320,7 +315,7 @@ static func position_for(start: GameState) -> Dictionary:
 	var lost := []
 	for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 		for piece: Piece in start.lost[team]:
-			lost.append([piece.def.id, team, piece.ability_used])
+			lost.append([piece.def.id, team, piece.ability_used, piece.has_moved])
 	var ep := []
 	for square in start.en_passant_squares:
 		ep.append([square.x, square.y])
@@ -330,6 +325,7 @@ static func position_for(start: GameState) -> Dictionary:
 	return {
 		"width": start.board.width, "height": start.board.height, "board": board,
 		"side": start.side_to_move, "halfmove": start.halfmove_clock, "fullmove": start.fullmove_number,
+		"unchanged": start.change_clock, "white_quiet_first": start.white_quiet_first_move_applies(),
 		"ep": ep, "ep_victim": victim, "lost": lost, "promo": promo,
 		"castling_corner": start.rules.castling_partner_in_corner,
 	}

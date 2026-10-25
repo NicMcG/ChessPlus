@@ -113,7 +113,7 @@ func test_request_carries_the_new_rules() -> void:
 	check_eq(pieces["squire"]["protects"], ["knight"], "The Squire protects knights")
 	check_eq(pieces["jester"]["decoy"], true, "The Jester takes hits")
 	check(request["board"].has(["vampire", Piece.Team.BLACK, 3, 4, false, false, false, true]), "The Vampire's gained shield")
-	check_eq(request["lost"], [["ghost", Piece.Team.WHITE, false]], "The lost Ghost, Haunt unused")
+	check_eq(request["lost"], [["ghost", Piece.Team.WHITE, false, true]], "The lost Ghost, Haunt unused, moved before it was captured")
 	check(JSON.parse_string(JSON.stringify(request)) is Dictionary, "Turns into JSON")
 
 # --- The game screen --------------------------------------------------------------------
@@ -316,7 +316,6 @@ func _hand_in_best(game: Node, ply: int, best: String, best_san: String) -> void
 func test_best_move_shows_what_a_pawn_promotes_to() -> void:
 	PlusfishLink.enabled = true
 	PlusfishLink.pretend_available = true
-	PlusfishLink.pretend_knows_abilities = true  # A Necromancer is in the position (see PlusfishLink.supports).
 	var game := _open_testing_game(_promotion_position(Piece.Team.WHITE))
 	check(game.state.find_move("b7-b8=R") != null, "The position allows the promotion")
 	check(game.testing_position.problems().is_empty(), "A fine position: %s" % [game.testing_position.problems()])
@@ -330,13 +329,11 @@ func test_best_move_shows_what_a_pawn_promotes_to() -> void:
 	_hand_in_best(game, 0, "d2-e3", "NCe3")
 	check(game.board_view.hint_piece.is_empty(), "An ordinary move has no badge")
 	game.free()
-	PlusfishLink.pretend_knows_abilities = false
 	_finish()
 
 func test_best_move_shows_what_raise_dead_brings_back() -> void:
 	PlusfishLink.enabled = true
 	PlusfishLink.pretend_available = true
-	PlusfishLink.pretend_knows_abilities = true  # A Necromancer is in the position (see PlusfishLink.supports).
 	var game := _open_testing_game(_promotion_position(Piece.Team.BLACK))
 	check(game.state.find_move("f7!=B") != null, "Black's Necromancer can raise the Bishop")
 	_hand_in_best(game, 0, "f7!=B", "NC!=B")
@@ -349,7 +346,6 @@ func test_best_move_shows_what_raise_dead_brings_back() -> void:
 	game.play(game.state.find_move("g2-g1=Q"))
 	check(game.board_view.hint_piece.is_empty(), "Gone once a move is played")
 	game.free()
-	PlusfishLink.pretend_knows_abilities = false
 	_finish()
 
 func test_bar_only_after_the_game() -> void:
@@ -547,6 +543,72 @@ func test_real_engine_lets_the_attacker_choose_the_jester() -> void:
 	check(start.find_move(best) != null, "Its best move at the start is one the game knows: " + best)
 	link.free()
 	_finish()
+
+## Plusfish's results for `start` and `moves` (the real engine, few nodes).
+func _engine_results(start: GameState, moves: Array) -> Dictionary:
+	PlusfishLink.enabled = true
+	var link := PlusfishLink.new()
+	_root().add_child(link)
+	link.desktop_nodes = 5000
+	link.analyse(start, moves)
+	for i in 2000:
+		if link.results.size() == moves.size() + 1:
+			break
+		await _frames(1)
+		OS.delay_msec(10)
+	var results := link.results.duplicate()
+	link.free()
+	return results
+
+func test_real_engine_knows_the_rules_of_24_and_25_october() -> void:
+	if PlusfishLink.program_path() == "" or OS.has_feature("web"):
+		print("    (Plusfish not built: cargo build --release in engine/plusfish to run this test)")
+		return
+	var defs := PieceCatalog.all_defs()
+	# White's first move may not attack: the Lance on a2 could take Black's
+	# Queen on a7, but not on move 1.
+	var white := _army_from_rows(["LPPPPPPP", "RNBQKBNR"])
+	var black := _army_from_rows(["QPPPPPPP", "RNB1KBNR"])
+	var start := ArmySetup.create_game(white, black, StandardSetup.create_rules())
+	check(start.find_move("a2xa7") == null, "The game forbids the capture")
+	var results: Dictionary = await _engine_results(start, [])
+	var best := str(results.get(0, {}).get("best", ""))
+	check(best != "" and start.find_move(best) != null, "Plusfish's best first move is one the game allows: " + best)
+	# A piece that has never moved doesn't promote: the Lance reaches a8 as it is.
+	start = Fen.parse("2k5/8/8/8/8/8/L7/7K w - - 0 1", defs, StandardSetup.create_rules())
+	check(start.find_move("a2-a8") != null, "The game plays a2-a8 without promoting")
+	results = await _engine_results(start, ["a2-a8"])
+	check_eq(results.size(), 2, "Plusfish follows it")
+	# The 75-move rule: 150 plies without a change to the pieces is a draw.
+	start = Fen.parse("k7/8/8/8/8/8/8/1R5K w - - 0 1 unchanged=149", defs, StandardSetup.create_rules())
+	results = await _engine_results(start, ["b1-b2"])
+	check_eq(str(results.get(0, {}).get("outcome", "")), "none", "Not yet a draw")
+	check_eq(str(results.get(1, {}).get("outcome", "")), "seventy_five_moves", "A draw after the 150th ply")
+	# An ability needs a move first: the Archer on c1 can't Crack Shot the Rook
+	# on f4 before it has moved (a FEN counts it as moved, so set it unmoved).
+	start = Fen.parse("4k3/8/8/8/5r2/8/8/2A1K3 w - - 0 1", defs, StandardSetup.create_rules())
+	start.board.get_piece(Board.parse_square("c1")).has_moved = false
+	check(start.find_move("c1!f4") == null, "The game: no Crack Shot yet")
+	var moves := ["c1-b2", "e8-d8", "b2-c1", "d8-e8", "c1!f4"]
+	results = await _engine_results(start, moves)
+	check(str(results.get(0, {}).get("best", "")) != "c1!f4", "Plusfish doesn't suggest it either")
+	check_eq(results.size(), moves.size() + 1, "Once the Archer has moved, Plusfish follows its Crack Shot")
+	_finish()
+
+## An army from its rows, front row first, files a-h ("-" or a digit: empty).
+func _army_from_rows(rows: Array) -> Army:
+	var army := Army.new()
+	for row in rows.size():
+		var file := 0
+		for letter: String in rows[row]:
+			if letter.is_valid_int():
+				file += letter.to_int()
+				continue
+			for def: PieceDef in PieceCatalog.all_defs():
+				if def.symbol == letter:
+					army.place(def, Vector2i(file, 1 - row))
+			file += 1
+	return army
 
 # --- Plusfish never holds up the game ----------------------------------------------
 

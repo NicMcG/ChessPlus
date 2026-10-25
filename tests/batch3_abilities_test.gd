@@ -187,9 +187,7 @@ func test_raise_dead_brings_back_a_werewolf_not_a_wolf() -> void:
 func test_eval_bar_knows_the_abilities() -> void:
 	for id in ["ghost", "bard", "werewolf"]:
 		var state := _game("4k3/8/8/8/3%s4/8/8/4K3 w - - 0 1" % ("(%s)" % _def(id).symbol if _def(id).symbol.length() > 1 else _def(id).symbol))
-		# Plusfish knows these abilities, but not yet Mac's Oct 2026 rule that an ability needs a
-		# move first, so it's off for games with ability pieces until it's updated.
-		check(not PlusfishLink.supports(state), "Plusfish is off for the %s until it knows abilities need a move first" % id)
+		check(PlusfishLink.supports(state), "Plusfish knows the %s, and that its ability needs a move first" % id)
 
 # --- On the game screen ------------------------------------------------------------------
 

@@ -867,9 +867,11 @@
 					"knight"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": false,
 				"name": "RNBQKBNR/PPPPPPPP",
@@ -1491,9 +1493,11 @@
 					"assassin"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": true,
 				"name": "(NC)(WW)ENKQPA/GB(AS)(CV)PG1(AS)",
@@ -2114,9 +2118,11 @@
 					"assassin"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": true,
 				"name": "QE(WW)1KN(NC)(RM)/(AS)APB(BR)(PD)G(AS)",
@@ -2738,9 +2744,11 @@
 					"assassin"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": true,
 				"name": "1Q1KGE(NC)C/B(AS)BG(BR)(AS)(PD)A",
@@ -3363,9 +3371,11 @@
 					"elephant"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": true,
 				"name": "(PA)(GA)V(PR)K(BR)N(WW)/PPPPPPPP",
@@ -3939,9 +3949,11 @@
 					"assassin"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": true,
 				"name": "(CH)(RO)(RO)KE(SQ)C(PD)/PNP(RM)PPPL",
@@ -4569,9 +4581,11 @@
 					"assassin"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": true,
 				"name": "BP(AS)1K(WW)WB/(PD)A(BD)(RM)(CV)A1(AS)",
@@ -5082,9 +5096,11 @@
 					"knight"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": false,
 				"name": "RNBQKBNR/PPPPPPPP",
@@ -5586,9 +5602,11 @@
 					"lance"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": false,
 				"name": "RNBQKBNR/PPPPLPPP",
@@ -6042,9 +6060,11 @@
 					"knight"
 				],
 				"side": 0,
+				"unchanged": 0,
+				"white_quiet_first": true,
 				"width": 8
 			},
-			"supported": false,
+			"supported": true,
 			"white": {
 				"mirror": true,
 				"name": "RWBKNBNR/P1PPPPPP",
@@ -6129,5 +6149,5 @@
 			"white_problems": []
 		}
 	],
-	"version": "606aca63ca5b"
+	"version": "9ffa477a061f"
 }

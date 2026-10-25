@@ -57,7 +57,7 @@ Balancing
               --games N per pairing (default 20)  --nodes N
   selfplay  Random-army games for the balance report / tuning.
               --games N  --nodes N  --out games.jsonl
-              --budget-spread P   each side's budget is 39 minus up to P points
+              --budget-spread P   each side's budget is 40 minus up to P points
                                   (default 6; needed to measure piece values)
   values    Balance report from saved games: plusfish values games.jsonl
               --html report.html       also write a web page

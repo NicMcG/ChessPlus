@@ -82,6 +82,22 @@ Deno.test("the attacker chooses which Jester takes the hit", () => {
   const quiet = ["h2-h3", "h7-h6"];
   check(judge(white, black, [...quiet, "b1xb8/c8"], rs, plusfish).legal, "the other Jester may take it instead");
   check(!judge(white, black, [...quiet, "b1xb8/d8"], rs, plusfish).legal, "but not a square without a Jester");
+  check(!judge(white, black, ["b1xb8/a8"], rs, plusfish).legal, "and not on White's first move");
+});
+
+Deno.test("the rules of 24 and 25 Oct 2026", () => {
+  // White: King e1, Archer c2, Lance a2. Black: King e8, Rook h7. The Archer's
+  // diagonal from c2 reaches the Rook; the Lance's file is open to a8.
+  const white: ArmyData = { name: "W", mirror: false, pieces: [["king", 4, 0], ["archer", 2, 1], ["lance", 0, 1]] };
+  const black: ArmyData = { name: "B", mirror: false, pieces: [["king", 4, 0], ["rook", 7, 1]] };
+  check(supported(white, black, rs), "the referee judges these armies");
+  check(!judge(white, black, ["c2xh7"], rs, plusfish).legal, "White's first move may not capture");
+  check(judge(white, black, ["e1-d1", "e8-d8", "c2xh7"], rs, plusfish).legal, "but its second may");
+  check(!judge(white, black, ["e1-d1", "e8-d8", "c2!h7"], rs, plusfish).legal, "no Crack Shot before the Archer has moved");
+  check(judge(white, black, ["c2-d3", "e8-d8", "d3!h7"], rs, plusfish).legal, "Crack Shot once it has");
+  check(judge(white, black, ["a2-a8"], rs, plusfish).legal, "a Lance reaching the far rank on its first move stays a Lance");
+  check(!judge(white, black, ["a2-a8=A"], rs, plusfish).legal, "it can't promote there");
+  check(judge(white, black, ["a2-a7", "e8-d8", "a7-a8=A"], rs, plusfish).legal, "but it can once it has moved");
 });
 
 Deno.test("illegal moves are refused", () => {
