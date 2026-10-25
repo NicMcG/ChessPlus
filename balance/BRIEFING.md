@@ -1,6 +1,6 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 25 October 2026 (after run 14). The full data is in the repo
+Last updated 25 October 2026 (after runs 15 and 15D). The full data is in the repo
 (github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run13` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
@@ -139,6 +139,17 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   rule is fine as a design choice but not a colour fix: first-move contact by
   long-range pieces is the driver, and only the Front-row rule or the
   White-only quiet first move have moved it.
+- **Runs 15 and 15D, the three pawn types** (Grunt 1.5, Abatis 1, Vassal 1,
+  added 25 Oct): measured worth Grunt ~0.9, Abatis ~0.6, Vassal 1.0. With
+  the pieces alone (run 15) White's edge was a little bigger in random
+  armies (56.4%) and the strong pool (57.6%), though the strongest armies'
+  first-move edge halved and colour specialists fought level-ish (54.9%):
+  a front-row Grunt is a tempo trap for strikers. With the White-only quiet
+  first move on top (run 15D) the numbers are the closest to chess of any
+  run: random armies 53.6%, the strong pool 52.1%, mirror matches +0.22,
+  specialists 47.5% (Black slightly ahead), and White and Black stop needing
+  different armies. Under that rule the Lance is worth only 2.8-3.1 (priced
+  3.5) and the Rook and Queen gain about half a point.
 
 ## Other open questions
 

@@ -171,6 +171,63 @@ problem one move later. Worth a rule thought (Mac).
   specialists 54.9% (would pass "under 60%"); best White specialist 83.1%
   (would pass "no 90%+").
 
-## Results, arm D
+## Results, arm D (full tables in `report_d.md`, `tools/balance/run15_analyse.py --arm D`)
 
-(pending)
+Server 15:03-17:37 UTC 25 Oct for arm D (2.6 hours; C and D together
+12:46-17:40, about 4.9 hours, roughly $12.50 metered), stopped through AWS
+after its pending package updates were applied. Plusfish commit f82b487.
+
+**Success lines: 2, 3, 5, 6, 7, 8 and 9 pass; 1 and 4 fail** (1: the Rook
+is +0.56 and the Queen +0.44 under the rule; 4: White's edge is smaller than
+C's and the round robin is 52.1% with gaps under 18, but two pairings are
+still at 80%+, one of them Black's).
+
+### Worth under the rule (20,000 games at 8k; 5,000 at 32k in brackets)
+
+Grunt **0.87** (0.85), Abatis **0.63** (0.58), Vassal **0.96** (1.05): the
+same as C. The rule itself moves a few pieces: Lance 3.5 -> worth 3.12 at
+8k, **2.84 at 32k** (its first-move strike is gone), Rook 5.06 (+0.56),
+Queen 10.44 (+0.44), Vampire 7.35, Wizard 8.79.
+
+### White's edge: the best numbers of any run
+
+| | Run 15 C | Run 15 D (rule) |
+|---|---|---|
+| Random armies, 8k: White | 56.4% | **53.6%** (53.0-54.2) |
+| Random armies, 32k: White | 56.7% | **53.3%** (52.1-54.5) |
+| ...White won both of a swapped pair | 13.2% | 10.2% |
+| Pool round robin: White | 57.6% | **52.1%** (50.3-54.0) |
+| ...biggest gap | +44.3 | +17.8 (Wide 7a) |
+| ...pairings at 80%+ | 5 | 2 (Wide 7a vs 1a, White 80.0%; Wide 8c vs 5a, **Black** 95%) |
+| ...White won both of a swapped pair | 15.1% | 11.9% |
+| Mirror matches (both rules): median | +0.23 (ability rule) | **+0.22**, 7 of 11 within ±0.35, 2 over +1 (Wide 5b +2.16 by 1. Kc1, Wide 7a +1.87) |
+| Specialists vs specialists: White | 54.9% | **47.5%** (Black a little ahead; run 13 under this rule 50.0%) |
+| White specialists vs all-rounders / all-rounders vs Black specialists | +15.6 / +5.9 | **+6.2 / +1.0** |
+| Uneven specialist pairings | 56 of 100 | 28 of 100 |
+| Best White specialist over the Black pool | 83.1% | 80.1% |
+
+Under the rule no game opens with a hit (by definition); Black opens with
+one in 13.4% of pool games (C: 30.8%).
+
+### The pool under the rule
+
+Every front-row square is filled (**8.0 of 8**, C 7.4); pawn-type pieces in
+the front row 1.1 as in C. 8 of 10 armies take a Grunt (5 in the front row,
+14 in the back), 4 an Abatis (2 front, 5 back), 2 a Vassal (both front).
+24 piece types (C 26): Archer 9, Grunt 8, Necromancer 8, Barbarian 7,
+Cavalry 7, Paladin 7, Wizard 6. The colour pools look alike (White: Wizard
+9, Cavalry 8, Grunt 8; Black: Archer 9, Grunt 9, Necromancer 8), as in
+run 13 under this rule: the colours stop needing different armies.
+
+### Reading
+
+- The new pieces' prices: Grunt ~0.9 (priced 1.5), Abatis ~0.6 (1), Vassal
+  1.0 (1), the same with or without the first-move rule.
+- The White-only quiet first move with the new pieces gives the closest
+  thing to chess yet: random armies 53.6% (chess 54-56%), the strong pool
+  52.1%, mirror median +0.22 (chess +0.29), specialists level, and the
+  colour pools converge. The two 80%+ pairings are one each way, so they
+  read as army strength, not colour.
+- The rule reprices the Lance (worth 2.8-3.1 at 3.5) and lifts the Rook and
+  Queen by about half a point: those are the price questions if the rule is
+  adopted.
