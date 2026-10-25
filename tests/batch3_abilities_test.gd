@@ -32,7 +32,7 @@ func _abilities(state: GameState, ability: PieceDef.Ability) -> Array[Move]:
 	return found
 
 func test_costs_symbols_and_forms() -> void:
-	check_eq([_def("ghost").value, _def("bard").value, _def("werewolf").value], [3.0, 3.5, 3.5], "Costs (Werewolf 3.5 since Oct 2026)")
+	check_eq([_def("ghost").value, _def("bard").value, _def("werewolf").value], [3.0, 3.5, 3.0], "Costs (Werewolf 3 since 25 Oct 2026)")
 	check_eq([_def("ghost").symbol, _def("bard").symbol, _def("werewolf").symbol], ["G", "BD", "WW"], "Symbols")
 	var wolf := _def("werewolf").transforms_into
 	check(wolf != null and wolf.id == "werewolf_wolf", "The Werewolf knows its wolf form")

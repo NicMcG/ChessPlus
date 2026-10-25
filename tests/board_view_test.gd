@@ -85,7 +85,7 @@ func test_every_piece_has_a_picture() -> void:
 
 func test_shield_pieces_have_a_wounded_picture() -> void:
 	for def in PieceCatalog.all_defs():
-		if def.has_shield():
+		if def.has_shield() and def.id not in ART_TO_COME:
 			for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
 				check(PieceArt.texture_for(def, team, PieceArt.DEFAULT_STYLE, "wounded") != null, "%s %s wounded" % [team, def.id])
 

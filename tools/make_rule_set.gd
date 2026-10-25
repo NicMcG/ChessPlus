@@ -18,7 +18,7 @@ extends SceneTree
 ##                          (referee_test.ts) check it agrees
 
 const FOLDER := "res://server/supabase/functions/referee/"
-const OUTCOMES := ["none", "checkmate", "stalemate", "fifty_moves", "repetition", "insufficient_material", "king_exposed"]
+const OUTCOMES := ["none", "checkmate", "stalemate", "fifty_moves", "repetition", "insufficient_material", "king_exposed", "seventy_five_moves"]
 
 ## Army pairs to check, as army text (Plusfish's form: back row / front row,
 ## files a-h, two-letter symbols in brackets, digits for gaps), and whether
@@ -39,8 +39,9 @@ const SHORT_GAMES := [
 	# A Lance looking straight at Black's king before any move: King exposed.
 	["RNBQKBNR/PPPPLPPP", false, "RNBQKBNR/PPPP1PPP", false, []],
 	# Black's Jesters on a8 and c8 could both take the Wizard's hit on b8: White
-	# chooses the one on a8.
-	["RWBKNBNR/P1PPPPPP", true, "1N1K1JRJ/PPPPPP1P", true, ["b1xb8/a8", "a8xb8"]],
+	# chooses the one on a8 (after a quiet first move each, as White's first may
+	# not attack).
+	["RWBKNBNR/P1PPPPPP", true, "1N1K1JRJ/PPPPPP1P", true, ["h2-h3", "h7-h6", "b1xb8/a8", "a8xb8"]],
 ]
 ## Armies that break the rules, with the problems the game finds.
 const BROKEN := [
@@ -111,7 +112,7 @@ func _test_cases(version: String) -> Dictionary:
 			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))),
 			"black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
 			"start": PlusfishLink.position_for(start),
-			"supported": PlusfishLink.supports(start),
+			"supported": PlusfishLink.referee_can_judge() and PlusfishLink.supports(start),
 			"moves": moves,
 			"outcome": OUTCOMES[state.outcome()],
 		})
@@ -125,7 +126,7 @@ func _test_cases(version: String) -> Dictionary:
 		cases.append({
 			"white": SavedGame.army_to_dict(white), "black": SavedGame.army_to_dict(black),
 			"white_problems": Array(RuleText.plain_lines(white.problems(rules, 8))), "black_problems": Array(RuleText.plain_lines(black.problems(rules, 8))),
-			"start": PlusfishLink.position_for(start), "supported": PlusfishLink.supports(start),
+			"start": PlusfishLink.position_for(start), "supported": PlusfishLink.referee_can_judge() and PlusfishLink.supports(start),
 			"moves": game[4], "outcome": OUTCOMES[state.outcome()],
 		})
 	var broken := []

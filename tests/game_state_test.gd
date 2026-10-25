@@ -91,4 +91,5 @@ func test_moves_are_kept_but_handed_out_fresh() -> void:
 	# A piece put on the board by hand changes the moves too.
 	state.board.set_piece(Board.parse_square("e3"), Piece.new(load("res://data/pieces/knight.tres"), Piece.Team.BLACK))
 	check(state.find_move("e2-e4") == null, "The e-pawn is blocked now")
-	check(state.find_move("d2xe3") != null, "The d-pawn can take the knight")
+	check(state.find_move("d2xe3") == null, "The d-pawn can't take it: White may not capture on its first move (Mac's rule)")
+	check_eq(state.moves().size(), 18, "Twenty moves less the e-pawn's two")

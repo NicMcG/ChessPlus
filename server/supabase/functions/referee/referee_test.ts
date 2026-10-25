@@ -72,13 +72,16 @@ Deno.test("whole games: every move legal, and the same ending", () => {
 });
 
 Deno.test("the attacker chooses which Jester takes the hit", () => {
-  // The short game in tools/make_rule_set.gd: the Wizard on b1 takes on b8,
-  // where Black's Jesters on a8 and c8 could both take the hit.
+  // The short game in tools/make_rule_set.gd: after a quiet move each, the
+  // Wizard on b1 takes on b8, where Black's Jesters on a8 and c8 could both
+  // take the hit. (Two Jesters no longer stop the referee; whether it judges
+  // the game at all is the rule set's `judge`, checked with the others above.)
   const game = cases.games.find((g) => g.moves.includes("b1xb8/a8"));
-  check(game !== undefined && game.supported, "a game with two Jesters on a side is refereed");
+  check(game !== undefined, "the two-Jester game is in the test cases");
   const white = game!.white as ArmyData, black = game!.black as ArmyData;
-  check(judge(white, black, ["b1xb8/c8"], rs, plusfish).legal, "the other Jester may take it instead");
-  check(!judge(white, black, ["b1xb8/d8"], rs, plusfish).legal, "but not a square without a Jester");
+  const quiet = ["h2-h3", "h7-h6"];
+  check(judge(white, black, [...quiet, "b1xb8/c8"], rs, plusfish).legal, "the other Jester may take it instead");
+  check(!judge(white, black, [...quiet, "b1xb8/d8"], rs, plusfish).legal, "but not a square without a Jester");
 });
 
 Deno.test("illegal moves are refused", () => {

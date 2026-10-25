@@ -1,6 +1,6 @@
 # Chess Plus balancing: briefing (for a chat that can't see the repo)
 
-Last updated 25 October 2026 (after run 13). The full data is in the repo
+Last updated 25 October 2026 (after runs 15 and 15D). The full data is in the repo
 (github.com/thedarkhorse99/ChessPlus): `balance/results/run1` to `run13` (a
 README and report each) and `CLAUDE.md`. All numbers below come from
 Plusfish, the game's own engine, playing itself: strong hints, not human play.
@@ -17,25 +17,28 @@ moves first. 30 piece types.
 
 Pawn 1, Knight 3, Bishop 3.5, Rook 4.5, Queen 10, King 0. Archer 4.5, Assassin
 0.5, Barbarian 2.5, Bard 3.5, Cannon 4, Catapult 3, Cavalry 3, Chariot 4,
-Elephant 1, Galleon 3, Ghost 3, Jester 3.5, Lance 3.5, Man 3, Necromancer 3.5,
+Elephant 1, Galleon 3, Ghost 3, Jester 3.5, Lance 3 (3.5 until 25 Oct), Man 3, Necromancer 3.5,
 Paladin 1.5, Parapet 2.5, Princess 8.5, Ram 3, Rogue 3.5, Squire 4, Vampire 6.5,
-Werewolf 3.5, Wizard 8. **Budget 40** (was 39) since 24 Oct 2026, when Mac set
+Werewolf 3 (3.5 for a day), Wizard 8; the pawn types added 25 Oct 2026 after run 15: Grunt 1 (pawn type with a shield; started 1.5), Abatis 0.5 (pawn type that is a Wall; started 1), Vassal 1 (pawn type moving forward or sideways, takes en passant sideways). **Rules adopted 25 Oct 2026 after run 15D:** White may not attack (capture or break a shield) on its first move; a piece must have moved once before it can promote; special abilities need a move first (24 Oct); the 75-move rule. **Budget 40** (was 39) since 24 Oct 2026, when Mac set
 Queen 10, Bishop 3.5, Rook 4.5, Werewolf 3.5, Parapet 2.5 and Jester 3.5, and
 made special abilities usable only once the piece has moved (a capture or
-shield break counts). Runs 1-13 were at the old prices and rules.
+shield break counts). Runs 1-13 were at the old prices and rules; run 14
+measured the new ones.
 
 Changed in October from run 1's data: Vampire 4 -> 6.5, Princess 7 -> 8.5,
 Squire 3 -> 4, Galleon 4.5 -> 3, Elephant 1.5 -> 1, Paladin 2 -> 1.5,
 Assassin 2 -> 0.5 (earlier: Lance 2.5 -> 3.5, Necromancer 3 -> 3.5,
 Ram 3.5 -> 3, Archer 4 -> 4.5). Queen kept at 9 on purpose (measured ~10).
 
-## Piece values (run 2, at the current prices)
+## Piece values (run 14, at the current prices and budget 40)
 
-"Worth" = what one extra piece is worth at the start, judged from 40,000 games.
-About right: Princess, Squire, Paladin, Assassin. Still off by 0.3 or more:
-Vampire worth ~7.0 (costs 6.5), Queen ~10 (9), Bishop ~3.5 (3), Werewolf
-+0.4, Archer +0.3, Cavalry +0.3, Galleon +0.2; Parapet -0.4, Jester -0.4,
-Lance -0.3, Rook -0.3, Pawn -0.3, Elephant -0.2.
+"Worth" = what one extra piece is worth at the start, judged from 20,000
+games. The six repriced pieces all land within 0.25 of cost (Queen 9.91,
+Rook 4.72, Bishop 3.47, Werewolf 3.43, Jester 3.51, Parapet 2.60). Still off:
+Vampire worth 7.2 (costs 6.5), Archer 5.0 (4.5), Wizard +0.4, Cavalry +0.4;
+nothing over 1.0. With the ability rule on (run 14's arm B) the Necromancer
+drops to 3.39 (-0.4) and the Werewolf to 3.16 (-0.3); the Archer, Ghost and
+Bard hardly move.
 
 ## Colour balance (Mac's goal: White's edge close to chess's)
 
@@ -121,13 +124,39 @@ strong players score 54-56% with White. Plusfish rates the chess start +0.29.
   narrow White's edge a little but it stays. Under the White-only quiet first
   move: gains +6.8 / +5.2, the two pools look alike, and specialists against
   specialists is level at 50.0%, the most even setting measured so far.
+- **Run 14, the 24 Oct prices and the ability rule** (abilities only after
+  the piece has moved; Plusfish taught the rule on a branch and checked
+  against the game, 0 mismatches). The rule removes every move-1 ability
+  (they were 4% of random-army games, 30% of strong-army games through the
+  Archer's Crack Shot) but White's edge barely moves: random armies 56.2% ->
+  55.8%, the regrown strong pool's round robin 53.6% with 4 pairings at 80%+,
+  armies against themselves median +1.39 -> +0.70 with Lances and Bishops
+  still striking on move 1 (a Lance can even capture on the back row and
+  promote with check on move 1). Colour specialists under the rule are more
+  lopsided than run 13's: White specialists +16 points against all-rounders,
+  Black +7.5, specialists against specialists 70.6% for White, and one White
+  army (two Lances, Princess, Wizard, Cannon) won 100% of its games. So the
+  rule is fine as a design choice but not a colour fix: first-move contact by
+  long-range pieces is the driver, and only the Front-row rule or the
+  White-only quiet first move have moved it.
+- **Runs 15 and 15D, the three pawn types** (Grunt 1.5, Abatis 1, Vassal 1,
+  added 25 Oct): measured worth Grunt ~0.9, Abatis ~0.6, Vassal 1.0. With
+  the pieces alone (run 15) White's edge was a little bigger in random
+  armies (56.4%) and the strong pool (57.6%), though the strongest armies'
+  first-move edge halved and colour specialists fought level-ish (54.9%):
+  a front-row Grunt is a tempo trap for strikers. With the White-only quiet
+  first move on top (run 15D) the numbers are the closest to chess of any
+  run: random armies 53.6%, the strong pool 52.1%, mirror matches +0.22,
+  specialists 47.5% (Black slightly ahead), and White and Black stop needing
+  different armies. Under that rule the Lance is worth only 2.8-3.1 (priced
+  3.5) and the Rook and Queen gain about half a point.
 
 ## Other open questions
 
 - Whether to adopt the Front-row rule or the White-only quiet first move
   (run 9), and the wording for whichever is chosen.
-- Queen at 9 vs measured ~10 (raising it puts Standard over 39).
-- Vampire still ~0.5 under its worth; Bishop ~0.5 under.
+- Vampire still ~0.7 under its worth (7.2 at 6.5); Archer ~0.5 under.
+- Under the ability rule the Necromancer and Werewolf lost 0.3-0.4 of worth.
 - The Berserker/Barbarian card note; Nicholas's Plusfish retrain.
 
 ## Running sims

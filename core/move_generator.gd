@@ -11,7 +11,10 @@ static func legal_moves(state: GameState) -> Array[Move]:
 	var table := state.attack_table(enemy)
 	var royals := _royal_squares(state.board, state.side_to_move)
 	var legal: Array[Move] = []
+	var quiet := state.white_quiet_first_move_applies()
 	for move in pseudo_legal_moves(state):
+		if quiet and move.is_capture():
+			continue
 		if _keeps_royals_safe(state, move, royals, enemy, table):
 			legal.append(move)
 	return legal
@@ -20,6 +23,8 @@ static func legal_moves(state: GameState) -> Array[Move]:
 ## doesn't leave a royal piece attacked). Quicker than looking for it among
 ## legal_moves when only a few moves need checking.
 static func is_legal(state: GameState, move: Move) -> bool:
+	if move.is_capture() and state.white_quiet_first_move_applies():
+		return false
 	var enemy := Piece.other_team(state.side_to_move)
 	return _keeps_royals_safe(state, move, _royal_squares(state.board, state.side_to_move), enemy, state.attack_table(enemy))
 
@@ -221,13 +226,13 @@ static func blocker(state: GameState, from: Vector2i, to: Vector2i) -> Vector2i:
 	var parapets: Array[Vector2i] = []
 	var enemy_pieces := board.pieces_of(Piece.other_team(piece.team))
 	for square: Vector2i in enemy_pieces.keys():
-		if enemy_pieces[square].def.blocks_jumps and square != to:
+		if enemy_pieces[square].def.blocks_jumps() and square != to:
 			parapets.append(square)
 	for square in parapets:
 		var parapet := board.get_piece(square)
 		var real_def := parapet.def
 		var plain: PieceDef = real_def.duplicate()
-		plain.blocks_jumps = false
+		plain.keywords &= ~PieceDef.Keyword.WALL
 		for variant in [null, plain]:
 			if variant == null:
 				board.set_piece(square, null)
@@ -297,7 +302,7 @@ static func _leap_blocked(board: Board, from: Vector2i, step: Vector2i, team: Pi
 ## True if `piece` is a Parapet that stops `team`'s pieces jumping over it (it's
 ## on the other side).
 static func stops_jumps(piece: Piece, team: Piece.Team) -> bool:
-	return piece != null and piece.def.blocks_jumps and piece.team != team
+	return piece != null and piece.def.blocks_jumps() and piece.team != team
 
 ## A piece's special-ability moves. Crack Shot: a copy of each of its captures
 ## (from `first_new` on in `moves`) in which it doesn't move. Raise Dead: one move
@@ -607,9 +612,11 @@ static func _add_hop_capture(state: GameState, from: Vector2i, screen: Vector2i,
 ## so instead of the plain move this adds one move per promotion option.
 static func _append(state: GameState, move: Move, moves: Array[Move]) -> void:
 	var options := state.rules.promotion_options
-	# A shield break doesn't move the piece, so it can't promote.
+	# A shield break doesn't move the piece, so it can't promote. A piece that
+	# has never moved can't promote either (Mac, 25 Oct 2026): reaching the far
+	# rank on its first move, it just stands there as it is.
 	if not move.piece.def.can_promote() or move.breaks_shield() or options.is_empty() \
-			or move.to.y != _far_rank(state.board, move.piece.team):
+			or not move.piece.has_moved or move.to.y != _far_rank(state.board, move.piece.team):
 		moves.append(move)
 		return
 	for option in options:
