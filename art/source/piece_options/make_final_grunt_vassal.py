@@ -1,6 +1,7 @@
 """Final art for the Grunt and the Vassal (Mac, 25 Oct 2026, rounds 26-28).
 Grunt: a great helm on a wide stand (round 26's G3: eye slit and a bar, no
-dots, no white line between helm and stand on the black piece). Grunt with
+dots, no white line between helm and stand on the black piece), scaled to
+the Pawn's height (Mac: smaller). Grunt with
 its shield broken (`_wounded`): the helm gone, a bare head on the stand, one
 silhouette with no dividing lines. Vassal: kneeling on both knees, head bowed,
 one silhouette, scaled to the Pawn's height (top at y 9). Both colours.
@@ -38,13 +39,19 @@ NECK = "M 19.5,26 L 19.5,21 L 25.5,21 L 25.5,26 Z"
 BARE_HEAD = "M 22.5,8 A 7,7 0 1 0 22.5,22 A 7,7 0 1 0 22.5,8 Z"
 
 
+# Drawn 35.5 high (y 4..39.5); shown at the Pawn's height (Mac: smaller), scaled about the bottom.
+GRUNT_SCALE = 30.5 / 35.5
+GRUNT_TRANSFORM = "translate(22.5,39.5) scale(%.4f) translate(-22.5,-39.5)" % GRUNT_SCALE
+
+
 def grunt(team):
     return group(team, '<path d="%s"/><path d="%s"/>' % (STAND, HELM)
-                 + line(team, "M 15.5,14 L 29.5,14", 2) + line(team, "M 22.5,16.5 L 22.5,26", 1.5))
+                 + line(team, "M 15.5,14 L 29.5,14", 2 / GRUNT_SCALE) + line(team, "M 22.5,16.5 L 22.5,26", 1.5 / GRUNT_SCALE),
+                 GRUNT_TRANSFORM, stroke_width=1.5 / GRUNT_SCALE)
 
 
 def grunt_wounded(team):
-    return group(team, union([STAND, NECK, BARE_HEAD]))
+    return group(team, union([STAND, NECK, BARE_HEAD], stroke_width=3 / GRUNT_SCALE), GRUNT_TRANSFORM, stroke_width=1.5 / GRUNT_SCALE)
 
 
 # --- Vassal: kneeling, scaled from a 34-high drawing (y 5.5..39.5) to the pawn's 30.5 ------
