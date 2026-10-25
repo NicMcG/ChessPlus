@@ -24,8 +24,8 @@ def stake(x0, y0, x1, y1, w, sharp=0.22):
     return "M %s Z" % " L ".join("%.2f,%.2f" % p for p in pts)
 
 
-BACK = stake(9.5, 39.5, 31.5, 9, 5)
-FRONT = stake(35.5, 39.5, 13.5, 9, 5)
+BACK = stake(10, 39.5, 31, 10.5, 5)   # tips at y 10.5: a little shorter than the Pawn (Mac)
+FRONT = stake(35, 39.5, 14, 10.5, 5)
 
 
 def svg(team):

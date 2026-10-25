@@ -40,7 +40,7 @@ BARE_HEAD = "M 22.5,8 A 7,7 0 1 0 22.5,22 A 7,7 0 1 0 22.5,8 Z"
 
 
 # Drawn 35.5 high (y 4..39.5); shown at the Pawn's height (Mac: smaller), scaled about the bottom.
-GRUNT_SCALE = 30.5 / 35.5
+GRUNT_SCALE = 32.5 / 35.5   # a little taller than the Pawn (Mac)
 GRUNT_TRANSFORM = "translate(22.5,39.5) scale(%.4f) translate(-22.5,-39.5)" % GRUNT_SCALE
 
 
@@ -58,7 +58,7 @@ def grunt_wounded(team):
 LEGS = "M 9,39.5 L 9,34 C 9,31.5 11,30 13.5,30 L 34,30 C 36,30 37,31.5 37,34 L 37,39.5 Z"
 TORSO = "M 15,30 C 14,22 18,14 25,13 C 31,13 35,20 34,30 Z"
 HEAD_C = "M 18.5,5.5 A 5,5 0 1 0 18.5,15.5 A 5,5 0 1 0 18.5,5.5 Z"
-SCALE = 30.5 / 34.0
+SCALE = 29.0 / 34.0   # a little shorter than the Pawn (Mac)
 
 
 def vassal(team):
