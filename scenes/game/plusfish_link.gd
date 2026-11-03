@@ -171,9 +171,12 @@ func _set_line(start: GameState, moves: Array) -> void:
 		_request_start = text.substr(0, text.length() - 1)
 	_moves_so_far = moves.duplicate()
 	_moves_json = JSON.stringify(moves)
+	# Each position's key: a fingerprint of the one before it and the move, so
+	# keys stay short however long the game (they used to be the start's key
+	# plus every move so far, which grew with the square of the game's length).
 	_line_keys = [_start_key.md5_text()]
 	for move: String in moves:
-		_line_keys.append(_line_keys.back() + " " + move)
+		_line_keys.append((_line_keys.back() + " " + move).md5_text())
 	results.clear()
 	_need_lines.clear()
 	for ply in _line_keys.size():
