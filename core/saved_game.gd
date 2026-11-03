@@ -50,7 +50,7 @@ static func from_state(state: GameState, white: Army, black: Army, p_bot_team: i
 func create_state(rules: GameRules) -> GameState:
 	var state := ArmySetup.create_game(white_army, black_army, rules)
 	for text in moves:
-		var move := state.find_move(text)
+		var move := state.find_legal_move(text)
 		if move == null:
 			return null
 		state.make_move(move)

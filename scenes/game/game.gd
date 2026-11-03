@@ -248,7 +248,7 @@ var testing_moves: PackedStringArray = []
 func _play_testing_moves() -> void:
 	state = _create_start_state()
 	for text in testing_moves:
-		var move := state.find_move(text)
+		var move := state.find_legal_move(text)
 		if move == null:
 			break
 		state.make_move(move)
@@ -572,7 +572,7 @@ func play_from_here() -> void:
 	while state.history.size() > target:
 		state.undo_move(state.history.back())
 	for text: String in extra:
-		var move := state.find_move(text)
+		var move := state.find_legal_move(text)
 		if move == null:
 			break
 		state.make_move(move)
@@ -2287,7 +2287,7 @@ func _on_online_changed(_row: Dictionary) -> void:
 	var server_moves := online.moves()
 	var last_san := ""
 	for i in range(state.history.size(), server_moves.size()):
-		var move := state.find_move(str(server_moves[i]))
+		var move := state.find_legal_move(str(server_moves[i]))
 		if move == null:
 			_resync_with_server()
 			break

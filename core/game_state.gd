@@ -562,6 +562,18 @@ static func _from_square(text: String) -> Vector2i:
 		end += 1
 	return Board.parse_square(text.substr(0, end))
 
+## The same as find_move (the legal move with this text, or null), for
+## replaying a whole game (continuing a saved or online game, importing one):
+## only the moving piece's moves are made and the one found is checked, instead
+## of working out every legal move (2.5 ms or more a move on a fast PC, so a
+## second or more for a long game on a phone).
+func find_legal_move(text: String) -> Move:
+	var move := find_played_move(text)
+	if move and MoveGenerator.is_legal(self, move):
+		return move
+	# Not found or not legal here (or an old text find_move still knows).
+	return find_move(text)
+
 ## The available move whose to_text() matches, e.g. "e2-e4" or "e7-e8=Q", or null.
 ## For tests.
 func find_move(text: String) -> Move:

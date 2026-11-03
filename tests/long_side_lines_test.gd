@@ -152,6 +152,8 @@ func test_removing_a_side_line_keeps_the_others() -> void:
 	check(game.side_lines.is_empty(), "Its x removes it")
 	game.free()
 
+## Replaying makes only the moving piece's moves (find_played_move), and
+## find_legal_move checks the one found: both must agree with find_move.
 func test_find_played_move_with_every_kind_of_move() -> void:
 	# Pieces with abilities, a Jester and a Squire, so their moves are replayed too.
 	var army: Army = ArmyShare.from_text('Chess Plus army "All sorts": P G J BD A WW P P / R NC SQ Q K N V R')["army"]
@@ -162,18 +164,28 @@ func test_find_played_move_with_every_kind_of_move() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 17
 	var checked := 0
+	var illegal := 0
 	for ply in 120:
 		var moves: Array[Move] = state.moves()
 		if moves.is_empty() or state.outcome() != GameState.Outcome.NONE:
 			break
 		for move in moves:
 			var found := state.find_played_move(move.to_text())
+			var legal := state.find_legal_move(move.to_text())
 			checked += 1
-			if found == null or found.to_text() != move.to_text():
-				check(false, "find_played_move found %s at ply %d" % [move.to_text(), ply])
+			if found == null or found.to_text() != move.to_text() or legal == null or legal.to_text() != move.to_text():
+				check(false, "find_played_move / find_legal_move found %s at ply %d" % [move.to_text(), ply])
 				return
+		# Moves that would leave the king attacked: find_legal_move finds none, as find_move.
+		for move in MoveGenerator.pseudo_legal_moves(state):
+			if not moves.any(func(m: Move) -> bool: return m.to_text() == move.to_text()):
+				illegal += 1
+				if state.find_legal_move(move.to_text()) != null:
+					check(false, "find_legal_move found the illegal %s at ply %d" % [move.to_text(), ply])
+					return
 		# Abilities and captures half the time, so they get used.
 		var special := moves.filter(func(m: Move) -> bool: return m.ability != PieceDef.Ability.NONE or m.is_capture())
 		var pick: Move = special[rng.randi() % special.size()] if not special.is_empty() and rng.randf() < 0.5 else moves[rng.randi() % moves.size()]
 		state.make_move(pick)
 	check(checked > 1000, "Checked %d moves" % checked)
+	check(illegal > 0, "...and %d illegal ones" % illegal)
