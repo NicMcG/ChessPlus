@@ -327,3 +327,27 @@ func test_report_a_bug_and_discord_buttons() -> void:
 
 func test_privacy_gives_a_contact_address() -> void:
 	check(SettingsMenu.PRIVACY[-1].contains("theoverchesshub@gmail.com"), "The last line says where to write")
+
+## Settings are read from the file once and kept (reading it for every sound
+## and click was slow); the online game and sign-in are still read fresh and
+## changes merged into the file as it is, since two copies of the game on one
+## PC share them.
+func test_settings_are_kept_but_another_copys_sign_in_is_not_lost() -> void:
+	UserSettings.set_animation_speed("slow")
+	check_eq(UserSettings.animation_speed(), "slow", "A change shows at once")
+	# Another copy of the game signs in and joins an online game meanwhile.
+	var other := ConfigFile.new()
+	other.load(UserSettings.save_path)
+	other.set_value("online_sign_in", "device", {"user": "other copy"})
+	other.set_value("online", "game", "ABCDE")
+	other.save(UserSettings.save_path)
+	check_eq(UserSettings.online_sign_in(), {"user": "other copy"}, "Its sign-in is seen")
+	check_eq(UserSettings.online_game(), "ABCDE", "...and its online game")
+	UserSettings.set_reduce_effects(true)
+	var after := ConfigFile.new()
+	after.load(UserSettings.save_path)
+	check_eq(after.get_value("online_sign_in", "device", {}), {"user": "other copy"}, "A change here doesn't lose it")
+	check(UserSettings.reduce_effects(), "...and is kept")
+	UserSettings.set_online_game("")
+	UserSettings.set_online_sign_in({})
+	_finish()

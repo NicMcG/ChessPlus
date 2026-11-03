@@ -101,7 +101,7 @@ static func from_text(text: String) -> Dictionary:
 	var moves: PackedStringArray = parts["moves"].split(" ", false)
 	var state := position.create_state()
 	for move_text in moves:
-		var move := state.find_move(move_text)
+		var move := state.find_legal_move(move_text)
 		if move == null:
 			return _error("%s's move %d (%s) can't be played there. The text may be cut short or changed, or from another version of the game." % [
 					"White" if state.side_to_move == Piece.Team.WHITE else "Black", state.fullmove_number, move_text])

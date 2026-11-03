@@ -23,6 +23,8 @@ static func bring_over(old_dir: String, new_dir: String) -> int:
 	var copied := 0
 	for name in SAVES:
 		copied += _copy(old_dir.path_join(name), new_dir.path_join(name))
+	if copied > 0:
+		UserSettings.reload()
 	return copied
 
 ## On PC at start-up: from the ChessPlus folder next to this game's own.

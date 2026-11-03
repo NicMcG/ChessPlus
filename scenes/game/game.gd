@@ -248,7 +248,7 @@ var testing_moves: PackedStringArray = []
 func _play_testing_moves() -> void:
 	state = _create_start_state()
 	for text in testing_moves:
-		var move := state.find_move(text)
+		var move := state.find_legal_move(text)
 		if move == null:
 			break
 		state.make_move(move)
@@ -357,28 +357,45 @@ func _replay(main_moves: int, extra: Array) -> GameState:
 	return copy
 
 ## A copy of the game after its first `moves_played` moves, for looking back.
-## The copy already on the board is moved there if it's on the game's own
-## moves (stepping back or forward is then one move, not the whole game again).
 func _game_copy_at(moves_played: int) -> GameState:
+	return _line_copy_at(moves_played, [])
+
+## A copy of the game after its first `main_moves` moves, then `extra` (a side
+## line's moves, Move.to_text()); null if one isn't legal. The copy on the
+## board (or the one last looked at) is moved there: only the moves where its
+## line and this one differ are taken back and played, so stepping or tapping
+## round a long game and its side lines doesn't replay the whole game each time.
+func _line_copy_at(main_moves: int, extra: Array) -> GameState:
 	var copy := _view_state
 	if copy == null and _spare_copy_of == state:
 		copy = _spare_copy
 	_keep_copy(null)
-	return _step_copy(copy, moves_played)
+	return _step_copy(copy, main_moves, extra)
 
 ## `copy` (a copy of this game, or null) moved to the position after the game's
-## first `moves_played` moves; a fresh copy if it isn't on the game's moves.
-func _step_copy(copy: GameState, moves_played: int) -> GameState:
-	if copy == null or copy == state or not _on_game_moves(copy):
-		return _replay(moves_played, [])
-	while copy.history.size() > moves_played:
+## first `main_moves` moves then `extra`; a fresh copy if there's none, null if
+## a move isn't legal.
+func _step_copy(copy: GameState, main_moves: int, extra: Array = []) -> GameState:
+	if copy == null or copy == state:
+		return _replay(main_moves, extra)
+	var wanted := main_moves + extra.size()
+	var same := 0
+	var limit := mini(copy.history.size(), wanted)
+	while same < limit and copy.history[same].to_text() == _line_move_text(same, main_moves, extra):
+		same += 1
+	while copy.history.size() > same:
 		copy.undo_move(copy.history.back())
-	while copy.history.size() < moves_played:
-		var move := copy.find_played_move(state.history[copy.history.size()].to_text())
+	for i in range(same, wanted):
+		var move := copy.find_played_move(_line_move_text(i, main_moves, extra))
 		if move == null:
-			return _replay(moves_played, [])
+			return null
 		copy.make_move(move)
 	return copy
+
+## Move `i` (Move.to_text()) of the line made of the game's first `main_moves`
+## moves then `extra`.
+func _line_move_text(i: int, main_moves: int, extra: Array) -> String:
+	return state.history[i].to_text() if i < main_moves else extra[i - main_moves]
 
 ## The last copy looked at, kept after going back to the game so looking back
 ## again starts from it, and the game it's a copy of.
@@ -388,15 +405,6 @@ var _spare_copy_of: GameState
 func _keep_copy(copy: GameState) -> void:
 	_spare_copy = copy
 	_spare_copy_of = state if copy else null
-
-## Whether every move played in `copy` is the game's move at that point.
-func _on_game_moves(copy: GameState) -> bool:
-	if copy.history.size() > state.history.size():
-		return false
-	for i in copy.history.size():
-		if copy.history[i].to_text() != state.history[i].to_text():
-			return false
-	return true
 
 ## Stop looking back and show the game as it is now.
 func back_to_game() -> void:
@@ -564,7 +572,7 @@ func play_from_here() -> void:
 	while state.history.size() > target:
 		state.undo_move(state.history.back())
 	for text: String in extra:
-		var move := state.find_move(text)
+		var move := state.find_legal_move(text)
 		if move == null:
 			break
 		state.make_move(move)
@@ -631,7 +639,7 @@ func play_side_move(move: Move) -> void:
 	var shown := board_view.state
 	if shown == state:
 		# After the game, from its last position: on a copy.
-		shown = _replay(state.history.size(), [])
+		shown = _game_copy_at(state.history.size())
 		move = shown.find_move(text) if shown else null
 		if move == null:
 			return
@@ -640,6 +648,8 @@ func play_side_move(move: Move) -> void:
 		_step_along_game(shown, move, from + 1)
 		return
 	var path: Array = side_lines[line_index]["moves"].slice(0, line_ply) if line_index >= 0 else []
+	# The moves before this one are written already (in the line it leaves).
+	var entries: Array = side_lines[line_index]["entries"].slice(0, line_ply) if line_index >= 0 else []
 	path.append(text)
 	var index := _side_line_with(from, path)
 	shown.make_move(move)
@@ -650,7 +660,13 @@ func play_side_move(move: Move) -> void:
 			side_lines.append({"from": from})
 			index = side_lines.size() - 1
 		side_lines[index]["moves"] = path
-		side_lines[index]["entries"] = Notation.numbered_moves(shown, from)
+		# Only the new move is written (writing a move works out every legal
+		# move); the line's first move keeps its "12..." if Black played it.
+		var added := Notation.numbered_moves(shown, shown.history.size() - 1)
+		if not entries.is_empty() and added[0][0].ends_with("..."):
+			added[0][0] = ""
+		entries.append_array(added)
+		side_lines[index]["entries"] = entries
 	viewing = from
 	line_index = index
 	line_ply = path.size()
@@ -698,7 +714,7 @@ func view_side_line(index: int, moves_played: int) -> void:
 	if moves_played == 0:
 		view_move(line["from"])
 		return
-	var copy := _replay(line["from"], line["moves"].slice(0, moves_played))
+	var copy := _line_copy_at(line["from"], line["moves"].slice(0, moves_played))
 	if copy == null:
 		return
 	viewing = line["from"]
@@ -2271,7 +2287,7 @@ func _on_online_changed(_row: Dictionary) -> void:
 	var server_moves := online.moves()
 	var last_san := ""
 	for i in range(state.history.size(), server_moves.size()):
-		var move := state.find_move(str(server_moves[i]))
+		var move := state.find_legal_move(str(server_moves[i]))
 		if move == null:
 			_resync_with_server()
 			break

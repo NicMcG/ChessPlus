@@ -143,9 +143,10 @@ static func tallest_height(host: Node, defs: Array, width: float, p_zoom := 1.0)
 		probe.size = Vector2(width, 0)
 		for i in 2:
 			await tree.process_frame
-		# The screen closed while measuring (the card went with it): give up.
+		# The screen closed while measuring (the card went with it): give up
+		# (0: not measured, rather than the tallest of the cards so far).
 		if not is_instance_valid(probe):
-			return tallest
+			return 0.0
 		tallest = maxf(tallest, probe.get_combined_minimum_size().y)
 	probe.queue_free()
 	_tallest[key] = tallest

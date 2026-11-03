@@ -78,45 +78,41 @@ func _init() -> void:
 ## `side_lines`: [{"from": main-line moves before it, "entries": its moves as
 ## from Notation.numbered_moves}, ...]; `shown_line` / `shown_line_ply`: the
 ## side line and its move being looked at (-1: none).
+##
+## Only what changed is made again: the moves still the same keep their
+## buttons, a side line that grew gets buttons for its new moves only, and the
+## rest are just put in order. Building the whole list again whenever a side
+## line showed (hundreds of controls in a long game, for every move tried in a
+## side line) took a quarter of a second or more.
 func show_moves(entries: Array, result: String, viewing: int, tip: String,
 		side_lines: Array = [], shown_line := -1, shown_line_ply := 0) -> void:
 	_tip.text = tip
 	_tip.visible = entries.is_empty() and side_lines.is_empty()
-	if side_lines.is_empty():
-		_show_main_line(entries, viewing)
-	else:
-		_rebuild(entries, viewing, side_lines, shown_line, shown_line_ply)
+	_sync_entries(entries)
+	_sync_boxes(side_lines)
+	_arrange(entries, side_lines)
+	_show_viewed(viewing, shown_line, shown_line_ply)
 	set_marks(marks)
 	_result.text = result
 	_result.visible = result != ""
 
-## The entries the list shows (main line only, see _show_main_line), and each
-## one's controls (its turn number and a spacer if it starts a turn, then its
-## button). Empty after a rebuild with side lines.
+## The main line's entries the list shows, and each one's controls (its turn
+## number and a spacer if it starts a turn, then its button).
 var _shown_entries: Array = []
 var _entry_nodes: Array = []
 
-## Without side lines: keep the buttons of the moves that are still the same,
-## and only add (or take off) the ones at the end. Rebuilding the whole list
-## after every move made hundreds of controls each time, which stalled the
-## screen late in a long game.
-func _show_main_line(entries: Array, viewing: int) -> void:
-	if _shown_entries.is_empty():
-		_clear()
+## Keep the controls of the entries that are still the same, and make (or take
+## off) the ones at the end. _arrange puts them in place.
+func _sync_entries(entries: Array) -> void:
 	var same := 0
 	var limit := mini(_shown_entries.size(), entries.size())
 	while same < limit and _shown_entries[same] == entries[same]:
 		same += 1
-	if viewed_button:
-		_style_button(viewed_button, false)
-		viewed_button = null
 	for i in range(_entry_nodes.size() - 1, same - 1, -1):
 		for node: Node in _entry_nodes[i]:
-			node.get_parent().remove_child(node)
-			node.queue_free()
+			_free(node)
 	_entry_nodes.resize(same)
 	buttons.resize(same)
-	var grid := _grids[0] if not _grids.is_empty() else _new_grid()
 	for i in range(same, entries.size()):
 		var nodes: Array[Control] = []
 		var number: String = entries[i][0]
@@ -128,58 +124,92 @@ func _show_main_line(entries: Array, viewing: int) -> void:
 		var moves_played := i + 1
 		var button := _move_button(entries[i][2], entries[i][1], false, func() -> void: move_tapped.emit(moves_played))
 		nodes.append(button)
-		for node in nodes:
-			grid.add_child(node)
 		buttons.append(button)
 		_entry_nodes.append(nodes)
 	_shown_entries = entries
-	if viewing > 0 and viewing <= buttons.size():
-		viewed_button = buttons[viewing - 1]
-		_style_button(viewed_button, true)
 
-## Take everything out of the list.
-func _clear() -> void:
-	for child in _body.get_children():
-		_body.remove_child(child)
-		child.queue_free()
-	_grids.clear()
-	buttons.clear()
-	side_buttons.clear()
-	viewed_button = null
-	_shown_entries = []
-	_entry_nodes.clear()
+## Each side line's box as shown: {"line" (the side line it shows), "from",
+## "entries" (the ones shown), "row" (their buttons), "node" (the box), "flow"
+## (holding its moves), "remove" (its x button)}.
+var _boxes: Array = []
 
-## With side lines: build the whole list again.
-func _rebuild(entries: Array, viewing: int, side_lines: Array, shown_line: int, shown_line_ply: int) -> void:
-	_clear()
-	side_buttons.resize(side_lines.size())
-	# Each side line's box goes after the turn holding the move it replaces
-	# (the last turn for one from the end of the game).
+## Keep each side line's box if it shows the start of that line, adding
+## buttons for its new moves; otherwise make it again. Boxes go with their
+## line, so removing one side line leaves the others' boxes as they are.
+func _sync_boxes(side_lines: Array) -> void:
+	var old := _boxes
+	_boxes = []
+	for line: Dictionary in side_lines:
+		var box: Dictionary = {}
+		for i in old.size():
+			if is_same(old[i]["line"], line):
+				box = old[i]
+				old.remove_at(i)
+				break
+		if not box.is_empty() and not _box_shows_start_of(box, line):
+			_free(box["node"])
+			box = {}
+		if box.is_empty():
+			box = _side_line_box()
+			box["line"] = line
+			box["from"] = line["from"]
+		_boxes.append(box)
+		var entries: Array = line["entries"]
+		var row: Array[Button] = box["row"]
+		var flow: HFlowContainer = box["flow"]
+		for i in range(box["entries"].size(), entries.size()):
+			if entries[i][0] != "":
+				var number := _number_label(entries[i][0])
+				number.custom_minimum_size.x = 0
+				number.add_theme_font_size_override("font_size", LINE_FONT_SIZE)
+				flow.add_child(number)
+			var moves_played := i + 1
+			var button := _move_button(entries[i][2], entries[i][1], false, func() -> void: line_tapped.emit(_box_index(box), moves_played), true)
+			button.set_meta("number", entries[i][0])
+			flow.add_child(button)
+			row.append(button)
+		flow.move_child(box["remove"], -1)
+		box["entries"] = entries.duplicate()
+	for box: Dictionary in old:
+		_free(box["node"])
+	side_buttons = _boxes.map(func(box: Dictionary) -> Array[Button]: return box["row"])
+
+## Which side line `box` shows now (its index), or -1.
+func _box_index(box: Dictionary) -> int:
+	for i in _boxes.size():
+		if is_same(_boxes[i], box):
+			return i
+	return -1
+
+static func _box_shows_start_of(box: Dictionary, line: Dictionary) -> bool:
+	var shown: Array = box["entries"]
+	var entries: Array = line["entries"]
+	if box["from"] != line["from"] or shown.size() > entries.size():
+		return false
+	for i in shown.size():
+		if shown[i] != entries[i]:
+			return false
+	return true
+
+## Put everything in order: the main line's turns in grids, split after each
+## turn holding a move a side line replaces, with that side line's box there
+## (the last turn for one from the end of the game).
+func _arrange(entries: Array, side_lines: Array) -> void:
 	var after_entry := {}
 	for index in side_lines.size():
 		var at := mini(int(side_lines[index]["from"]), entries.size() - 1)
 		if not after_entry.has(at):
 			after_entry[at] = []
 		after_entry[at].append(index)
-	var grid := _new_grid()
-	for index: int in after_entry.get(-1, []):
-		_body.add_child(_side_line_box(side_lines[index], index, shown_line_ply if index == shown_line else -1))
+	# The list's parts in order: side lines (their index) and runs of the main
+	# line's entries (Vector2i(first, end)).
+	var parts: Array = []
+	parts.append_array(after_entry.get(-1, []))
+	var run_start := 0
 	var turn_start := 0
 	for i in entries.size():
-		var number: String = entries[i][0]
-		# A turn starts with a number. If Black moved first, White's cell is empty.
-		if number != "":
+		if entries[i][0] != "":
 			turn_start = i
-			grid.add_child(_number_label(number))
-			if number.ends_with("..."):
-				grid.add_child(Control.new())
-		var viewed := i + 1 == viewing
-		var moves_played := i + 1
-		var button := _move_button(entries[i][2], entries[i][1], viewed, func() -> void: move_tapped.emit(moves_played))
-		grid.add_child(button)
-		buttons.append(button)
-		if viewed:
-			viewed_button = button
 		# At the end of each turn: the side lines branching in it.
 		if i < entries.size() - 1 and entries[i + 1][0] == "":
 			continue
@@ -189,9 +219,73 @@ func _rebuild(entries: Array, viewing: int, side_lines: Array, shown_line: int, 
 		if boxes.is_empty():
 			continue
 		boxes.sort()
-		for index: int in boxes:
-			_body.add_child(_side_line_box(side_lines[index], index, shown_line_ply if index == shown_line else -1))
-		grid = _new_grid()
+		parts.append(Vector2i(run_start, i + 1))
+		parts.append_array(boxes)
+		run_start = i + 1
+	parts.append(Vector2i(run_start, entries.size()))
+	var wanted: Array[Node] = []
+	var grid_count := 0
+	for part: Variant in parts:
+		if part is Vector2i:
+			if grid_count == _grids.size():
+				_grids.append(_new_grid())
+			_fill_grid(_grids[grid_count], part.x, part.y)
+			wanted.append(_grids[grid_count])
+			grid_count += 1
+		else:
+			wanted.append(_boxes[part]["node"])
+	for k in range(_grids.size() - 1, grid_count - 1, -1):
+		_free(_grids[k])
+	_grids.resize(grid_count)
+	for i in wanted.size():
+		var node := wanted[i]
+		if node.get_parent() != _body:
+			if node.get_parent():
+				node.get_parent().remove_child(node)
+			_body.add_child(node)
+		if node.get_index() != i:
+			_body.move_child(node, i)
+
+## Give `grid` the controls of entries first .. end - 1, keeping the ones
+## already in place.
+func _fill_grid(grid: GridContainer, first: int, end: int) -> void:
+	var wanted: Array[Node] = []
+	for i in range(first, end):
+		wanted.append_array(_entry_nodes[i])
+	var children := grid.get_children()
+	var same := 0
+	var limit := mini(children.size(), wanted.size())
+	while same < limit and children[same] == wanted[same]:
+		same += 1
+	for k in range(children.size() - 1, same - 1, -1):
+		grid.remove_child(children[k])
+	for k in range(same, wanted.size()):
+		var node := wanted[k]
+		if node.get_parent():
+			node.get_parent().remove_child(node)
+		grid.add_child(node)
+
+## Highlight the move being looked at (and only that one).
+func _show_viewed(viewing: int, shown_line: int, shown_line_ply: int) -> void:
+	var button: Button = null
+	if shown_line >= 0 and shown_line < side_buttons.size():
+		var row: Array = side_buttons[shown_line]
+		if shown_line_ply > 0 and shown_line_ply <= row.size():
+			button = row[shown_line_ply - 1]
+	elif viewing > 0 and viewing <= buttons.size():
+		button = buttons[viewing - 1]
+	if button == viewed_button:
+		return
+	if is_instance_valid(viewed_button):
+		_style_button(viewed_button, false)
+	viewed_button = button
+	if button:
+		_style_button(button, true)
+
+static func _free(node: Node) -> void:
+	if node.get_parent():
+		node.get_parent().remove_child(node)
+	node.queue_free()
 
 ## Mark mistakes and blunders (moves played -> MoveQuality.Mark; {} for none).
 func set_marks(p_marks: Dictionary) -> void:
@@ -218,13 +312,13 @@ func _new_grid() -> GridContainer:
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 2)
-	_body.add_child(grid)
-	_grids.append(grid)
 	return grid
 
-## One side line: its moves in a box (wrapping onto more rows if it's long),
-## then a remove button. `shown_ply`: its move being looked at (-1: none).
-func _side_line_box(line: Dictionary, index: int, shown_ply: int) -> Control:
+## One side line's box (wrapping onto more rows if it's long), empty but for
+## its remove button: _sync_boxes adds the moves before that.
+func _side_line_box() -> Dictionary:
+	var row: Array[Button] = []
+	var result := {"entries": [], "row": row}
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", LINE_INDENT)
 	margin.add_theme_constant_override("margin_top", 2)
@@ -241,22 +335,6 @@ func _side_line_box(line: Dictionary, index: int, shown_ply: int) -> Control:
 	flow.add_theme_constant_override("v_separation", 2)
 	flow.mouse_filter = Control.MOUSE_FILTER_PASS
 	box.add_child(flow)
-	var row: Array[Button] = []
-	var entries: Array = line["entries"]
-	for i in entries.size():
-		if entries[i][0] != "":
-			var number := _number_label(entries[i][0])
-			number.custom_minimum_size.x = 0
-			number.add_theme_font_size_override("font_size", LINE_FONT_SIZE)
-			flow.add_child(number)
-		var viewed := i + 1 == shown_ply
-		var moves_played := i + 1
-		var button := _move_button(entries[i][2], entries[i][1], viewed, func() -> void: line_tapped.emit(index, moves_played), true)
-		button.set_meta("number", entries[i][0])
-		flow.add_child(button)
-		row.append(button)
-		if viewed:
-			viewed_button = button
 	var remove := Button.new()
 	remove.name = "Remove"
 	remove.text = "×"
@@ -266,10 +344,12 @@ func _side_line_box(line: Dictionary, index: int, shown_ply: int) -> Control:
 	remove.add_theme_font_size_override("font_size", FONT_SIZE)
 	remove.custom_minimum_size = Vector2(LINE_ICON_SIZE + 8, LINE_ICON_SIZE + 8)
 	remove.mouse_filter = Control.MOUSE_FILTER_PASS
-	remove.pressed.connect(func() -> void: line_removed.emit(index))
+	remove.pressed.connect(func() -> void: line_removed.emit(_box_index(result)))
 	flow.add_child(remove)
-	side_buttons[index] = row
-	return margin
+	result["node"] = margin
+	result["flow"] = flow
+	result["remove"] = remove
+	return result
 
 ## Side line `index` as plain text, e.g. "12... d6 13. Bc4" (for tests).
 func side_line_text(index: int) -> String:

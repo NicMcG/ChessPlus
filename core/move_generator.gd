@@ -52,10 +52,14 @@ static func _keeps_royals_safe(state: GameState, move: Move, royals: Array[Vecto
 ## without checking whether it leaves their royal piece attacked. With
 ## `captures_only`, just the captures (and shield breaks): the practice bot uses
 ## that to look at captures without paying for every quiet move too.
-static func pseudo_legal_moves(state: GameState, captures_only := false) -> Array[Move]:
+static func pseudo_legal_moves(state: GameState, captures_only := false, only_from := Board.NO_SQUARE) -> Array[Move]:
 	var board := state.board
 	var moves: Array[Move] = []
 	var pieces := board.pieces_of(state.side_to_move)
+	# Just one piece's moves (GameState.find_played_move): no Haunt then.
+	if only_from != Board.NO_SQUARE:
+		var only := board.get_piece(only_from)
+		pieces = {only_from: only} if only and only.team == state.side_to_move else {}
 	# A piece put to sleep by the opponent's Song of Slumber can't move this turn.
 	var frozen := state.frozen_piece()
 	for from: Vector2i in pieces:
@@ -69,7 +73,7 @@ static func pseudo_legal_moves(state: GameState, captures_only := false) -> Arra
 			_add_castling_moves(board, state.rules, from, piece, moves)
 		if piece.can_use_ability():
 			_add_ability_moves(state, from, piece, moves, first_new, captures_only)
-	if not captures_only:
+	if not captures_only and only_from == Board.NO_SQUARE:
 		_add_haunt_moves(state, moves)
 	return _apply_guards(state, moves)
 
