@@ -541,15 +541,26 @@ static func _stays_on_one_color(def: PieceDef) -> bool:
 ## quicker: it doesn't check every move for leaving the king attacked (each a
 ## make, attack test and undo), which made looking back through a long game
 ## take a quarter of a second per step. If two moves have the text, it asks
-## find_move to be sure.
+## find_move to be sure. Only the moves of the piece on the square the text
+## starts with are made (a fifth of the time again).
 func find_played_move(text: String) -> Move:
 	var found: Move = null
-	for move in MoveGenerator.pseudo_legal_moves(self):
+	for move in MoveGenerator.pseudo_legal_moves(self, false, _from_square(text)):
 		if move.to_text() == text:
 			if found:
 				return find_move(text)
 			found = move
 	return found
+
+## The square a move's text (Move.to_text()) starts from: "e2" for "e2-e4",
+## "c1" for "c1!g5"; NO_SQUARE for a Haunt ("@e3"), which starts off the board.
+static func _from_square(text: String) -> Vector2i:
+	if text.begins_with("@"):
+		return Board.NO_SQUARE
+	var end := 1
+	while end < text.length() and text[end] >= "0" and text[end] <= "9":
+		end += 1
+	return Board.parse_square(text.substr(0, end))
 
 ## The available move whose to_text() matches, e.g. "e2-e4" or "e7-e8=Q", or null.
 ## For tests.
