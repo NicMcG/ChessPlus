@@ -101,8 +101,8 @@ var _fitted_size := Vector2i.ZERO
 func _process(_delta: float) -> void:
 	if _fitting_scale and get_window().size != _fitted_size:
 		_fit_content_scale()
-	if not _screens_to_load.is_empty():
-		_load_next_screens()
+	if not _warm_up.is_empty():
+		_warm_up_step()
 
 ## The smallest space (in game units) the screens need. A smaller window (a
 ## small browser window, say) is drawn scaled down just enough to fit.
@@ -312,31 +312,45 @@ func screen_scene(path: String) -> PackedScene:
 		_scenes[path] = scene if scene else load(path)
 	return _scenes[path]
 
-## Screens still to load after the menu (see _load_screens_soon), and frames
-## to wait before starting.
-var _screens_to_load: Array[String] = []
+## What's still to load after the menu (see _load_screens_soon), one step a
+## frame, and frames to wait before starting.
+var _warm_up: Array[Callable] = []
 var _frames_before_loading := 0
 
-## Once the menu has been drawn, load the other screens so they're ready when
-## wanted (_load_next_screens, every frame until done): on other threads where
-## there are threads (the PC app), else (the web version) one a frame.
+## Once the menu has been drawn, load what the other screens need so it's ready
+## when wanted: the screens themselves (on other threads where there are threads,
+## the PC app; else, in the web version, one a frame), then every piece's
+## pictures, a piece a frame (the army builder, testing mode and the first game
+## each loaded dozens at once: about 0.1 s on a fast PC).
 func _load_screens_soon() -> void:
-	_screens_to_load = SCREENS.duplicate()
 	_frames_before_loading = 2
+	if OS.has_feature("threads"):
+		_warm_up.append(func() -> void:
+			for path in SCREENS:
+				if not _scenes.has(path):
+					ResourceLoader.load_threaded_request(path))
+	else:
+		for path in SCREENS:
+			_warm_up.append(screen_scene.bind(path))
+	_warm_up.append(_load_piece_pictures_soon)
 
-func _load_next_screens() -> void:
+func _load_piece_pictures_soon() -> void:
+	for def in PieceCatalog.all_defs():
+		for team in [Piece.Team.WHITE, Piece.Team.BLACK]:
+			_warm_up.append(func() -> void:
+				PieceArt.all_textures(def, team)
+				# The army builder's tray shows the form a piece turns into.
+				if def.transforms_into:
+					PieceArt.all_textures(def.transforms_into, team))
+	# Last: the piece card pop-up's size (PieceInfo.prepare), measured over
+	# the next frames while the menu is idle.
+	_warm_up.append(func() -> void: PieceInfo.prepare(self))
+
+func _warm_up_step() -> void:
 	if _frames_before_loading > 0:
 		_frames_before_loading -= 1
 		return
-	while not _screens_to_load.is_empty():
-		var path: String = _screens_to_load.pop_front()
-		if _scenes.has(path):
-			continue
-		if OS.has_feature("threads"):
-			ResourceLoader.load_threaded_request(path)
-		else:
-			screen_scene(path)
-			return
+	_warm_up.pop_front().call()
 
 ## Replace the current screen with `new_screen`.
 func _show(new_screen: Node) -> void:

@@ -16,12 +16,21 @@ var team := Piece.Team.WHITE
 const CARD_WIDTH := 612.0
 static var card_height := 0.0
 
-## Measure the tallest card ahead of time (the game screen calls this), so every
-## pop-up is the same size.
+## Measure the tallest card ahead of time, so every pop-up is the same size.
+## The main menu starts this once it has loaded the rest (it takes a card per
+## piece, two frames each, better done there than while a game's first moves
+## are animating); the game screen calls it too, in case it hasn't happened.
 static func prepare(host: Node) -> void:
-	if card_height > 0:
+	if card_height > 0 or _preparing:
 		return
-	card_height = await PieceCard.tallest_height(host, PieceCatalog.all_defs(), CARD_WIDTH)
+	_preparing = true
+	var height := await PieceCard.tallest_height(host, PieceCatalog.all_defs(), CARD_WIDTH)
+	_preparing = false
+	if height > 0:
+		card_height = height
+
+## True while prepare() is measuring.
+static var _preparing := false
 
 ## Show the card for `p_def` on top of `parent` (usually the current screen).
 static func open(parent: Node, p_def: PieceDef, p_team := Piece.Team.WHITE) -> PieceInfo:
