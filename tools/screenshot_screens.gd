@@ -68,6 +68,7 @@ func _initialize() -> void:
 		print("Saved ", path)
 	DirAccess.remove_absolute(SavedGame.save_path)
 	DirAccess.remove_absolute(UserSettings.save_path)
+	UserSettings.reload()
 	for army in main.library.armies():
 		main.library.delete(army)
 	DirAccess.remove_absolute(ARMIES_DIR)
