@@ -1,13 +1,13 @@
-# Chess Plus army pool grown by `plusfish meta --wide` (wide eval-guided climbs; games decide who stays).
-# After round 15. Games = mean score against the rest of the pool (40 games per pair, 6000 nodes per move); eval = mean turn-0 advantage at 20000 nodes (cp).
+# Overchess army pool: `plusfish meta --wide` (15 rounds from #29's pool trimmed to the budget), then the best ten of that pool + the start pool by games (select.py).
+# Games = mean score against the other nine (40 games per pair, 6000 nodes per move); eval = mean turn-0 advantage over them at 20000 nodes (cp).
 # army | name | cost | games (Elo) | eval | pieces
-1(VS)JK(SQ)1(VS)1/GVVL(WW)AB(AB) | Wide 15a | 40 | 57.2% (+51) | +137 | 2 Vampire, Archer, Squire, Bishop, Jester, Ghost, Lance, Werewolf, 2 Vassal, Abatis
-(VS)R(VS)K1(GR)(CT)1/JVV(RM)(RM)(WW)B(AB) | Wide 11a | 40 | 54.4% (+31) | +13 | 2 Vampire, Rook, Bishop, Jester, Catapult, 2 Ram, Werewolf, Grunt, 2 Vassal, Abatis
-(GR)(GR)J1KW1R/(PD)VV(BR)(AB)(PD)(CV)1 | Wide 11c | 40 | 54.4% (+31) | +71 | Wizard, 2 Vampire, Rook, Jester, Cavalry, Barbarian, 2 Paladin, 2 Grunt, Abatis
-1A(CH)(CT)K(GR)(VS)1/(AB)B1(BR)(BR)VVR | Wide 14b | 40 | 54.2% (+29) | +94 | 2 Vampire, Archer, Rook, Chariot, Bishop, Catapult, 2 Barbarian, Grunt, Vassal, Abatis
-(GA)2KC2N/B(GA)VJA(RM)(PD)A | Wide 5b | 40 | 52.6% (+18) | -63 | Vampire, 2 Archer, Cannon, Bishop, Jester, 2 Galleon, Knight, Ram, Paladin
-(VS)W(VS)JK2(PA)/R1BV(NC)(BR)G(AB) | Wide 13a | 40 | 51.0% (+7) | -34 | Wizard, Vampire, Rook, Bishop, Jester, Necromancer, Ghost, Barbarian, Parapet, 2 Vassal, Abatis
-1ANNK1G(VS)/1VV(CT)(NC)(BR)G(AB) | Wide 14c | 40 | 48.9% (-8) | +88 | 2 Vampire, Archer, Necromancer, Catapult, 2 Ghost, 2 Knight, Barbarian, Vassal, Abatis
-(NC)1PNK(BR)(GR)G/(AB)JV(PA)(BR)BV(AB) | Wide 4b | 40 | 46.8% (-22) | +111 | 2 Vampire, Bishop, Jester, Necromancer, Ghost, Knight, 2 Barbarian, Parapet, Grunt, Pawn, 2 Abatis
-(VS)(GR)(GR)1K(GR)1(GR)/(CH)(CV)VJQA1J | Wide 1c | 40 | 43.5% (-46) | -70 | Queen, Vampire, Archer, Chariot, 2 Jester, Cavalry, 4 Grunt, Vassal
-(NC)(VS)NK(SQ)1R(AS)/(CV)(PD)(RM)LV1(RO)N | Wide 2a | 40 | 36.9% (-93) | -347 | Vampire, Rook, Squire, Necromancer, Rogue, Cavalry, 2 Knight, Lance, Ram, Paladin, Vassal, Assassin
+(NC)(VS)(VS)K1(BR)J1/LG(BR)(CV)(RM)A(PR)(GR) | Wide 11a | 40 | 69.2% (+140) | +156 | Princess, Archer, Jester, Necromancer, Cavalry, Ghost, Lance, Ram, 2 Barbarian, Grunt, 2 Vassal
+(PA)(NC)J1K1N1/B(PA)B(BR)(AB)Q(PD)J | Wide 3a | 40 | 61.5% (+82) | -22 | Queen, 2 Bishop, 2 Jester, Necromancer, Knight, Barbarian, 2 Parapet, Paladin, Abatis
+1R1(PR)K1(CT)1/JV1(BR)(PD)AB1 | Wide 2a | 39 | 51.2% (+9) | -138 | Princess, Vampire, Archer, Rook, Bishop, Jester, Catapult, Barbarian, Paladin
+R(PD)C(WW)KPNR/1AGG(WW)(BR)(BR)1 | Wide 14b | 40 | 48.2% (-13) | +154 | Archer, 2 Rook, Cannon, 2 Ghost, Knight, 2 Werewolf, 2 Barbarian, Paladin, Pawn
+(AS)(VS)(RM)KA(VS)(VS)(VS)/(AB)(VS)AJJVCB | Wide 15a | 40 | 47.9% (-14) | +69 | Vampire, 2 Archer, Cannon, Bishop, 2 Jester, Ram, 5 Vassal, Abatis, Assassin
+1A(CH)(CT)K3/(AB)B1(BR)(BR)VVR | Wide 14b (#29) | 40 | 46.8% (-22) | -43 | 2 Vampire, Archer, Rook, Chariot, Bishop, Catapult, 2 Barbarian, Abatis
+(GA)2KC2N/B(GA)VJA(RM)1A | Wide 5b (#29) | 39.5 | 46.5% (-24) | -32 | Vampire, 2 Archer, Cannon, Bishop, Jester, 2 Galleon, Knight, Ram
+1(GR)(GR)1K(GR)1(GR)/(CH)(CV)VJQA1J | Wide 1c (#29) | 40 | 45.1% (-34) | -4 | Queen, Vampire, Archer, Chariot, 2 Jester, Cavalry, 4 Grunt
+1R1K1(GR)(CT)1/JVV(RM)(RM)(WW)B(AB) | Wide 11a (#29) | 40 | 43.8% (-44) | -95 | 2 Vampire, Rook, Bishop, Jester, Catapult, 2 Ram, Werewolf, Grunt, Abatis
+2JK(SQ)3/GVVL(WW)AB(AB) | Wide 15a (#29) | 40 | 39.7% (-72) | -45 | 2 Vampire, Archer, Squire, Bishop, Jester, Ghost, Lance, Werewolf, Abatis
