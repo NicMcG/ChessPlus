@@ -10,7 +10,9 @@ extends SceneTree
 ## "ring:d5" right-clicks d5 (a green ring); "arrow:g1>f3" right-drags an arrow.
 ## "wait:2" lets 2 seconds pass (animations, the checkmate effect, Plusfish).
 ## "board" presses View board on the result screen (and skips the checkmate effect).
-## "view:5" looks at the position after 5 moves, as tapping the move list does.
+## "view:5" looks at the position after 5 moves, as tapping the move list does;
+## moves after it are tried on the board (side lines, where allowed: testing).
+## "line:0:3" looks at side line 0's third move (moves after it branch off it).
 ## "export" presses Export game on the result screen (skips the checkmate effect).
 ## "testing" (anywhere) opens it as a testing-mode game from the standard position.
 
@@ -55,12 +57,15 @@ func _initialize() -> void:
 			game._on_game_over_action("export")
 		elif arg.begins_with("view:"):
 			game.view_move(int(arg.substr(5)))
+		elif arg.begins_with("line:"):
+			game.view_side_line(int(arg.get_slice(":", 1)), int(arg.get_slice(":", 2)))
 		else:
-			var move := Notation.find_move(game.state, arg)
+			# A move in the position on the board (a side line while looking back).
+			var move := Notation.find_move(game.board_view.state, arg)
 			if move == null:
 				push_error("Not a legal move: " + arg)
 				break
-			game.play(move)
+			game.choose(move)
 	for i in 5:
 		await process_frame
 	root.get_texture().get_image().save_png(out_path)
