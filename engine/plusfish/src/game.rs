@@ -633,3 +633,46 @@ pub fn outcome_name(o: Outcome) -> &'static str {
         Outcome::SeventyFiveMoves => "seventy_five_moves",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn game(fen: &str) -> Game {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/pieces");
+        let cat = Arc::new(Catalog::load_dir(&dir).unwrap());
+        game_from_fen(&cat, fen, None).unwrap()
+    }
+
+    fn play(g: &mut Game, moves: &[&str]) {
+        for m in moves {
+            g.play_text(m).unwrap();
+        }
+    }
+
+    // The game's tests/game_end_test.gd checks the same two games.
+    #[test]
+    fn repetition_counts_across_vassal_moves() {
+        // A Vassal can step sideways and back, so its moves don't end the
+        // window for repetition (Mac, 27 Oct 2026).
+        let mut g = game("4k3/8/8/8/8/4(VS)3/8/K7 w - - 0 1");
+        let shuffle = ["e3-f3", "e8-d8", "f3-e3", "d8-e8"];
+        play(&mut g, &shuffle);
+        assert_eq!(g.outcome(), Outcome::None, "seen twice");
+        play(&mut g, &shuffle);
+        assert_eq!(g.outcome(), Outcome::Repetition, "seen three times, Vassal moves and all");
+    }
+
+    #[test]
+    fn a_piece_that_lost_its_first_move_is_a_new_position() {
+        // The Abatis on its starting square still has its double step; stepped
+        // back and forward again it doesn't, so the start doesn't count.
+        let mut g = game("4k3/8/8/8/8/8/4(AB)3/K7 w - - 0 1");
+        let shuffle = ["e2-e1", "e8-d8", "e1-e2", "d8-e8"];
+        play(&mut g, &shuffle);
+        play(&mut g, &shuffle);
+        assert_eq!(g.outcome(), Outcome::None, "same squares as the start three times, but the start had a double step");
+        play(&mut g, &shuffle);
+        assert_eq!(g.outcome(), Outcome::Repetition, "the moved Abatis's position three times");
+    }
+}

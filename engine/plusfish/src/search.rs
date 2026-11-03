@@ -771,7 +771,7 @@ impl<'a> Searcher<'a> {
 
     fn is_repetition(&self, p: &Position) -> bool {
         let n = self.keys.len();
-        let window = (p.halfmove as usize).min(n);
+        let window = (p.unchanged as usize).min(n);
         for i in 1..=window {
             if self.keys[n - i] == p.key {
                 return true;

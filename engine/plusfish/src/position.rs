@@ -2060,7 +2060,10 @@ impl Position {
         if self.unchanged >= 150 {
             return Outcome::SeventyFiveMoves;
         }
-        if repetitions(keys, self.halfmove as usize) >= 3 {
+        // Repetitions count back to the last change to the pieces, not to the
+        // last capture or pawn-type move: a Vassal can step sideways and an
+        // Abatis back, so their moves can be undone (Mac, 27 Oct 2026).
+        if repetitions(keys, self.unchanged as usize) >= 3 {
             return Outcome::Repetition;
         }
         Outcome::None
