@@ -131,13 +131,23 @@ var hint_arrow: Array = []:
 	set(value):
 		hint_arrow = value
 		queue_redraw()
-## The piece Plusfish's suggestion promotes to or brings back (Raise Dead):
-## {"square", "def", "team", "ring"}, or empty for none. Drawn as a small blue
-## badge with the piece's picture in the square's top-right corner; "ring" also
-## circles the square (Raise Dead has no arrow). Cleared with hint_arrow.
+## The piece Plusfish's suggestion promotes to, brings back (Raise Dead) or
+## turns into (Full Moon): {"square", "def", "team"}, or empty for none. Drawn
+## as a small blue badge with the piece's picture in the square's top-right
+## corner. Cleared with hint_arrow.
 var hint_piece: Dictionary = {}:
 	set(value):
 		hint_piece = value
+		queue_redraw()
+## Plusfish's suggestion when it's a special ability (no arrow: the piece
+## doesn't move): {"ability" (PieceDef.Ability), "from", "to", "def", "team"},
+## or empty for none. The piece using it gets a blue ring; Crack Shot adds a
+## dashed shot to a crosshair on its target, Song of Slumber a dotted line to a
+## blue "Zz" on its target, Haunt the Ghost faded in on the square it comes back
+## to ("def"/"team"). Cleared with hint_arrow.
+var hint_ability: Dictionary = {}:
+	set(value):
+		hint_ability = value
 		queue_redraw()
 ## Where the right button went down (NO_SQUARE when it isn't held).
 var _arrow_start := Board.NO_SQUARE
@@ -174,6 +184,7 @@ func refresh() -> void:
 	highlights.clear()
 	hint_arrow = []
 	hint_piece = {}
+	hint_ability = {}
 	_arrow_start = Board.NO_SQUARE
 	queue_redraw()
 
@@ -645,6 +656,8 @@ func _draw() -> void:
 			_draw_closing_rings(_square_rect(move.decoy_square))
 	if hint_arrow.size() == 2 and hint_arrow[0] != hint_arrow[1]:
 		_draw_arrow(square_center(hint_arrow[0]), square_center(hint_arrow[1]), HINT_ARROW_COLOR)
+	if not hint_ability.is_empty():
+		_draw_hint_ability(hint_ability)
 	if not hint_piece.is_empty():
 		_draw_hint_piece(hint_piece)
 	for arrow: Array in arrows:
@@ -659,14 +672,48 @@ func _draw() -> void:
 		var rect := Rect2(_pointer_pos - Vector2(size_px, size_px) / 2, Vector2(size_px, size_px))
 		_draw_piece(board.get_piece(_selected), rect)
 
+## The marks for hint_ability, all in the hint arrow's blue: a ring round the
+## piece using it (or, for Haunt, round the square the Ghost comes back to),
+## and what it does to its target.
+func _draw_hint_ability(hint: Dictionary) -> void:
+	var s := _square_size()
+	var ability: PieceDef.Ability = hint["ability"]
+	var ring_radius := s * 0.45
+	var ring_width := s * 0.07
+	if ability == PieceDef.Ability.HAUNT:
+		var rect := _square_rect(hint["to"])
+		var picture := rect.grow(-s * 0.08)
+		var def: PieceDef = hint["def"]
+		_draw_piece(Piece.new(def, hint["team"]), picture, 0.5, Color(0, 0, 0), def)
+		draw_arc(rect.get_center(), ring_radius, 0.0, TAU, 48, HINT_ARROW_COLOR, ring_width, true)
+		return
+	var from := square_center(hint["from"])
+	draw_arc(from, ring_radius, 0.0, TAU, 48, HINT_ARROW_COLOR, ring_width, true)
+	if not ability in [PieceDef.Ability.CRACK_SHOT, PieceDef.Ability.SONG_OF_SLUMBER]:
+		return
+	var to := square_center(hint["to"])
+	var direction := (to - from).normalized()
+	var start := from + direction * ring_radius
+	if ability == PieceDef.Ability.CRACK_SHOT:
+		# A dashed shot (the Archer doesn't move) into a crosshair on the target.
+		var aim := s * 0.3
+		draw_dashed_line(start, to - direction * aim, HINT_ARROW_COLOR, s * 0.08, maxf(1.0, s * 0.16), true, true)
+		draw_arc(to, aim, 0.0, TAU, 40, HINT_ARROW_COLOR, s * 0.06, true)
+		for side: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+			draw_line(to + side * s * 0.14, to + side * s * 0.44, HINT_ARROW_COLOR, s * 0.06, true)
+	else:
+		# Song of Slumber: a line of round dots, and the target falls asleep.
+		var end := to - direction * s * 0.3
+		var count := maxi(1, int(start.distance_to(end) / (s * 0.2)))
+		for i in count + 1:
+			draw_circle(start.lerp(end, float(i) / count), s * 0.055, HINT_ARROW_COLOR)
+		_draw_asleep(_square_rect(hint["to"]), HINT_BADGE_COLOR, Color(0.08, 0.25, 0.55), false)
+
 ## The badge for hint_piece: the piece's picture on a pale disc with a blue rim
-## in the square's top-right corner (clear of the coordinates), plus a ring
-## round the square if asked for.
+## in the square's top-right corner (clear of the coordinates).
 func _draw_hint_piece(hint: Dictionary) -> void:
 	var rect := _square_rect(hint["square"])
 	var s := rect.size.x
-	if hint.get("ring", false):
-		draw_arc(rect.get_center(), s * 0.45, 0.0, TAU, 48, HINT_ARROW_COLOR, s * 0.07, true)
 	var radius := s * 0.28
 	var center := rect.position + Vector2(s - radius - s * 0.01, radius + s * 0.01)
 	draw_circle(center, radius, HINT_BADGE_COLOR)
@@ -867,16 +914,17 @@ func _draw_note(at: Vector2, height: float, color: Color) -> void:
 		draw_line(stem_top, stem_top + Vector2(height * 0.25, height * 0.25), pass_color, height * 0.09 + grow * 2)
 
 ## A piece put to sleep by Song of Slumber (it can't move this turn): a "Zz" in
-## the top-right corner of its square, in the Bard's gold, gently bobbing.
-func _draw_asleep(rect: Rect2) -> void:
+## the top-right corner of its square, in the Bard's gold, gently bobbing. The
+## best-move hint draws it still, in its own colours.
+func _draw_asleep(rect: Rect2, fill := Color(1.0, 0.82, 0.35), outline := Color(0.25, 0.12, 0.0), bobbing := true) -> void:
 	var s := rect.size.x
 	var font := UiStyle.bold()
-	var bob := sin(Time.get_ticks_msec() / 1000.0 * 2.5) * s * 0.025
+	var bob := sin(Time.get_ticks_msec() / 1000.0 * 2.5) * s * 0.025 if bobbing else 0.0
 	for i in 2:
 		var size_px := int(s * (0.34 if i == 0 else 0.25))
 		var at := rect.position + Vector2(s * (0.56 + 0.2 * i), s * (0.36 - 0.15 * i) + bob * (1 - 2 * i))
-		draw_string_outline(font, at, "Z", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, maxi(2, int(s * 0.035)), Color(0.25, 0.12, 0.0))
-		draw_string(font, at, "Z", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, Color(1.0, 0.82, 0.35))
+		draw_string_outline(font, at, "Z", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, maxi(2, int(s * 0.035)), outline)
+		draw_string(font, at, "Z", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, fill)
 
 ## Draw a piece the animation is moving: `pose` is from MoveAnimation.pose.
 ## It's scaled and turned about the middle of its bottom edge, so a slam

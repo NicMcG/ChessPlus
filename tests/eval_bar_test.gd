@@ -325,7 +325,7 @@ func test_best_move_shows_what_a_pawn_promotes_to() -> void:
 	check_eq(hint.get("square"), Board.parse_square("b8"), "Badge on the promotion square")
 	check(hint.get("def") == _def("rook"), "Showing the Rook to promote to")
 	check_eq(hint.get("team"), Piece.Team.WHITE, "A White Rook")
-	check(not hint.get("ring", true), "No ring: the arrow shows which piece")
+	check(game.board_view.hint_ability.is_empty(), "Not an ability: the arrow shows which piece")
 	_hand_in_best(game, 0, "d2-e3", "NCe3")
 	check(game.board_view.hint_piece.is_empty(), "An ordinary move has no badge")
 	game.free()
@@ -342,7 +342,9 @@ func test_best_move_shows_what_raise_dead_brings_back() -> void:
 	check_eq(hint.get("square"), Board.parse_square("f7"), "Badge on the Necromancer's square")
 	check(hint.get("def") == _def("bishop"), "Showing the Bishop it brings back")
 	check_eq(hint.get("team"), Piece.Team.BLACK, "A Black Bishop: the side to move")
-	check(hint.get("ring", false), "A ring marks the Necromancer")
+	var ability: Dictionary = game.board_view.hint_ability
+	check_eq(ability.get("ability"), PieceDef.Ability.RAISE_DEAD, "Shown as an ability")
+	check_eq(ability.get("from"), Board.parse_square("f7"), "A ring marks the Necromancer")
 	game.play(game.state.find_move("g2-g1=Q"))
 	check(game.board_view.hint_piece.is_empty(), "Gone once a move is played")
 	game.free()
@@ -689,4 +691,64 @@ func test_real_engine_never_holds_up_the_screen() -> void:
 	started = Time.get_ticks_msec()
 	link.free()
 	check(Time.get_ticks_msec() - started < 500, "Closing stops Plusfish straight away")
+	_finish()
+
+## Kings on a1 and h8; White has an Archer on c1 that can shoot the Black Rook
+## on f4, a Bard on e1 that can sing to the Black Knight on g3, a Werewolf on b3
+## and a captured Ghost (testing mode counts them all as moved, so all can act).
+func _ability_position() -> TestingPosition:
+	var position := TestingPosition.new()
+	position.place(Board.parse_square("a1"), _def("king"), Piece.Team.WHITE)
+	position.place(Board.parse_square("h8"), _def("king"), Piece.Team.BLACK)
+	position.place(Board.parse_square("c1"), _def("archer"), Piece.Team.WHITE)
+	position.place(Board.parse_square("e1"), _def("bard"), Piece.Team.WHITE)
+	position.place(Board.parse_square("b3"), _def("werewolf"), Piece.Team.WHITE)
+	position.place(Board.parse_square("f4"), _def("rook"), Piece.Team.BLACK)
+	position.place(Board.parse_square("g3"), _def("knight"), Piece.Team.BLACK)
+	position.captured.append([_def("ghost"), Piece.Team.WHITE])
+	position.side_to_move = Piece.Team.WHITE
+	return position
+
+func test_best_move_shows_each_special_ability() -> void:
+	PlusfishLink.enabled = true
+	PlusfishLink.pretend_available = true
+	var game := _open_testing_game(_ability_position())
+	check(game.testing_position.problems().is_empty(), "A fine position: %s" % [game.testing_position.problems()])
+	var view: BoardView = game.board_view
+	for text in ["c1!f4", "e1~g3", "@e5", "b3!"]:
+		check(game.state.find_move(text) != null, "The position allows %s" % text)
+	_hand_in_best(game, 0, "c1!f4", "A!xf4")
+	check(view.hint_arrow.is_empty(), "Crack Shot: no arrow (the Archer stays put)")
+	check_eq(view.hint_ability.get("ability"), PieceDef.Ability.CRACK_SHOT, "Shown as Crack Shot")
+	check_eq(view.hint_ability.get("from"), Board.parse_square("c1"), "From the Archer")
+	check_eq(view.hint_ability.get("to"), Board.parse_square("f4"), "At the Rook")
+	check(view.hint_piece.is_empty(), "No badge")
+	_hand_in_best(game, 0, "e1~g3", "BD~g3")
+	check(view.hint_arrow.is_empty(), "Song of Slumber: no arrow")
+	check_eq(view.hint_ability.get("ability"), PieceDef.Ability.SONG_OF_SLUMBER, "Shown as Song of Slumber")
+	check_eq(view.hint_ability.get("to"), Board.parse_square("g3"), "At the Knight")
+	_hand_in_best(game, 0, "@e5", "G@e5")
+	check(view.hint_arrow.is_empty(), "Haunt: no arrow")
+	check_eq(view.hint_ability.get("ability"), PieceDef.Ability.HAUNT, "Shown as Haunt")
+	check_eq(view.hint_ability.get("to"), Board.parse_square("e5"), "On the square it comes back to")
+	check(view.hint_ability.get("def") == _def("ghost"), "Showing the Ghost")
+	check_eq(view.hint_ability.get("team"), Piece.Team.WHITE, "A White Ghost")
+	_hand_in_best(game, 0, "b3!", "WW!")
+	check(view.hint_arrow.is_empty(), "Full Moon: no arrow")
+	check_eq(view.hint_ability.get("ability"), PieceDef.Ability.FULL_MOON, "Shown as Full Moon")
+	check_eq(view.hint_ability.get("from"), Board.parse_square("b3"), "A ring marks the Werewolf")
+	check_eq(view.hint_piece.get("square"), Board.parse_square("b3"), "Badge on the Werewolf's square")
+	check(view.hint_piece.get("def") == _def("werewolf").transforms_into, "Showing the wolf it becomes")
+	# Every one of them draws without errors (the runner counts logged errors).
+	for text in ["c1!f4", "e1~g3", "@e5", "b3!"]:
+		_hand_in_best(game, 0, text, text)
+		view.queue_redraw()
+		await _frames(1)
+	_hand_in_best(game, 0, "e1-f2", "BDf2")
+	check(view.hint_ability.is_empty(), "An ordinary move: no ability marks")
+	check_eq(view.hint_arrow, [Board.parse_square("e1"), Board.parse_square("f2")], "Just its arrow")
+	_hand_in_best(game, 0, "c1!f4", "A!xf4")
+	game.play(game.state.find_move("e1-f2"))
+	check(view.hint_ability.is_empty(), "Gone once a move is played")
+	game.free()
 	_finish()

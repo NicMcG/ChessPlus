@@ -133,8 +133,9 @@ var _board_row: HBoxContainer
 var _status_base := ""
 ## The eval bar's width as a share of the board's.
 const EVAL_BAR_SHARE := 0.05
-## Picks the squares out of a move's text ("e2-e4", "a1xb2", "a1!c3", ...).
-var _move_squares := RegEx.create_from_string("^([a-z][0-9]+)[-x!~]([a-z][0-9]+)")
+## Picks the squares out of a move's text ("e2-e4", "a1xb2", ...; abilities
+## have no arrow).
+var _move_squares := RegEx.create_from_string("^([a-z][0-9]+)[-x]([a-z][0-9]+)")
 
 ## Looking back: the number of moves played in the position being shown, or -1
 ## when showing the game as it is now. Looking back never changes the game.
@@ -1586,27 +1587,49 @@ func _update_eval_bar() -> void:
 	if best != "" and result == "" and not _top_row.visible:
 		status_label.text = "%s  ·  best: %s" % [base, found.get("best_san", best)]
 
-## Show Plusfish's suggestion on the board ("" = none): the arrow, and for a
-## promotion or Raise Dead the piece it turns into or brings back.
+## Show Plusfish's suggestion on the board ("" = none): the arrow, or for a
+## special ability what it does (BoardView.hint_ability), and for a promotion,
+## Raise Dead or Full Moon the piece it turns into or brings back.
 func _show_hint(move_text: String) -> void:
-	board_view.hint_arrow = _arrow_for(move_text)
-	board_view.hint_piece = _hint_piece_for(move_text)
+	var ability := _hint_ability_for(move_text)
+	board_view.hint_ability = ability
+	# An ability doesn't move its piece, so an arrow would mislead.
+	board_view.hint_arrow = _arrow_for(move_text) if ability.is_empty() else []
+	board_view.hint_piece = _hint_piece_for(move_text, ability)
+
+## Ability texts have "!" (Crack Shot "a1!c3", Raise Dead "d1!=Q", Full Moon
+## "e4!"), "~" (Song of Slumber "c1~g5") or "@" (Haunt "@e3"); other moves never do.
+var _ability_text := RegEx.create_from_string("[!~@]")
+
+## For a special ability: BoardView.hint_ability, read from the legal move in
+## the position shown; {} for any other move (or one that isn't legal there).
+func _hint_ability_for(move_text: String) -> Dictionary:
+	if move_text == "" or _ability_text.search(move_text) == null:
+		return {}
+	var move := board_view.state.find_move(move_text)
+	if move == null or move.ability == PieceDef.Ability.NONE:
+		return {}
+	return {"ability": move.ability, "from": move.from, "to": move.to, "def": move.piece.def, "team": move.piece.team}
 
 ## Promotions ("e7-e8=Q": the piece on the square moved to) and Raise Dead
-## ("d1!=Q": the piece on the Necromancer's square, which gets a ring).
+## ("d1!=Q": the piece on the Necromancer's square).
 var _promotion_text := RegEx.create_from_string("^[a-z][0-9]+[-x]([a-z][0-9]+)=([A-Z]+)$")
 var _raise_text := RegEx.create_from_string("^([a-z][0-9]+)!=([A-Z]+)$")
 ## Piece types by symbol, for reading the moves (made when first needed).
 var _defs_by_symbol := {}
 
-## For a promotion or Raise Dead: BoardView.hint_piece (the piece belongs to
-## the side to move in the position shown); {} for any other move.
-func _hint_piece_for(move_text: String) -> Dictionary:
-	var ring := false
+## For a promotion, Raise Dead or Full Moon (`ability` = _hint_ability_for's):
+## BoardView.hint_piece (the piece belongs to the side to move in the position
+## shown); {} for any other move.
+func _hint_piece_for(move_text: String, ability: Dictionary) -> Dictionary:
+	if ability.get("ability") == PieceDef.Ability.FULL_MOON:
+		var into: PieceDef = ability["def"].transforms_into
+		if into == null:
+			return {}
+		return {"square": ability["from"], "def": into, "team": ability["team"]}
 	var found := _promotion_text.search(move_text)
 	if found == null:
 		found = _raise_text.search(move_text)
-		ring = true
 	if found == null:
 		return {}
 	if _defs_by_symbol.is_empty():
@@ -1615,9 +1638,9 @@ func _hint_piece_for(move_text: String) -> Dictionary:
 	var def: PieceDef = _defs_by_symbol.get(found.get_string(2))
 	if def == null:
 		return {}
-	return {"square": Board.parse_square(found.get_string(1)), "def": def, "team": board_view.state.side_to_move, "ring": ring}
+	return {"square": Board.parse_square(found.get_string(1)), "def": def, "team": board_view.state.side_to_move}
 
-## A move's text ("e2-e4", "a1!c3") as [from, to] squares; [] if it has none.
+## A move's text ("e2-e4", "a1xb2") as [from, to] squares; [] if it has none.
 func _arrow_for(move_text: String) -> Array:
 	var found := _move_squares.search(move_text)
 	if found == null:
