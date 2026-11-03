@@ -1,4 +1,83 @@
-# The meta pool (October 2026, fourth search: the rules of 24-25 October)
+# The meta pool (November 2026, fifth search: the 26 October prices)
+
+Regrown on 3 November 2026 for Mac's prices of 26 October (Vampire 6.5 -> 7.5,
+Wizard 8 -> 8.5), with Plusfish after it learned Mac's repetition rule of
+27 October (repeats count across Vassal and Abatis moves; this PR). Every
+other rule is as in the fourth search below. At the new prices every army in
+the fourth search's pool cost 41 to 42.5, over the 40 budget, so each was
+trimmed first: the cheapest set of pieces covering the overspend was taken
+off (`trim.py`): eight Vassals in all, two Grunts, a Pawn, an Abatis, a Paladin
+(Wide 5b) and a Barbarian each from Wide 11c and 14c; no army lost more than
+two pieces. Those ten trimmed armies were the starting pool:
+
+```
+plusfish meta --wide 38 --pool start_pool.txt --out meta_pool.txt --game-climb --king-exposed reject --rounds 15 --stable 6 --threads 19 --seed 1
+```
+
+(Nicholas's PC, 19 threads, 2 h 24 min.) As in every earlier search, every
+round changed the pool and it never settled.
+
+**The run's pool alone wasn't clearly better** than where it started: in a
+round robin of all 20 (the run's ten and the trimmed ten, 40 games a pair at
+6,000 nodes, every pair on the same openings) the run's armies averaged
+51.4%, the starting armies 48.6%. One new army (Wide 11a) is far ahead of
+everything (75.5%), but five of the run's ten were among the weakest seven.
+So, as in the second search, the final ten were picked from all 20 by those
+games (`select.py`): near-copies (fewer than 3 pieces apart) keep the better
+one (the trimmed Wide 11a beat the run's Wide 10a, one piece apart), then the
+army with the lowest score against the others still in is dropped, one at a
+time, until ten remain. Five come from the run and five are trimmed armies
+from the fourth search, marked "(#29)" (three of them share a name with one
+of the run's armies).
+
+## The pool
+
+Games = mean score against the other nine (40 games a pair, 20 per colour,
+6,000 nodes). As White / as Black = the same split by colour. Eval = mean
+turn-0 advantage over the other nine at 20,000 nodes (cp). vs Standard = 40
+games at 6,000 nodes.
+
+| Army | Name | Cost | Games (Elo) | As White / as Black | Eval | vs Standard | Pieces |
+|---|---|---|---|---|---|---|---|
+| `(NC)(VS)(VS)K1(BR)J1/LG(BR)(CV)(RM)A(PR)(GR)` | Wide 11a | 40 | 69.2% (+140) | 65.3% / 73.1% | +156 | 97.5% | Princess, Archer, Jester, Necromancer, Cavalry, Ghost, Lance, Ram, 2 Barbarian, Grunt, 2 Vassal |
+| `(PA)(NC)J1K1N1/B(PA)B(BR)(AB)Q(PD)J` | Wide 3a | 40 | 61.5% (+82) | 69.2% / 53.9% | -22 | 87.5% | Queen, 2 Bishop, 2 Jester, Necromancer, Knight, Barbarian, 2 Parapet, Paladin, Abatis |
+| `1R1(PR)K1(CT)1/JV1(BR)(PD)AB1` | Wide 2a | 39 | 51.2% (+9) | 53.6% / 48.9% | -138 | 87.5% | Princess, Vampire, Archer, Rook, Bishop, Jester, Catapult, Barbarian, Paladin |
+| `R(PD)C(WW)KPNR/1AGG(WW)(BR)(BR)1` | Wide 14b | 40 | 48.2% (-13) | 50.6% / 45.8% | +154 | 93.8% | Archer, 2 Rook, Cannon, 2 Ghost, Knight, 2 Werewolf, 2 Barbarian, Paladin, Pawn |
+| `(AS)(VS)(RM)KA(VS)(VS)(VS)/(AB)(VS)AJJVCB` | Wide 15a | 40 | 47.9% (-14) | 45.3% / 50.6% | +69 | 91.2% | Vampire, 2 Archer, Cannon, Bishop, 2 Jester, Ram, 5 Vassal, Abatis, Assassin |
+| `1A(CH)(CT)K3/(AB)B1(BR)(BR)VVR` | Wide 14b (#29) | 40 | 46.8% (-22) | 35.3% / 58.3% | -43 | 80.0% | 2 Vampire, Archer, Rook, Chariot, Bishop, Catapult, 2 Barbarian, Abatis |
+| `(GA)2KC2N/B(GA)VJA(RM)1A` | Wide 5b (#29) | 39.5 | 46.5% (-24) | 45.8% / 47.2% | -32 | 96.2% | Vampire, 2 Archer, Cannon, Bishop, Jester, 2 Galleon, Knight, Ram |
+| `1(GR)(GR)1K(GR)1(GR)/(CH)(CV)VJQA1J` | Wide 1c (#29) | 40 | 45.1% (-34) | 54.2% / 36.1% | -4 | 97.5% | Queen, Vampire, Archer, Chariot, 2 Jester, Cavalry, 4 Grunt |
+| `1R1K1(GR)(CT)1/JVV(RM)(RM)(WW)B(AB)` | Wide 11a (#29) | 40 | 43.8% (-44) | 49.4% / 38.1% | -95 | 93.8% | 2 Vampire, Rook, Bishop, Jester, Catapult, 2 Ram, Werewolf, Grunt, Abatis |
+| `2JK(SQ)3/GVVL(WW)AB(AB)` | Wide 15a (#29) | 40 | 39.7% (-72) | 36.7% / 42.8% | -45 | 92.5% | 2 Vampire, Archer, Squire, Bishop, Jester, Ghost, Lance, Werewolf, Abatis |
+
+All legal at today's prices (two cost under 40). No pairing among the 20
+ended at once with a king attacked at the start.
+
+## What it shows
+
+* **The Vampire is no longer in every army**: in seven of ten (ten in all;
+  the fourth search had all ten, 16 in all). The top two armies have none.
+* **The Princess is picked for the first time** (8.5): in two armies,
+  including the top one, Wide 11a, far ahead of the rest (69.2% against the
+  other nine, 75.5% against all 19). It also leads by eval (+156).
+* **The Wizard is gone** (8.5; it was in two of the fourth search's armies),
+  and the Queen is in two.
+* **Jester and Archer in eight armies each**, Bishop in seven, Barbarian
+  and Abatis in five. Vassals dropped to two armies (seven in all; Wide 15a
+  has five).
+* **Never picked:** Bard, Elephant, Man, Rogue, Wizard.
+* **White's edge is small:** White scored 50.5% in the 7,600 games between
+  the 20 armies, and 50.5% among the final ten (White's quiet first move).
+* **Standard does better against this pool** (80-97.5%; it lost 97.5-100%
+  before): the trimmed Wide 14b scored only 80% against it.
+
+## Files
+
+Run inputs and outputs (start_pool.txt, trim.py, meta.log, meta_pool.txt =
+the run's own last pool, rr40/ = the 40-game round robin, select.py,
+select.out) are outside the repo, in Nicholas's `work-meta2/`.
+
+# Earlier: the fourth search (the rules of 24-25 October)
 
 Regrown on 25 October 2026 for Mac's rules of 24 and 25 October (an ability
 and a promotion need a move first, White's first move may not attack, the
