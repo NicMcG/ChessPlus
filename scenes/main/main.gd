@@ -4,12 +4,17 @@ extends Control
 ## main menu -> my armies -> army builder, and main menu -> choose armies -> game.
 
 const MAIN_MENU := preload("res://scenes/menu/main_menu.tscn")
-const ARMY_LIST := preload("res://scenes/armies/army_list.tscn")
-const ARMY_BUILDER := preload("res://scenes/armies/army_builder.tscn")
-const MATCH_SETUP := preload("res://scenes/menu/match_setup.tscn")
-const GAME := preload("res://scenes/game/game.tscn")
-const ONLINE_LOBBY := preload("res://scenes/online/online_lobby.tscn")
-const POSITION_SETUP := preload("res://scenes/testing/position_setup.tscn")
+## The other screens load once the main menu is showing (_load_screens_soon),
+## not before it: loading them all first (the game screen's scripts most of
+## all) held the menu back by about half a second on a fast PC.
+const ARMY_LIST := "res://scenes/armies/army_list.tscn"
+const ARMY_BUILDER := "res://scenes/armies/army_builder.tscn"
+const MATCH_SETUP := "res://scenes/menu/match_setup.tscn"
+const GAME := "res://scenes/game/game.tscn"
+const ONLINE_LOBBY := "res://scenes/online/online_lobby.tscn"
+const POSITION_SETUP := "res://scenes/testing/position_setup.tscn"
+## In the order they're loaded after the menu shows (most wanted first).
+const SCREENS: Array[String] = [GAME, MATCH_SETUP, ARMY_LIST, ARMY_BUILDER, POSITION_SETUP, ONLINE_LOBBY]
 
 var library := ArmyLibrary.new()
 ## The screen currently showing.
@@ -31,6 +36,7 @@ func _ready() -> void:
 	var note := SavedGame.end_if_abandoned()
 	show_main_menu()
 	show_how_to_play_once()
+	_load_screens_soon()
 	if note != "":
 		show_note("Game ended", note)
 	_watch_for_updates()
@@ -95,6 +101,8 @@ var _fitted_size := Vector2i.ZERO
 func _process(_delta: float) -> void:
 	if _fitting_scale and get_window().size != _fitted_size:
 		_fit_content_scale()
+	if not _screens_to_load.is_empty():
+		_load_next_screens()
 
 ## The smallest space (in game units) the screens need. A smaller window (a
 ## small browser window, say) is drawn scaled down just enough to fit.
@@ -183,7 +191,7 @@ func show_settings() -> void:
 	_show(settings)
 
 func show_army_list() -> void:
-	var army_list := ARMY_LIST.instantiate()
+	var army_list := screen_scene(ARMY_LIST).instantiate()
 	army_list.library = library
 	army_list.closed.connect(show_main_menu)
 	army_list.edit_requested.connect(show_army_builder)
@@ -191,14 +199,14 @@ func show_army_list() -> void:
 
 ## `army` is null to start a new one.
 func show_army_builder(army: Army) -> void:
-	var builder := ARMY_BUILDER.instantiate()
+	var builder := screen_scene(ARMY_BUILDER).instantiate()
 	builder.setup(library, army)
 	builder.closed.connect(show_army_list)
 	builder.saved.connect(func(_army: Army) -> void: show_army_list())
 	_show(builder)
 
 func show_match_setup() -> void:
-	var setup := MATCH_SETUP.instantiate()
+	var setup := screen_scene(MATCH_SETUP).instantiate()
 	setup.library = library
 	setup.closed.connect(show_main_menu)
 	setup.start_requested.connect(func(white: Army, black: Army, bot_team: int, bot_level: int) -> void:
@@ -207,7 +215,7 @@ func show_match_setup() -> void:
 
 ## `bot_team` is the practice bot's side (Piece.Team), or -1 for two players.
 func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeBot.Level.MEDIUM, eval_bar := false) -> void:
-	var game := GAME.instantiate()
+	var game := screen_scene(GAME).instantiate()
 	game.eval_bar_on = eval_bar
 	game.white_army = white
 	game.black_army = black
@@ -220,7 +228,7 @@ func start_game(white: Army, black: Army, bot_team := -1, bot_level := PracticeB
 ## Testing mode: set up a position (`position` to carry on editing one, or
 ## null for the standard start).
 func show_testing_setup(position: TestingPosition = null) -> void:
-	var setup := POSITION_SETUP.instantiate()
+	var setup := screen_scene(POSITION_SETUP).instantiate()
 	setup.library = library
 	if position:
 		setup.setup = position
@@ -232,7 +240,7 @@ func show_testing_setup(position: TestingPosition = null) -> void:
 ## A two-player game from a Testing mode position (with `moves` already played,
 ## for an imported game). Its Setup button goes back to editing that position.
 func start_testing_game(position: TestingPosition, moves := PackedStringArray()) -> void:
-	var game := GAME.instantiate()
+	var game := screen_scene(GAME).instantiate()
 	game.testing_position = position
 	game.testing_moves = moves
 	game.menu_requested.connect(func() -> void: show_testing_setup(position.copy()))
@@ -244,7 +252,7 @@ func continue_game() -> void:
 	if saved == null:
 		show_main_menu()
 		return
-	var game := GAME.instantiate()
+	var game := screen_scene(GAME).instantiate()
 	game.white_army = saved.white_army
 	game.black_army = saved.black_army
 	game.bot_team = saved.bot_team
@@ -259,7 +267,7 @@ func continue_game() -> void:
 ## The online lobby: create a game (and wait for a friend) or join one by code.
 ## `backend` is for tests (null = the real server).
 func show_online_lobby(backend: OnlineBackend = null) -> void:
-	var lobby := ONLINE_LOBBY.instantiate()
+	var lobby := screen_scene(ONLINE_LOBBY).instantiate()
 	lobby.library = library
 	lobby.backend = backend
 	lobby.closed.connect(show_main_menu)
@@ -271,7 +279,7 @@ func show_online_lobby(backend: OnlineBackend = null) -> void:
 func start_online_game(session: OnlineSession) -> void:
 	if session.get_parent():
 		session.get_parent().remove_child(session)
-	var game := GAME.instantiate()
+	var game := screen_scene(GAME).instantiate()
 	game.online = session
 	game.library = library
 	game.menu_requested.connect(show_main_menu)
@@ -290,6 +298,45 @@ func continue_online_game(backend: OnlineBackend = null) -> void:
 		show_main_menu()
 		return
 	start_online_game(session)
+
+## Screens loaded so far (path -> PackedScene), kept so each loads once.
+var _scenes := {}
+
+## The screen at `path` (one of SCREENS), loaded now if it isn't yet.
+func screen_scene(path: String) -> PackedScene:
+	if not _scenes.has(path):
+		var scene: PackedScene = null
+		if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			# Loading in the background: wait for it.
+			scene = ResourceLoader.load_threaded_get(path)
+		_scenes[path] = scene if scene else load(path)
+	return _scenes[path]
+
+## Screens still to load after the menu (see _load_screens_soon), and frames
+## to wait before starting.
+var _screens_to_load: Array[String] = []
+var _frames_before_loading := 0
+
+## Once the menu has been drawn, load the other screens so they're ready when
+## wanted (_load_next_screens, every frame until done): on other threads where
+## there are threads (the PC app), else (the web version) one a frame.
+func _load_screens_soon() -> void:
+	_screens_to_load = SCREENS.duplicate()
+	_frames_before_loading = 2
+
+func _load_next_screens() -> void:
+	if _frames_before_loading > 0:
+		_frames_before_loading -= 1
+		return
+	while not _screens_to_load.is_empty():
+		var path: String = _screens_to_load.pop_front()
+		if _scenes.has(path):
+			continue
+		if OS.has_feature("threads"):
+			ResourceLoader.load_threaded_request(path)
+		else:
+			screen_scene(path)
+			return
 
 ## Replace the current screen with `new_screen`.
 func _show(new_screen: Node) -> void:
